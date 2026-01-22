@@ -1,0 +1,90 @@
+// ✅ CRITICAL: Runs on Cloudflare Edge & prevents build crashes
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+
+import { NextResponse } from 'next/server';
+import { getSupabaseAdmin } from "@/app/lib/supabase/admin";
+
+export async function GET(req: Request) {
+  try {
+    // 1. Security Check (Your Secret Key)
+    const { searchParams } = new URL(req.url);
+    if (searchParams.get('key') !== process.env.CRON_KEY) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // 2. Define Leagues to Fetch (ESPN IDs)
+    const leagues = [
+      { id: 'eng.1', name: 'Premier League' },
+      { id: 'esp.1', name: 'La Liga' },
+      { id: 'ger.1', name: 'Bundesliga' },
+      { id: 'ita.1', name: 'Serie A' },
+      { id: 'fra.1', name: 'Ligue 1' },
+      { id: 'uefa.champions', name: 'Champions League' }
+    ];
+
+    // 3. Fetch Data from ESPN (Parallel Requests)
+    const requests = leagues.map(league => 
+      fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league.id}/scoreboard`, { cache: 'no-store' })
+        .then(res => res.json())
+        .then(data => ({ ...data, _leagueName: league.name }))
+        .catch(() => null)
+    );
+
+    const results = await Promise.all(requests);
+    let matchesToSync: any[] = [];
+
+    // 4. Process the messy ESPN data into clean rows
+    results.forEach((data: any) => {
+      if (data && data.events) {
+        data.events.forEach((event: any) => {
+          const competition = event.competitions[0];
+          const home = competition.competitors.find((c: any) => c.homeAway === 'home');
+          const away = competition.competitors.find((c: any) => c.homeAway === 'away');
+          const state = event.status.type.state; // 'in', 'post', 'pre'
+
+          // Clean Status String
+          let status = 'SCHEDULED';
+          if (state === 'in') status = 'LIVE';
+          if (state === 'post') status = 'FINISHED';
+
+          // Create a SEO-friendly slug
+          const slug = `${home.team.name}-vs-${away.team.name}-${event.date.split('T')[0]}`
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-');
+
+          matchesToSync.push({
+            id: event.id, // ESPN ID is our Primary Key
+            league: data._leagueName,
+            home_team: home.team.shortDisplayName || home.team.name,
+            away_team: away.team.shortDisplayName || away.team.name,
+            home_score: parseInt(home.score) || 0,
+            away_score: parseInt(away.score) || 0,
+            match_date: event.date,
+            status: status,
+            slug: slug
+          });
+        });
+      }
+    });
+
+    // 5. Bulk Upsert to Supabase (The "War Machine" Logic)
+    if (matchesToSync.length > 0) {
+      const admin = getSupabaseAdmin();
+      const { error } = await admin
+        .from('matches')
+        .upsert(matchesToSync, { onConflict: 'id' }); // Updates if exists, Inserts if new
+
+      if (error) throw error;
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      message: `Synced ${matchesToSync.length} matches`,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
