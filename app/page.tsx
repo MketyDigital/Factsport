@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, Activity, Calendar, Ticket, ArrowRight, PlayCircle, Clock } from "lucide-react";
+import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Clock } from "lucide-react";
 
 // SEO Metadata
 export const metadata = {
@@ -27,11 +27,18 @@ async function getHomepageData(leagueFilter: string | null) {
       matchQuery = matchQuery.ilike('league', `%${leagueFilter}%`);
   }
 
-  // 2. News (Limit 20 to ensure we have enough for ticker + slider + list)
-  const newsQuery = supabase.from('news').select('*').eq('is_published', true).order('created_at', { ascending: false }).limit(20); 
+  // 2. News (FIX: Removed .eq('is_published', true) because Admin page doesn't set it)
+  const newsQuery = supabase.from('news')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(20); 
 
-  // 3. Highlights (Limit 10 as requested)
-  const highlightsQuery = supabase.from('matches').select('*').not('video_url', 'is', null).order('match_date', { ascending: false }).limit(10);
+  // 3. Highlights
+  const highlightsQuery = supabase.from('matches')
+    .select('*')
+    .not('video_url', 'is', null)
+    .order('match_date', { ascending: false })
+    .limit(10);
 
   const [matchesRes, newsRes, highlightsRes] = await Promise.all([matchQuery, newsQuery, highlightsQuery]);
   return { matches: matchesRes.data || [], news: newsRes.data || [], highlights: highlightsRes.data || [] };
@@ -43,9 +50,11 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
 
   // News Sorting Logic
   const breakingNews = news.filter(n => n.is_breaking); 
+  // Headlines: Must mark "Slider" in admin AND have an image
   const headlines = news.filter(n => n.is_headline && n.image_url).slice(0, 3);
+  
   const headlineIds = headlines.map(h => h.id);
-  // Latest News (Next 5 after headlines)
+  // Latest News: Everything else that isn't a headline or ticker
   const latestNews = news.filter(n => !headlineIds.includes(n.id) && !n.is_breaking).slice(0, 5);
 
   // Match Sorting Logic
