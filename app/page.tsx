@@ -1,179 +1,150 @@
-// ✅ RUNS ON EDGE (Compatible with Vercel & Cloudflare)
 export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
 
+import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, TrendingUp, ChevronRight, Activity, PlayCircle } from "lucide-react";
+import { ChevronRight, Calendar } from "lucide-react";
 
-export default function Home() {
+async function getMatches(leagueFilter: string | null) {
+  const supabase = createClient();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1); 
+
+  let query = supabase
+    .from('matches')
+    .select('*')
+    .gte('match_date', yesterday.toISOString())
+    .order('match_date', { ascending: true }); 
+
+  if (leagueFilter && leagueFilter !== 'All') {
+    query = query.ilike('league', `%${leagueFilter}%`);
+  }
+
+  const { data } = await query.limit(100);
+  return data || [];
+}
+
+async function getNews() {
+  const supabase = createClient();
+  const { data } = await supabase.from('news').select('*').limit(3);
+  return data || [];
+}
+
+export default async function Home({ searchParams }: { searchParams: { league?: string } }) {
+  const selectedLeague = searchParams.league || 'All';
+  const matches = await getMatches(selectedLeague);
+  const news = await getNews();
+
+  // ✅ SORTING: Live -> Upcoming -> Finished
+  const liveMatches = matches.filter(m => m.status === 'LIVE');
+  const upcomingMatches = matches.filter(m => m.status === 'SCHEDULED' || m.status === 'UPCOMING');
+  const finishedMatches = matches.filter(m => m.status === 'FINISHED' || m.status === 'FT');
+
+  // Sort upcoming by time (soonest first)
+  upcomingMatches.sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
+  
+  // Sort finished by time (most recent first)
+  finishedMatches.sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
+
+  const displayMatches = [...liveMatches, ...upcomingMatches, ...finishedMatches];
+
   return (
-    <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans">
+    <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-20">
       
-      {/* --- 1. NAVBAR (Brand Aligned) --- */}
+      {/* NAVBAR */}
       <nav className="sticky top-0 z-50 bg-[#0a1428] text-white border-b border-white/10 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          {/* LOGO AREA */}
+        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            {/* CSS Hexagon matching your logo */}
-            <div className="relative flex items-center justify-center w-10 h-10">
+            <div className="relative flex items-center justify-center w-8 h-8">
                <div className="absolute w-full h-full bg-gradient-to-r from-red-600 to-blue-800 clip-hexagon"></div>
-               <div className="absolute w-[80%] h-[80%] bg-blue-900 clip-hexagon"></div>
-               <span className="relative font-bold italic text-white text-xs">FS</span>
+               <span className="relative font-bold italic text-white text-[10px]">FS</span>
             </div>
-            <span className="text-2xl font-black tracking-tighter text-white">
-              Fact<span className="text-gray-300">Sport</span>
-            </span>
+            <span className="text-xl font-black tracking-tighter text-white">FactSport</span>
           </div>
-
-          {/* MOBILE ACTIONS */}
           <div className="flex items-center space-x-3">
-            <Link href="/login" className="px-4 py-1.5 text-xs font-bold text-white/80 hover:text-white border border-white/20 rounded-full transition">
-              Login
-            </Link>
-            <Link href="/vip/upgrade" className="px-4 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-full shadow-[0_0_15px_rgba(220,38,38,0.5)] transition flex items-center gap-1">
-              <Trophy size={12} /> VIP
-            </Link>
+            <Link href="/matches" className="text-[10px] font-bold text-slate-300">Matches</Link>
+            <Link href="/login" className="px-3 py-1 text-[10px] font-bold bg-white/10 rounded-full">Login</Link>
           </div>
         </div>
       </nav>
 
-      {/* --- 2. BREAKING NEWS TICKER --- */}
-      <div className="bg-red-700 text-white text-[10px] font-bold py-2 overflow-hidden relative flex items-center shadow-md z-40">
-        <div className="absolute left-0 h-full bg-red-800 px-3 flex items-center z-10 shadow-r-xl">
-          <Activity size={12} className="mr-1 animate-pulse" /> BREAKING
-        </div>
-        <div className="whitespace-nowrap animate-marquee pl-32 flex space-x-8">
-          <span>🚨 MAN CITY AGREE DEAL FOR NEW STRIKER</span>
-          <span>• OSIMHEN TRANSFER SAGA CONTINUES</span>
-          <span>• REAL MADRID INJURY CRISIS: VINICIUS OUT</span>
-          <span>• AFCON 2025: SUPER EAGLES LAND IN UYO</span>
-        </div>
-      </div>
-
-      {/* --- 3. HERO SECTION (Live Match) --- */}
-      <header className="relative bg-[#0a1428] pb-12 overflow-hidden">
-        {/* Background Gradients to match logo vibes */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600 rounded-full blur-[100px] opacity-20"></div>
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-red-600 rounded-full blur-[100px] opacity-10"></div>
-
-        <div className="relative max-w-7xl mx-auto px-4 pt-6">
-          <h1 className="text-white text-lg font-black uppercase italic tracking-tighter mb-4 flex items-center gap-2">
-            <span className="w-1 h-6 bg-red-600 block"></span>
-            Featured <span className="text-blue-400">Match</span>
-          </h1>
-          
-          {/* LIVE SCOREBOARD CARD */}
-          <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-5 text-white shadow-2xl relative overflow-hidden">
-            
-            {/* Live Indicator */}
-            <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 mb-6">
-              <span className="bg-white/10 px-2 py-1 rounded tracking-wider">PREMIER LEAGUE</span>
-              <span className="text-red-500 flex items-center gap-1 animate-pulse">
-                <span className="w-2 h-2 bg-red-500 rounded-full"></span> LIVE 34'
-              </span>
-            </div>
-
-            {/* Teams & Score */}
-            <div className="flex justify-between items-center mb-8 px-2">
-              <div className="flex flex-col items-center gap-2 w-1/3">
-                <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center text-slate-900 font-black text-xl shadow-lg border-2 border-slate-200">
-                  ARS
-                </div>
-                <div className="font-bold text-sm text-center">Arsenal</div>
-              </div>
-
-              <div className="flex flex-col items-center justify-center w-1/3">
-                <div className="text-4xl font-black tracking-widest leading-none">
-                  2<span className="text-gray-500 text-2xl mx-1">:</span>1
-                </div>
-                <div className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">2nd Half</div>
-              </div>
-
-              <div className="flex flex-col items-center gap-2 w-1/3">
-                <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center text-slate-900 font-black text-xl shadow-lg border-2 border-slate-200">
-                  LIV
-                </div>
-                <div className="font-bold text-sm text-center">Liverpool</div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="grid grid-cols-2 gap-3">
-              <button className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white w-full py-3 rounded-xl font-black uppercase text-xs shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95">
-                <Zap size={14} /> Predict
-              </button>
-              <button className="bg-white/10 hover:bg-white/20 w-full py-3 rounded-xl font-black uppercase text-xs flex items-center justify-center gap-2 border border-white/10 transition-all backdrop-blur-sm">
-                <TrendingUp size={14} /> Stats
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* --- 4. LEAGUE TABS --- */}
-      <div className="sticky top-[105px] z-30 bg-[#F0F2F5] pt-4 pb-2 overflow-x-auto shadow-sm">
-        <div className="flex px-4 space-x-3 min-w-max">
-          {['All', 'EPL', 'La Liga', 'Bundesliga', 'Serie A', 'Ligue 1', 'UCL'].map((league, i) => (
-            <button key={league} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-              i === 0 
-                ? 'bg-blue-900 text-white shadow-md' 
-                : 'bg-white text-slate-500 border border-slate-200 shadow-sm'
-            }`}>
-              {league}
-            </button>
+      {/* TABS */}
+      <div className="bg-white border-b border-slate-200 sticky top-14 z-40 overflow-x-auto scrollbar-hide">
+        <div className="flex px-4 py-2 space-x-2 min-w-max">
+          {['All', 'Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Champions League'].map((league) => (
+             <Link 
+               key={league} 
+               href={`/?league=${league}`}
+               className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-all ${
+                 selectedLeague === league ? 'bg-blue-900 text-white shadow' : 'bg-slate-50 text-slate-500 border border-slate-100'
+               }`}
+             >
+               {league === 'Premier League' ? 'EPL' : league}
+             </Link>
           ))}
         </div>
       </div>
 
-      {/* --- 5. UPCOMING MATCHES LIST --- */}
-      <main className="max-w-7xl mx-auto px-4 py-4 space-y-3 pb-20">
-        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Up Next</h3>
-        
-        {/* Match Item */}
-        {[1, 2, 3].map((item) => (
-          <div key={item} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 flex items-center justify-between active:bg-slate-50 transition">
-            <div className="flex items-center space-x-4">
-              <div className="flex flex-col items-center justify-center w-10 border-r border-slate-100 pr-4">
-                <span className="text-xs font-black text-slate-800">14:00</span>
-                <span className="text-[10px] text-slate-400 font-bold">Today</span>
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-slate-200"></div>
-                  <span className="text-sm font-bold text-slate-700">Man United</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full bg-slate-200"></div>
-                  <span className="text-sm font-bold text-slate-700">Chelsea</span>
-                </div>
-              </div>
-            </div>
-            <ChevronRight className="text-slate-300" size={18} />
-          </div>
-        ))}
+      {/* NEWS */}
+      <div className="p-4 space-y-3">
+         {news.length > 0 && (
+             news.map((item: any) => (
+                 <div key={item.id} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                     <h4 className="text-xs font-bold">{item.title}</h4>
+                 </div>
+             ))
+         )}
+      </div>
 
-        {/* --- MONTHLY REWARD BANNER --- */}
-        <div className="mt-6 relative overflow-hidden rounded-2xl bg-gradient-to-r from-yellow-500 to-amber-600 p-5 text-white shadow-xl">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <Trophy size={100} />
-          </div>
-          <div className="relative z-10">
-            <h3 className="font-black text-lg uppercase italic mb-1">Monthly Jackpot</h3>
-            <p className="text-xs text-yellow-100 mb-3 max-w-[70%]">
-              Predict 3 games correctly to qualify for the ₦500,000 prize pool.
-            </p>
-            <div className="w-full bg-black/20 rounded-full h-1.5 mb-2">
-              <div className="bg-white h-1.5 rounded-full w-1/3 shadow-[0_0_10px_white]"></div>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-[10px] font-bold">1/3 Correct</span>
-              <button className="text-[10px] font-bold bg-white text-amber-600 px-3 py-1 rounded-full">
-                View Leaderboard
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* MATCH LIST */}
+      <main className="px-4 space-y-3">
+        <h3 className="text-xs font-black uppercase text-slate-400 flex items-center gap-2 mb-2">
+            <Calendar size={12} /> {selectedLeague} Matches
+        </h3>
+
+        {displayMatches.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-xs">No matches found.</div>
+        ) : (
+            displayMatches.map((match: any) => (
+                <Link href={`/match/${match.id}`} key={match.id}>
+                    <div className={`bg-white rounded-xl p-3 shadow-sm border border-slate-100 flex items-center justify-between active:scale-[0.99] transition-transform mb-3 ${match.status.includes('FT') || match.status === 'FINISHED' ? 'bg-slate-50 opacity-80' : ''}`}>
+                        <div className="flex items-center gap-3">
+                             {/* Status/Time */}
+                            <div className="flex flex-col items-center justify-center w-10 border-r border-slate-100 pr-3">
+                                {match.status === 'LIVE' ? (
+                                    <span className="text-[10px] font-black text-red-600 animate-pulse">LIVE</span>
+                                ) : (match.status === 'FINISHED' || match.status === 'FT') ? (
+                                    <span className="text-[10px] font-bold text-slate-400">FT</span>
+                                ) : (
+                                    <span className="text-[10px] font-bold text-slate-800">
+                                        {new Date(match.match_date).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})}
+                                    </span>
+                                )}
+                            </div>
+                            
+                            {/* Teams */}
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2 w-40">
+                                    <span className={`text-[10px] font-bold w-4 text-right ${match.status === 'LIVE' ? 'text-red-600' : 'text-slate-500'}`}>
+                                        {(match.status === 'LIVE' || match.status === 'FINISHED' || match.status === 'FT') ? match.home_score : '-'}
+                                    </span>
+                                    <span className="text-xs font-bold text-slate-800 truncate">{match.home_team}</span>
+                                </div>
+                                <div className="flex items-center gap-2 w-40">
+                                    <span className={`text-[10px] font-bold w-4 text-right ${match.status === 'LIVE' ? 'text-red-600' : 'text-slate-500'}`}>
+                                        {(match.status === 'LIVE' || match.status === 'FINISHED' || match.status === 'FT') ? match.away_score : '-'}
+                                    </span>
+                                    <span className="text-xs font-bold text-slate-800 truncate">{match.away_team}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <ChevronRight size={16} className="text-slate-300" />
+                    </div>
+                </Link>
+            ))
+        )}
       </main>
-
     </div>
   );
 }
