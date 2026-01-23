@@ -16,20 +16,37 @@ async function getUserData() {
 
   if (!user) return null;
 
-  // Fetch Profile
+  // 1. Fetch Profile
   const { data: profile } = await supabase
     .from('profiles')
-    .select('*')
+    .select('*, monthly_points, monthly_correct_scores')
     .eq('id', user.id)
     .single();
 
-  // Fetch Recent Predictions
-  const { data: predictions } = await supabase
-    .from('predictions')
-    .select('*, match:matches(home_team, away_team, home_score, away_score, status)')
+  // 2. Fetch Predictions (FIXED QUERY)
+  // We explicitly select the match details using the foreign key relationship
+  const { data: predictions, error } = await supabase
+    .from('user_predictions')
+    .select(`
+        id,
+        predicted_outcome,
+        predicted_home_score,
+        predicted_away_score,
+        points_awarded,
+        status,
+        created_at,
+        match:matches (
+            home_team,
+            away_team
+        )
+    `)
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
-    .limit(5);
+    .limit(10);
+
+  if (error) {
+      console.error("Dashboard Prediction Error:", error);
+  }
 
   return { user, profile, predictions };
 }
@@ -43,29 +60,14 @@ export default async function Dashboard() {
 
   const { profile, predictions } = data;
 
-  // --- 🧠 SMART VIP LOGIC ---
   const expiryDate = profile?.vip_expires_at ? new Date(profile.vip_expires_at) : null;
-  const now = new Date();
-  
-  // Calculate days remaining (if expiry exists)
-  const daysLeft = expiryDate 
-    ? Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) 
-    : 0;
-
-  // User is VIP only if flag is TRUE AND time hasn't run out
-  // (Or if they are admin/lifetime without expiry)
-  const isVipActive = profile?.is_vip && (expiryDate === null || daysLeft > 0);
+  const isVipActive = profile?.is_vip && (!expiryDate || expiryDate > new Date());
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans text-slate-900">
       
       {/* --- HEADER --- */}
       <div className="bg-[#0a1428] text-white pt-8 pb-20 px-6 rounded-b-[2.5rem] relative overflow-hidden shadow-2xl">
-        {/* Background FX */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600 rounded-full blur-[100px] opacity-20"></div>
-        <div className="absolute bottom-0 left-0 w-40 h-40 bg-red-600 rounded-full blur-[80px] opacity-10"></div>
-        
-        {/* Nav */}
         <div className="relative z-10 flex justify-between items-start mb-6">
             <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center border border-white/10 shadow-inner">
@@ -78,184 +80,90 @@ export default async function Dashboard() {
             </div>
             <SignOutButton />
         </div>
-
-        {/* STATS CARDS */}
-        <div className="grid grid-cols-2 gap-3 relative z-10">
-            {/* Points Card */}
-            <div className="bg-white/10 backdrop-blur-md border border-white/10 p-4 rounded-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-12 h-12 bg-green-500 blur-[30px] opacity-20"></div>
-                <div className="flex items-center gap-2 mb-2 text-slate-300 text-[10px] font-bold uppercase tracking-wider">
-                    <TrendingUp size={12} className="text-green-400" /> Total Points
-                </div>
-                <div className="text-3xl font-black tracking-tighter">{profile?.points || 0}</div>
-            </div>
-
-            {/* VIP Status Card (Dynamic) */}
-            <Link href={isVipActive ? "#" : "/vip/upgrade"}>
-                <div className={`p-4 rounded-2xl border relative overflow-hidden transition active:scale-95 h-full ${isVipActive ? 'bg-gradient-to-br from-yellow-600 to-yellow-800 border-yellow-500' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}>
-                    <div className="flex items-center gap-2 mb-2 text-white/80 text-[10px] font-bold uppercase tracking-wider">
-                        <Trophy size={12} className={isVipActive ? 'text-white' : 'text-slate-400'} /> Status
-                    </div>
-                    
-                    {isVipActive ? (
-                        <div>
-                            <div className="text-lg font-black uppercase tracking-wide text-white flex items-center gap-1">
-                                VIP ACTIVE
-                            </div>
-                            <div className="text-[9px] text-yellow-200 font-medium mt-1">
-                                {expiryDate ? `Expires in ${daysLeft} days` : 'Lifetime Access'}
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="text-lg font-black uppercase tracking-wide flex items-center justify-between">
-                            Free Plan
-                            <span className="text-[9px] bg-red-600 text-white px-2 py-1 rounded-full animate-pulse shadow-lg">UPGRADE</span>
-                        </div>
-                    )}
-                </div>
-            </Link>
-        </div>
       </div>
 
-      {/* --- BODY CONTENT --- */}
-      <div className="px-4 -mt-12 relative z-20 space-y-4">
-        
-        {/* 1. EXPIRY WARNING (Only if < 3 days) */}
-        {isVipActive && daysLeft > 0 && daysLeft <= 3 && (
-             <div className="bg-red-100 border border-red-200 text-red-800 px-4 py-3 rounded-xl flex items-center gap-3 shadow-sm">
-                <AlertCircle size={20} className="shrink-0" />
-                <div>
-                    <p className="font-bold text-xs">Subscription Ending Soon!</p>
-                    <p className="text-[10px]">Your VIP access expires in {daysLeft} days.</p>
+      {/* --- STATS CARDS --- */}
+      <div className="grid grid-cols-2 gap-3 px-4 -mt-16 relative z-20">
+            {/* MONTHLY CARD */}
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                <div className="text-[10px] font-bold uppercase text-slate-400 mb-1 flex items-center gap-1">
+                    <Star size={12} className="text-yellow-500" /> Monthly
                 </div>
-                <Link href="/vip/upgrade" className="ml-auto bg-red-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-sm whitespace-nowrap">Renew Now</Link>
-             </div>
-        )}
-
-        {/* 2. REVENUE CARD (Money Maker) */}
-        <div className="bg-gradient-to-r from-[#1a1a1a] to-black rounded-2xl p-4 shadow-xl border border-slate-800 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 blur-[60px] opacity-10"></div>
-            
-            <div className="flex justify-between items-start relative z-10">
-                <div>
-                    <h3 className="text-yellow-400 font-black text-sm uppercase italic mb-1 flex items-center gap-2">
-                        <Ticket size={16} /> Exclusive Partner Deal
-                    </h3>
-                    <p className="text-slate-400 text-xs mb-3 w-[90%]">
-                        Sign up on <span className="text-white font-bold">1xBet</span> & get 300% Bonus on your first deposit!
-                    </p>
-                    <div className="bg-white/10 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/10">
-                        <span className="text-[10px] text-slate-400 uppercase">Promo Code:</span>
-                        <span className="text-yellow-400 font-black text-sm tracking-widest">FACTSPORT</span>
-                    </div>
-                </div>
-                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                    {/* Brand Logo Placeholder */}
-                    <span className="text-black font-black text-xs">1X</span>
-                </div>
+                <div className="text-2xl font-black text-slate-800">{profile?.monthly_points || 0}</div>
+                <div className="text-[10px] text-slate-500 mt-1">CS Wins: <b className="text-green-600">{profile?.monthly_correct_scores || 0}</b></div>
             </div>
-            
-            <Link href="https://bit.ly/your-affiliate-link" target="_blank" className="mt-4 w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xs uppercase py-3 rounded-xl flex items-center justify-center gap-2 transition shadow-lg active:scale-95">
-                Claim Bonus Now <ExternalLink size={14} />
-            </Link>
-        </div>
 
-        {/* 3. DAILY REWARD (Gamification) */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center">
-                    <Gift size={20} />
+            {/* LIFETIME CARD */}
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                 <div className="text-[10px] font-bold uppercase text-slate-400 mb-1 flex items-center gap-1">
+                    <History size={12} className="text-blue-500" /> Lifetime
                 </div>
-                <div>
-                    <h4 className="font-bold text-sm text-slate-800">Daily Login Bonus</h4>
-                    <p className="text-[10px] text-slate-500">Come back tomorrow for +5 Pts</p>
-                </div>
+                <div className="text-2xl font-black text-slate-800">{profile?.points || 0}</div>
             </div>
-            <button className="bg-slate-100 text-slate-400 text-[10px] font-bold px-3 py-1.5 rounded-full cursor-not-allowed">
-                Claimed
-            </button>
-        </div>
+      </div>
 
-        {/* 4. PREDICTION HISTORY */}
-        <div>
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2 px-2">
-                <History size={14} /> Recent Activity
-            </h3>
-            
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                {predictions && predictions.length > 0 ? (
-                    predictions.map((pred: any) => (
-                        <div key={pred.id} className="p-4 border-b border-slate-50 last:border-0 flex justify-between items-center hover:bg-slate-50 transition">
-                            <div>
-                                <div className="text-xs font-bold text-slate-800 mb-1">
-                                    {pred.match?.home_team} <span className="text-slate-400 text-[10px] font-normal">vs</span> {pred.match?.away_team}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold border border-slate-200">
-                                        {pred.selection}
-                                    </span>
-                                    <span className="text-[10px] text-slate-400">
-                                        {new Date(pred.created_at).toLocaleDateString(undefined, {month:'short', day:'numeric'})}
-                                    </span>
-                                </div>
+      {/* --- PREDICTION HISTORY LIST --- */}
+      <div className="px-4 mt-6">
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+             <TrendingUp size={14} /> Recent Predictions
+          </h3>
+          
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+             {predictions && predictions.length > 0 ? (
+                 predictions.map((pred: any) => (
+                     <div key={pred.id} className="p-4 border-b border-slate-50 last:border-0 flex justify-between items-center hover:bg-slate-50 transition">
+                        <div>
+                            {/* Match Name */}
+                            <div className="text-xs font-bold text-slate-800 mb-1">
+                                {pred.match ? (
+                                    <>
+                                      {pred.match.home_team} <span className="text-slate-400 font-normal">vs</span> {pred.match.away_team}
+                                    </>
+                                ) : (
+                                    <span className="text-red-400">Match Data Unavailable</span>
+                                )}
                             </div>
                             
-                            {/* Status Badge */}
-                            <div>
-                                {pred.status === 'won' && <span className="text-[9px] font-black text-green-700 bg-green-100 px-2 py-1 rounded shadow-sm">WON</span>}
-                                {pred.status === 'lost' && <span className="text-[9px] font-black text-red-700 bg-red-100 px-2 py-1 rounded shadow-sm">LOST</span>}
-                                {pred.status === 'pending' && <span className="text-[9px] font-black text-yellow-700 bg-yellow-100 px-2 py-1 rounded shadow-sm">PENDING</span>}
+                            {/* User's Prediction */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold border border-slate-200 uppercase">
+                                    Pick: {pred.predicted_outcome}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-mono font-bold">
+                                    ({pred.predicted_home_score} - {pred.predicted_away_score})
+                                </span>
                             </div>
                         </div>
-                    ))
-                ) : (
-                    <div className="text-center py-8">
-                        <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-2 text-slate-300">
-                            <AlertCircle size={24} />
+                        
+                        {/* Status / Points */}
+                        <div className="text-right">
+                            {pred.status === 'pending' ? (
+                                <span className="text-[9px] font-black text-yellow-600 bg-yellow-100 px-2 py-1 rounded">PENDING</span>
+                            ) : (
+                                <span className={`text-[9px] font-black px-2 py-1 rounded ${pred.points_awarded > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    {pred.points_awarded > 0 ? `+${pred.points_awarded} PTS` : 'LOST'}
+                                </span>
+                            )}
+                            <div className="text-[9px] text-slate-300 mt-1">
+                                {new Date(pred.created_at).toLocaleDateString()}
+                            </div>
                         </div>
-                        <p className="text-xs font-bold text-slate-500">No predictions yet</p>
-                        <Link href="/" className="text-[10px] font-bold text-blue-600 mt-2 block hover:underline">
-                            Start Winning Today
-                        </Link>
+                     </div>
+                 ))
+             ) : (
+                 <div className="p-8 text-center">
+                    <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-2 text-slate-300">
+                        <AlertCircle size={20} />
                     </div>
-                )}
-            </div>
-            {predictions && predictions.length > 0 && (
-                <div className="text-center mt-2">
-                    <button className="text-[10px] font-bold text-slate-400 hover:text-slate-600 transition">View Full History</button>
-                </div>
-            )}
-        </div>
-
-        {/* 5. SOCIAL MEDIA COMMUNITY */}
-        <div>
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2 px-2 mt-6">
-                <Star size={14} /> Join Community
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-                <Link href="https://youtube.com/@yourchannel" target="_blank" className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3 hover:bg-slate-50 transition group">
-                    <div className="w-10 h-10 bg-red-50 text-red-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Youtube size={20} />
-                    </div>
-                    <div>
-                        <div className="text-xs font-black text-slate-800">YouTube</div>
-                        <div className="text-[9px] text-slate-400">Watch Analysis</div>
-                    </div>
-                </Link>
-                
-                <Link href="https://facebook.com/yourpage" target="_blank" className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3 hover:bg-slate-50 transition group">
-                    <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Facebook size={20} />
-                    </div>
-                    <div>
-                        <div className="text-xs font-black text-slate-800">Facebook</div>
-                        <div className="text-[9px] text-slate-400">Join Group</div>
-                    </div>
-                </Link>
-            </div>
-        </div>
-
+                    <p className="text-xs font-bold text-slate-500">No predictions found.</p>
+                    <Link href="/" className="text-[10px] font-bold text-blue-600 mt-2 block hover:underline">
+                        Go to Home to Predict
+                    </Link>
+                 </div>
+             )}
+          </div>
       </div>
+
     </div>
   );
 }
