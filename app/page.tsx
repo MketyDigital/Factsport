@@ -5,17 +5,30 @@ import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
 import { Zap, Trophy, Activity, Calendar, Ticket, ArrowRight, PlayCircle, Clock } from "lucide-react";
 
+// 1. ADD SEO METADATA
+export const metadata = {
+  title: 'FactSport | Live Scores, News & Predictions',
+  description: 'The #1 Platform for sports predictions, live scores, and breaking news. Join VIP to win monthly prizes.',
+};
+
 async function getHomepageData(leagueFilter: string | null) {
   const supabase = createClient();
-  const startDate = new Date(); startDate.setDate(startDate.getDate() - 1);
-  const endDate = new Date(); endDate.setDate(endDate.getDate() + 2);
+  const startDate = new Date(); startDate.setDate(startDate.getDate() - 1); // Get Yesterday
+  const endDate = new Date(); endDate.setDate(endDate.getDate() + 2);     // Get Tomorrow + Next Day
 
-  // 1. Matches
-  let matchQuery = supabase.from('matches').select('*').gte('match_date', startDate.toISOString()).lte('match_date', endDate.toISOString()).order('match_date', { ascending: true });
-  if (leagueFilter && leagueFilter !== 'All') matchQuery = matchQuery.ilike('league', `%${leagueFilter}%`);
+  // 1. Matches (Fetch recent past and near future)
+  let matchQuery = supabase.from('matches')
+    .select('*')
+    .gte('match_date', startDate.toISOString())
+    .lte('match_date', endDate.toISOString())
+    .order('match_date', { ascending: true });
+    
+  if (leagueFilter && leagueFilter !== 'All') {
+      matchQuery = matchQuery.ilike('league', `%${leagueFilter}%`);
+  }
 
   // 2. News
-  const newsQuery = supabase.from('news').select('*').order('created_at', { ascending: false }).limit(20); 
+  const newsQuery = supabase.from('news').select('*').eq('is_published', true).order('created_at', { ascending: false }).limit(20); 
 
   // 3. Highlights
   const highlightsQuery = supabase.from('matches').select('*').not('video_url', 'is', null).order('match_date', { ascending: false }).limit(10);
@@ -33,11 +46,15 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const headlineIds = headlines.map(h => h.id);
   const latestNews = news.filter(n => !headlineIds.includes(n.id)).slice(0, 6);
 
+  // Sorting Logic
   const live = matches.filter(m => m.status === 'LIVE');
   const upcoming = matches.filter(m => m.status === 'SCHEDULED' || m.status === 'UPCOMING');
+  // ✅ FIX: Include 'FT' in finished matches
   const finished = matches.filter(m => m.status === 'FINISHED' || m.status === 'FT');
+  
   upcoming.sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
   finished.sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
+  
   const displayMatches = [...live, ...upcoming, ...finished];
 
   return (
@@ -48,7 +65,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="relative flex items-center justify-center w-8 h-8"><div className="absolute w-full h-full bg-gradient-to-r from-red-600 to-blue-800 clip-hexagon"></div><span className="relative font-bold italic text-white text-[10px]">FS</span></div>
-            <span className="text-xl font-black tracking-tighter text-white">FactSport</span>
+            <Link href="/" className="text-xl font-black tracking-tighter text-white">FactSport</Link>
           </div>
           <div className="flex items-center space-x-3">
             <Link href="/login" className="px-4 py-1.5 text-[10px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition">Login</Link>
@@ -61,7 +78,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       {breakingNews.length > 0 && (
         <div className="bg-yellow-400 text-black text-[10px] font-black py-2 overflow-hidden relative flex items-center shadow-md z-40">
             <div className="absolute left-0 h-full bg-yellow-500 px-3 flex items-center z-10 shadow-r-xl border-r border-yellow-600"><Activity size={12} className="mr-1 animate-pulse text-red-600" /> BREAKING</div>
-            <div className="whitespace-nowrap animate-marquee pl-28 flex space-x-8">{breakingNews.map(n => ( <span key={n.id} className="uppercase tracking-wide">🚨 {n.title}</span> ))}</div>
+            <div className="whitespace-nowrap animate-marquee pl-28 flex space-x-8">{breakingNews.map(n => ( <Link href={`/news/${n.slug}`} key={n.id} className="uppercase tracking-wide hover:underline">🚨 {n.title}</Link> ))}</div>
         </div>
       )}
 
@@ -83,7 +100,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       )}
 
-      {/* 3. HIGHLIGHTS SLIDER (Moved Up) */}
+      {/* 3. HIGHLIGHTS SLIDER */}
       {highlights.length > 0 && (
         <div className="mt-4 px-4">
              <div className="flex justify-between items-center mb-3">
@@ -107,7 +124,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       )}
 
-      {/* 4. LATEST NEWS (Moved Down) */}
+      {/* 4. LATEST NEWS */}
       <div className="px-4 mb-2 mt-4">
         <div className="flex justify-between items-center mb-2">
             <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">Latest News</h3>
@@ -146,15 +163,21 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                   <div key={match.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-3">
                       <div className="bg-slate-50 px-3 py-1.5 flex justify-between items-center border-b border-slate-100">
                            <div className="flex items-center gap-1">
-                              {match.status === 'LIVE' ? (<span className="text-[9px] font-black text-red-600 animate-pulse flex items-center gap-1"><span className="w-1.5 h-1.5 bg-red-600 rounded-full"></span> LIVE</span>) : (<span className="text-[9px] font-bold text-slate-500 flex items-center gap-1"><Clock size={10} />{new Date(match.match_date).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})}</span>)}
+                              {match.status === 'LIVE' ? (
+                                  <span className="text-[9px] font-black text-red-600 animate-pulse flex items-center gap-1"><span className="w-1.5 h-1.5 bg-red-600 rounded-full"></span> LIVE</span>
+                              ) : (match.status === 'FT' || match.status === 'FINISHED' ? (
+                                  <span className="text-[9px] font-black text-slate-600">FT</span>
+                              ) : (
+                                  <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1"><Clock size={10} />{new Date(match.match_date).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})}</span>
+                              ))}
                            </div>
                            {match.league && <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[100px] truncate">{match.league}</span>}
                       </div>
                       <Link href={`/match/${match.id}`}>
                           <div className="p-4 flex justify-between items-center active:bg-slate-50 transition">
-                              <div className="flex-1 flex items-center gap-3"><div className="w-8 h-8 flex items-center justify-center shrink-0">{match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}</div><span className="text-xs font-bold text-slate-800 line-clamp-1">{match.home_team}</span>{(match.status === 'LIVE' || match.status === 'FINISHED') && <span className={`text-sm font-black ml-auto ${match.status === 'LIVE' ? 'text-red-600' : 'text-slate-900'}`}>{match.home_score}</span>}</div>
+                              <div className="flex-1 flex items-center gap-3"><div className="w-8 h-8 flex items-center justify-center shrink-0">{match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}</div><span className="text-xs font-bold text-slate-800 line-clamp-1">{match.home_team}</span>{(match.status === 'LIVE' || match.status === 'FINISHED' || match.status === 'FT') && <span className={`text-sm font-black ml-auto ${match.status === 'LIVE' ? 'text-red-600' : 'text-slate-900'}`}>{match.home_score}</span>}</div>
                               <div className="mx-2 text-[10px] text-slate-300 font-light">vs</div>
-                              <div className="flex-1 flex items-center gap-3 flex-row-reverse text-right"><div className="w-8 h-8 flex items-center justify-center shrink-0">{match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}</div><span className="text-xs font-bold text-slate-800 line-clamp-1">{match.away_team}</span>{(match.status === 'LIVE' || match.status === 'FINISHED') && <span className={`text-sm font-black mr-auto ${match.status === 'LIVE' ? 'text-red-600' : 'text-slate-900'}`}>{match.away_score}</span>}</div>
+                              <div className="flex-1 flex items-center gap-3 flex-row-reverse text-right"><div className="w-8 h-8 flex items-center justify-center shrink-0">{match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}</div><span className="text-xs font-bold text-slate-800 line-clamp-1">{match.away_team}</span>{(match.status === 'LIVE' || match.status === 'FINISHED' || match.status === 'FT') && <span className={`text-sm font-black mr-auto ${match.status === 'LIVE' ? 'text-red-600' : 'text-slate-900'}`}>{match.away_score}</span>}</div>
                           </div>
                       </Link>
                       <div className="px-3 py-2 border-t border-slate-100 grid grid-cols-2 gap-3 bg-slate-50/50">
@@ -166,7 +189,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </section>
 
-      {/* 6. VIP REWARD SECTION (Restored) */}
+      {/* 6. VIP REWARD SECTION */}
       <div className="mx-4 mb-8">
         <div className="rounded-2xl overflow-hidden relative shadow-2xl group cursor-pointer bg-black p-6 text-center">
             <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 blur-[60px] opacity-20 group-hover:opacity-30 transition"></div>
