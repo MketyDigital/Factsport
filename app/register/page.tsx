@@ -1,7 +1,7 @@
-// ✅ RUNS ON EDGE
-export const runtime = 'edge';
-
 'use client';
+
+// ✅ RUNS ON EDGE (Must come AFTER 'use client')
+export const runtime = 'edge';
 
 import { useState } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
@@ -40,7 +40,6 @@ export default function RegisterPage() {
     }
 
     // 2. Create Profile (API Call for consistency)
-    // Note: We'll create this API route next
     const res = await fetch('/api/register', {
         method: 'POST',
         body: JSON.stringify({ 
