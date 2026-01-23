@@ -3,11 +3,11 @@
 // ✅ RUNS ON EDGE
 export const runtime = 'edge';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { User, Mail, Phone, Lock, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, Lock, Loader2, ArrowRight } from 'lucide-react';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({ fullName: '', email: '', phone: '', password: '' });
@@ -16,19 +16,31 @@ export default function RegisterPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  // 1. CHECK SESSION: Redirect if already logged in
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.replace('/dashboard');
+      }
+    };
+    checkSession();
+  }, [router, supabase]);
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    // 1. Sign Up (Trigger handles the profile creation now)
+    // 2. SIGN UP (Data passed here is handled by your SQL Trigger)
     const { data, error: authError } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.password,
       options: {
         data: {
-          full_name: formData.fullName, // Passed to Trigger
+          full_name: formData.fullName,
           phone: formData.phone,
+          // The SQL Trigger will read these and create the profile
         },
       },
     });
@@ -39,67 +51,117 @@ export default function RegisterPage() {
       return;
     }
 
-    // 2. Success! Redirect immediately
-    // Small delay to ensure Trigger finishes
+    // 3. SUCCESS: Redirect
+    // We add a tiny delay to ensure the database trigger finishes
     setTimeout(() => {
+        router.refresh();
         router.push('/dashboard');
     }, 1000);
   };
 
   return (
-    <div className="min-h-screen bg-[#0a1428] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
+    <div className="min-h-screen bg-[#0a1428] flex items-center justify-center p-4 font-sans">
+      
+      {/* Background Ambience */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600 rounded-full blur-[120px] opacity-20"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-red-600 rounded-full blur-[120px] opacity-20"></div>
+      </div>
+
+      <div className="w-full max-w-md bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl relative z-10">
+        
+        {/* Header */}
         <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-red-600 to-[#0a1428] shadow-lg border border-white/10 mb-4">
+             <span className="text-xl font-black text-white italic">FS</span>
+          </div>
           <h1 className="text-2xl font-black text-white tracking-tight">Join FactSport</h1>
-          <p className="text-slate-400 text-sm mt-1">Start winning monthly rewards today</p>
+          <p className="text-slate-400 text-xs mt-1 font-medium">Start winning with premium predictions today</p>
         </div>
 
         <form onSubmit={handleRegister} className="space-y-4">
-          {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-bold text-center">{error}</div>}
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-bold text-center animate-pulse">
+                {error}
+            </div>
+          )}
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-300 uppercase ml-1">Full Name</label>
-            <div className="relative">
-              <User className="absolute left-4 top-3.5 text-slate-500" size={18} />
-              <input type="text" required className="w-full bg-[#050b16] border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-slate-600 focus:border-red-600 focus:outline-none" placeholder="John Doe"
-                value={formData.fullName} onChange={(e) => setFormData({...formData, fullName: e.target.value})} />
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 tracking-wider">Full Name</label>
+            <div className="relative group">
+              <User className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-white transition-colors" size={18} />
+              <input 
+                type="text" 
+                required 
+                className="w-full bg-[#050b16] border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-slate-600 focus:border-red-600 focus:outline-none transition-all text-sm font-medium" 
+                placeholder="John Doe"
+                value={formData.fullName} 
+                onChange={(e) => setFormData({...formData, fullName: e.target.value})} 
+              />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-300 uppercase ml-1">Email Address</label>
-            <div className="relative">
-              <Mail className="absolute left-4 top-3.5 text-slate-500" size={18} />
-              <input type="email" required className="w-full bg-[#050b16] border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-slate-600 focus:border-red-600 focus:outline-none" placeholder="john@example.com"
-                value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 tracking-wider">Email Address</label>
+            <div className="relative group">
+              <Mail className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-white transition-colors" size={18} />
+              <input 
+                type="email" 
+                required 
+                className="w-full bg-[#050b16] border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-slate-600 focus:border-red-600 focus:outline-none transition-all text-sm font-medium" 
+                placeholder="john@example.com"
+                value={formData.email} 
+                onChange={(e) => setFormData({...formData, email: e.target.value})} 
+              />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-300 uppercase ml-1">Phone Number</label>
-            <div className="relative">
-              <Phone className="absolute left-4 top-3.5 text-slate-500" size={18} />
-              <input type="tel" required className="w-full bg-[#050b16] border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-slate-600 focus:border-red-600 focus:outline-none" placeholder="080..."
-                value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 tracking-wider">Phone Number</label>
+            <div className="relative group">
+              <Phone className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-white transition-colors" size={18} />
+              <input 
+                type="tel" 
+                required 
+                className="w-full bg-[#050b16] border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-slate-600 focus:border-red-600 focus:outline-none transition-all text-sm font-medium" 
+                placeholder="080..."
+                value={formData.phone} 
+                onChange={(e) => setFormData({...formData, phone: e.target.value})} 
+              />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-300 uppercase ml-1">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-3.5 text-slate-500" size={18} />
-              <input type="password" required className="w-full bg-[#050b16] border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-slate-600 focus:border-red-600 focus:outline-none" placeholder="••••••••"
-                value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 tracking-wider">Password</label>
+            <div className="relative group">
+              <Lock className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-white transition-colors" size={18} />
+              <input 
+                type="password" 
+                required 
+                className="w-full bg-[#050b16] border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-slate-600 focus:border-red-600 focus:outline-none transition-all text-sm font-medium" 
+                placeholder="••••••••"
+                value={formData.password} 
+                onChange={(e) => setFormData({...formData, password: e.target.value})} 
+              />
             </div>
           </div>
 
-          <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2">
-            {loading ? <Loader2 size={20} className="animate-spin" /> : "Create Account"}
+          <button 
+            type="submit" 
+            disabled={loading} 
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-900/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-4"
+          >
+            {loading ? <Loader2 size={20} className="animate-spin" /> : <>Create Account <ArrowRight size={18} /></>}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-            <Link href="/login" className="text-sm text-slate-400 hover:text-white transition">Already have an account? Login</Link>
+        <div className="mt-8 text-center border-t border-white/5 pt-6">
+            <p className="text-slate-400 text-xs">
+                Already have an account?{' '}
+                <Link href="/login" className="text-white font-bold hover:text-blue-400 transition-colors">
+                    Login Here
+                </Link>
+            </p>
         </div>
       </div>
     </div>
