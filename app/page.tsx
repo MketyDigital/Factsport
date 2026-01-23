@@ -30,7 +30,7 @@ async function getHomepageData(leagueFilter: string | null) {
     matchQuery = matchQuery.ilike('league', `%${leagueFilter}%`);
   }
 
-  // 3. Fetch News (Get enough to separate Headlines vs Latest)
+  // 3. Fetch News
   const newsQuery = supabase
     .from('news')
     .select('*')
@@ -50,25 +50,16 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const { matches, news } = await getHomepageData(selectedLeague);
 
   // --- DATA PROCESSING ---
-
-  // 1. News Segments
   const breakingNews = news.filter(n => n.is_breaking); 
-  
-  // "Headlines" are the first 3 items with images (Simulating Admin Selection)
   const headlines = news.filter(n => n.image_url && !n.is_breaking).slice(0, 3);
-  
-  // "Latest News" is everything else (excluding the headlines we just showed)
   const headlineIds = headlines.map(h => h.id);
   const latestNews = news.filter(n => !n.is_breaking && !headlineIds.includes(n.id)).slice(0, 5);
 
-  // 2. Match Sorting (Live -> Upcoming -> Finished)
   const live = matches.filter(m => m.status === 'LIVE');
   const upcoming = matches.filter(m => m.status === 'SCHEDULED' || m.status === 'UPCOMING');
   const finished = matches.filter(m => m.status === 'FINISHED' || m.status === 'FT');
 
-  // Sort upcoming by time (soonest first)
   upcoming.sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
-  // Sort finished by time (most recent first)
   finished.sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
 
   const displayMatches = [...live, ...upcoming, ...finished];
@@ -79,7 +70,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       {/* --- HEADER (Fixed) --- */}
       <nav className="sticky top-0 z-50 bg-[#0a1428] text-white border-b border-white/10 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          {/* Logo */}
           <div className="flex items-center space-x-2">
             <div className="relative flex items-center justify-center w-8 h-8">
                <div className="absolute w-full h-full bg-gradient-to-r from-red-600 to-blue-800 clip-hexagon"></div>
@@ -87,7 +77,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             </div>
             <span className="text-xl font-black tracking-tighter text-white">FactSport</span>
           </div>
-          {/* Action Buttons */}
           <div className="flex items-center space-x-3">
             <Link href="/login" className="px-4 py-1.5 text-[10px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition">Login</Link>
             <Link href="/vip/upgrade" className="flex items-center gap-1 px-4 py-1.5 text-[10px] font-bold bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 rounded-full shadow-lg shadow-red-900/50 transition">
@@ -111,7 +100,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       )}
 
-      {/* --- 2. HEADLINES SLIDER (Admin Selected) --- */}
+      {/* --- 2. HEADLINES SLIDER --- */}
       <div className="mt-3 px-3">
         <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-4 scrollbar-hide">
             {headlines.length > 0 ? headlines.map((item) => (
@@ -158,6 +147,15 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
 
       {/* --- 4. MATCH CENTER --- */}
       <section className="mt-6">
+        
+        {/* ✅ NEW: Match Center Header with "All Matches" Button */}
+        <div className="px-4 flex justify-between items-center mb-2">
+            <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">Match Center</h3>
+            <Link href="/matches" className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded flex items-center gap-1">
+                View All <ArrowRight size={10} />
+            </Link>
+        </div>
+
         {/* Horizontal League Tabs */}
         <div className="bg-white border-y border-slate-200 sticky top-14 z-30 overflow-x-auto scrollbar-hide py-2 shadow-sm">
             <div className="flex px-4 space-x-2 min-w-max">
@@ -189,7 +187,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                 displayMatches.map((match) => (
                     <div key={match.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-3">
                         
-                        {/* Match Header: Status & Time */}
+                        {/* Match Header */}
                         <div className="bg-slate-50 px-3 py-1.5 flex justify-between items-center border-b border-slate-100">
                              <div className="flex items-center gap-1">
                                 {match.status === 'LIVE' ? (
@@ -199,7 +197,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                 ) : (
                                     <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1">
                                         <Clock size={10} />
-                                        {/* Smart Date Formatting */}
                                         {new Date(match.match_date).toDateString() === new Date().toDateString() 
                                           ? `Today, ${new Date(match.match_date).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})}`
                                           : new Date(match.match_date).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})
@@ -210,7 +207,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                              {match.league && <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[100px] truncate">{match.league}</span>}
                         </div>
 
-                        {/* Match Body: Teams & Scores */}
+                        {/* Match Body */}
                         <Link href={`/match/${match.id}`}>
                             <div className="p-4 flex justify-between items-center active:bg-slate-50 transition">
                                 {/* Home Team */}
@@ -224,7 +221,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                     )}
                                 </div>
 
-                                {/* Divider */}
                                 <div className="mx-2 text-[10px] text-slate-300 font-light">vs</div>
 
                                 {/* Away Team */}
@@ -240,7 +236,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                             </div>
                         </Link>
 
-                        {/* Revenue Buttons */}
+                        {/* Buttons */}
                         <div className="px-3 py-2 border-t border-slate-100 grid grid-cols-2 gap-3 bg-slate-50/50">
                             <Link href={`/match/${match.id}`} className="flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:border-blue-200 rounded-lg py-2 shadow-sm text-[10px] font-bold text-slate-700 active:scale-95 transition">
                                 <Zap size={12} className="text-blue-500" /> Predict
@@ -262,10 +258,9 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </section>
 
-      {/* --- 5. VIP / MONTHLY REWARDS --- */}
+      {/* --- 5. VIP SECTION --- */}
       <div className="mx-4 mb-8">
         <div className="rounded-2xl overflow-hidden relative shadow-2xl group cursor-pointer">
-            {/* Background */}
             <div className="absolute inset-0 bg-gradient-to-br from-[#1a1a1a] to-black"></div>
             <div className="absolute top-0 right-0 w-40 h-40 bg-yellow-500 blur-[80px] opacity-20 group-hover:opacity-30 transition"></div>
             
