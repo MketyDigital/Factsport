@@ -33,7 +33,8 @@ export async function GET(request: Request) {
             .from('matches')
             .select('*')
             .eq('status', 'FT')
-            .eq('points_distributed', false);
+            .eq('points_distributed', false)
+            .limit(10); // ✅ ADDED: Process max 10 matches at a time to prevent timeouts
 
         if (fetchError) throw fetchError;
 
