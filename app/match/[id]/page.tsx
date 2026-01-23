@@ -6,14 +6,25 @@ import { notFound } from "next/navigation";
 import Link from 'next/link';
 import { 
   ChevronLeft, Calendar, MapPin, Zap, TrendingUp, Users, 
-  Clock, PlayCircle, Ticket, ExternalLink, ArrowRight 
+  Clock, PlayCircle, Ticket, ExternalLink, ArrowRight, Lock, Copy 
 } from 'lucide-react';
+import FactSportPlayer from '@/app/components/FactSportPlayer';
+import PredictionBoard from '@/app/components/PredictionBoard';
 
-// 1. Fetch Live Data from ESPN
-async function getEspnData(id: string) {
+// 1. Fetch "Revenue Data" (Codes, Videos, Internal ID) from Supabase
+async function getSupabaseData(id: string) {
+    const supabase = createClient();
+    // We fetch by ID (UUID). This is the source of truth.
+    const { data } = await supabase.from('matches').select('*').eq('id', id).single();
+    return data;
+}
+
+// 2. Fetch Live Data from ESPN using the API_ID from Supabase
+async function getEspnData(apiId: string) {
+  if (!apiId) return null;
   try {
-    const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${id}`, {
-        next: { revalidate: 30 } 
+    const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${apiId}`, {
+        next: { revalidate: 30 } // Cache for 30s
     });
     if (!res.ok) return null;
     return res.json();
@@ -22,35 +33,40 @@ async function getEspnData(id: string) {
   }
 }
 
-// 2. Fetch "Revenue Data" (Codes, Videos) from Supabase
-async function getSupabaseData(id: string) {
-    const supabase = createClient();
-    const { data } = await supabase.from('matches').select('*').eq('id', id).single();
-    return data;
-}
-
 export default async function MatchDetailsPage({ params }: { params: { id: string } }) {
-  // Run fetches in parallel for speed
-  const [espnData, dbData] = await Promise.all([
-    getEspnData(params.id),
-    getSupabaseData(params.id)
-  ]);
+  // A. Get Internal Match Data First
+  const dbData = await getSupabaseData(params.id);
 
-  if (!espnData || !espnData.header) return notFound();
+  if (!dbData) return notFound();
 
-  const { header, boxscore, gameInfo, rosters } = espnData;
-  const home = header.competitions[0].competitors.find((c: any) => c.homeAway === 'home');
-  const away = header.competitions[0].competitors.find((c: any) => c.homeAway === 'away');
-  const status = header.competitions[0].status;
-  const timeline = header.competitions[0].details || [];
+  // B. Get Live ESPN Data (using the stored api_id)
+  const espnData = await getEspnData(dbData.api_id);
+
+  // C. Fallback: If ESPN fails, use DB data for basic names
+  const header = espnData?.header;
+  const boxscore = espnData?.boxscore;
+  const gameInfo = espnData?.gameInfo;
+  const rosters = espnData?.rosters;
+  const timeline = header?.competitions?.[0]?.details || [];
+
+  // Parse Teams (Use ESPN if available, else DB)
+  const homeTeamName = header ? header.competitions[0].competitors.find((c: any) => c.homeAway === 'home').team.name : dbData.home_team;
+  const awayTeamName = header ? header.competitions[0].competitors.find((c: any) => c.homeAway === 'away').team.name : dbData.away_team;
   
-  // Get User for Prediction Logic
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const homeScore = header ? header.competitions[0].competitors.find((c: any) => c.homeAway === 'home').score : dbData.home_score;
+  const awayScore = header ? header.competitions[0].competitors.find((c: any) => c.homeAway === 'away').score : dbData.away_score;
+  
+  const homeLogo = header ? header.competitions[0].competitors.find((c: any) => c.homeAway === 'home').team.logos?.[0]?.href : dbData.home_logo;
+  const awayLogo = header ? header.competitions[0].competitors.find((c: any) => c.homeAway === 'away').team.logos?.[0]?.href : dbData.away_logo;
+
+  const matchStatus = header ? header.competitions[0].status.type.state : 'pre'; // pre, in, post
+  const displayClock = header ? header.competitions[0].status.displayClock : '';
 
   // Helper for Stats
-  const getStat = (teamId: string, name: string) => {
-    const teamStats = boxscore?.teams?.find((t: any) => t.team.id === teamId)?.statistics;
+  const getStat = (homeAway: string, name: string) => {
+    if (!boxscore) return "0";
+    const team = header.competitions[0].competitors.find((c: any) => c.homeAway === homeAway);
+    const teamStats = boxscore.teams?.find((t: any) => t.team.id === team.id)?.statistics;
     return teamStats?.find((s: any) => s.name === name)?.displayValue || "0";
   };
 
@@ -66,7 +82,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           <Link href="/" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition">
             <ChevronLeft size={24} />
           </Link>
-          <span className="text-xs font-bold tracking-widest opacity-70 uppercase">{header.league?.name}</span>
+          <span className="text-xs font-bold tracking-widest opacity-70 uppercase">{dbData.league || header?.league?.name}</span>
           <div className="w-10"></div>
         </div>
 
@@ -74,13 +90,13 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         <div className="relative z-10 px-4 mt-2">
           {/* Status */}
           <div className="flex justify-center mb-6">
-            {status.type.state === 'in' ? (
+            {matchStatus === 'in' ? (
                <span className="bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-full animate-pulse flex items-center gap-1">
-                 <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE {status.displayClock}'
+                 <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE {displayClock}'
                </span>
             ) : (
                <span className="bg-white/10 text-slate-300 text-[10px] font-bold px-3 py-1 rounded-full border border-white/10 flex items-center gap-1">
-                 {status.type.state === 'post' ? 'Full Time' : new Date(header.competitions[0].date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                 {matchStatus === 'post' ? 'Full Time' : new Date(dbData.match_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                </span>
             )}
           </div>
@@ -89,46 +105,49 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             {/* Home */}
             <div className="flex flex-col items-center w-1/3">
               <div className="w-16 h-16 bg-white p-2 rounded-full shadow-lg shadow-blue-900/50 mb-2">
-                 <img src={home.team.logos?.[0]?.href} alt={home.team.name} className="w-full h-full object-contain" />
+                 {homeLogo ? <img src={homeLogo} className="w-full h-full object-contain" /> : <div className="w-full h-full bg-slate-200 rounded-full"></div>}
               </div>
-              <h2 className="font-bold text-center text-xs leading-tight">{home.team.shortDisplayName}</h2>
+              <h2 className="font-bold text-center text-xs leading-tight">{homeTeamName}</h2>
             </div>
 
             {/* Score */}
             <div className="flex flex-col items-center w-1/3">
               <div className="text-4xl font-black tracking-tighter flex items-center gap-3 bg-white/5 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/10">
-                <span>{home.score}</span>
+                <span>{homeScore ?? 0}</span>
                 <span className="text-slate-500 text-2xl">:</span>
-                <span>{away.score}</span>
+                <span>{awayScore ?? 0}</span>
               </div>
             </div>
 
             {/* Away */}
             <div className="flex flex-col items-center w-1/3">
               <div className="w-16 h-16 bg-white p-2 rounded-full shadow-lg shadow-red-900/50 mb-2">
-                 <img src={away.team.logos?.[0]?.href} alt={away.team.name} className="w-full h-full object-contain" />
+                 {awayLogo ? <img src={awayLogo} className="w-full h-full object-contain" /> : <div className="w-full h-full bg-slate-200 rounded-full"></div>}
               </div>
-              <h2 className="font-bold text-center text-xs leading-tight">{away.team.shortDisplayName}</h2>
+              <h2 className="font-bold text-center text-xs leading-tight">{awayTeamName}</h2>
             </div>
           </div>
         </div>
       </div>
 
-      {/* --- 2. REVENUE & PREDICTION --- */}
       <div className="mx-4 -mt-4 relative z-20 space-y-3">
         
-        {/* A. BETTING PARTNER (Revenue) */}
+        {/* --- 2. VIDEO PLAYER (If available) --- */}
+        {dbData.video_url && (
+            <div className="rounded-xl overflow-hidden shadow-2xl border border-white/20">
+                <FactSportPlayer videoUrl={dbData.video_url} />
+            </div>
+        )}
+
+        {/* --- 3. REVENUE CARD (Betting) --- */}
         <div className="bg-[#1A1A1A] rounded-xl p-4 shadow-xl border border-slate-800 flex items-center justify-between overflow-hidden relative">
-            {/* Shine Effect */}
             <div className="absolute top-0 right-0 w-20 h-full bg-gradient-to-l from-white/5 to-transparent"></div>
             
             <div className="flex items-center gap-3 relative z-10">
-                <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center font-black text-black shadow-lg">
-                    1X
-                </div>
+                <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center font-black text-black shadow-lg">1X</div>
                 <div>
                     <div className="text-white font-bold text-sm">Bet on 1xBet</div>
-                    {dbData?.booking_code ? (
+                    {dbData.booking_code ? (
                         <div className="text-yellow-400 text-xs font-mono">Code: <span className="font-black bg-yellow-400/20 px-1 rounded">{dbData.booking_code}</span></div>
                     ) : (
                         <div className="text-slate-400 text-[10px]">Highest Odds Guaranteed</div>
@@ -136,78 +155,44 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                 </div>
             </div>
             
-            <Link href="https://bit.ly/your-affiliate-link" target="_blank" className="bg-yellow-400 hover:bg-yellow-300 text-black text-xs font-black px-4 py-2.5 rounded-lg shadow-lg active:scale-95 transition flex items-center gap-1">
+            <Link href={dbData.affiliate_link || "https://bit.ly/your-affiliate-link"} target="_blank" className="bg-yellow-400 hover:bg-yellow-300 text-black text-xs font-black px-4 py-2.5 rounded-lg shadow-lg active:scale-95 transition flex items-center gap-1">
                 Bet Now <ExternalLink size={10} />
             </Link>
         </div>
 
-        {/* B. PREDICTION CARD (Engagement) */}
-        <div className="bg-white rounded-xl shadow-lg p-4 border border-slate-100">
-           <div className="flex justify-between items-center mb-3">
-               <h3 className="text-xs font-black uppercase text-slate-800 flex items-center gap-1">
-                   <Zap size={14} className="text-blue-600 fill-blue-600" /> FactSport Prediction
-               </h3>
-               <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold">Win 10 Points</span>
-           </div>
+        {/* --- 4. PREDICTION BOARD (Interactive) --- */}
+        <div className="bg-white rounded-xl shadow-lg p-5 border border-slate-100">
+           <h3 className="text-xs font-black uppercase text-slate-800 flex items-center gap-1 mb-4">
+               <Zap size={14} className="text-blue-600 fill-blue-600" /> Predict & Win Points
+           </h3>
            
-           {user ? (
-             <div className="grid grid-cols-3 gap-2">
-               <button className="bg-slate-50 border border-slate-200 py-3 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white hover:border-blue-600 transition shadow-sm">
-                 {home.team.abbreviation} Win
-               </button>
-               <button className="bg-slate-50 border border-slate-200 py-3 rounded-lg text-xs font-bold hover:bg-slate-600 hover:text-white hover:border-slate-600 transition shadow-sm">
-                 Draw
-               </button>
-               <button className="bg-slate-50 border border-slate-200 py-3 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white hover:border-red-600 transition shadow-sm">
-                 {away.team.abbreviation} Win
-               </button>
-             </div>
-           ) : (
-             <Link href="/login" className="block w-full bg-slate-900 text-white text-center py-3 rounded-lg text-xs font-bold shadow-md active:scale-95 transition">
-                Login to Predict & Win
-             </Link>
-           )}
+           <PredictionBoard 
+                matchId={dbData.id} // ✅ Uses Supabase UUID
+                matchDate={dbData.match_date} 
+                homeTeam={homeTeamName} 
+                awayTeam={awayTeamName} 
+           />
         </div>
       </div>
 
-      {/* --- 3. CONDITIONAL HIGHLIGHTS --- */}
-      {dbData?.video_url && (
-          <div className="px-4 mt-6">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                <PlayCircle size={14} /> Match Highlights
-            </h3>
-            <Link href={dbData.video_url} target="_blank">
-                <div className="bg-black rounded-xl overflow-hidden aspect-video relative flex items-center justify-center group cursor-pointer shadow-lg border border-slate-800">
-                    <img src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80" className="absolute inset-0 w-full h-full object-cover opacity-50" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-                    <PlayCircle size={48} className="text-white relative z-10 opacity-90 group-hover:scale-110 transition shadow-xl" />
-                    <div className="absolute bottom-3 left-3 z-10">
-                        <p className="text-white text-xs font-bold">Watch Goals & Highlights</p>
-                        <p className="text-gray-400 text-[10px]">External Video Source</p>
-                    </div>
-                </div>
-            </Link>
-          </div>
-      )}
-
-      {/* --- 4. DETAILS TABS --- */}
+      {/* --- 5. DETAILS TABS --- */}
+      {header && (
       <div className="px-4 mt-8 space-y-8">
         
-        {/* TIMELINE (Improved) */}
+        {/* TIMELINE */}
         <div>
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                 <Clock size={14} /> Key Events
             </h3>
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-2">
                 {timeline.length > 0 ? timeline.map((event: any, i: number) => {
-                    const isHome = event.team?.id === home.id;
-                    const type = event.type?.text?.toLowerCase();
+                    const isHome = event.team?.id === header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').id;
+                    const type = event.type?.text?.toLowerCase() || "";
                     let icon = <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>;
                     
                     if(type.includes('goal')) icon = <span className="text-sm">⚽</span>;
                     if(type.includes('yellow')) icon = <div className="w-3 h-4 bg-yellow-400 rounded-[1px] shadow-sm border border-yellow-500"></div>;
                     if(type.includes('red')) icon = <div className="w-3 h-4 bg-red-600 rounded-[1px] shadow-sm border border-red-700"></div>;
-                    if(type.includes('substitution')) icon = <span className="text-xs">🔄</span>;
 
                     return (
                         <div key={i} className={`flex items-center gap-3 p-3 border-b border-slate-50 last:border-0 ${i % 2 === 0 ? 'bg-slate-50/50' : ''}`}>
@@ -216,17 +201,11 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                                 {isHome ? (
                                     <>
                                         <div className="flex justify-center w-6">{icon}</div>
-                                        <div className="flex-col flex">
-                                            <span className="font-bold text-xs text-slate-800">{event.text || event.type?.text}</span>
-                                            {event.participants?.[0] && <span className="text-[10px] text-slate-500">{event.participants[0].athlete.displayName}</span>}
-                                        </div>
+                                        <span className="font-bold text-xs text-slate-800">{event.text}</span>
                                     </>
                                 ) : (
                                     <>
-                                        <div className="flex-1 text-right">
-                                             <span className="font-bold text-xs text-slate-800">{event.text || event.type?.text}</span>
-                                             {event.participants?.[0] && <span className="text-[10px] text-slate-500 block">{event.participants[0].athlete.displayName}</span>}
-                                        </div>
+                                        <div className="flex-1 text-right"><span className="font-bold text-xs text-slate-800">{event.text}</span></div>
                                         <div className="flex justify-center w-6">{icon}</div>
                                     </>
                                 )}
@@ -240,57 +219,21 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         </div>
 
         {/* STATS */}
+        {boxscore && (
         <div>
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                 <TrendingUp size={14} /> Match Stats
             </h3>
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 space-y-5">
-                <StatBar label="Possession" h={getStat(home.id, "possessionPct")} a={getStat(away.id, "possessionPct")} suffix="%" />
-                <StatBar label="Shots (On Target)" h={getStat(home.id, "shotsSummary")} a={getStat(away.id, "shotsSummary")} />
-                <StatBar label="Corners" h={getStat(home.id, "corners")} a={getStat(away.id, "corners")} />
-                <StatBar label="Fouls" h={getStat(home.id, "foulsCommitted")} a={getStat(away.id, "foulsCommitted")} />
-                <StatBar label="Yellow Cards" h={getStat(home.id, "yellowCards")} a={getStat(away.id, "yellowCards")} />
+                <StatBar label="Possession" h={getStat('home', "possessionPct")} a={getStat('away', "possessionPct")} suffix="%" />
+                <StatBar label="Shots (On Target)" h={getStat('home', "shotsSummary")} a={getStat('away', "shotsSummary")} />
+                <StatBar label="Corners" h={getStat('home', "corners")} a={getStat('away', "corners")} />
+                <StatBar label="Fouls" h={getStat('home', "foulsCommitted")} a={getStat('away', "foulsCommitted")} />
             </div>
         </div>
-
-        {/* LINEUPS */}
-        <div>
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                <Users size={14} /> Starting Lineups
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-                {/* Home Team */}
-                <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100">
-                    <div className="flex items-center gap-2 mb-3 border-b border-slate-100 pb-2">
-                        {home.team.logos?.[0]?.href && <img src={home.team.logos[0].href} className="w-4 h-4" />}
-                        <span className="text-[10px] font-black uppercase text-slate-800">{home.team.abbreviation}</span>
-                    </div>
-                    <ul className="space-y-2">
-                        {rosters?.find((r:any) => r.team.id === home.id)?.roster?.filter((p:any) => p.starter).map((p:any) => (
-                            <li key={p.athlete.id} className="text-[10px] font-bold text-slate-600 flex gap-2">
-                                <span className="text-slate-300 w-4 text-right">{p.jersey}</span> {p.athlete.displayName}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-                {/* Away Team */}
-                <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100">
-                    <div className="flex items-center gap-2 mb-3 border-b border-slate-100 pb-2">
-                        {away.team.logos?.[0]?.href && <img src={away.team.logos[0].href} className="w-4 h-4" />}
-                        <span className="text-[10px] font-black uppercase text-slate-800">{away.team.abbreviation}</span>
-                    </div>
-                    <ul className="space-y-2">
-                        {rosters?.find((r:any) => r.team.id === away.id)?.roster?.filter((p:any) => p.starter).map((p:any) => (
-                            <li key={p.athlete.id} className="text-[10px] font-bold text-slate-600 flex gap-2">
-                                <span className="text-slate-300 w-4 text-right">{p.jersey}</span> {p.athlete.displayName}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            </div>
-        </div>
-
+        )}
       </div>
+      )}
     </div>
   );
 }
