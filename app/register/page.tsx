@@ -12,16 +12,19 @@ import { User, Mail, Phone, Lock, Loader2, ArrowRight } from 'lucide-react';
 export default function RegisterPage() {
   const [formData, setFormData] = useState({ fullName: '', email: '', phone: '', password: '' });
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true); // ✅ Prevents Redirect Loop
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
-  // 1. CHECK SESSION: Redirect if already logged in
+  // 1. SAFE SESSION CHECK (Prevents Application Error)
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         router.replace('/dashboard');
+      } else {
+        setCheckingSession(false); // Only show form if NO session found
       }
     };
     checkSession();
@@ -32,7 +35,7 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
 
-    // 2. SIGN UP (Data passed here is handled by your SQL Trigger)
+    // 2. SIGN UP (Data handled by SQL Trigger)
     const { data, error: authError } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.password,
@@ -40,7 +43,6 @@ export default function RegisterPage() {
         data: {
           full_name: formData.fullName,
           phone: formData.phone,
-          // The SQL Trigger will read these and create the profile
         },
       },
     });
@@ -52,12 +54,20 @@ export default function RegisterPage() {
     }
 
     // 3. SUCCESS: Redirect
-    // We add a tiny delay to ensure the database trigger finishes
     setTimeout(() => {
         router.refresh();
-        router.push('/dashboard');
+        router.replace('/dashboard');
     }, 1000);
   };
+
+  // ✅ LOADING SCREEN (Prevents flashing/crashing)
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen bg-[#0a1428] flex items-center justify-center">
+        <Loader2 className="text-white animate-spin" size={32} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0a1428] flex items-center justify-center p-4 font-sans">

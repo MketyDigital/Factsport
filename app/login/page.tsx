@@ -12,15 +12,21 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true); // ✅ New Loading State
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
-  // ✅ NEW: Check if already logged in
+  // ✅ PREVENT LOOP: Check session once, securely
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) router.replace('/dashboard');
+      if (session) {
+        // Use replace to prevent "Back" button loops
+        router.replace('/dashboard'); 
+      } else {
+        setCheckingSession(false); // Only show login form if NO session found
+      }
     };
     checkUser();
   }, [router, supabase]);
@@ -33,17 +39,31 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      setError('Invalid Email or Password');
+      setError(error.message); // Show actual error message
       setLoading(false);
     } else {
       router.refresh();
-      router.push('/dashboard');
+      router.replace('/dashboard');
     }
   };
 
+  // ✅ Show Loading Spinner while checking session (Prevents flashing/looping)
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen bg-[#0a1428] flex items-center justify-center">
+        <Loader2 className="text-white animate-spin" size={32} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0a1428] flex items-center justify-center p-4">
-      {/* ... (Rest of your existing JSX UI keeps exact same) ... */}
+      {/* Background Ambience */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600 rounded-full blur-[120px] opacity-10"></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-red-600 rounded-full blur-[120px] opacity-10"></div>
+      </div>
+
       <div className="w-full max-w-md bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl relative z-10">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-900 to-[#0a1428] shadow-lg border border-white/10 mb-4">
