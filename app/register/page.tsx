@@ -21,13 +21,13 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
 
-    // 1. Sign Up (Using Email as the unique identifier now)
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    // 1. Sign Up (Trigger handles the profile creation now)
+    const { data, error: authError } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.password,
       options: {
         data: {
-          full_name: formData.fullName,
+          full_name: formData.fullName, // Passed to Trigger
           phone: formData.phone,
         },
       },
@@ -39,22 +39,11 @@ export default function RegisterPage() {
       return;
     }
 
-    // 2. Create Profile in Database
-    const res = await fetch('/api/register', {
-        method: 'POST',
-        body: JSON.stringify({ 
-            id: authData.user?.id,
-            ...formData 
-        })
-    });
-
-    if (res.ok) {
-        // Redirect to Dashboard immediately
-        router.push('/dashboard'); 
-    } else {
-        setError("Account created but profile setup failed. Contact Admin.");
-        setLoading(false);
-    }
+    // 2. Success! Redirect immediately
+    // Small delay to ensure Trigger finishes
+    setTimeout(() => {
+        router.push('/dashboard');
+    }, 1000);
   };
 
   return (
