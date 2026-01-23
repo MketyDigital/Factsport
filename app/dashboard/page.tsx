@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Trophy, TrendingUp, History, Star, User as UserIcon, 
-  AlertCircle, Ticket, Youtube, Facebook, Gift, ArrowRight, ExternalLink 
+  AlertCircle, Ticket, Youtube, Facebook, Gift, ExternalLink 
 } from 'lucide-react';
 import SignOutButton from '@/app/components/SignOutButton';
 
@@ -16,12 +16,14 @@ async function getUserData() {
 
   if (!user) return null;
 
+  // Fetch Profile
   const { data: profile } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single();
 
+  // Fetch Recent Predictions
   const { data: predictions } = await supabase
     .from('predictions')
     .select('*, match:matches(home_team, away_team, home_score, away_score, status)')
@@ -41,8 +43,21 @@ export default async function Dashboard() {
 
   const { profile, predictions } = data;
 
+  // --- 🧠 SMART VIP LOGIC ---
+  const expiryDate = profile?.vip_expires_at ? new Date(profile.vip_expires_at) : null;
+  const now = new Date();
+  
+  // Calculate days remaining (if expiry exists)
+  const daysLeft = expiryDate 
+    ? Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) 
+    : 0;
+
+  // User is VIP only if flag is TRUE AND time hasn't run out
+  // (Or if they are admin/lifetime without expiry)
+  const isVipActive = profile?.is_vip && (expiryDate === null || daysLeft > 0);
+
   return (
-    <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans">
+    <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans text-slate-900">
       
       {/* --- HEADER --- */}
       <div className="bg-[#0a1428] text-white pt-8 pb-20 px-6 rounded-b-[2.5rem] relative overflow-hidden shadow-2xl">
@@ -66,7 +81,7 @@ export default async function Dashboard() {
 
         {/* STATS CARDS */}
         <div className="grid grid-cols-2 gap-3 relative z-10">
-            {/* Points */}
+            {/* Points Card */}
             <div className="bg-white/10 backdrop-blur-md border border-white/10 p-4 rounded-2xl relative overflow-hidden group">
                 <div className="absolute top-0 right-0 w-12 h-12 bg-green-500 blur-[30px] opacity-20"></div>
                 <div className="flex items-center gap-2 mb-2 text-slate-300 text-[10px] font-bold uppercase tracking-wider">
@@ -75,16 +90,28 @@ export default async function Dashboard() {
                 <div className="text-3xl font-black tracking-tighter">{profile?.points || 0}</div>
             </div>
 
-            {/* VIP Status */}
-            <Link href="/vip/upgrade">
-                <div className={`p-4 rounded-2xl border relative overflow-hidden transition active:scale-95 ${profile?.is_vip ? 'bg-gradient-to-br from-yellow-600 to-yellow-800 border-yellow-500' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}>
+            {/* VIP Status Card (Dynamic) */}
+            <Link href={isVipActive ? "#" : "/vip/upgrade"}>
+                <div className={`p-4 rounded-2xl border relative overflow-hidden transition active:scale-95 h-full ${isVipActive ? 'bg-gradient-to-br from-yellow-600 to-yellow-800 border-yellow-500' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}>
                     <div className="flex items-center gap-2 mb-2 text-white/80 text-[10px] font-bold uppercase tracking-wider">
-                        <Trophy size={12} className={profile?.is_vip ? 'text-white' : 'text-slate-400'} /> Status
+                        <Trophy size={12} className={isVipActive ? 'text-white' : 'text-slate-400'} /> Status
                     </div>
-                    <div className="text-lg font-black uppercase tracking-wide flex items-center justify-between">
-                        {profile?.is_vip ? 'VIP Member' : 'Free Plan'}
-                        {!profile?.is_vip && <span className="text-[9px] bg-red-600 text-white px-2 py-1 rounded-full animate-pulse shadow-lg">UPGRADE</span>}
-                    </div>
+                    
+                    {isVipActive ? (
+                        <div>
+                            <div className="text-lg font-black uppercase tracking-wide text-white flex items-center gap-1">
+                                VIP ACTIVE
+                            </div>
+                            <div className="text-[9px] text-yellow-200 font-medium mt-1">
+                                {expiryDate ? `Expires in ${daysLeft} days` : 'Lifetime Access'}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-lg font-black uppercase tracking-wide flex items-center justify-between">
+                            Free Plan
+                            <span className="text-[9px] bg-red-600 text-white px-2 py-1 rounded-full animate-pulse shadow-lg">UPGRADE</span>
+                        </div>
+                    )}
                 </div>
             </Link>
         </div>
@@ -93,7 +120,19 @@ export default async function Dashboard() {
       {/* --- BODY CONTENT --- */}
       <div className="px-4 -mt-12 relative z-20 space-y-4">
         
-        {/* 1. REVENUE CARD (The Money Maker) */}
+        {/* 1. EXPIRY WARNING (Only if < 3 days) */}
+        {isVipActive && daysLeft > 0 && daysLeft <= 3 && (
+             <div className="bg-red-100 border border-red-200 text-red-800 px-4 py-3 rounded-xl flex items-center gap-3 shadow-sm">
+                <AlertCircle size={20} className="shrink-0" />
+                <div>
+                    <p className="font-bold text-xs">Subscription Ending Soon!</p>
+                    <p className="text-[10px]">Your VIP access expires in {daysLeft} days.</p>
+                </div>
+                <Link href="/vip/upgrade" className="ml-auto bg-red-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-sm whitespace-nowrap">Renew Now</Link>
+             </div>
+        )}
+
+        {/* 2. REVENUE CARD (Money Maker) */}
         <div className="bg-gradient-to-r from-[#1a1a1a] to-black rounded-2xl p-4 shadow-xl border border-slate-800 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 blur-[60px] opacity-10"></div>
             
@@ -111,7 +150,7 @@ export default async function Dashboard() {
                     </div>
                 </div>
                 <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                    {/* Placeholder Logo - Replace with actual 1xBet/Melbet logo URL */}
+                    {/* Brand Logo Placeholder */}
                     <span className="text-black font-black text-xs">1X</span>
                 </div>
             </div>
@@ -121,7 +160,7 @@ export default async function Dashboard() {
             </Link>
         </div>
 
-        {/* 2. DAILY REWARD (Gamification) */}
+        {/* 3. DAILY REWARD (Gamification) */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center">
@@ -137,7 +176,7 @@ export default async function Dashboard() {
             </button>
         </div>
 
-        {/* 3. PREDICTION HISTORY */}
+        {/* 4. PREDICTION HISTORY */}
         <div>
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2 px-2">
                 <History size={14} /> Recent Activity
@@ -188,7 +227,7 @@ export default async function Dashboard() {
             )}
         </div>
 
-        {/* 4. SOCIAL MEDIA COMMUNITY */}
+        {/* 5. SOCIAL MEDIA COMMUNITY */}
         <div>
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2 px-2 mt-6">
                 <Star size={14} /> Join Community
