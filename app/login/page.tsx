@@ -1,7 +1,7 @@
-// ✅ RUNS ON EDGE
-export const runtime = 'edge';
+'use client';
 
-'use client'; // This page needs interactivity (clicking buttons)
+// ✅ RUNS ON EDGE (Must come AFTER 'use client')
+export const runtime = 'edge';
 
 import { useState } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
