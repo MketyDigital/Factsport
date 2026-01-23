@@ -4,7 +4,7 @@ import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { 
   ChevronLeft, Zap, TrendingUp, Users, 
-  ExternalLink, AlertCircle, Bug 
+  ExternalLink, AlertCircle, Bug, Activity 
 } from 'lucide-react';
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
@@ -13,15 +13,10 @@ import PredictionBoard from '@/app/components/PredictionBoard';
 async function getSupabaseData(id: string) {
     const supabase = createClient();
     try {
-        // We removed the Regex check to prevent false positives
         const { data, error } = await supabase.from('matches').select('*').eq('id', id).single();
-        if (error) {
-            console.error("Supabase Error:", error);
-            return null;
-        }
+        if (error) return null;
         return data;
     } catch (e) {
-        console.error("Unexpected Error:", e);
         return null;
     }
 }
@@ -69,28 +64,28 @@ async function getEspnData(dbData: any) {
 }
 
 export default async function MatchDetailsPage({ params }: { params: { id: string } }) {
-  // 1. FIX: Await params (Critical for Next.js 15+)
   const resolvedParams = await params; 
   const matchId = resolvedParams?.id;
 
-  if (!matchId) {
-      return <ErrorDisplay message="No Match ID found in URL" />;
-  }
+  if (!matchId) return <ErrorDisplay message="No Match ID found" />;
 
-  // 2. Fetch DB Data
   const dbData = await getSupabaseData(matchId);
-
-  // 3. DEBUG VIEW: If DB fails, tell us why instead of 404ing
-  if (!dbData) {
-      return <ErrorDisplay message={`Match not found in Database. ID: ${matchId}`} />;
-  }
+  if (!dbData) return <ErrorDisplay message={`Match not found. ID: ${matchId}`} />;
 
   const espnData = await getEspnData(dbData);
   
-  // Safe Parsing
+  // Parsing
   const header = espnData?.header;
   const boxscore = espnData?.boxscore;
   const rosters = espnData?.rosters;
+  
+  // SAFE TIMELINE: Filter ONLY Goals
+  const rawTimeline = header?.competitions?.[0]?.details || [];
+  const goals = Array.isArray(rawTimeline) ? rawTimeline.filter((event: any) => {
+      const text = event?.type?.text?.toLowerCase() || "";
+      // Only show scored goals (exclude missed penalties/shootouts)
+      return text.includes("goal") && !text.includes("missed") && !text.includes("saved");
+  }) : [];
 
   const homeComp = header?.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'home');
   const awayComp = header?.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'away');
@@ -205,6 +200,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             </Link>
         </div>
 
+        {/* Prediction */}
         <div className="bg-white rounded-xl shadow-lg p-5 border border-slate-100">
            <h3 className="text-xs font-black uppercase text-slate-800 flex items-center gap-1 mb-4">
                <Zap size={14} className="text-blue-600 fill-blue-600" /> Predict & Win Points
@@ -213,7 +209,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         </div>
       </div>
 
-      {/* RICH DATA (STATS & LINEUPS ONLY) */}
+      {/* --- RICH DATA SECTION --- */}
       {!espnData ? (
           <div className="mx-4 mt-6 bg-white p-6 rounded-xl border border-slate-100 text-center shadow-sm">
               <AlertCircle className="mx-auto text-slate-300 mb-2" />
@@ -221,9 +217,70 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
               <p className="text-[10px] text-slate-400">Sync pending.</p>
           </div>
       ) : (
-        <div className="px-4 mt-8 space-y-8">
+        <div className="px-4 mt-8 space-y-6">
             
-            {/* STATS */}
+            {/* 1. GOAL SCORERS (WITH ASSISTS) */}
+            {goals.length > 0 && (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
+                     <h3 className="text-xs font-black uppercase text-slate-400 mb-4 flex items-center gap-2">
+                        <Activity size={14} className="text-green-600" /> Goals
+                     </h3>
+                     <div className="space-y-3">
+                        {goals.map((goal: any, i: number) => {
+                            const isHome = goal.team?.id === homeTeam.id;
+                            
+                            // Safe Data Extraction
+                            const player = goal.participants?.[0]?.athlete?.displayName || "Goal";
+                            const assist = goal.participants?.[1]?.athlete?.displayName; // Safe access for assist
+                            
+                            const time = goal.clock?.displayValue || "";
+                            
+                            const typeText = goal.type?.text?.toLowerCase() || "";
+                            const isPenalty = typeText.includes("penalty");
+                            const isOwnGoal = typeText.includes("own goal");
+                            
+                            return (
+                                <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-slate-50 last:border-0">
+                                    {/* Home Side */}
+                                    <div className={`flex-1 text-right flex flex-col items-end ${isHome ? "text-slate-900" : "text-slate-300"}`}>
+                                        {isHome && (
+                                            <>
+                                                <span className="font-bold flex items-center gap-1 justify-end">
+                                                    {isPenalty && <span className="text-[8px] uppercase text-red-500 font-bold bg-red-50 px-1 rounded">PEN</span>}
+                                                    {isOwnGoal && <span className="text-[8px] uppercase text-red-500 font-bold bg-red-50 px-1 rounded">OG</span>}
+                                                    {player}
+                                                </span>
+                                                {assist && <span className="text-[9px] text-slate-400">Asst: {assist}</span>}
+                                            </>
+                                        )}
+                                    </div>
+                                    
+                                    {/* Time */}
+                                    <div className="mx-3 text-xs font-mono font-bold bg-green-50 text-green-700 px-2 py-1 rounded border border-green-100 min-w-[3rem] text-center">
+                                        {time}'
+                                    </div>
+
+                                    {/* Away Side */}
+                                    <div className={`flex-1 text-left flex flex-col items-start ${!isHome ? "text-slate-900" : "text-slate-300"}`}>
+                                        {!isHome && (
+                                            <>
+                                                <span className="font-bold flex items-center gap-1">
+                                                    {player}
+                                                    {isPenalty && <span className="text-[8px] uppercase text-red-500 font-bold bg-red-50 px-1 rounded">PEN</span>}
+                                                    {isOwnGoal && <span className="text-[8px] uppercase text-red-500 font-bold bg-red-50 px-1 rounded">OG</span>}
+                                                </span>
+                                                {assist && <span className="text-[9px] text-slate-400">Asst: {assist}</span>}
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            )
+                        })}
+                     </div>
+                </div>
+            )}
+
+            {/* 2. STATS */}
             {boxscore && (
             <div>
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
@@ -238,7 +295,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             </div>
             )}
 
-            {/* LINEUPS */}
+            {/* 3. LINEUPS */}
             {rosters && (
             <div>
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
@@ -274,7 +331,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   );
 }
 
-// Debug Component to show you WHY it failed
 function ErrorDisplay({ message }: { message: string }) {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-white text-slate-900 p-6">
