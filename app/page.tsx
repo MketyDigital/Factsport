@@ -5,7 +5,7 @@ import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
 import { Zap, Trophy, Activity, Calendar, Ticket, ArrowRight, PlayCircle, Clock } from "lucide-react";
 
-// 1. ADD SEO METADATA
+// SEO Metadata
 export const metadata = {
   title: 'FactSport | Live Scores, News & Predictions',
   description: 'The #1 Platform for sports predictions, live scores, and breaking news. Join VIP to win monthly prizes.',
@@ -13,10 +13,10 @@ export const metadata = {
 
 async function getHomepageData(leagueFilter: string | null) {
   const supabase = createClient();
-  const startDate = new Date(); startDate.setDate(startDate.getDate() - 1); // Get Yesterday
-  const endDate = new Date(); endDate.setDate(endDate.getDate() + 2);     // Get Tomorrow + Next Day
+  const startDate = new Date(); startDate.setDate(startDate.getDate() - 1); 
+  const endDate = new Date(); endDate.setDate(endDate.getDate() + 3); 
 
-  // 1. Matches (Fetch recent past and near future)
+  // 1. Matches
   let matchQuery = supabase.from('matches')
     .select('*')
     .gte('match_date', startDate.toISOString())
@@ -27,10 +27,10 @@ async function getHomepageData(leagueFilter: string | null) {
       matchQuery = matchQuery.ilike('league', `%${leagueFilter}%`);
   }
 
-  // 2. News
+  // 2. News (Limit 20 to ensure we have enough for ticker + slider + list)
   const newsQuery = supabase.from('news').select('*').eq('is_published', true).order('created_at', { ascending: false }).limit(20); 
 
-  // 3. Highlights
+  // 3. Highlights (Limit 10 as requested)
   const highlightsQuery = supabase.from('matches').select('*').not('video_url', 'is', null).order('match_date', { ascending: false }).limit(10);
 
   const [matchesRes, newsRes, highlightsRes] = await Promise.all([matchQuery, newsQuery, highlightsQuery]);
@@ -41,15 +41,16 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const selectedLeague = searchParams.league || 'All';
   const { matches, news, highlights } = await getHomepageData(selectedLeague);
 
+  // News Sorting Logic
   const breakingNews = news.filter(n => n.is_breaking); 
   const headlines = news.filter(n => n.is_headline && n.image_url).slice(0, 3);
   const headlineIds = headlines.map(h => h.id);
-  const latestNews = news.filter(n => !headlineIds.includes(n.id)).slice(0, 6);
+  // Latest News (Next 5 after headlines)
+  const latestNews = news.filter(n => !headlineIds.includes(n.id) && !n.is_breaking).slice(0, 5);
 
-  // Sorting Logic
+  // Match Sorting Logic
   const live = matches.filter(m => m.status === 'LIVE');
   const upcoming = matches.filter(m => m.status === 'SCHEDULED' || m.status === 'UPCOMING');
-  // ✅ FIX: Include 'FT' in finished matches
   const finished = matches.filter(m => m.status === 'FINISHED' || m.status === 'FT');
   
   upcoming.sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
@@ -74,7 +75,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </nav>
 
-      {/* 1. TICKER */}
+      {/* 1. BREAKING NEWS TICKER */}
       {breakingNews.length > 0 && (
         <div className="bg-yellow-400 text-black text-[10px] font-black py-2 overflow-hidden relative flex items-center shadow-md z-40">
             <div className="absolute left-0 h-full bg-yellow-500 px-3 flex items-center z-10 shadow-r-xl border-r border-yellow-600"><Activity size={12} className="mr-1 animate-pulse text-red-600" /> BREAKING</div>
@@ -100,11 +101,11 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       )}
 
-      {/* 3. HIGHLIGHTS SLIDER */}
+      {/* 3. HIGHLIGHTS (Latest 10) */}
       {highlights.length > 0 && (
-        <div className="mt-4 px-4">
+        <div className="mt-2 px-4">
              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2"><PlayCircle size={14} className="text-red-600" /> Match Highlights</h3>
+                <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2"><PlayCircle size={14} className="text-red-600" /> Highlights</h3>
             </div>
             <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 scrollbar-hide">
                 {highlights.map((item: any) => (
@@ -124,8 +125,8 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       )}
 
-      {/* 4. LATEST NEWS */}
-      <div className="px-4 mb-2 mt-4">
+      {/* 4. LATEST NEWS (5 Items) */}
+      <div className="px-4 mb-4 mt-6">
         <div className="flex justify-between items-center mb-2">
             <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">Latest News</h3>
             <Link href="/news" className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded">View All</Link>
@@ -161,6 +162,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         <div className="px-4 py-4 space-y-3">
              {displayMatches.map((match) => (
                   <div key={match.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-3">
+                      {/* HEADER: STATUS & DATE */}
                       <div className="bg-slate-50 px-3 py-1.5 flex justify-between items-center border-b border-slate-100">
                            <div className="flex items-center gap-1">
                               {match.status === 'LIVE' ? (
@@ -168,7 +170,10 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                               ) : (match.status === 'FT' || match.status === 'FINISHED' ? (
                                   <span className="text-[9px] font-black text-slate-600">FT</span>
                               ) : (
-                                  <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1"><Clock size={10} />{new Date(match.match_date).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})}</span>
+                                  <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1">
+                                    <Clock size={10} /> 
+                                    {new Date(match.match_date).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })} • {new Date(match.match_date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
                               ))}
                            </div>
                            {match.league && <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[100px] truncate">{match.league}</span>}

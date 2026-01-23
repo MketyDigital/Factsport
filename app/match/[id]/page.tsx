@@ -1,4 +1,3 @@
-// ✅ RUNS ON EDGE
 export const runtime = 'edge';
 
 import { createClient } from '@/app/lib/supabase/server';
@@ -11,15 +10,14 @@ import {
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
 
-// 1. Fetch "Revenue Data" (Codes, Videos, Internal ID) from Supabase
+// 1. Fetch Supabase Data (Internal)
 async function getSupabaseData(id: string) {
     const supabase = createClient();
-    // We fetch by ID (UUID). This is the source of truth.
     const { data } = await supabase.from('matches').select('*').eq('id', id).single();
     return data;
 }
 
-// 2. Fetch Live Data from ESPN using the API_ID from Supabase
+// 2. Fetch ESPN Data (Rich Stats)
 async function getEspnData(apiId: string) {
   if (!apiId) return null;
   try {
@@ -34,46 +32,41 @@ async function getEspnData(apiId: string) {
 }
 
 export default async function MatchDetailsPage({ params }: { params: { id: string } }) {
-  // A. Get Internal Match Data First
   const dbData = await getSupabaseData(params.id);
-
   if (!dbData) return notFound();
 
-  // B. Get Live ESPN Data (using the stored api_id)
+  // Try fetch ESPN data if api_id exists
   const espnData = await getEspnData(dbData.api_id);
-
-  // C. Fallback: If ESPN fails, use DB data for basic names
+  
+  // Data Parsing
   const header = espnData?.header;
   const boxscore = espnData?.boxscore;
-  const gameInfo = espnData?.gameInfo;
   const rosters = espnData?.rosters;
   const timeline = header?.competitions?.[0]?.details || [];
 
-  // Parse Teams (Use ESPN if available, else DB)
+  // Team Names/Scores (Fallback to DB if ESPN fails)
   const homeTeamName = header ? header.competitions[0].competitors.find((c: any) => c.homeAway === 'home').team.name : dbData.home_team;
   const awayTeamName = header ? header.competitions[0].competitors.find((c: any) => c.homeAway === 'away').team.name : dbData.away_team;
-  
   const homeScore = header ? header.competitions[0].competitors.find((c: any) => c.homeAway === 'home').score : dbData.home_score;
   const awayScore = header ? header.competitions[0].competitors.find((c: any) => c.homeAway === 'away').score : dbData.away_score;
-  
   const homeLogo = header ? header.competitions[0].competitors.find((c: any) => c.homeAway === 'home').team.logos?.[0]?.href : dbData.home_logo;
   const awayLogo = header ? header.competitions[0].competitors.find((c: any) => c.homeAway === 'away').team.logos?.[0]?.href : dbData.away_logo;
-
-  const matchStatus = header ? header.competitions[0].status.type.state : 'pre'; // pre, in, post
+  const matchStatus = header ? header.competitions[0].status.type.state : 'pre';
   const displayClock = header ? header.competitions[0].status.displayClock : '';
 
-  // Helper for Stats
-  const getStat = (homeAway: string, name: string) => {
-    if (!boxscore) return "0";
-    const team = header.competitions[0].competitors.find((c: any) => c.homeAway === homeAway);
-    const teamStats = boxscore.teams?.find((t: any) => t.team.id === team.id)?.statistics;
+  // Identify Home/Away IDs for Stats mapping
+  const homeId = header?.competitions[0].competitors.find((c: any) => c.homeAway === 'home').id;
+  const awayId = header?.competitions[0].competitors.find((c: any) => c.homeAway === 'away').id;
+
+  const getStat = (id: string, name: string) => {
+    const teamStats = boxscore?.teams?.find((t: any) => t.team.id === id)?.statistics;
     return teamStats?.find((s: any) => s.name === name)?.displayValue || "0";
   };
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       
-      {/* --- 1. HEADER (Scoreboard) --- */}
+      {/* 1. HEADER (Scoreboard) */}
       <div className="relative bg-[#0a1428] text-white pb-6 rounded-b-[2rem] overflow-hidden shadow-2xl">
         <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
         
@@ -88,7 +81,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
         {/* Score Area */}
         <div className="relative z-10 px-4 mt-2">
-          {/* Status */}
           <div className="flex justify-center mb-6">
             {matchStatus === 'in' ? (
                <span className="bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-full animate-pulse flex items-center gap-1">
@@ -132,50 +124,40 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
       <div className="mx-4 -mt-4 relative z-20 space-y-3">
         
-        {/* --- 2. VIDEO PLAYER (If available) --- */}
+        {/* 2. VIDEO PLAYER */}
         {dbData.video_url && (
             <div className="rounded-xl overflow-hidden shadow-2xl border border-white/20">
                 <FactSportPlayer videoUrl={dbData.video_url} />
             </div>
         )}
 
-        {/* --- 3. REVENUE CARD (Betting) --- */}
+        {/* 3. REVENUE CARD */}
         <div className="bg-[#1A1A1A] rounded-xl p-4 shadow-xl border border-slate-800 flex items-center justify-between overflow-hidden relative">
             <div className="absolute top-0 right-0 w-20 h-full bg-gradient-to-l from-white/5 to-transparent"></div>
-            
             <div className="flex items-center gap-3 relative z-10">
                 <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center font-black text-black shadow-lg">1X</div>
                 <div>
                     <div className="text-white font-bold text-sm">Bet on 1xBet</div>
                     {dbData.booking_code ? (
                         <div className="text-yellow-400 text-xs font-mono">Code: <span className="font-black bg-yellow-400/20 px-1 rounded">{dbData.booking_code}</span></div>
-                    ) : (
-                        <div className="text-slate-400 text-[10px]">Highest Odds Guaranteed</div>
-                    )}
+                    ) : <div className="text-slate-400 text-[10px]">Highest Odds Guaranteed</div>}
                 </div>
             </div>
-            
             <Link href={dbData.affiliate_link || "https://bit.ly/your-affiliate-link"} target="_blank" className="bg-yellow-400 hover:bg-yellow-300 text-black text-xs font-black px-4 py-2.5 rounded-lg shadow-lg active:scale-95 transition flex items-center gap-1">
                 Bet Now <ExternalLink size={10} />
             </Link>
         </div>
 
-        {/* --- 4. PREDICTION BOARD (Interactive) --- */}
+        {/* 4. PREDICTION BOARD */}
         <div className="bg-white rounded-xl shadow-lg p-5 border border-slate-100">
            <h3 className="text-xs font-black uppercase text-slate-800 flex items-center gap-1 mb-4">
                <Zap size={14} className="text-blue-600 fill-blue-600" /> Predict & Win Points
            </h3>
-           
-           <PredictionBoard 
-                matchId={dbData.id} // ✅ Uses Supabase UUID
-                matchDate={dbData.match_date} 
-                homeTeam={homeTeamName} 
-                awayTeam={awayTeamName} 
-           />
+           <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={homeTeamName} awayTeam={awayTeamName} />
         </div>
       </div>
 
-      {/* --- 5. DETAILS TABS --- */}
+      {/* 5. RICH STATS (Restored) */}
       {header && (
       <div className="px-4 mt-8 space-y-8">
         
@@ -186,7 +168,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             </h3>
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-2">
                 {timeline.length > 0 ? timeline.map((event: any, i: number) => {
-                    const isHome = event.team?.id === header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').id;
+                    const isHome = event.team?.id === homeId;
                     const type = event.type?.text?.toLowerCase() || "";
                     let icon = <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>;
                     
@@ -212,9 +194,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                             </div>
                         </div>
                     );
-                }) : (
-                    <div className="text-center text-slate-400 text-xs py-6">No key events recorded yet.</div>
-                )}
+                }) : <div className="text-center text-slate-400 text-xs py-6">No key events recorded yet.</div>}
             </div>
         </div>
 
@@ -225,13 +205,41 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                 <TrendingUp size={14} /> Match Stats
             </h3>
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 space-y-5">
-                <StatBar label="Possession" h={getStat('home', "possessionPct")} a={getStat('away', "possessionPct")} suffix="%" />
-                <StatBar label="Shots (On Target)" h={getStat('home', "shotsSummary")} a={getStat('away', "shotsSummary")} />
-                <StatBar label="Corners" h={getStat('home', "corners")} a={getStat('away', "corners")} />
-                <StatBar label="Fouls" h={getStat('home', "foulsCommitted")} a={getStat('away', "foulsCommitted")} />
+                <StatBar label="Possession" h={getStat(homeId, "possessionPct")} a={getStat(awayId, "possessionPct")} suffix="%" />
+                <StatBar label="Shots (On Target)" h={getStat(homeId, "shotsSummary")} a={getStat(awayId, "shotsSummary")} />
+                <StatBar label="Corners" h={getStat(homeId, "corners")} a={getStat(awayId, "corners")} />
+                <StatBar label="Fouls" h={getStat(homeId, "foulsCommitted")} a={getStat(awayId, "foulsCommitted")} />
             </div>
         </div>
         )}
+
+        {/* LINEUPS (New Addition) */}
+        {rosters && (
+        <div>
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <Users size={14} /> Lineups
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100">
+                    <div className="border-b border-slate-100 pb-2 mb-2 font-black text-[10px] text-slate-400 uppercase">Home</div>
+                    <ul className="space-y-1">
+                        {rosters.find((r:any) => r.team.id === homeId)?.roster?.filter((p:any) => p.starter).map((p:any) => (
+                            <li key={p.athlete.id} className="text-[10px] font-bold text-slate-600 flex gap-2"><span className="text-slate-300 w-4">{p.jersey}</span> {p.athlete.displayName}</li>
+                        ))}
+                    </ul>
+                </div>
+                <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100">
+                    <div className="border-b border-slate-100 pb-2 mb-2 font-black text-[10px] text-slate-400 uppercase">Away</div>
+                    <ul className="space-y-1">
+                        {rosters.find((r:any) => r.team.id === awayId)?.roster?.filter((p:any) => p.starter).map((p:any) => (
+                            <li key={p.athlete.id} className="text-[10px] font-bold text-slate-600 flex gap-2"><span className="text-slate-300 w-4">{p.jersey}</span> {p.athlete.displayName}</li>
+                        ))}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        )}
+
       </div>
       )}
     </div>
