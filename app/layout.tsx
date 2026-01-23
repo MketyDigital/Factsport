@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+import AuthProvider from "@/app/components/AuthProvider"; // Import the new provider
 
-// This runs on the Edge (Cloudflare)
-export const runtime = 'edge';
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Factsport - Live Predictions & News",
-  description: "The #1 African Sports Prediction Platform",
+  title: "FactSport - Win Big",
+  description: "Premium Sports Predictions",
 };
 
 export default function RootLayout({
@@ -16,10 +17,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="bg-slate-50 text-slate-900 antialiased">
-        <main className="min-h-screen flex flex-col">
+      <body className={inter.className}>
+        {/* Wrap everything inside AuthProvider */}
+        <AuthProvider>
           {children}
-        </main>
+        </AuthProvider>
       </body>
     </html>
   );
