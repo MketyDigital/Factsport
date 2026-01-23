@@ -5,7 +5,8 @@ import { notFound } from "next/navigation";
 import Link from 'next/link';
 import { 
   ChevronLeft, Zap, TrendingUp, Users, Clock, 
-  PlayCircle, ExternalLink, AlertCircle
+  PlayCircle, ExternalLink, AlertCircle, 
+  ArrowRightLeft, Flag, MonitorPlay 
 } from 'lucide-react';
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
@@ -17,41 +18,26 @@ async function getSupabaseData(id: string) {
     return data;
 }
 
-// 2. SMART FETCH: Try ID first, if missing, Search ESPN
+// 2. SMART FETCH
 async function getEspnData(dbData: any) {
   try {
-    // A. Fast Path: We have the ID
     if (dbData.api_id) {
         const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${dbData.api_id}`, { next: { revalidate: 60 } });
         if (res.ok) return res.json();
     }
-
-    // B. Slow Path: Auto-Search (The Magic)
-    // Format date to YYYYMMDD
     const dateStr = new Date(dbData.match_date).toISOString().slice(0, 10).replace(/-/g, "");
-    console.log(`Auto-detecting match for ${dbData.home_team} vs ${dbData.away_team} on ${dateStr}...`);
-    
     const searchRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates=${dateStr}`, { next: { revalidate: 60 } });
     const searchData = await searchRes.json();
-    
-    // Find the match in the daily scoreboard
     const foundEvent = searchData.events?.find((e: any) => {
         const name = e.name.toLowerCase();
-        const h = dbData.home_team.toLowerCase();
-        const a = dbData.away_team.toLowerCase();
-        // Loose matching
-        return (name.includes(h) || name.includes(a));
+        return (name.includes(dbData.home_team.toLowerCase()) || name.includes(dbData.away_team.toLowerCase()));
     });
-
     if (foundEvent) {
-        // Found it! Fetch the full details now
         const detailRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${foundEvent.id}`, { next: { revalidate: 60 } });
         if (detailRes.ok) return detailRes.json();
     }
-    
-    return null; // Truly not found
+    return null;
   } catch (e) {
-    console.error("ESPN Fetch Error:", e);
     return null;
   }
 }
@@ -60,23 +46,19 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const dbData = await getSupabaseData(params.id);
   if (!dbData) return notFound();
 
-  // This now handles both scenarios (ID exists OR it searches)
   const espnData = await getEspnData(dbData);
   
-  // Data Parsing
   const header = espnData?.header;
   const boxscore = espnData?.boxscore;
   const rosters = espnData?.rosters;
   const timeline = header?.competitions?.[0]?.details || [];
 
-  // Fallback Data (If ESPN fails entirely, show DB data)
   const homeTeam = header ? header.competitions[0].competitors.find((c: any) => c.homeAway === 'home') : { team: { name: dbData.home_team }, score: dbData.home_score };
   const awayTeam = header ? header.competitions[0].competitors.find((c: any) => c.homeAway === 'away') : { team: { name: dbData.away_team }, score: dbData.away_score };
   
   const matchStatus = header ? header.competitions[0].status.type.state : 'pre';
   const displayClock = header ? header.competitions[0].status.displayClock : '';
 
-  // Stats Helper
   const getStat = (id: string, name: string) => {
     const teamStats = boxscore?.teams?.find((t: any) => t.team.id === id)?.statistics;
     return teamStats?.find((s: any) => s.name === name)?.displayValue || "0";
@@ -85,11 +67,9 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       
-      {/* 1. HEADER (Scoreboard) */}
+      {/* 1. HEADER */}
       <div className="relative bg-[#0a1428] text-white pb-8 rounded-b-[2.5rem] overflow-hidden shadow-2xl">
         <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-        
-        {/* Nav */}
         <div className="relative z-10 p-4 flex items-center justify-between">
           <Link href="/" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
             <ChevronLeft size={24} />
@@ -98,9 +78,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           <div className="w-10"></div>
         </div>
 
-        {/* Score Area */}
         <div className="relative z-10 px-4 mt-2">
-          {/* Status Badge */}
           <div className="flex justify-center mb-6">
             {matchStatus === 'in' ? (
                <span className="bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-full animate-pulse flex items-center gap-1 shadow-lg shadow-red-900/50">
@@ -114,7 +92,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           </div>
 
           <div className="flex justify-between items-center">
-            {/* Home */}
             <div className="flex flex-col items-center w-1/3">
               <div className="w-16 h-16 bg-white p-3 rounded-2xl shadow-xl shadow-blue-900/40 mb-3 flex items-center justify-center">
                  {homeTeam.team.logos?.[0]?.href || dbData.home_logo ? 
@@ -124,8 +101,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
               </div>
               <h2 className="font-bold text-center text-xs leading-tight opacity-90">{homeTeam.team.name || homeTeam.team.shortDisplayName}</h2>
             </div>
-
-            {/* Score */}
             <div className="flex flex-col items-center w-1/3">
               <div className="text-5xl font-black tracking-tighter flex items-center gap-4 text-white drop-shadow-lg">
                 <span>{homeTeam.score ?? 0}</span>
@@ -133,8 +108,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                 <span>{awayTeam.score ?? 0}</span>
               </div>
             </div>
-
-            {/* Away */}
             <div className="flex flex-col items-center w-1/3">
               <div className="w-16 h-16 bg-white p-3 rounded-2xl shadow-xl shadow-red-900/40 mb-3 flex items-center justify-center">
                  {awayTeam.team.logos?.[0]?.href || dbData.away_logo ? 
@@ -149,15 +122,12 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       </div>
 
       <div className="mx-4 -mt-6 relative z-20 space-y-4">
-        
-        {/* 2. VIDEO PLAYER */}
         {dbData.video_url && (
             <div className="rounded-xl overflow-hidden shadow-2xl border border-white/20">
                 <FactSportPlayer videoUrl={dbData.video_url} />
             </div>
         )}
 
-        {/* 3. REVENUE CARD */}
         <div className="bg-[#1A1A1A] rounded-xl p-4 shadow-xl border border-slate-800 flex items-center justify-between overflow-hidden relative">
             <div className="absolute top-0 right-0 w-20 h-full bg-gradient-to-l from-white/5 to-transparent"></div>
             <div className="flex items-center gap-3 relative z-10">
@@ -174,7 +144,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             </Link>
         </div>
 
-        {/* 4. PREDICTION BOARD */}
         <div className="bg-white rounded-xl shadow-lg p-5 border border-slate-100">
            <h3 className="text-xs font-black uppercase text-slate-800 flex items-center gap-1 mb-4">
                <Zap size={14} className="text-blue-600 fill-blue-600" /> Predict & Win Points
@@ -183,7 +152,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         </div>
       </div>
 
-      {/* 5. RICH STATS SECTIONS (Now Auto-Appears) */}
       {!espnData ? (
           <div className="mx-4 mt-6 bg-white p-6 rounded-xl border border-slate-100 text-center shadow-sm">
               <AlertCircle className="mx-auto text-slate-300 mb-2" />
@@ -193,7 +161,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       ) : (
         <div className="px-4 mt-8 space-y-8">
             
-            {/* TIMELINE */}
+            {/* TIMELINE - FIXED ICONS */}
             <div>
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <Clock size={14} /> Key Events
@@ -202,10 +170,17 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                     {timeline.length > 0 ? timeline.map((event: any, i: number) => {
                         const isHome = event.team?.id === homeTeam.team.id;
                         const type = event.type?.text?.toLowerCase() || "";
+                        const text = event.text || event.type?.text;
+                        const player = event.participants?.[0]?.athlete?.displayName;
+
+                        // Enhanced Icon Logic
                         let icon = <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>;
                         if(type.includes('goal')) icon = <span className="text-sm">⚽</span>;
-                        if(type.includes('yellow')) icon = <div className="w-3 h-4 bg-yellow-400 rounded-[1px] border border-yellow-500"></div>;
-                        if(type.includes('red')) icon = <div className="w-3 h-4 bg-red-600 rounded-[1px] border border-red-700"></div>;
+                        if(type.includes('yellow')) icon = <div className="w-3 h-4 bg-yellow-400 rounded-[1px] border border-yellow-500 shadow-sm"></div>;
+                        if(type.includes('red')) icon = <div className="w-3 h-4 bg-red-600 rounded-[1px] border border-red-700 shadow-sm"></div>;
+                        if(type.includes('substitution')) icon = <ArrowRightLeft size={14} className="text-green-600" />;
+                        if(type.includes('var')) icon = <MonitorPlay size={14} className="text-slate-600" />;
+                        if(type.includes('offside') || type.includes('corner')) icon = <Flag size={14} className="text-slate-400" />;
 
                         return (
                             <div key={i} className={`flex items-center gap-3 p-3 border-b border-slate-50 last:border-0 ${i % 2 === 0 ? 'bg-slate-50/50' : ''}`}>
@@ -214,11 +189,17 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                                     {isHome ? (
                                         <>
                                             <div className="flex justify-center w-6">{icon}</div>
-                                            <div className="flex-1"><span className="font-bold text-xs text-slate-800 block">{event.text}</span>{event.participants?.[0] && <span className="text-[9px] text-slate-400">{event.participants[0].athlete.displayName}</span>}</div>
+                                            <div className="flex-1">
+                                                <span className="font-bold text-xs text-slate-800 block">{player || text}</span>
+                                                {player && <span className="text-[9px] text-slate-400 uppercase">{text.replace(player, '').trim()}</span>}
+                                            </div>
                                         </>
                                     ) : (
                                         <>
-                                            <div className="flex-1 text-right"><span className="font-bold text-xs text-slate-800 block">{event.text}</span>{event.participants?.[0] && <span className="text-[9px] text-slate-400">{event.participants[0].athlete.displayName}</span>}</div>
+                                            <div className="flex-1 text-right">
+                                                <span className="font-bold text-xs text-slate-800 block">{player || text}</span>
+                                                {player && <span className="text-[9px] text-slate-400 uppercase">{text.replace(player, '').trim()}</span>}
+                                            </div>
                                             <div className="flex justify-center w-6">{icon}</div>
                                         </>
                                     )}
@@ -276,7 +257,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   );
 }
 
-// Helper for Stats Bars
 function StatBar({ label, h, a, suffix = "" }: any) {
     const hVal = parseInt(h) || 0;
     const aVal = parseInt(a) || 0;
