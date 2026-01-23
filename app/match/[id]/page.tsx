@@ -1,39 +1,36 @@
 export const runtime = 'edge';
 
 import { createClient } from '@/app/lib/supabase/server';
-import { notFound } from "next/navigation";
 import Link from 'next/link';
 import { 
   ChevronLeft, Zap, TrendingUp, Users, 
-  ExternalLink, AlertCircle 
+  ExternalLink, AlertCircle, Bug 
 } from 'lucide-react';
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
 
-// --- 1. ID VALIDATION (CRITICAL FOR STABILITY) ---
-function isValidUUID(id: string) {
-    const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    return regex.test(id);
-}
-
-// --- 2. DATA FETCHING ---
+// --- DATA FETCHING ---
 async function getSupabaseData(id: string) {
-    if (!isValidUUID(id)) return null; // Stop bad IDs instantly
-    
     const supabase = createClient();
     try {
+        // We removed the Regex check to prevent false positives
         const { data, error } = await supabase.from('matches').select('*').eq('id', id).single();
-        if (error || !data) return null;
+        if (error) {
+            console.error("Supabase Error:", error);
+            return null;
+        }
         return data;
     } catch (e) {
+        console.error("Unexpected Error:", e);
         return null;
     }
 }
 
 async function getEspnData(dbData: any) {
+  if (!dbData) return null;
   try {
-    // Strategy A: Use saved API ID
-    if (dbData?.api_id) {
+    // Strategy A: Saved ID
+    if (dbData.api_id) {
         const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${dbData.api_id}`, { next: { revalidate: 60 } });
         if (res.ok) {
             const data = await res.json();
@@ -67,13 +64,26 @@ async function getEspnData(dbData: any) {
     
     return null;
   } catch (e) {
-    return null; // Silently fail to DB data
+    return null; 
   }
 }
 
 export default async function MatchDetailsPage({ params }: { params: { id: string } }) {
-  const dbData = await getSupabaseData(params.id);
-  if (!dbData) return notFound();
+  // 1. FIX: Await params (Critical for Next.js 15+)
+  const resolvedParams = await params; 
+  const matchId = resolvedParams?.id;
+
+  if (!matchId) {
+      return <ErrorDisplay message="No Match ID found in URL" />;
+  }
+
+  // 2. Fetch DB Data
+  const dbData = await getSupabaseData(matchId);
+
+  // 3. DEBUG VIEW: If DB fails, tell us why instead of 404ing
+  if (!dbData) {
+      return <ErrorDisplay message={`Match not found in Database. ID: ${matchId}`} />;
+  }
 
   const espnData = await getEspnData(dbData);
   
@@ -82,7 +92,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const boxscore = espnData?.boxscore;
   const rosters = espnData?.rosters;
 
-  // Teams Construction (Safe Fallback)
   const homeComp = header?.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'home');
   const awayComp = header?.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'away');
 
@@ -179,6 +188,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             </div>
         )}
 
+        {/* Affiliate Card */}
         <div className="bg-[#1A1A1A] rounded-xl p-4 shadow-xl border border-slate-800 flex items-center justify-between overflow-hidden relative">
             <div className="absolute top-0 right-0 w-20 h-full bg-gradient-to-l from-white/5 to-transparent"></div>
             <div className="flex items-center gap-3 relative z-10">
@@ -203,7 +213,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         </div>
       </div>
 
-      {/* RICH DATA (STATS & LINEUPS ONLY - NO TIMELINE) */}
+      {/* RICH DATA (STATS & LINEUPS ONLY) */}
       {!espnData ? (
           <div className="mx-4 mt-6 bg-white p-6 rounded-xl border border-slate-100 text-center shadow-sm">
               <AlertCircle className="mx-auto text-slate-300 mb-2" />
@@ -262,6 +272,18 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       )}
     </div>
   );
+}
+
+// Debug Component to show you WHY it failed
+function ErrorDisplay({ message }: { message: string }) {
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-white text-slate-900 p-6">
+            <Bug className="text-red-500 mb-4" size={48} />
+            <h1 className="text-xl font-bold mb-2">Debug Info</h1>
+            <p className="font-mono bg-slate-100 p-4 rounded text-xs">{message}</p>
+            <Link href="/" className="mt-6 text-blue-600 underline text-sm">Return Home</Link>
+        </div>
+    );
 }
 
 // Simple Helper for Stats Bars
