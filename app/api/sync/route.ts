@@ -1,4 +1,3 @@
-// ✅ CRITICAL: Runs on Cloudflare Edge & prevents build crashes
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
@@ -7,13 +6,11 @@ import { getSupabaseAdmin } from "@/app/lib/supabase/admin";
 
 export async function GET(req: Request) {
   try {
-    // 1. Security Check (Your Secret Key)
     const { searchParams } = new URL(req.url);
     if (searchParams.get('key') !== process.env.CRON_KEY) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. Define Leagues to Fetch (ESPN IDs)
     const leagues = [
       { id: 'eng.1', name: 'Premier League' },
       { id: 'esp.1', name: 'La Liga' },
@@ -23,7 +20,6 @@ export async function GET(req: Request) {
       { id: 'uefa.champions', name: 'Champions League' }
     ];
 
-    // 3. Fetch Data from ESPN (Parallel Requests)
     const requests = leagues.map(league => 
       fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league.id}/scoreboard`, { cache: 'no-store' })
         .then(res => res.json())
@@ -34,27 +30,23 @@ export async function GET(req: Request) {
     const results = await Promise.all(requests);
     let matchesToSync: any[] = [];
 
-    // 4. Process the messy ESPN data into clean rows
     results.forEach((data: any) => {
       if (data && data.events) {
         data.events.forEach((event: any) => {
           const competition = event.competitions[0];
           const home = competition.competitors.find((c: any) => c.homeAway === 'home');
           const away = competition.competitors.find((c: any) => c.homeAway === 'away');
-          const state = event.status.type.state; // 'in', 'post', 'pre'
+          const state = event.status.type.state; 
 
-          // Clean Status String
           let status = 'SCHEDULED';
           if (state === 'in') status = 'LIVE';
           if (state === 'post') status = 'FINISHED';
 
-          // Create a SEO-friendly slug
           const slug = `${home.team.name}-vs-${away.team.name}-${event.date.split('T')[0]}`
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-');
+            .toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
           matchesToSync.push({
-            id: event.id, // ESPN ID is our Primary Key
+            id: event.id,
             league: data._leagueName,
             home_team: home.team.shortDisplayName || home.team.name,
             away_team: away.team.shortDisplayName || away.team.name,
@@ -62,27 +54,22 @@ export async function GET(req: Request) {
             away_score: parseInt(away.score) || 0,
             match_date: event.date,
             status: status,
-            slug: slug
+            slug: slug,
+            // ✅ NEW: Saving Logos
+            home_logo: home.team.logo || home.team.logos?.[0]?.href || null,
+            away_logo: away.team.logo || away.team.logos?.[0]?.href || null
           });
         });
       }
     });
 
-    // 5. Bulk Upsert to Supabase (The "War Machine" Logic)
     if (matchesToSync.length > 0) {
       const admin = getSupabaseAdmin();
-      const { error } = await admin
-        .from('matches')
-        .upsert(matchesToSync, { onConflict: 'id' }); // Updates if exists, Inserts if new
-
+      const { error } = await admin.from('matches').upsert(matchesToSync, { onConflict: 'id' });
       if (error) throw error;
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: `Synced ${matchesToSync.length} matches`,
-      timestamp: new Date().toISOString()
-    });
+    return NextResponse.json({ success: true, count: matchesToSync.length });
 
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
