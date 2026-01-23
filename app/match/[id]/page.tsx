@@ -4,14 +4,13 @@ import { createClient } from '@/app/lib/supabase/server';
 import { notFound } from "next/navigation";
 import Link from 'next/link';
 import { 
-  ChevronLeft, Zap, TrendingUp, Users, Clock, 
-  PlayCircle, ExternalLink, AlertCircle, 
-  ArrowRightLeft, Flag, MonitorPlay 
+  ChevronLeft, Zap, TrendingUp, Users, 
+  ExternalLink, AlertCircle 
 } from 'lucide-react';
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
 
-// --- 1. ID VALIDATION ---
+// --- 1. ID VALIDATION (CRITICAL FOR STABILITY) ---
 function isValidUUID(id: string) {
     const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     return regex.test(id);
@@ -19,7 +18,8 @@ function isValidUUID(id: string) {
 
 // --- 2. DATA FETCHING ---
 async function getSupabaseData(id: string) {
-    if (!isValidUUID(id)) return null;
+    if (!isValidUUID(id)) return null; // Stop bad IDs instantly
+    
     const supabase = createClient();
     try {
         const { data, error } = await supabase.from('matches').select('*').eq('id', id).single();
@@ -67,8 +67,7 @@ async function getEspnData(dbData: any) {
     
     return null;
   } catch (e) {
-    console.error("ESPN Fetch Error:", e);
-    return null;
+    return null; // Silently fail to DB data
   }
 }
 
@@ -82,12 +81,8 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const header = espnData?.header;
   const boxscore = espnData?.boxscore;
   const rosters = espnData?.rosters;
-  
-  // 🛡️ SAFE TIMELINE EXTRACTION 🛡️
-  const rawTimeline = header?.competitions?.[0]?.details || [];
-  // Filter out any garbage events to prevent crashes
-  const timeline = Array.isArray(rawTimeline) ? rawTimeline : [];
 
+  // Teams Construction (Safe Fallback)
   const homeComp = header?.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'home');
   const awayComp = header?.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === 'away');
 
@@ -208,79 +203,16 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         </div>
       </div>
 
+      {/* RICH DATA (STATS & LINEUPS ONLY - NO TIMELINE) */}
       {!espnData ? (
           <div className="mx-4 mt-6 bg-white p-6 rounded-xl border border-slate-100 text-center shadow-sm">
               <AlertCircle className="mx-auto text-slate-300 mb-2" />
-              <p className="text-xs font-bold text-slate-500">Stats syncing from live feed...</p>
-              <p className="text-[10px] text-slate-400">If this persists, check back in 5 minutes.</p>
+              <p className="text-xs font-bold text-slate-500">Stats unavailable.</p>
+              <p className="text-[10px] text-slate-400">Sync pending.</p>
           </div>
       ) : (
         <div className="px-4 mt-8 space-y-8">
             
-            {/* TIMELINE */}
-            <div>
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                    <Clock size={14} /> Key Events
-                </h3>
-                <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-2">
-                    {timeline && timeline.length > 0 ? timeline.map((event: any, i: number) => {
-                        // 🛡️ CRASH PREVENTION: Safe Destructuring
-                        if (!event) return null; // Skip empty events
-                        
-                        const isHome = event.team?.id === homeTeam.id;
-                        
-                        // Safe Type Check
-                        const rawType = event.type?.text || "";
-                        const type = typeof rawType === 'string' ? rawType.toLowerCase() : "";
-                        
-                        // Safe Text Extraction
-                        let text = event.text || event.type?.text || "Event";
-                        if (typeof text !== 'string') text = "Event"; // Fallback if text is not a string
-                        
-                        const player = event.participants?.[0]?.athlete?.displayName;
-
-                        let icon = <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>;
-                        if(type.includes('goal')) icon = <span className="text-sm">⚽</span>;
-                        if(type.includes('yellow')) icon = <div className="w-3 h-4 bg-yellow-400 rounded-[1px] border border-yellow-500 shadow-sm"></div>;
-                        if(type.includes('red')) icon = <div className="w-3 h-4 bg-red-600 rounded-[1px] border border-red-700 shadow-sm"></div>;
-                        if(type.includes('substitution')) icon = <ArrowRightLeft size={14} className="text-green-600" />;
-                        if(type.includes('var')) icon = <MonitorPlay size={14} className="text-slate-600" />;
-                        if(type.includes('offside') || type.includes('corner')) icon = <Flag size={14} className="text-slate-400" />;
-
-                        // Safe String Replacement for Substitution Text
-                        let secondaryText = "";
-                        if (player && typeof text === 'string') {
-                            secondaryText = text.replace(player, '').trim();
-                        }
-
-                        return (
-                            <div key={i} className={`flex items-center gap-3 p-3 border-b border-slate-50 last:border-0 ${i % 2 === 0 ? 'bg-slate-50/50' : ''}`}>
-                                <span className="font-black text-slate-400 text-xs w-8 text-center">{event.clock?.displayValue || "0"}'</span>
-                                <div className="flex-1 flex items-center gap-3">
-                                    {isHome ? (
-                                        <>
-                                            <div className="flex justify-center w-6">{icon}</div>
-                                            <div className="flex-1">
-                                                <span className="font-bold text-xs text-slate-800 block">{player || text}</span>
-                                                {secondaryText && <span className="text-[9px] text-slate-400 uppercase">{secondaryText}</span>}
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div className="flex-1 text-right">
-                                                <span className="font-bold text-xs text-slate-800 block">{player || text}</span>
-                                                {secondaryText && <span className="text-[9px] text-slate-400 uppercase">{secondaryText}</span>}
-                                            </div>
-                                            <div className="flex justify-center w-6">{icon}</div>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    }) : <div className="text-center text-slate-400 text-xs py-6">No events recorded.</div>}
-                </div>
-            </div>
-
             {/* STATS */}
             {boxscore && (
             <div>
