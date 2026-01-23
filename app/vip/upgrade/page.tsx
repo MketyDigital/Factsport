@@ -2,7 +2,7 @@
 
 export const runtime = 'edge';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { Trophy, Check, Copy, CreditCard, Bitcoin, Loader2, ShieldCheck, UploadCloud, Image as ImageIcon, X } from 'lucide-react';
@@ -19,7 +19,7 @@ export default function VipUpgradePage() {
   const router = useRouter();
   const supabase = createClient();
 
-  // --- CONFIG ---
+  // --- 🔧 CONFIGURATION: UPDATE THESE WITH YOUR REAL DETAILS ---
   const BANK_DETAILS = {
     bankName: "Opay / Paycom",
     accountNumber: "9012345678",
@@ -29,10 +29,22 @@ export default function VipUpgradePage() {
 
   const CRYPTO_DETAILS = {
     network: "USDT (TRC20)",
-    address: "TWe7....(Your Wallet)...",
+    address: "TWe7....(Your Wallet Address)...",
     price: "$5.00"
   };
-  // -------------
+  // -------------------------------------------------------------
+
+  // Check login on load
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        // Optional: Redirect immediately or let them see the page but force login on submit
+        // router.push('/login'); 
+      }
+    };
+    checkUser();
+  }, [supabase, router]);
 
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -43,10 +55,19 @@ export default function VipUpgradePage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
         const selected = e.target.files[0];
-        if (selected.size > 5 * 1024 * 1024) { // 5MB limit
+        
+        // Validation: Max 5MB
+        if (selected.size > 5 * 1024 * 1024) { 
             setUploadError("File too large (Max 5MB)");
             return;
         }
+        
+        // Validation: Image types only
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(selected.type)) {
+            setUploadError("Only JPG, PNG, or WEBP images allowed");
+            return;
+        }
+
         setFile(selected);
         setUploadError(null);
     }
@@ -54,31 +75,39 @@ export default function VipUpgradePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setUploadError(null);
+
+    // Validation: Must have Ref ID OR File
     if (!file && !ref) {
-        setUploadError("Please provide proof (Screenshot OR Ref ID)");
+        setUploadError("Please provide a Screenshot OR a Reference ID.");
         return;
     }
     setLoading(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
+    // 1. Reliable User Check
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
 
     if (!user) {
+        alert("You must be logged in to submit a payment.");
         router.push('/login');
         return;
     }
 
     let proofUrl = null;
 
-    // 1. Upload Image if exists
+    // 2. Upload Image (If selected)
     if (file) {
         const fileExt = file.name.split('.').pop();
         const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+        
         const { error: uploadErr } = await supabase.storage
             .from('payment_proofs')
             .upload(fileName, file);
 
         if (uploadErr) {
-            setUploadError("Image upload failed. Try again.");
+            console.error('Upload Error:', uploadErr);
+            setUploadError("Image upload failed. Please try again or use Ref ID.");
             setLoading(false);
             return;
         }
@@ -91,20 +120,22 @@ export default function VipUpgradePage() {
         proofUrl = publicUrlData.publicUrl;
     }
 
-    // 2. Insert Request
+    // 3. Save Request to Database
     const { error } = await supabase.from('subscriptions').insert({
         user_id: user.id,
         plan: 'monthly',
         amount: paymentMethod === 'bank' ? 5000 : 5,
         payment_method: paymentMethod,
         transaction_ref: ref || 'Screenshot Uploaded',
-        proof_url: proofUrl
+        proof_url: proofUrl,
+        status: 'pending'
     });
 
     if (!error) {
         setSuccess(true);
     } else {
-        setUploadError("Submission failed. Contact support.");
+        console.error('Database Error:', error);
+        setUploadError("Submission failed. Please contact support.");
     }
     setLoading(false);
   };
@@ -113,14 +144,14 @@ export default function VipUpgradePage() {
     return (
         <div className="min-h-screen bg-black flex items-center justify-center p-4">
             <div className="bg-[#111] border border-yellow-500/30 p-8 rounded-2xl text-center max-w-md w-full">
-                <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-4 text-black">
-                    <Check size={32} />
+                <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-4 text-black shadow-[0_0_20px_rgba(234,179,8,0.5)]">
+                    <Check size={32} strokeWidth={3} />
                 </div>
                 <h2 className="text-2xl font-black text-white mb-2">Proof Received!</h2>
-                <p className="text-slate-400 text-sm mb-6">
-                    Our team will verify your transaction shortly. Your account will be upgraded within 30 minutes.
+                <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+                    Our team will verify your transaction shortly. Your account will be upgraded within <span className="text-white font-bold">30 minutes</span>.
                 </p>
-                <button onClick={() => router.push('/dashboard')} className="w-full bg-slate-800 text-white font-bold py-3 rounded-xl hover:bg-slate-700">
+                <button onClick={() => router.push('/dashboard')} className="w-full bg-slate-800 text-white font-bold py-3.5 rounded-xl hover:bg-slate-700 transition">
                     Back to Dashboard
                 </button>
             </div>
@@ -129,78 +160,102 @@ export default function VipUpgradePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a1428] pb-20 font-sans text-white">
+    <div className="min-h-screen bg-[#0a1428] pb-24 font-sans text-white">
       
-      {/* Header */}
-      <div className="relative overflow-hidden bg-black pb-10 pt-8 px-6 rounded-b-[3rem] shadow-2xl border-b border-yellow-900/30">
+      {/* --- HEADER --- */}
+      <div className="relative overflow-hidden bg-black pb-12 pt-10 px-6 rounded-b-[3rem] shadow-2xl border-b border-yellow-900/30">
         <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-600 rounded-full blur-[120px] opacity-20"></div>
+        <div className="absolute bottom-0 left-0 w-40 h-40 bg-yellow-600 rounded-full blur-[100px] opacity-10"></div>
+        
         <div className="flex flex-col items-center text-center relative z-10">
-            <div className="w-14 h-14 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-[0_0_25px_rgba(234,179,8,0.4)] mb-4">
-                <Trophy className="text-black fill-black" size={28} />
+            <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-[0_0_25px_rgba(234,179,8,0.4)] mb-5">
+                <Trophy className="text-black fill-black" size={32} />
             </div>
-            <h1 className="text-2xl font-black uppercase italic tracking-tighter">
+            <h1 className="text-3xl font-black uppercase italic tracking-tighter mb-2">
                 Join the <span className="text-yellow-400">Winners Circle</span>
             </h1>
-            <p className="text-slate-400 text-xs mt-2 max-w-xs">
-                Stop guessing. Start winning with premium analysis and guaranteed tips.
+            <p className="text-slate-400 text-xs font-medium max-w-xs leading-relaxed">
+                Stop guessing. Start winning with 98% accurate premium analysis and guaranteed tips.
             </p>
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-4 -mt-6 relative z-10 space-y-6">
+      <div className="max-w-md mx-auto px-4 -mt-8 relative z-10 space-y-6">
         
-        {/* Payment Selector */}
+        {/* --- BENEFITS CARD --- */}
+        <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-xl backdrop-blur-md">
+            <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-4">VIP Benefits</h3>
+            <ul className="space-y-3.5">
+                {[
+                    "Daily 5-10 Odds (98% Win Rate)",
+                    "Weekend 50+ Odds Jackpot Ticket",
+                    "Qualify for ₦500,000 Monthly Prize",
+                    "Priority Customer Support (24/7)",
+                    "No Ads Experience"
+                ].map((item, i) => (
+                    <li key={i} className="flex items-start gap-3 text-sm font-bold text-slate-200">
+                        <div className="w-5 h-5 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 shrink-0 mt-0.5">
+                            <Check size={12} strokeWidth={4} />
+                        </div>
+                        {item}
+                    </li>
+                ))}
+            </ul>
+        </div>
+
+        {/* --- PAYMENT METHOD TOGGLE --- */}
         <div className="grid grid-cols-2 gap-3">
             <button 
                 onClick={() => setPaymentMethod('bank')}
-                className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition ${paymentMethod === 'bank' ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-[#111] border-white/10 text-slate-400'}`}
+                className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition active:scale-95 ${paymentMethod === 'bank' ? 'bg-yellow-500 text-black border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)]' : 'bg-[#111] border-white/10 text-slate-400 hover:bg-white/5'}`}
             >
                 <CreditCard size={24} />
-                <span className="text-xs font-black uppercase">Bank Transfer</span>
+                <span className="text-[10px] font-black uppercase tracking-wide">Bank Transfer</span>
             </button>
             <button 
                 onClick={() => setPaymentMethod('crypto')}
-                className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition ${paymentMethod === 'crypto' ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-[#111] border-white/10 text-slate-400'}`}
+                className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition active:scale-95 ${paymentMethod === 'crypto' ? 'bg-yellow-500 text-black border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)]' : 'bg-[#111] border-white/10 text-slate-400 hover:bg-white/5'}`}
             >
                 <Bitcoin size={24} />
-                <span className="text-xs font-black uppercase">Crypto (USDT)</span>
+                <span className="text-[10px] font-black uppercase tracking-wide">Crypto (USDT)</span>
             </button>
         </div>
 
-        {/* Payment Details */}
-        <div className="bg-gradient-to-br from-[#1a1a1a] to-black border border-yellow-500/30 rounded-2xl p-6 text-center relative overflow-hidden">
+        {/* --- PAYMENT DETAILS CARD --- */}
+        <div className="bg-gradient-to-br from-[#1a1a1a] to-black border border-yellow-500/30 rounded-2xl p-6 text-center relative overflow-hidden shadow-2xl">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-yellow-500 to-transparent"></div>
             
-            <p className="text-slate-400 text-xs font-bold uppercase mb-1">Make Payment of</p>
-            <h2 className="text-3xl font-black text-white mb-6">
+            <p className="text-slate-400 text-[10px] font-bold uppercase mb-1">Make Payment of</p>
+            <h2 className="text-3xl font-black text-white mb-6 tracking-tight">
                 {paymentMethod === 'bank' ? BANK_DETAILS.price : CRYPTO_DETAILS.price} <span className="text-sm font-normal text-slate-500">/ Month</span>
             </h2>
 
             {paymentMethod === 'bank' ? (
                 <div className="space-y-4">
                     <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                        <p className="text-[10px] text-slate-400 uppercase">Bank Name</p>
-                        <p className="font-bold">{BANK_DETAILS.bankName}</p>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Bank Name</p>
+                        <p className="font-bold text-sm text-slate-200">{BANK_DETAILS.bankName}</p>
                     </div>
-                    <div className="bg-white/5 rounded-xl p-3 border border-white/10 relative">
-                        <p className="text-[10px] text-slate-400 uppercase">Account Number</p>
+                    <div className="bg-white/5 rounded-xl p-3 border border-white/10 relative group">
+                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Account Number</p>
                         <p className="font-mono text-xl font-bold tracking-widest text-yellow-400 my-1">{BANK_DETAILS.accountNumber}</p>
-                        <p className="text-[10px] text-slate-300">{BANK_DETAILS.accountName}</p>
+                        <p className="text-[10px] text-slate-300 font-medium">{BANK_DETAILS.accountName}</p>
+                        
                         <button 
                             onClick={() => handleCopy(BANK_DETAILS.accountNumber, 'acc')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 bg-yellow-500 text-black p-2 rounded-lg hover:bg-yellow-400"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 bg-yellow-500 text-black p-2 rounded-lg hover:bg-yellow-400 transition active:scale-90 shadow-lg"
                         >
                             {copied === 'acc' ? <Check size={16} /> : <Copy size={16} />}
                         </button>
                     </div>
                 </div>
             ) : (
-                <div className="bg-white/5 rounded-xl p-3 border border-white/10 relative">
-                    <p className="text-[10px] text-slate-400 uppercase">USDT (TRC20) Address</p>
-                    <p className="font-mono text-xs font-bold text-yellow-400 my-2 break-all">{CRYPTO_DETAILS.address}</p>
+                <div className="bg-white/5 rounded-xl p-4 border border-white/10 relative">
+                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">USDT (TRC20) Address</p>
+                    <p className="font-mono text-xs font-bold text-yellow-400 my-3 break-all px-2">{CRYPTO_DETAILS.address}</p>
                     <button 
                         onClick={() => handleCopy(CRYPTO_DETAILS.address, 'crypto')}
-                        className="flex items-center justify-center gap-2 w-full bg-yellow-500 text-black py-2 rounded-lg font-bold text-xs mt-2"
+                        className="flex items-center justify-center gap-2 w-full bg-yellow-500 hover:bg-yellow-400 text-black py-2.5 rounded-lg font-bold text-xs mt-2 transition active:scale-95 shadow-lg"
                     >
                         {copied === 'crypto' ? <Check size={14} /> : <Copy size={14} />} Copy Address
                     </button>
@@ -208,24 +263,28 @@ export default function VipUpgradePage() {
             )}
         </div>
 
-        {/* Confirmation Form */}
-        <form onSubmit={handleSubmit} className="bg-[#111] border border-white/10 rounded-2xl p-5 shadow-xl">
-            <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                <ShieldCheck className="text-green-500" size={16} /> Submit Proof
+        {/* --- CONFIRMATION FORM --- */}
+        <form onSubmit={handleSubmit} className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-xl">
+            <h3 className="text-sm font-bold text-white mb-5 flex items-center gap-2">
+                <ShieldCheck className="text-green-500" size={18} /> Confirm Payment
             </h3>
             
-            {uploadError && <div className="mb-4 p-3 bg-red-500/20 text-red-400 text-xs font-bold rounded-lg">{uploadError}</div>}
+            {uploadError && (
+                <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold rounded-lg text-center animate-pulse">
+                    {uploadError}
+                </div>
+            )}
 
-            <div className="space-y-4">
+            <div className="space-y-5">
                 {/* 1. Transaction Ref Input */}
                 <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2 pl-1">
                         {paymentMethod === 'bank' ? 'Sender Name / Ref ID' : 'Transaction Hash'}
                     </label>
                     <input 
                         type="text" 
                         placeholder={paymentMethod === 'bank' ? "e.g. John Doe" : "e.g. TxID12345..."}
-                        className="w-full bg-black border border-white/20 rounded-xl py-3 px-4 text-white text-sm focus:border-yellow-500 focus:outline-none placeholder:text-slate-600"
+                        className="w-full bg-black border border-white/20 rounded-xl py-3.5 px-4 text-white text-sm focus:border-yellow-500 focus:outline-none placeholder:text-slate-600 transition-colors"
                         value={ref}
                         onChange={(e) => setRef(e.target.value)}
                     />
@@ -233,26 +292,30 @@ export default function VipUpgradePage() {
 
                 {/* 2. File Upload Area */}
                 <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2 pl-1">
                         Upload Screenshot (Optional)
                     </label>
                     
                     {!file ? (
-                        <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-yellow-500/50 hover:bg-white/5 transition">
-                            <UploadCloud className="text-slate-500 mb-1" size={24} />
-                            <span className="text-[10px] text-slate-400">Tap to upload receipt</span>
+                        <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-yellow-500/50 hover:bg-white/5 transition group">
+                            <UploadCloud className="text-slate-500 group-hover:text-yellow-500 transition-colors mb-2" size={28} />
+                            <span className="text-[10px] font-bold text-slate-400">Tap to upload receipt</span>
+                            <span className="text-[9px] text-slate-600 mt-1">Max 5MB (JPG/PNG)</span>
                             <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
                         </label>
                     ) : (
                         <div className="flex items-center justify-between bg-white/10 p-3 rounded-xl border border-white/20">
                             <div className="flex items-center gap-3 overflow-hidden">
-                                <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center shrink-0">
-                                    <ImageIcon size={16} className="text-black" />
+                                <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center shrink-0">
+                                    <ImageIcon size={18} className="text-black" />
                                 </div>
-                                <span className="text-xs truncate text-slate-200">{file.name}</span>
+                                <div className="min-w-0">
+                                    <p className="text-xs font-bold text-slate-200 truncate">{file.name}</p>
+                                    <p className="text-[10px] text-slate-400">Ready to upload</p>
+                                </div>
                             </div>
-                            <button type="button" onClick={() => setFile(null)} className="text-slate-400 hover:text-white">
-                                <X size={16} />
+                            <button type="button" onClick={() => setFile(null)} className="p-2 text-slate-400 hover:text-red-500 transition">
+                                <X size={18} />
                             </button>
                         </div>
                     )}
@@ -261,7 +324,7 @@ export default function VipUpgradePage() {
                 <button 
                     type="submit" 
                     disabled={loading || (!ref && !file)}
-                    className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black uppercase py-3.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2"
+                    className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black uppercase py-4 rounded-xl shadow-[0_0_20px_rgba(234,179,8,0.4)] transition active:scale-98 flex items-center justify-center gap-2 mt-2"
                 >
                     {loading ? <Loader2 className="animate-spin" size={20} /> : "Submit Payment"}
                 </button>
@@ -269,7 +332,7 @@ export default function VipUpgradePage() {
         </form>
 
         <p className="text-center text-[10px] text-slate-500 pb-8">
-            Need help? <a href="#" className="text-yellow-500 underline">Contact Support</a>
+            Having trouble? <a href="#" className="text-yellow-500 underline font-bold">Contact Support</a>
         </p>
 
       </div>
