@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-// ✅ FIXED: Missing Edge Runtime definition added back
 export const runtime = 'edge'; 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +17,7 @@ export async function GET(request: Request) {
     );
 
     try {
-        // 1. Fetch Matches (Using PLURAL 'points_distributed')
+        // 1. Fetch Matches marked as 'FT' but not yet settled
         const { data: matches, error: fetchError } = await supabase
             .from('matches')
             .select('*')
@@ -36,8 +35,9 @@ export async function GET(request: Request) {
 
         // 2. Process Loop
         for (const match of matches) {
+            // ✅ We explicitly pass match.id.toString() to satisfy the new SQL function
             const { error: rpcError } = await supabase.rpc('settle_match_points', { 
-                target_match_id: match.id 
+                target_match_id: match.id.toString() 
             });
 
             if (!rpcError) {

@@ -13,6 +13,8 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
   useEffect(() => {
     const now = new Date();
     const matchTime = new Date(matchDate);
+    
+    // Logic: Only poll the API if match is currently Live or about to start
     const isLive = ['LIVE', 'in'].includes(data.status) || 
                    (now >= matchTime && !['FT', 'post', 'FINISHED'].includes(data.status));
 
@@ -34,10 +36,11 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
     };
 
     fetchScore();
-    const interval = setInterval(fetchScore, 60000);
+    const interval = setInterval(fetchScore, 60000); // Check every 60 seconds
     return () => clearInterval(interval);
   }, []);
 
+  // 1. UI for LIVE Matches
   if (['LIVE', 'in'].includes(data.status)) {
     return (
       <div className="flex flex-col items-center">
@@ -51,6 +54,7 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
     );
   }
 
+  // 2. UI for FINISHED Matches
   if (['FT', 'post', 'FINISHED'].includes(data.status)) {
     return (
       <div className="flex flex-col items-center">
@@ -62,9 +66,15 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
     );
   }
 
+  // 3. UI for UPCOMING Matches (Restored Date & Time)
   return (
-    <div className="bg-slate-100 px-3 py-1 rounded text-xs font-bold text-slate-500 whitespace-nowrap">
-      {new Date(matchDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+    <div className="flex flex-col items-center min-w-[70px]">
+      <span className="text-[8px] font-black text-slate-400 uppercase tracking-tight mb-1">
+        {new Date(matchDate).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })}
+      </span>
+      <div className="bg-slate-100 px-3 py-1 rounded-lg text-[10px] font-black text-slate-600 whitespace-nowrap border border-slate-200/50">
+        {new Date(matchDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+      </div>
     </div>
   );
 }
