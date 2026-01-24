@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Trophy, TrendingUp, History, Star, User as UserIcon, 
-  AlertCircle, Crown, ExternalLink, Zap
+  ExternalLink, Zap, Crown
 } from 'lucide-react';
 import SignOutButton from '@/app/components/SignOutButton';
 
@@ -43,14 +43,14 @@ export default async function Dashboard() {
   if (!data) redirect('/login');
 
   const { profile, predictions } = data;
-  
+   
   // VIP Logic
   const expiryDate = profile?.vip_expires_at ? new Date(profile.vip_expires_at) : null;
   const isVipActive = profile?.is_vip && (!expiryDate || expiryDate > new Date());
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans text-slate-900">
-      
+       
       {/* --- 1. HEADER SECTION --- */}
       <div className="bg-[#0a1428] text-white pt-8 pb-24 px-6 rounded-b-[2.5rem] relative overflow-hidden shadow-2xl">
         {/* Background Texture */}
@@ -155,7 +155,7 @@ export default async function Dashboard() {
                   View Leaderboard <ExternalLink size={10} />
               </Link>
           </div>
-          
+           
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden min-h-[200px]">
              {predictions && predictions.length > 0 ? (
                  predictions.map((pred: any) => (
@@ -185,7 +185,8 @@ export default async function Dashboard() {
                         
                         {/* Status / Points */}
                         <div className="text-right">
-                            {pred.status === 'pending' ? (
+                            {/* ✅ SAFE CHECK: Converts to lowercase to prevent 'LOST' bug */}
+                            {pred.status?.toLowerCase() === 'pending' ? (
                                 <div className="flex flex-col items-end">
                                     <span className="text-[9px] font-black text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-100">PENDING</span>
                                 </div>

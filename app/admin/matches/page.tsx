@@ -5,12 +5,13 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
 import { 
   Search, Plus, Save, Trash2, Calculator, 
-  Loader2, Link as LinkIcon, Video, Calendar 
+  Loader2, Link as LinkIcon, Video, Calendar, Image as ImageIcon,
+  CheckCircle, RefreshCw
 } from 'lucide-react';
 
 export default function AdminMatchesPage() {
   const supabase = createClient();
-  
+   
   // States
   const [loading, setLoading] = useState(false);
   const [matches, setMatches] = useState<any[]>([]);
@@ -24,8 +25,8 @@ export default function AdminMatchesPage() {
     away_team: '',
     league: 'Premier League',
     match_date: '',
-    home_logo: '', // Optional: URL to logo
-    away_logo: ''  // Optional: URL to logo
+    home_logo: '', 
+    away_logo: ''
   });
 
   // 1. Fetch Matches on Load
@@ -53,13 +54,18 @@ export default function AdminMatchesPage() {
         return;
     }
     setLoading(true);
-    const { error } = await supabase.from('matches').insert([newMatch]);
+    // Use the state directly
+    const { error } = await supabase.from('matches').insert([{
+        ...newMatch,
+        // Ensure status defaults to SCHEDULED
+        status: 'SCHEDULED' 
+    }]);
     
     if (error) alert("Error creating match: " + error.message);
     else {
         setIsCreating(false);
         setNewMatch({ home_team: '', away_team: '', league: 'Premier League', match_date: '', home_logo: '', away_logo: '' });
-        fetchMatches(); // Refresh list
+        fetchMatches(); 
     }
     setLoading(false);
   };
@@ -75,28 +81,32 @@ export default function AdminMatchesPage() {
         home_score: match.home_score,
         away_score: match.away_score,
         status: match.status,
-        api_id: match.api_id, // Vital for Automation
+        api_id: match.api_id, 
         booking_code: match.booking_code,
         affiliate_link: match.affiliate_link,
         video_url: match.video_url,
         is_featured_video: match.is_featured_video,
-        // You can add logic to update names if needed, but usually names don't change
+        points_distributed: match.points_distributed // ✅ Added capability to update this manualy
     }).eq('id', match.id);
 
     if (error) alert("Save failed: " + error.message);
     
-    // Visual feedback
     setTimeout(() => setSavingId(null), 1000);
   };
 
-  // 4. Distribute Points (The Magic Button)
+  // 4. Distribute Points
   const settlePoints = async (matchId: string) => {
     if (!confirm("⚠️ CONFIRM SETTLEMENT: \n\nAre you sure the match is finished? \nThis will calculate points for all users.")) return;
     
     const { error } = await supabase.rpc('settle_match_points', { target_match_id: matchId });
     
-    if (error) alert("Error: " + error.message);
-    else alert("✅ Success! Points distributed.");
+    if (error) {
+        alert("Error: " + error.message);
+    } else {
+        alert("✅ Success! Points distributed.");
+        // Auto-update local state to show it's done
+        handleUpdateChange(matchId, 'points_distributed', true);
+    }
   };
 
   // 5. Delete Match
@@ -123,13 +133,13 @@ export default function AdminMatchesPage() {
         </button>
       </div>
 
-      {/* CREATE FORM (Collapsible) */}
+      {/* CREATE FORM */}
       {isCreating && (
         <div className="bg-white p-6 rounded-2xl shadow-xl border border-blue-100 mb-8 animate-in fade-in slide-in-from-top-4">
             <h2 className="text-sm font-black uppercase text-blue-600 mb-4 flex items-center gap-2"><Calendar size={16}/> New Match Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <input type="text" placeholder="Home Team (e.g. Chelsea)" className="border p-3 rounded-xl font-bold" value={newMatch.home_team} onChange={e => setNewMatch({...newMatch, home_team: e.target.value})} />
-                <input type="text" placeholder="Away Team (e.g. Arsenal)" className="border p-3 rounded-xl font-bold" value={newMatch.away_team} onChange={e => setNewMatch({...newMatch, away_team: e.target.value})} />
+                <input type="text" placeholder="Home Team" className="border p-3 rounded-xl font-bold" value={newMatch.home_team} onChange={e => setNewMatch({...newMatch, home_team: e.target.value})} />
+                <input type="text" placeholder="Away Team" className="border p-3 rounded-xl font-bold" value={newMatch.away_team} onChange={e => setNewMatch({...newMatch, away_team: e.target.value})} />
                 <input type="datetime-local" className="border p-3 rounded-xl" value={newMatch.match_date} onChange={e => setNewMatch({...newMatch, match_date: e.target.value})} />
                 <select className="border p-3 rounded-xl bg-white" value={newMatch.league} onChange={e => setNewMatch({...newMatch, league: e.target.value})}>
                     <option>Premier League</option>
@@ -140,6 +150,9 @@ export default function AdminMatchesPage() {
                     <option>Ligue 1</option>
                     <option>Other</option>
                 </select>
+                {/* Added Logo Inputs */}
+                <input type="text" placeholder="Home Logo URL (Optional)" className="border p-3 rounded-xl text-xs" value={newMatch.home_logo} onChange={e => setNewMatch({...newMatch, home_logo: e.target.value})} />
+                <input type="text" placeholder="Away Logo URL (Optional)" className="border p-3 rounded-xl text-xs" value={newMatch.away_logo} onChange={e => setNewMatch({...newMatch, away_logo: e.target.value})} />
             </div>
             <div className="flex justify-end">
                 <button onClick={handleCreate} disabled={loading} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold">
@@ -195,7 +208,7 @@ export default function AdminMatchesPage() {
                             onChange={(e) => handleUpdateChange(match.id, 'away_score', e.target.value)}
                         />
                          <select 
-                            className="h-10 border rounded-lg bg-white text-xs font-bold px-2"
+                            className={`h-10 border rounded-lg text-xs font-bold px-2 ${match.status === 'LIVE' ? 'text-red-600 bg-red-50 border-red-200' : 'bg-white'}`}
                             value={match.status}
                             onChange={(e) => handleUpdateChange(match.id, 'status', e.target.value)}
                         >
@@ -262,7 +275,7 @@ export default function AdminMatchesPage() {
                 {/* 3. RIGHT: Video & Actions */}
                 <div className="p-5 lg:w-1/3 bg-slate-50/30 flex flex-col justify-between">
                     <div>
-                         <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3">Media</h4>
+                         <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3">Media & Settings</h4>
                          <div className="relative mb-3">
                             <Video size={12} className="absolute left-2.5 top-2.5 text-slate-400" />
                             <input 
@@ -273,25 +286,50 @@ export default function AdminMatchesPage() {
                                 onChange={(e) => handleUpdateChange(match.id, 'video_url', e.target.value)}
                             />
                         </div>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input 
-                                type="checkbox" 
-                                checked={match.is_featured_video || false}
-                                onChange={(e) => handleUpdateChange(match.id, 'is_featured_video', e.target.checked)}
-                            />
-                            <span className="text-xs font-bold text-slate-600">Feature on Homepage?</span>
-                        </label>
+                        
+                        <div className="space-y-2">
+                             <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border border-slate-100">
+                                <input 
+                                    type="checkbox" 
+                                    checked={match.is_featured_video || false}
+                                    onChange={(e) => handleUpdateChange(match.id, 'is_featured_video', e.target.checked)}
+                                />
+                                <span className="text-xs font-bold text-slate-600">Feature on Homepage</span>
+                            </label>
+
+                            {/* ✅ NEW: Reset Points Toggle (Lifesaver for bugs) */}
+                            <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border border-slate-100">
+                                <input 
+                                    type="checkbox" 
+                                    checked={match.points_distributed || false}
+                                    onChange={(e) => handleUpdateChange(match.id, 'points_distributed', e.target.checked)}
+                                />
+                                <span className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                                    Points Distributed?
+                                    {match.points_distributed && <CheckCircle size={12} className="text-green-600" />}
+                                </span>
+                            </label>
+                        </div>
                     </div>
 
                     <div className="mt-6 pt-4 border-t border-slate-200">
-                        <button 
-                            onClick={() => settlePoints(match.id)} 
-                            className="w-full py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-200 hover:shadow-xl hover:scale-[1.02] transition"
-                        >
-                            <Calculator size={16} /> DISTRIBUTE POINTS
-                        </button>
+                        {match.points_distributed ? (
+                             <button 
+                                onClick={() => settlePoints(match.id)} 
+                                className="w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-green-100 text-green-700 cursor-default"
+                             >
+                                <CheckCircle size={16} /> POINTS DISTRIBUTED
+                             </button>
+                        ) : (
+                             <button 
+                                onClick={() => settlePoints(match.id)} 
+                                className="w-full py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-200 hover:shadow-xl hover:scale-[1.02] transition"
+                             >
+                                <Calculator size={16} /> DISTRIBUTE POINTS
+                             </button>
+                        )}
                         <p className="text-[9px] text-center text-slate-400 mt-2">
-                            Click only when match is fully finished.
+                            {match.points_distributed ? "Uncheck 'Points Distributed' above to re-run." : "Click when match is finished."}
                         </p>
                     </div>
                 </div>
