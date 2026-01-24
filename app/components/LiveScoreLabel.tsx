@@ -11,13 +11,10 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
   });
 
   useEffect(() => {
-    // Only update if LIVE or Scheduled for TODAY
     const now = new Date();
     const matchTime = new Date(matchDate);
-    // Logic: Is it live? OR Is it future/past but the component is stale?
-    // We only fetch if it's explicitly LIVE/IN or we want to catch the kick-off
-    const isLive = data.status === 'LIVE' || data.status === 'in' || 
-                   (now >= matchTime && data.status !== 'FT' && data.status !== 'post');
+    const isLive = ['LIVE', 'in'].includes(data.status) || 
+                   (now >= matchTime && !['FT', 'post', 'FINISHED'].includes(data.status));
 
     if (!isLive) return;
 
@@ -27,7 +24,7 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
         if (res.ok) {
           const json = await res.json();
           setData({
-            status: json.status === 'in' ? 'LIVE' : json.status,
+            status: json.status,
             home: json.home.score,
             away: json.away.score,
             clock: json.displayClock
@@ -41,7 +38,7 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
     return () => clearInterval(interval);
   }, []);
 
-  if (data.status === 'LIVE' || data.status === 'in') {
+  if (['LIVE', 'in'].includes(data.status)) {
     return (
       <div className="flex flex-col items-center">
         <span className="text-red-600 font-bold text-[10px] animate-pulse whitespace-nowrap">
@@ -54,7 +51,7 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
     );
   }
 
-  if (data.status === 'FT' || data.status === 'post') {
+  if (['FT', 'post', 'FINISHED'].includes(data.status)) {
     return (
       <div className="flex flex-col items-center">
         <div className="text-lg font-black tracking-tighter text-slate-800 leading-none">
