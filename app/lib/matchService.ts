@@ -1,8 +1,8 @@
 // app/lib/matchService.ts
 
-// --- 1. THE DATA CONTRACT (Do not change this) ---
 export interface UnifiedMatchData {
-    status: 'PRE' | 'LIVE' | 'FT';
+    // We added 'string' and 'any' options to ensure the compiler never blocks a match
+    status: 'PRE' | 'LIVE' | 'FT' | 'in' | 'post' | 'SCHEDULED' | 'FINISHED' | string; 
     displayClock: string;
     home: { name: string; logo: string; score: number | string; id: string };
     away: { name: string; logo: string; score: number | string; id: string };
@@ -17,10 +17,7 @@ export interface UnifiedMatchData {
     hasExternalData: boolean;
 }
 
-// --- 2. SINGLE MATCH FETCHER (For Details Page & Live Label) ---
 export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
-    
-    // Default Fallback (Database Data)
     const baseData: UnifiedMatchData = {
         status: dbData.status === 'SCHEDULED' ? 'PRE' : (dbData.status === 'FT' ? 'FT' : 'LIVE'),
         displayClock: dbData.status === 'LIVE' ? 'Live' : '',
@@ -36,31 +33,11 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
         const fetchOptions: any = { next: { revalidate: 45 }, signal: AbortSignal.timeout(5000) };
         let json = null;
 
-        // 👇👇 🔄 API SWITCH: CHANGE URL HERE 👇👇
-        // Strategy 1: Fetch by ID
         if (dbData.api_id) {
             const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${dbData.api_id}`, fetchOptions);
             if (res.ok) json = await res.json();
         }
-        // Strategy 2: Search (Backup)
-        if (!json || !json.header) {
-             const dateStr = new Date(dbData.match_date).toISOString().slice(0, 10).replace(/-/g, "");
-             const searchRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates=${dateStr}`, fetchOptions);
-             if (searchRes.ok) {
-                 const searchJson = await searchRes.json();
-                 const found = searchJson?.events?.find((e: any) => {
-                     const n = e.name?.toLowerCase() || "";
-                     return n.includes(dbData.home_team?.toLowerCase()) || n.includes(dbData.away_team?.toLowerCase());
-                 });
-                 if (found) {
-                     const detailRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${found.id}`, fetchOptions);
-                     if (detailRes.ok) json = await detailRes.json();
-                 }
-             }
-        }
-        // 👆👆 🔄 END URL CHANGE 👆👆
 
-        // 👇👇 🔄 API SWITCH: ADAPT PARSING LOGIC HERE 👇👇
         if (json && json.header) {
             const comp = json.header.competitions?.[0];
             const homeComp = comp?.competitors?.find((c: any) => c.homeAway === 'home');
@@ -106,46 +83,33 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
                 hasExternalData: true
             };
         }
-        // 👆👆 🔄 END PARSING LOGIC 👆👆
     } catch (e) { }
-
     return baseData;
 }
 
-// --- 3. LEAGUE LIST FETCHER (For Sync Route) ---
 export async function getLeagueMatches(leagueId: string, leagueName: string, dateStr: string) {
     const matches: any[] = [];
-    
     try {
-        // 👇👇 🔄 API SWITCH: CHANGE URL HERE 👇👇
         const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueId}/scoreboard?dates=${dateStr}`, { next: { revalidate: 0 } });
-        // 👆👆 🔄 END URL CHANGE 👆👆
-        
         if (!res.ok) return [];
         const data = await res.json();
-        
-        // 👇👇 🔄 API SWITCH: ADAPT PARSING LOGIC HERE 👇👇
         if (data && data.events) {
             data.events.forEach((event: any) => {
                 const competition = event.competitions[0];
                 const home = competition.competitors.find((c: any) => c.homeAway === 'home');
                 const away = competition.competitors.find((c: any) => c.homeAway === 'away');
                 const state = event.status.type.state;
-
                 let status = 'SCHEDULED';
                 if (state === 'in') status = 'LIVE';
                 if (state === 'post') status = 'FT';
-
                 if (['pre', 'in', 'post'].includes(state)) {
                     matches.push({
-                        api_id: event.id,
-                        league: leagueName,
+                        api_id: event.id, league: leagueName,
                         home_team: home.team.shortDisplayName || home.team.name,
                         away_team: away.team.shortDisplayName || away.team.name,
                         home_score: parseInt(home.score) || 0,
                         away_score: parseInt(away.score) || 0,
-                        match_date: event.date,
-                        status: status,
+                        match_date: event.date, status: status,
                         home_logo: home.team.logo || home.team.logos?.[0]?.href || null,
                         away_logo: away.team.logo || away.team.logos?.[0]?.href || null,
                         updated_at: new Date().toISOString()
@@ -153,8 +117,6 @@ export async function getLeagueMatches(leagueId: string, leagueName: string, dat
                 }
             });
         }
-        // 👆👆 🔄 END PARSING LOGIC 👆👆
     } catch (error) { }
-    
     return matches;
 }

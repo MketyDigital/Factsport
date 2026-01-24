@@ -4,10 +4,8 @@ import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronLeft, Zap, ExternalLink, AlertCircle, Activity } from 'lucide-react';
-// ✅ IMPORT THE PLAYER
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
-// ✅ IMPORT THE NEW SERVICE
 import { getExternalData } from '@/app/lib/matchService';
 
 async function getSupabaseData(id: string) {
@@ -21,11 +19,9 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const resolvedParams = await params;
   if (!resolvedParams?.id) return notFound();
 
-  // 1. Get Database Data (Video URL is here!)
   const dbData = await getSupabaseData(resolvedParams.id);
   if (!dbData) return notFound();
 
-  // 2. Get Live Stats (Service)
   const data = await getExternalData(dbData);
 
   return (
@@ -43,15 +39,15 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         </div>
 
         <div className="relative z-10 px-4 mt-2">
-          {/* Status */}
+          {/* Status Section - FIXED LOGIC HERE */}
           <div className="flex justify-center mb-6">
-            {data.status === 'LIVE' || data.status === 'in' ? (
+            {['LIVE', 'in'].includes(data.status) ? (
                <span className="bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-full animate-pulse flex items-center gap-1 shadow-lg">
                  <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE {data.displayClock}'
                </span>
             ) : (
                <span className="bg-white/10 text-slate-300 text-[10px] font-bold px-3 py-1 rounded-full border border-white/10 backdrop-blur-md">
-                 {data.status === 'FT' ? 'Full Time' : new Date(dbData.match_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                 {['FT', 'post'].includes(data.status) ? 'Full Time' : new Date(dbData.match_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                </span>
             )}
           </div>
@@ -82,15 +78,8 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       </div>
 
       <div className="mx-4 -mt-6 relative z-20 space-y-4">
-        
-        {/* ✅ HIGHLIGHTS PLAYER (Right here!) */}
-        {dbData.video_url && (
-            <div className="rounded-xl overflow-hidden shadow-2xl border border-white/20">
-                <FactSportPlayer videoUrl={dbData.video_url} />
-            </div>
-        )}
+        {dbData.video_url && <div className="rounded-xl overflow-hidden shadow-2xl border border-white/20"><FactSportPlayer videoUrl={dbData.video_url} /></div>}
 
-        {/* Affiliate Card */}
         <div className="bg-[#1A1A1A] rounded-xl p-4 shadow-xl border border-slate-800 flex items-center justify-between overflow-hidden relative">
             <div className="absolute top-0 right-0 w-20 h-full bg-gradient-to-l from-white/5 to-transparent"></div>
             <div className="flex items-center gap-3 relative z-10">
@@ -103,14 +92,12 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             <Link href={dbData.affiliate_link || "#"} target="_blank" className="bg-yellow-400 hover:bg-yellow-300 text-black text-xs font-black px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-1">Bet Now <ExternalLink size={10} /></Link>
         </div>
 
-        {/* Prediction */}
         <div className="bg-white rounded-xl shadow-lg p-5 border border-slate-100">
            <h3 className="text-xs font-black uppercase text-slate-800 flex items-center gap-1 mb-4"><Zap size={14} className="text-blue-600 fill-blue-600" /> Predict & Win Points</h3>
            <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
         </div>
       </div>
 
-      {/* --- STATS SECTION --- */}
       {!data.hasExternalData ? (
           <div className="mx-4 mt-6 bg-white p-6 rounded-xl border border-slate-100 text-center shadow-sm">
               <AlertCircle className="mx-auto text-slate-300 mb-2" />
@@ -118,8 +105,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           </div>
       ) : (
         <div className="px-4 mt-8 space-y-6">
-            
-            {/* GOALS */}
             {data.goals.length > 0 && (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
                      <h3 className="text-xs font-black uppercase text-slate-400 mb-4 flex items-center gap-2"><Activity size={14} className="text-green-600" /> Goals</h3>
@@ -138,7 +123,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                 </div>
             )}
 
-            {/* STATS */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 space-y-5">
                 <StatBar label="Possession" h={data.stats.possession.h} a={data.stats.possession.a} suffix="%" />
                 <StatBar label="Shots" h={data.stats.shots.h} a={data.stats.shots.a} />
@@ -146,7 +130,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                 <StatBar label="Fouls" h={data.stats.fouls.h} a={data.stats.fouls.a} />
             </div>
 
-            {/* LINEUPS */}
             <div className="grid grid-cols-2 gap-3">
                  <RosterList title="Home" players={data.lineups.home} />
                  <RosterList title="Away" players={data.lineups.away} />
@@ -156,8 +139,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
     </div>
   );
 }
-
-// --- SUB-COMPONENTS ---
 
 function StatBar({ label, h, a, suffix = "" }: any) {
     const total = (h + a) || 1;
