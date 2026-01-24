@@ -4,6 +4,8 @@ export const dynamic = 'force-dynamic';
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
 import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Clock } from "lucide-react";
+// ✅ IMPORT THE LIVE LABEL
+import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 
 // SEO Metadata
 export const metadata = {
@@ -27,7 +29,7 @@ async function getHomepageData(leagueFilter: string | null) {
       matchQuery = matchQuery.ilike('league', `%${leagueFilter}%`);
   }
 
-  // 2. News (FIX: Removed .eq('is_published', true) because Admin page doesn't set it)
+  // 2. News
   const newsQuery = supabase.from('news')
     .select('*')
     .order('created_at', { ascending: false })
@@ -45,25 +47,19 @@ async function getHomepageData(leagueFilter: string | null) {
 }
 
 export default async function Home({ searchParams }: { searchParams: { league?: string } }) {
-  const selectedLeague = searchParams.league || 'All';
+  const selectedLeague = (await searchParams).league || 'All';
   const { matches, news, highlights } = await getHomepageData(selectedLeague);
 
   // News Sorting Logic
   const breakingNews = news.filter(n => n.is_breaking); 
-  // Headlines: Must mark "Slider" in admin AND have an image
   const headlines = news.filter(n => n.is_headline && n.image_url).slice(0, 3);
-  
   const headlineIds = headlines.map(h => h.id);
-  // Latest News: Everything else that isn't a headline or ticker
   const latestNews = news.filter(n => !headlineIds.includes(n.id) && !n.is_breaking).slice(0, 5);
 
   // Match Sorting Logic
-  const live = matches.filter(m => m.status === 'LIVE');
+  const live = matches.filter(m => m.status === 'LIVE' || m.status === 'in');
   const upcoming = matches.filter(m => m.status === 'SCHEDULED' || m.status === 'UPCOMING');
   const finished = matches.filter(m => m.status === 'FINISHED' || m.status === 'FT');
-  
-  upcoming.sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
-  finished.sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
   
   const displayMatches = [...live, ...upcoming, ...finished];
 
@@ -110,7 +106,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       )}
 
-      {/* 3. HIGHLIGHTS (Latest 10) */}
+      {/* 3. HIGHLIGHTS */}
       {highlights.length > 0 && (
         <div className="mt-2 px-4">
              <div className="flex justify-between items-center mb-3">
@@ -134,7 +130,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       )}
 
-      {/* 4. LATEST NEWS (5 Items) */}
+      {/* 4. LATEST NEWS */}
       <div className="px-4 mb-4 mt-6">
         <div className="flex justify-between items-center mb-2">
             <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">Latest News</h3>
@@ -171,29 +167,45 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         <div className="px-4 py-4 space-y-3">
              {displayMatches.map((match) => (
                   <div key={match.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-3">
-                      {/* HEADER: STATUS & DATE */}
+                      {/* HEADER */}
                       <div className="bg-slate-50 px-3 py-1.5 flex justify-between items-center border-b border-slate-100">
                            <div className="flex items-center gap-1">
-                              {match.status === 'LIVE' ? (
-                                  <span className="text-[9px] font-black text-red-600 animate-pulse flex items-center gap-1"><span className="w-1.5 h-1.5 bg-red-600 rounded-full"></span> LIVE</span>
-                              ) : (match.status === 'FT' || match.status === 'FINISHED' ? (
-                                  <span className="text-[9px] font-black text-slate-600">FT</span>
-                              ) : (
-                                  <span className="text-[9px] font-bold text-slate-500 flex items-center gap-1">
-                                    <Clock size={10} /> 
-                                    {new Date(match.match_date).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })} • {new Date(match.match_date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                                  </span>
-                              ))}
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[150px] truncate">{match.league || 'Football Match'}</span>
                            </div>
-                           {match.league && <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[100px] truncate">{match.league}</span>}
+                           <span className="text-[8px] font-bold text-slate-300 uppercase tracking-widest italic">FactSport Exclusive</span>
                       </div>
+                      
                       <Link href={`/match/${match.id}`}>
                           <div className="p-4 flex justify-between items-center active:bg-slate-50 transition">
-                              <div className="flex-1 flex items-center gap-3"><div className="w-8 h-8 flex items-center justify-center shrink-0">{match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}</div><span className="text-xs font-bold text-slate-800 line-clamp-1">{match.home_team}</span>{(match.status === 'LIVE' || match.status === 'FINISHED' || match.status === 'FT') && <span className={`text-sm font-black ml-auto ${match.status === 'LIVE' ? 'text-red-600' : 'text-slate-900'}`}>{match.home_score}</span>}</div>
-                              <div className="mx-2 text-[10px] text-slate-300 font-light">vs</div>
-                              <div className="flex-1 flex items-center gap-3 flex-row-reverse text-right"><div className="w-8 h-8 flex items-center justify-center shrink-0">{match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}</div><span className="text-xs font-bold text-slate-800 line-clamp-1">{match.away_team}</span>{(match.status === 'LIVE' || match.status === 'FINISHED' || match.status === 'FT') && <span className={`text-sm font-black mr-auto ${match.status === 'LIVE' ? 'text-red-600' : 'text-slate-900'}`}>{match.away_score}</span>}</div>
+                              {/* Home */}
+                              <div className="flex-1 flex items-center gap-3 overflow-hidden">
+                                  <div className="w-8 h-8 flex items-center justify-center shrink-0">
+                                      {match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}
+                                  </div>
+                                  <span className="text-xs font-bold text-slate-800 truncate">{match.home_team}</span>
+                              </div>
+
+                              {/* ✅ CENTER: THE SMART LIVE LABEL */}
+                              <div className="px-4 min-w-[80px] flex justify-center border-x border-slate-50">
+                                  <LiveScoreLabel 
+                                    matchId={match.id}
+                                    initialStatus={match.status}
+                                    homeScore={match.home_score}
+                                    awayScore={match.away_score}
+                                    matchDate={match.match_date}
+                                  />
+                              </div>
+
+                              {/* Away */}
+                              <div className="flex-1 flex items-center gap-3 flex-row-reverse text-right overflow-hidden">
+                                  <div className="w-8 h-8 flex items-center justify-center shrink-0">
+                                      {match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}
+                                  </div>
+                                  <span className="text-xs font-bold text-slate-800 truncate">{match.away_team}</span>
+                              </div>
                           </div>
                       </Link>
+
                       <div className="px-3 py-2 border-t border-slate-100 grid grid-cols-2 gap-3 bg-slate-50/50">
                           <Link href={`/match/${match.id}`} className="flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:border-blue-200 rounded-lg py-2 shadow-sm text-[10px] font-bold text-slate-700 active:scale-95 transition"><Zap size={12} className="text-blue-500" /> Predict</Link>
                           {match.booking_code ? (<button className="flex items-center justify-center gap-1.5 bg-[#1A1A1A] text-yellow-400 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition"><Ticket size={12} /> {match.booking_code}</button>) : (<Link href="/vip/upgrade" className="flex items-center justify-center gap-1.5 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition"><Ticket size={12} /> Bet Now</Link>)}
