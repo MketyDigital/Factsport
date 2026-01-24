@@ -2,6 +2,7 @@ export const runtime = 'edge';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
+import { notFound } from 'next/navigation'; // 👈 Added this for 404 handling
 import { 
   ChevronLeft, Zap, TrendingUp, Users, 
   ExternalLink, AlertCircle, Bug, Activity 
@@ -67,10 +68,13 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const resolvedParams = await params; 
   const matchId = resolvedParams?.id;
 
-  if (!matchId) return <ErrorDisplay message="No Match ID found" />;
+  // ✅ FIX: If no ID, show standard 404 Page (Users won't see debug info)
+  if (!matchId) return notFound();
 
   const dbData = await getSupabaseData(matchId);
-  if (!dbData) return <ErrorDisplay message={`Match not found. ID: ${matchId}`} />;
+  
+  // ✅ FIX: If match doesn't exist in DB, show standard 404 Page
+  if (!dbData) return notFound();
 
   const espnData = await getEspnData(dbData);
   
@@ -329,17 +333,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       )}
     </div>
   );
-}
-
-function ErrorDisplay({ message }: { message: string }) {
-    return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-white text-slate-900 p-6">
-            <Bug className="text-red-500 mb-4" size={48} />
-            <h1 className="text-xl font-bold mb-2">Debug Info</h1>
-            <p className="font-mono bg-slate-100 p-4 rounded text-xs">{message}</p>
-            <Link href="/" className="mt-6 text-blue-600 underline text-sm">Return Home</Link>
-        </div>
-    );
 }
 
 // Simple Helper for Stats Bars
