@@ -2,7 +2,7 @@ export const runtime = 'edge';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
-import { notFound } from 'next/navigation'; // 👈 Added this for 404 handling
+import { notFound } from 'next/navigation';
 import { 
   ChevronLeft, Zap, TrendingUp, Users, 
   ExternalLink, AlertCircle, Bug, Activity 
@@ -25,9 +25,17 @@ async function getSupabaseData(id: string) {
 async function getEspnData(dbData: any) {
   if (!dbData) return null;
   try {
+    // 🔒 SAFETY UPDATE:
+    // 1. Revalidate: 45s (Safe from IP Bans, but still fresh enough)
+    // 2. Timeout: 5s (Prevents page hanging if ESPN is slow)
+    const fetchOptions: any = { 
+        next: { revalidate: 45 },
+        signal: AbortSignal.timeout(5000) 
+    };
+
     // Strategy A: Saved ID
     if (dbData.api_id) {
-        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${dbData.api_id}`, { next: { revalidate: 60 } });
+        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${dbData.api_id}`, fetchOptions);
         if (res.ok) {
             const data = await res.json();
             if (data?.header) return data;
@@ -40,7 +48,7 @@ async function getEspnData(dbData: any) {
     
     const dateStr = dateObj.toISOString().slice(0, 10).replace(/-/g, "");
     
-    const searchRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates=${dateStr}`, { next: { revalidate: 60 } });
+    const searchRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates=${dateStr}`, fetchOptions);
     if (!searchRes.ok) return null;
     
     const searchData = await searchRes.json();
@@ -54,12 +62,13 @@ async function getEspnData(dbData: any) {
     });
 
     if (foundEvent) {
-        const detailRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${foundEvent.id}`, { next: { revalidate: 60 } });
+        const detailRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${foundEvent.id}`, fetchOptions);
         if (detailRes.ok) return detailRes.json();
     }
     
     return null;
   } catch (e) {
+    // Fail silently (Safety First) - User just sees DB data
     return null; 
   }
 }
@@ -68,12 +77,9 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const resolvedParams = await params; 
   const matchId = resolvedParams?.id;
 
-  // ✅ FIX: If no ID, show standard 404 Page (Users won't see debug info)
   if (!matchId) return notFound();
 
   const dbData = await getSupabaseData(matchId);
-  
-  // ✅ FIX: If match doesn't exist in DB, show standard 404 Page
   if (!dbData) return notFound();
 
   const espnData = await getEspnData(dbData);
@@ -83,11 +89,10 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const boxscore = espnData?.boxscore;
   const rosters = espnData?.rosters;
   
-  // SAFE TIMELINE: Filter ONLY Goals
+  // Timeline
   const rawTimeline = header?.competitions?.[0]?.details || [];
   const goals = Array.isArray(rawTimeline) ? rawTimeline.filter((event: any) => {
       const text = event?.type?.text?.toLowerCase() || "";
-      // Only show scored goals (exclude missed penalties/shootouts)
       return text.includes("goal") && !text.includes("missed") && !text.includes("saved");
   }) : [];
 
@@ -113,11 +118,24 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
   const getStat = (teamId: string, statName: string) => {
     if (!boxscore?.teams) return "0";
-    const teamObj = boxscore.teams.find((t: any) => t.team?.id === teamId);
+    // Strict string comparison
+    const teamObj = boxscore.teams.find((t: any) => String(t.team?.id) === String(teamId));
     if (!teamObj?.statistics) return "0";
     const statObj = teamObj.statistics.find((s: any) => s.name === statName);
     return statObj?.displayValue || "0";
   };
+
+  // Helper: Robust Roster Finder
+  const getRoster = (targetTeamId: string, indexFallback: number) => {
+    if (!rosters) return null;
+    const byId = rosters.find((r: any) => String(r.team?.id) === String(targetTeamId));
+    if (byId) return byId.roster;
+    if (rosters[indexFallback]) return rosters[indexFallback].roster;
+    return null;
+  };
+
+  const homeRoster = getRoster(homeTeam.id, 0);
+  const awayRoster = getRoster(awayTeam.id, 1);
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
@@ -223,7 +241,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       ) : (
         <div className="px-4 mt-8 space-y-6">
             
-            {/* 1. GOAL SCORERS (WITH ASSISTS) */}
+            {/* 1. GOAL SCORERS */}
             {goals.length > 0 && (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
                      <h3 className="text-xs font-black uppercase text-slate-400 mb-4 flex items-center gap-2">
@@ -231,12 +249,10 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                      </h3>
                      <div className="space-y-3">
                         {goals.map((goal: any, i: number) => {
-                            const isHome = goal.team?.id === homeTeam.id;
+                            const isHome = String(goal.team?.id) === String(homeTeam.id);
                             
-                            // Safe Data Extraction
                             const player = goal.participants?.[0]?.athlete?.displayName || "Goal";
-                            const assist = goal.participants?.[1]?.athlete?.displayName; // Safe access for assist
-                            
+                            const assist = goal.participants?.[1]?.athlete?.displayName;
                             const time = goal.clock?.displayValue || "";
                             
                             const typeText = goal.type?.text?.toLowerCase() || "";
@@ -259,7 +275,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                                         )}
                                     </div>
                                     
-                                    {/* Time */}
                                     <div className="mx-3 text-xs font-mono font-bold bg-green-50 text-green-700 px-2 py-1 rounded border border-green-100 min-w-[3rem] text-center">
                                         {time}'
                                     </div>
@@ -306,20 +321,23 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                     <Users size={14} /> Lineups
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
+                    {/* HOME LINEUP */}
                     <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100">
                         <div className="border-b border-slate-100 pb-2 mb-2 font-black text-[10px] text-slate-400 uppercase">Home</div>
                         <ul className="space-y-1">
-                            {rosters.find((r:any) => r.team?.id === homeTeam.id)?.roster?.filter((p:any) => p.starter).map((p:any) => (
+                            {homeRoster?.filter((p:any) => p.starter).map((p:any) => (
                                 <li key={p.athlete?.id || Math.random()} className="text-[10px] font-bold text-slate-600 flex gap-2">
                                     <span className="text-slate-300 w-4">{p.jersey}</span> {p.athlete?.displayName || "Player"}
                                 </li>
                             )) || <li className="text-[10px] text-slate-300 italic">Not available</li>}
                         </ul>
                     </div>
+
+                    {/* AWAY LINEUP */}
                     <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100">
                         <div className="border-b border-slate-100 pb-2 mb-2 font-black text-[10px] text-slate-400 uppercase">Away</div>
                         <ul className="space-y-1">
-                            {rosters.find((r:any) => r.team?.id === awayTeam.id)?.roster?.filter((p:any) => p.starter).map((p:any) => (
+                            {awayRoster?.filter((p:any) => p.starter).map((p:any) => (
                                 <li key={p.athlete?.id || Math.random()} className="text-[10px] font-bold text-slate-600 flex gap-2">
                                     <span className="text-slate-300 w-4">{p.jersey}</span> {p.athlete?.displayName || "Player"}
                                 </li>
