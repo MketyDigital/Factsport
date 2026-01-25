@@ -7,10 +7,12 @@ import Link from 'next/link';
 import { CreditCard, Eye, ShieldAlert, LayoutDashboard, ArrowRight, Newspaper } from 'lucide-react';
 import ApproveButton from '@/app/components/ApproveButton';
 import ResetMonthButton from './components/ResetMonthButton'; 
+// 👇 IMPORT THE NEW BUTTON HERE
+import CleanupButton from './components/CleanupButton'; 
 
 export default async function AdminDashboard() {
   const supabase = createClient();
-   
+    
   // 1. Fetch VIP Requests (Pending)
   const { data: pendingSubs, error } = await supabase
     .from('subscriptions')
@@ -34,8 +36,12 @@ export default async function AdminDashboard() {
           </div>
       </div>
 
-      {/* --- SECTION 1: MONTHLY RESET (Danger Zone) --- */}
-      <ResetMonthButton />
+      {/* --- SECTION 1: DANGER ZONE (Reset & Cleanup) --- */}
+      {/* 👇 I updated this section to be a GRID so the buttons sit side-by-side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          <ResetMonthButton />
+          <CleanupButton /> 
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
@@ -118,7 +124,7 @@ export default async function AdminDashboard() {
                  </div>
              </Link>
 
-             {/* 2. NEWS MANAGER (Restored) */}
+             {/* 2. NEWS MANAGER */}
              <Link href="/admin/news" className="block group">
                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:border-purple-500 transition relative overflow-hidden">
                      <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-bl-full -mr-4 -mt-4 transition group-hover:bg-purple-100"></div>
