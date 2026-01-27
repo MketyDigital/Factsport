@@ -3,13 +3,13 @@ export const runtime = 'edge';
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
-import { Loader2, Plus, Trash2, Star, Activity, Search, Shield } from 'lucide-react';
+import { Loader2, Plus, Trash2, Star, Activity, Search, Shield, Bot } from 'lucide-react';
 
 export default function AdminNewsPage() {
   const [news, setNews] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   
-  // ✅ ADDED: team1Logo and team2Logo to state
+  // Form State
   const [formData, setFormData] = useState({ 
     title: '', 
     body: '', 
@@ -25,23 +25,18 @@ export default function AdminNewsPage() {
   useEffect(() => { fetchNews(); }, []);
 
   // 🪄 AUTO-SUGGEST LOGOS FROM TITLE
-  // When you type "Man Utd vs Chelsea", this tries to find their logos in your DB
   useEffect(() => {
     const findLogos = async () => {
         if (!formData.title || formData.title.length < 5) return;
-        
-        // Only run if logos are empty (don't overwrite manual edits)
         if (formData.team1Logo && formData.team2Logo) return;
 
-        // Search matches for team names loosely matching the title
         const { data } = await supabase
             .from('matches')
             .select('home_team, home_logo, away_team, away_logo')
             .or(`home_team.ilike.%${formData.title.split(' ')[0]}%,away_team.ilike.%${formData.title.split(' ')[0]}%`)
-            .limit(5);
+            .limit(50);
 
         if (data && data.length > 0) {
-             // Simple heuristic: check if words from title match team names
              const titleLower = formData.title.toLowerCase();
              let t1 = formData.team1Logo;
              let t2 = formData.team2Logo;
@@ -50,7 +45,6 @@ export default function AdminNewsPage() {
                  if (!t1 && titleLower.includes(m.home_team.toLowerCase())) t1 = m.home_logo;
                  if (!t1 && titleLower.includes(m.away_team.toLowerCase())) t1 = m.away_logo;
                  
-                 // If we found T1, look for T2 (different team)
                  if (t1) {
                      if (!t2 && m.home_logo !== t1 && titleLower.includes(m.home_team.toLowerCase())) t2 = m.home_logo;
                      if (!t2 && m.away_logo !== t1 && titleLower.includes(m.away_team.toLowerCase())) t2 = m.away_logo;
@@ -63,7 +57,6 @@ export default function AdminNewsPage() {
         }
     };
     
-    // Debounce the search (wait 1s after typing stops)
     const timeoutId = setTimeout(findLogos, 1000);
     return () => clearTimeout(timeoutId);
   }, [formData.title]);
@@ -82,8 +75,8 @@ export default function AdminNewsPage() {
         title: formData.title, 
         body: formData.body, 
         image_url: formData.imageUrl,
-        team_1_logo: formData.team1Logo, // ✅ SAVING LOGO 1
-        team_2_logo: formData.team2Logo, // ✅ SAVING LOGO 2
+        team_1_logo: formData.team1Logo,
+        team_2_logo: formData.team2Logo,
         is_breaking: formData.isBreaking, 
         is_headline: formData.isHeadline, 
         slug: slug
@@ -100,7 +93,34 @@ export default function AdminNewsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-black text-slate-800">News Editor</h1>
+      {/* HEADER WITH AUTO-BOT BUTTON */}
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <h1 className="text-2xl font-black text-slate-800">News Editor</h1>
+          
+          <button 
+              onClick={async () => {
+                  const btn = document.getElementById('bot-btn');
+                  if(btn) btn.innerHTML = '⚙️ Running...';
+                  try {
+                    const res = await fetch('/api/cron/news');
+                    const json = await res.json();
+                    if(json.success) {
+                        alert(json.message);
+                        window.location.reload();
+                    } else {
+                        alert("Bot Error: " + json.error);
+                    }
+                  } catch (e) {
+                    alert("Failed to run bot.");
+                  }
+                  if(btn) btn.innerHTML = '🤖 Run Auto-Bot';
+              }}
+              id="bot-btn"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg transition active:scale-95 flex items-center gap-2 border border-blue-500"
+          >
+              <Bot size={18} /> Run Auto-Bot
+          </button>
+      </div>
       
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -125,7 +145,7 @@ export default function AdminNewsPage() {
                      </div>
                      <input 
                         type="text" 
-                        placeholder="Team 1 Logo URL (Auto-detected)" 
+                        placeholder="Team 1 Logo URL" 
                         className="flex-1 bg-transparent text-xs border-b border-slate-200 focus:border-blue-500 outline-none pb-1" 
                         value={formData.team1Logo} 
                         onChange={(e) => setFormData({...formData, team1Logo: e.target.value})} 
@@ -137,7 +157,7 @@ export default function AdminNewsPage() {
                      </div>
                      <input 
                         type="text" 
-                        placeholder="Team 2 Logo URL (Auto-detected)" 
+                        placeholder="Team 2 Logo URL" 
                         className="flex-1 bg-transparent text-xs border-b border-slate-200 focus:border-blue-500 outline-none pb-1" 
                         value={formData.team2Logo} 
                         onChange={(e) => setFormData({...formData, team2Logo: e.target.value})} 
@@ -160,30 +180,35 @@ export default function AdminNewsPage() {
         </form>
       </div>
 
+      {/* NEWS LIST */}
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-100">
-        {news.map((item) => (
-            <div key={item.id} className="p-4 border-b last:border-0 flex justify-between items-center hover:bg-slate-50 transition">
-                <div className="flex gap-3 items-center">
-                    {/* Preview Thumbnail Logic */}
-                    <div className="w-10 h-10 rounded bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
-                        {item.image_url ? (
-                            <img src={item.image_url} className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="flex items-center -space-x-1">
-                                {item.team_1_logo && <img src={item.team_1_logo} className="w-5 h-5 object-contain" />}
-                                {item.team_2_logo && <img src={item.team_2_logo} className="w-5 h-5 object-contain" />}
-                                {!item.team_1_logo && !item.team_2_logo && <Activity size={16} className="text-slate-300" />}
-                            </div>
-                        )}
+        {news.length === 0 ? (
+            <div className="p-10 text-center text-slate-400 text-sm">No news yet. Try running the bot!</div>
+        ) : (
+            news.map((item) => (
+                <div key={item.id} className="p-4 border-b last:border-0 flex justify-between items-center hover:bg-slate-50 transition">
+                    <div className="flex gap-3 items-center">
+                        {/* Preview Thumbnail Logic */}
+                        <div className="w-10 h-10 rounded bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
+                            {item.image_url ? (
+                                <img src={item.image_url} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="flex items-center -space-x-1">
+                                    {item.team_1_logo && <img src={item.team_1_logo} className="w-5 h-5 object-contain" />}
+                                    {item.team_2_logo && <img src={item.team_2_logo} className="w-5 h-5 object-contain" />}
+                                    {!item.team_1_logo && !item.team_2_logo && <Activity size={16} className="text-slate-300" />}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="font-bold text-sm line-clamp-1">{item.title}</span>
+                            <span className="text-[10px] text-slate-400">{new Date(item.created_at).toLocaleDateString()}</span>
+                        </div>
                     </div>
-                    <div className="flex flex-col">
-                        <span className="font-bold text-sm">{item.title}</span>
-                        <span className="text-[10px] text-slate-400">{new Date(item.created_at).toLocaleDateString()}</span>
-                    </div>
+                    <button onClick={() => deleteNews(item.id)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 text-slate-400 hover:text-red-600 transition shrink-0"><Trash2 size={16}/></button>
                 </div>
-                <button onClick={() => deleteNews(item.id)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 text-slate-400 hover:text-red-600 transition"><Trash2 size={16}/></button>
-            </div>
-        ))}
+            ))
+        )}
       </div>
     </div>
   );
