@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Clock } from "lucide-react";
+import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Clock, ShieldCheck, FileText } from "lucide-react";
 // ✅ IMPORT THE LIVE LABEL
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 
@@ -74,6 +74,9 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             <Link href="/" className="text-xl font-black tracking-tighter text-white">FactSport</Link>
           </div>
           <div className="flex items-center space-x-3">
+            {/* ✅ TEMPORARY PRIVACY LINK FOR GOOGLE VERIFICATION */}
+            <Link href="/privacy" className="text-[10px] font-bold text-slate-300 hover:text-white transition">Privacy</Link>
+            
             <Link href="/login" className="px-4 py-1.5 text-[10px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition">Login</Link>
             <Link href="/vip/upgrade" className="flex items-center gap-1 px-4 py-1.5 text-[10px] font-bold bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 rounded-full shadow-lg shadow-red-900/50 transition"><Trophy size={11} /> VIP</Link>
           </div>
@@ -160,7 +163,15 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         <div className="bg-white border-y border-slate-200 sticky top-14 z-30 overflow-x-auto scrollbar-hide py-2 shadow-sm">
             <div className="flex px-4 space-x-2 min-w-max">
             {['All', 'Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Champions League'].map((league) => (
-                <Link key={league} href={`/?league=${league}`} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all ${selectedLeague === league ? 'bg-[#0a1428] text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200'}`}>{league === 'Premier League' ? 'EPL' : league}</Link>
+                // ✅ FIXED SCROLL ISSUE: Added scroll={false}
+                <Link 
+                  key={league} 
+                  href={`/?league=${league}`} 
+                  scroll={false} 
+                  className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all ${selectedLeague === league ? 'bg-[#0a1428] text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200'}`}
+                >
+                  {league === 'Premier League' ? 'EPL' : league}
+                </Link>
             ))}
             </div>
         </div>
@@ -229,6 +240,28 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             </div>
         </div>
       </div>
+
+      {/* ✅ 7. FOOTER (ADDED AS REQUESTED) */}
+      <footer className="bg-[#0a1428] text-slate-400 py-8 px-4 mt-8 border-t border-white/10">
+        <div className="flex flex-col items-center text-center space-y-4">
+           {/* Logo */}
+           <div className="flex items-center space-x-2 opacity-80">
+                <div className="relative flex items-center justify-center w-6 h-6"><div className="absolute w-full h-full bg-gradient-to-r from-red-600 to-blue-800 clip-hexagon"></div><span className="relative font-bold italic text-white text-[9px]">FS</span></div>
+                <span className="text-lg font-black tracking-tighter text-white">FactSport</span>
+           </div>
+           
+           {/* Mandatory Links */}
+           <div className="flex flex-wrap justify-center gap-6 text-[10px] font-bold uppercase tracking-wider">
+               <Link href="/privacy" className="hover:text-white transition flex items-center gap-1"><ShieldCheck size={12}/> Privacy Policy</Link>
+               <Link href="/terms" className="hover:text-white transition flex items-center gap-1"><FileText size={12}/> Terms of Service</Link>
+           </div>
+
+           <p className="text-[10px] text-slate-600 max-w-xs leading-relaxed">
+             © {new Date().getFullYear()} FactSport. All rights reserved. 
+             <br /> Gambling involves risk. Please gamble responsibly.
+           </p>
+        </div>
+      </footer>
 
     </div>
   );

@@ -3,7 +3,7 @@ export const runtime = 'edge';
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft, Zap, ExternalLink, AlertCircle, Activity } from 'lucide-react';
+import { ChevronLeft, Zap, ExternalLink, AlertCircle, Activity, Trophy } from 'lucide-react';
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
 import { getExternalData } from '@/app/lib/matchService';
@@ -22,6 +22,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const dbData = await getSupabaseData(resolvedParams.id);
   if (!dbData) return notFound();
 
+  // This now returns your clean "UnifiedMatchData"
   const data = await getExternalData(dbData);
 
   return (
@@ -39,15 +40,19 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         </div>
 
         <div className="relative z-10 px-4 mt-2">
-          {/* Status Section - FIXED LOGIC HERE */}
+          {/* Status Section - UPDATED LOGIC */}
           <div className="flex justify-center mb-6">
-            {['LIVE', 'in'].includes(data.status) ? (
+            {['LIVE', 'in', '1H', '2H'].includes(data.status) ? (
                <span className="bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-full animate-pulse flex items-center gap-1 shadow-lg">
                  <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE {data.displayClock}'
                </span>
+            ) : data.status === 'HT' ? (
+               <span className="bg-slate-200 text-slate-800 text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-1 shadow-lg animate-pulse">
+                 HALF TIME
+               </span>
             ) : (
                <span className="bg-white/10 text-slate-300 text-[10px] font-bold px-3 py-1 rounded-full border border-white/10 backdrop-blur-md">
-                 {['FT', 'post'].includes(data.status) ? 'Full Time' : new Date(dbData.match_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                 {['FT', 'post', 'FINISHED'].includes(data.status) ? 'Full Time' : new Date(dbData.match_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                </span>
             )}
           </div>
@@ -105,21 +110,41 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           </div>
       ) : (
         <div className="px-4 mt-8 space-y-6">
+            {/* GOALS SECTION - NOW USING CLEAN ADAPTER DATA */}
             {data.goals.length > 0 && (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
-                     <h3 className="text-xs font-black uppercase text-slate-400 mb-4 flex items-center gap-2"><Activity size={14} className="text-green-600" /> Goals</h3>
-                     <div className="space-y-3">
-                        {data.goals.map((goal: any, i: number) => {
-                            const isHome = String(goal.team?.id) === String(data.home.id);
+                      <h3 className="text-xs font-black uppercase text-slate-400 mb-4 flex items-center gap-2"><Activity size={14} className="text-green-600" /> Goals</h3>
+                      <div className="space-y-3">
+                         {data.goals.map((goal: any, i: number) => {
+                            // Adapter returns 'home' or 'away'
+                            const isHome = goal.team === 'home'; 
                             return (
                                 <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-slate-50 last:border-0">
-                                    <div className={`flex-1 text-right ${isHome ? "font-bold" : "text-slate-300"}`}>{isHome && goal.participants?.[0]?.athlete?.displayName}</div>
-                                    <div className="mx-3 text-xs font-mono font-bold bg-green-50 text-green-700 px-2 py-1 rounded">{goal.clock?.displayValue}'</div>
-                                    <div className={`flex-1 text-left ${!isHome ? "font-bold" : "text-slate-300"}`}>{!isHome && goal.participants?.[0]?.athlete?.displayName}</div>
+                                    <div className={`flex-1 text-right ${isHome ? "font-bold text-slate-900" : "text-slate-300"}`}>
+                                        {isHome && (
+                                            <>
+                                                {goal.player} 
+                                                {goal.assist && <span className="text-[9px] text-slate-400 block font-normal">({goal.assist})</span>}
+                                            </>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="mx-3 text-xs font-mono font-bold bg-green-50 text-green-700 px-2 py-1 rounded flex items-center gap-1">
+                                        {goal.time}
+                                    </div>
+                                    
+                                    <div className={`flex-1 text-left ${!isHome ? "font-bold text-slate-900" : "text-slate-300"}`}>
+                                        {!isHome && (
+                                            <>
+                                                {goal.player}
+                                                {goal.assist && <span className="text-[9px] text-slate-400 block font-normal">({goal.assist})</span>}
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             )
-                        })}
-                     </div>
+                         })}
+                      </div>
                 </div>
             )}
 

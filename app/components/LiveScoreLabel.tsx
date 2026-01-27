@@ -15,7 +15,7 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
     const matchTime = new Date(matchDate);
     
     // Logic: Only poll the API if match is currently Live or about to start
-    const isLive = ['LIVE', 'in'].includes(data.status) || 
+    const isLive = ['LIVE', 'in', '1H', '2H', 'HT'].includes(data.status) || 
                    (now >= matchTime && !['FT', 'post', 'FINISHED'].includes(data.status));
 
     if (!isLive) return;
@@ -26,7 +26,7 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
         if (res.ok) {
           const json = await res.json();
           setData({
-            status: json.status,
+            status: json.status, // This needs to return "HT" from your bot for the HT logic to work
             home: json.home.score,
             away: json.away.score,
             clock: json.displayClock
@@ -38,24 +38,48 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
     fetchScore();
     const interval = setInterval(fetchScore, 60000); // Check every 60 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, []); // Empty dependency array to run once on mount
 
-  // 1. UI for LIVE Matches
-  if (['LIVE', 'in'].includes(data.status)) {
+  // 1. ✅ NEW: UI for HALF TIME
+  // Checks for various HT strings to be safe
+  if (['HT', 'HALF TIME', 'BREAK', 'Half Time'].includes(data.status)) {
     return (
       <div className="flex flex-col items-center">
-        <span className="text-red-600 font-bold text-[10px] animate-pulse whitespace-nowrap">
-           LIVE {data.clock ? `• ${data.clock}'` : ''}
+        <div className="text-lg font-black tracking-tighter leading-none text-slate-900">
+          {data.home} - {data.away}
+        </div>
+        <span className="text-[10px] font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded mt-1 animate-pulse">
+          Half Time
         </span>
-        <div className="text-lg font-black tracking-tighter leading-none">
+      </div>
+    );
+  }
+
+  // 2. ✅ UPDATED: UI for LIVE Matches (With Pulsing Dot)
+  if (['LIVE', 'in', '1H', '2H'].includes(data.status)) {
+    return (
+      <div className="flex flex-col items-center">
+        {/* Pulsing Dot & Time */}
+        <div className="flex items-center gap-1.5 mb-0.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-600"></span>
+            </span>
+            <span className="text-red-600 font-bold text-[10px] animate-pulse whitespace-nowrap">
+               {data.clock ? `${data.clock}'` : 'LIVE'}
+            </span>
+        </div>
+        
+        {/* Score */}
+        <div className="text-lg font-black tracking-tighter leading-none text-red-600">
           {data.home} - {data.away}
         </div>
       </div>
     );
   }
 
-  // 2. UI for FINISHED Matches
-  if (['FT', 'post', 'FINISHED'].includes(data.status)) {
+  // 3. UI for FINISHED Matches (Your existing logic)
+  if (['FT', 'post', 'FINISHED', 'FULL TIME'].includes(data.status)) {
     return (
       <div className="flex flex-col items-center">
         <div className="text-lg font-black tracking-tighter text-slate-800 leading-none">
@@ -66,7 +90,7 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
     );
   }
 
-  // 3. UI for UPCOMING Matches (Restored Date & Time)
+  // 4. UI for UPCOMING Matches (Your existing custom design)
   return (
     <div className="flex flex-col items-center min-w-[70px]">
       <span className="text-[8px] font-black text-slate-400 uppercase tracking-tight mb-1">

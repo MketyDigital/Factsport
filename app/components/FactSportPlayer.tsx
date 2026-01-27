@@ -7,6 +7,7 @@ import {
 
 // --- 🔧 AD CONFIGURATION ---
 const AD_CONFIG = {
+  // Replace this with your actual betting affiliate banner
   image: "https://images.unsplash.com/photo-1518091043644-c1d4457512c6?q=80&w=1000&auto=format&fit=crop",
   link: "https://bit.ly/your-affiliate-link",
   timer: 5 
@@ -22,6 +23,9 @@ export default function FactSportPlayer({ videoUrl }: { videoUrl: string }) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  // 1. DETECT IF YOUTUBE (To bypass Ad)
+  const isYouTube = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be');
 
   // --- AD TIMER LOGIC ---
   useEffect(() => {
@@ -149,16 +153,26 @@ export default function FactSportPlayer({ videoUrl }: { videoUrl: string }) {
     // A. THUMBNAIL (Premium Start)
     if (viewState === 'thumbnail') {
       return (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#0a1428] cursor-pointer group" onClick={() => setViewState('ad')}>
+        <div 
+          className="absolute inset-0 flex items-center justify-center bg-[#0a1428] cursor-pointer group" 
+          onClick={() => {
+            // 🟢 SAFETY CHECK: Only show ads for Non-YouTube videos
+            if (isYouTube) {
+              setViewState('playing');
+            } else {
+              setViewState('ad');
+            }
+          }}
+        >
            {/* Fallback pattern if no image */}
            <div className="absolute inset-0 opacity-30 bg-[radial-gradient(#ffffff33_1px,transparent_1px)] [background-size:16px_16px]"></div>
            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
            
            <div className="relative z-10 flex flex-col items-center">
-              <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.6)] group-hover:scale-110 transition duration-300 animate-pulse">
-                  <Play className="text-white fill-white ml-1" size={32} />
-              </div>
-              <p className="text-white text-xs font-bold mt-4 tracking-widest uppercase opacity-80 group-hover:opacity-100">Watch Highlights</p>
+             <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.6)] group-hover:scale-110 transition duration-300 animate-pulse">
+                 <Play className="text-white fill-white ml-1" size={32} />
+             </div>
+             <p className="text-white text-xs font-bold mt-4 tracking-widest uppercase opacity-80 group-hover:opacity-100">Watch Highlights</p>
            </div>
         </div>
       );
@@ -191,7 +205,7 @@ export default function FactSportPlayer({ videoUrl }: { videoUrl: string }) {
     }
 
     // C. VIDEO PLAYER (The Content)
-    if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+    if (isYouTube) {
       return renderYouTube(videoUrl);
     } 
     
