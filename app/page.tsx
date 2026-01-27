@@ -3,9 +3,11 @@ export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Clock } from "lucide-react";
+import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Clock, ShieldCheck, FileText } from "lucide-react";
 // ✅ IMPORT THE LIVE LABEL
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
+// ✅ IMPORT THE NEW ARTWORK COMPONENT
+import NewsArtwork from '@/app/components/NewsArtwork';
 
 // SEO Metadata
 export const metadata = {
@@ -29,7 +31,7 @@ async function getHomepageData(leagueFilter: string | null) {
       matchQuery = matchQuery.ilike('league', `%${leagueFilter}%`);
   }
 
-  // 2. News
+  // 2. News (Now fetching team logos too if you added columns)
   const newsQuery = supabase.from('news')
     .select('*')
     .order('created_at', { ascending: false })
@@ -47,19 +49,20 @@ async function getHomepageData(leagueFilter: string | null) {
 }
 
 export default async function Home({ searchParams }: { searchParams: { league?: string } }) {
-  const selectedLeague = (await searchParams).league || 'All';
+  const resolvedParams = await searchParams;
+  const selectedLeague = resolvedParams.league || 'All';
   const { matches, news, highlights } = await getHomepageData(selectedLeague);
 
   // News Sorting Logic
   const breakingNews = news.filter(n => n.is_breaking); 
-  const headlines = news.filter(n => n.is_headline && n.image_url).slice(0, 3);
+  const headlines = news.filter(n => n.is_headline).slice(0, 3); // Removed strict image_url check so artwork works
   const headlineIds = headlines.map(h => h.id);
   const latestNews = news.filter(n => !headlineIds.includes(n.id) && !n.is_breaking).slice(0, 5);
 
   // Match Sorting Logic
-  const live = matches.filter(m => m.status === 'LIVE' || m.status === 'in');
-  const upcoming = matches.filter(m => m.status === 'SCHEDULED' || m.status === 'UPCOMING');
-  const finished = matches.filter(m => m.status === 'FINISHED' || m.status === 'FT');
+  const live = matches.filter(m => m.status === 'LIVE' || m.status === 'in' || m.status === '1H' || m.status === '2H' || m.status === 'HT');
+  const upcoming = matches.filter(m => m.status === 'SCHEDULED' || m.status === 'UPCOMING' || m.status === 'PRE');
+  const finished = matches.filter(m => m.status === 'FINISHED' || m.status === 'FT' || m.status === 'post');
   
   const displayMatches = [...live, ...upcoming, ...finished];
 
@@ -74,6 +77,9 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             <Link href="/" className="text-xl font-black tracking-tighter text-white">FactSport</Link>
           </div>
           <div className="flex items-center space-x-3">
+            {/* ✅ TEMPORARY PRIVACY LINK FOR GOOGLE VERIFICATION */}
+            <Link href="/privacy" className="text-[10px] font-bold text-slate-300 hover:text-white transition">Privacy</Link>
+            
             <Link href="/login" className="px-4 py-1.5 text-[10px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition">Login</Link>
             <Link href="/vip/upgrade" className="flex items-center gap-1 px-4 py-1.5 text-[10px] font-bold bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 rounded-full shadow-lg shadow-red-900/50 transition"><Trophy size={11} /> VIP</Link>
           </div>
@@ -88,13 +94,21 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       )}
 
-      {/* 2. HEADLINES SLIDER */}
+      {/* 2. HEADLINES SLIDER (UPDATED WITH ARTWORK) */}
       {headlines.length > 0 && (
         <div className="mt-3 px-3">
             <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-4 scrollbar-hide">
                 {headlines.map((item) => (
                     <Link href={`/news/${item.slug || '#'}`} key={item.id} className="snap-center shrink-0 w-[85%] md:w-[400px] h-48 relative rounded-2xl overflow-hidden shadow-lg border border-white/20">
-                        <img src={item.image_url} className="absolute inset-0 w-full h-full object-cover" />
+                        {/* ✅ SMART ARTWORK REPLACES STATIC IMG */}
+                        <NewsArtwork 
+                           image={item.image_url} 
+                           team1Logo={item.team_1_logo} 
+                           team2Logo={item.team_2_logo}
+                           title={item.title}
+                           className="absolute inset-0 w-full h-full"
+                        />
+                        
                         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"></div>
                         <div className="absolute bottom-0 left-0 p-4 w-full">
                             <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase mb-1.5 inline-block shadow-sm">Top Story</span>
@@ -130,7 +144,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       )}
 
-      {/* 4. LATEST NEWS */}
+      {/* 4. LATEST NEWS (UPDATED WITH ARTWORK) */}
       <div className="px-4 mb-4 mt-6">
         <div className="flex justify-between items-center mb-2">
             <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">Latest News</h3>
@@ -140,7 +154,14 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             {latestNews.length > 0 ? latestNews.map((item) => (
                 <Link href={`/news/${item.slug || '#'}`} key={item.id} className="flex gap-3 items-center p-3 active:bg-slate-50 transition">
                     <div className="w-14 h-14 bg-slate-100 rounded-lg shrink-0 overflow-hidden relative">
-                        {item.image_url ? <img src={item.image_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300"><Zap size={20}/></div>}
+                        {/* ✅ SMART ARTWORK REPLACES THUMBNAIL */}
+                        <NewsArtwork 
+                           image={item.image_url} 
+                           team1Logo={item.team_1_logo} 
+                           team2Logo={item.team_2_logo}
+                           title={item.title}
+                           className="w-full h-full"
+                        />
                     </div>
                     <div>
                         <h4 className="text-xs font-bold leading-tight line-clamp-2 text-slate-800">{item.title}</h4>
@@ -160,7 +181,15 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         <div className="bg-white border-y border-slate-200 sticky top-14 z-30 overflow-x-auto scrollbar-hide py-2 shadow-sm">
             <div className="flex px-4 space-x-2 min-w-max">
             {['All', 'Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Champions League'].map((league) => (
-                <Link key={league} href={`/?league=${league}`} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all ${selectedLeague === league ? 'bg-[#0a1428] text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200'}`}>{league === 'Premier League' ? 'EPL' : league}</Link>
+                // ✅ FIXED SCROLL ISSUE: Added scroll={false}
+                <Link 
+                  key={league} 
+                  href={`/?league=${league}`} 
+                  scroll={false} 
+                  className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all ${selectedLeague === league ? 'bg-[#0a1428] text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200'}`}
+                >
+                  {league === 'Premier League' ? 'EPL' : league}
+                </Link>
             ))}
             </div>
         </div>
@@ -229,6 +258,28 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             </div>
         </div>
       </div>
+
+      {/* ✅ 7. FOOTER (REQUIRED FOR GOOGLE VERIFICATION) */}
+      <footer className="bg-[#0a1428] text-slate-400 py-8 px-4 mt-8 border-t border-white/10">
+        <div className="flex flex-col items-center text-center space-y-4">
+           {/* Logo */}
+           <div className="flex items-center space-x-2 opacity-80">
+                <div className="relative flex items-center justify-center w-6 h-6"><div className="absolute w-full h-full bg-gradient-to-r from-red-600 to-blue-800 clip-hexagon"></div><span className="relative font-bold italic text-white text-[9px]">FS</span></div>
+                <span className="text-lg font-black tracking-tighter text-white">FactSport</span>
+           </div>
+           
+           {/* Mandatory Links */}
+           <div className="flex flex-wrap justify-center gap-6 text-[10px] font-bold uppercase tracking-wider">
+               <Link href="/privacy" className="hover:text-white transition flex items-center gap-1"><ShieldCheck size={12}/> Privacy Policy</Link>
+               <Link href="/terms" className="hover:text-white transition flex items-center gap-1"><FileText size={12}/> Terms of Service</Link>
+           </div>
+
+           <p className="text-[10px] text-slate-600 max-w-xs leading-relaxed">
+             © {new Date().getFullYear()} FactSport. All rights reserved. 
+             <br /> Gambling involves risk. Please gamble responsibly.
+           </p>
+        </div>
+      </footer>
 
     </div>
   );
