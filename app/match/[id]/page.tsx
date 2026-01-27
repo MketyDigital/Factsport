@@ -3,13 +3,14 @@ export const runtime = 'edge';
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft, Zap, ExternalLink, AlertCircle, Activity, Trophy } from 'lucide-react';
+import { ChevronLeft, Zap, ExternalLink, AlertCircle, Activity, Mic, AlignLeft, Radio, PlayCircle } from 'lucide-react';
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
 import { getExternalData } from '@/app/lib/matchService';
 
 async function getSupabaseData(id: string) {
     const supabase = createClient();
+    // ✅ Fetch the new columns (livestream_url, audio_url) automatically via *
     const { data, error } = await supabase.from('matches').select('*').eq('id', id).single();
     if (error) return null;
     return data;
@@ -22,8 +23,12 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const dbData = await getSupabaseData(resolvedParams.id);
   if (!dbData) return notFound();
 
-  // This now returns your clean "UnifiedMatchData"
   const data = await getExternalData(dbData);
+
+  // 🧠 SMART MEDIA LOGIC
+  // 1. Decide which video to show (Live Stream takes priority over Highlights)
+  const activeVideoUrl = dbData.livestream_url || dbData.video_url;
+  const isLiveStream = !!dbData.livestream_url; // Boolean check
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
@@ -40,7 +45,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         </div>
 
         <div className="relative z-10 px-4 mt-2">
-          {/* Status Section - UPDATED LOGIC */}
+          {/* Status Badge */}
           <div className="flex justify-center mb-6">
             {['LIVE', 'in', '1H', '2H'].includes(data.status) ? (
                <span className="bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-full animate-pulse flex items-center gap-1 shadow-lg">
@@ -58,20 +63,17 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           </div>
 
           <div className="flex justify-between items-center">
-            {/* Home */}
             <div className="flex flex-col items-center w-1/3">
               <div className="w-16 h-16 bg-white p-3 rounded-2xl shadow-xl mb-3 flex items-center justify-center">
                  {data.home.logo ? <img src={data.home.logo} className="w-full h-full object-contain" /> : <div className="font-black text-slate-300 text-xl">{data.home.name.substring(0,1)}</div>}
               </div>
               <h2 className="font-bold text-center text-xs leading-tight opacity-90">{data.home.name}</h2>
             </div>
-            {/* Score */}
             <div className="flex flex-col items-center w-1/3">
               <div className="text-5xl font-black tracking-tighter flex items-center gap-4 text-white drop-shadow-lg">
                 <span>{data.home.score}</span><span className="text-slate-600 text-2xl">:</span><span>{data.away.score}</span>
               </div>
             </div>
-            {/* Away */}
             <div className="flex flex-col items-center w-1/3">
               <div className="w-16 h-16 bg-white p-3 rounded-2xl shadow-xl mb-3 flex items-center justify-center">
                  {data.away.logo ? <img src={data.away.logo} className="w-full h-full object-contain" /> : <div className="font-black text-slate-300 text-xl">{data.away.name.substring(0,1)}</div>}
@@ -83,8 +85,59 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       </div>
 
       <div className="mx-4 -mt-6 relative z-20 space-y-4">
-        {dbData.video_url && <div className="rounded-xl overflow-hidden shadow-2xl border border-white/20"><FactSportPlayer videoUrl={dbData.video_url} /></div>}
+        
+        {/* 📺 VIDEO PLAYER (Handles Both Live & Highlights) */}
+        {activeVideoUrl && (
+            <div className="rounded-xl overflow-hidden shadow-2xl border border-white/20 relative">
+                {/* Badge Overlay to distinguish Live vs Highlight */}
+                <div className="absolute top-3 left-3 z-30 pointer-events-none">
+                    {isLiveStream ? (
+                        <div className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded flex items-center gap-1 animate-pulse shadow-md">
+                            <Radio size={10} /> LIVE WATCHALONG
+                        </div>
+                    ) : (
+                        <div className="bg-black/60 backdrop-blur text-white text-[9px] font-bold px-2 py-0.5 rounded border border-white/10 flex items-center gap-1">
+                            <PlayCircle size={10} /> HIGHLIGHTS
+                        </div>
+                    )}
+                </div>
+                
+                {/* The Player Component */}
+                <FactSportPlayer videoUrl={activeVideoUrl} />
+            </div>
+        )}
 
+        {/* 🎙️ LIVE AUDIO RADIO (Dynamic) */}
+        <div className="bg-[#0f172a] rounded-xl p-3 border border-slate-800 shadow-xl flex items-center justify-between">
+             <div className="flex items-center gap-3">
+                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${dbData.audio_url ? 'bg-red-600 animate-pulse' : 'bg-slate-800'}`}>
+                    <Mic className="text-white" size={20} />
+                 </div>
+                 <div>
+                    <h3 className="text-white font-bold text-xs">Live Audio Commentary</h3>
+                    <p className="text-slate-400 text-[10px]">
+                        {dbData.audio_url ? "Radio is currently LIVE" : "Tune in when match starts"}
+                    </p>
+                 </div>
+             </div>
+             
+             {/* If audio_url exists, show Listen button. If not, show Coming Soon */}
+             {dbData.audio_url ? (
+                 <Link 
+                    href={dbData.audio_url} 
+                    target="_blank"
+                    className="bg-white text-black hover:bg-slate-200 text-[10px] font-black px-4 py-2 rounded-full shadow-lg transition transform active:scale-95 flex items-center gap-1"
+                 >
+                    LISTEN NOW <ExternalLink size={10} />
+                 </Link>
+             ) : (
+                 <button disabled className="bg-slate-700 text-slate-400 text-[10px] font-bold px-3 py-1.5 rounded-full cursor-not-allowed border border-white/5">
+                     OFF AIR
+                 </button>
+             )}
+        </div>
+
+        {/* 1xBet Banner */}
         <div className="bg-[#1A1A1A] rounded-xl p-4 shadow-xl border border-slate-800 flex items-center justify-between overflow-hidden relative">
             <div className="absolute top-0 right-0 w-20 h-full bg-gradient-to-l from-white/5 to-transparent"></div>
             <div className="flex items-center gap-3 relative z-10">
@@ -97,12 +150,14 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             <Link href={dbData.affiliate_link || "#"} target="_blank" className="bg-yellow-400 hover:bg-yellow-300 text-black text-xs font-black px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-1">Bet Now <ExternalLink size={10} /></Link>
         </div>
 
+        {/* Predictions & Stats ... */}
         <div className="bg-white rounded-xl shadow-lg p-5 border border-slate-100">
            <h3 className="text-xs font-black uppercase text-slate-800 flex items-center gap-1 mb-4"><Zap size={14} className="text-blue-600 fill-blue-600" /> Predict & Win Points</h3>
            <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
         </div>
       </div>
 
+      {/* STATS SECTION (Keep existing stats code below) */}
       {!data.hasExternalData ? (
           <div className="mx-4 mt-6 bg-white p-6 rounded-xl border border-slate-100 text-center shadow-sm">
               <AlertCircle className="mx-auto text-slate-300 mb-2" />
@@ -110,37 +165,20 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           </div>
       ) : (
         <div className="px-4 mt-8 space-y-6">
-            {/* GOALS SECTION - NOW USING CLEAN ADAPTER DATA */}
-            {data.goals.length > 0 && (
+            {/* ... Paste the GOALS, COMMENTARY, STATS, LINEUPS code from previous answer here ... */}
+            {/* (I omitted it here to save space, but make sure to keep it!) */}
+             {/* GOALS */}
+             {data.goals.length > 0 && (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
                       <h3 className="text-xs font-black uppercase text-slate-400 mb-4 flex items-center gap-2"><Activity size={14} className="text-green-600" /> Goals</h3>
                       <div className="space-y-3">
                          {data.goals.map((goal: any, i: number) => {
-                            // Adapter returns 'home' or 'away'
                             const isHome = goal.team === 'home'; 
                             return (
                                 <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-slate-50 last:border-0">
-                                    <div className={`flex-1 text-right ${isHome ? "font-bold text-slate-900" : "text-slate-300"}`}>
-                                        {isHome && (
-                                            <>
-                                                {goal.player} 
-                                                {goal.assist && <span className="text-[9px] text-slate-400 block font-normal">({goal.assist})</span>}
-                                            </>
-                                        )}
-                                    </div>
-                                    
-                                    <div className="mx-3 text-xs font-mono font-bold bg-green-50 text-green-700 px-2 py-1 rounded flex items-center gap-1">
-                                        {goal.time}
-                                    </div>
-                                    
-                                    <div className={`flex-1 text-left ${!isHome ? "font-bold text-slate-900" : "text-slate-300"}`}>
-                                        {!isHome && (
-                                            <>
-                                                {goal.player}
-                                                {goal.assist && <span className="text-[9px] text-slate-400 block font-normal">({goal.assist})</span>}
-                                            </>
-                                        )}
-                                    </div>
+                                    <div className={`flex-1 text-right ${isHome ? "font-bold text-slate-900" : "text-slate-300"}`}>{isHome && <>{goal.player} {goal.assist && <span className="text-[9px] text-slate-400 block font-normal">({goal.assist})</span>}</>}</div>
+                                    <div className="mx-3 text-xs font-mono font-bold bg-green-50 text-green-700 px-2 py-1 rounded flex items-center gap-1">{goal.time}</div>
+                                    <div className={`flex-1 text-left ${!isHome ? "font-bold text-slate-900" : "text-slate-300"}`}>{!isHome && <>{goal.player}{goal.assist && <span className="text-[9px] text-slate-400 block font-normal">({goal.assist})</span>}</>}</div>
                                 </div>
                             )
                          })}
@@ -148,6 +186,24 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                 </div>
             )}
 
+            {/* AUTOMATED COMMENTARY */}
+            {data.commentary.length > 0 && (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
+                    <h3 className="text-xs font-black uppercase text-slate-400 mb-4 flex items-center gap-2">
+                        <AlignLeft size={14} className="text-blue-500" /> Live Feed
+                    </h3>
+                    <div className="space-y-4 max-h-60 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200">
+                        {data.commentary.map((c: any) => (
+                            <div key={c.id || Math.random()} className="flex gap-3 text-xs">
+                                <div className="font-mono font-bold text-slate-400 min-w-[24px] pt-0.5">{c.time}'</div>
+                                <p className="text-slate-700 leading-relaxed font-medium">{c.text}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+            
+            {/* STATS BARS */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 space-y-5">
                 <StatBar label="Possession" h={data.stats.possession.h} a={data.stats.possession.a} suffix="%" />
                 <StatBar label="Shots" h={data.stats.shots.h} a={data.stats.shots.a} />
@@ -155,6 +211,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                 <StatBar label="Fouls" h={data.stats.fouls.h} a={data.stats.fouls.a} />
             </div>
 
+            {/* LINEUPS */}
             <div className="grid grid-cols-2 gap-3">
                  <RosterList title="Home" players={data.lineups.home} />
                  <RosterList title="Away" players={data.lineups.away} />
@@ -165,6 +222,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   );
 }
 
+// ... Keep the Helper Components (StatBar, RosterList) at the bottom ...
 function StatBar({ label, h, a, suffix = "" }: any) {
     const total = (h + a) || 1;
     const pct = (h / total) * 100;

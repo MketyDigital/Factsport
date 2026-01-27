@@ -6,7 +6,7 @@ import { createClient } from '@/app/lib/supabase/client';
 import { 
   Search, Plus, Save, Trash2, Calculator, 
   Loader2, Link as LinkIcon, Video, Calendar, Image as ImageIcon,
-  CheckCircle, RefreshCw
+  CheckCircle, RefreshCw, Mic, Radio
 } from 'lucide-react';
 
 export default function AdminMatchesPage() {
@@ -84,9 +84,11 @@ export default function AdminMatchesPage() {
         api_id: match.api_id, 
         booking_code: match.booking_code,
         affiliate_link: match.affiliate_link,
-        video_url: match.video_url,
+        video_url: match.video_url,         // Highlights
+        livestream_url: match.livestream_url, // ✅ NEW: Live Youtube
+        audio_url: match.audio_url,         // ✅ NEW: Live Radio
         is_featured_video: match.is_featured_video,
-        points_distributed: match.points_distributed // ✅ Added capability to update this manualy
+        points_distributed: match.points_distributed 
     }).eq('id', match.id);
 
     if (error) alert("Save failed: " + error.message);
@@ -214,6 +216,7 @@ export default function AdminMatchesPage() {
                         >
                             <option value="SCHEDULED">SCHEDULED</option>
                             <option value="LIVE">LIVE</option>
+                            <option value="HT">HALF TIME</option>
                             <option value="FT">FINISHED</option>
                         </select>
                     </div>
@@ -272,32 +275,61 @@ export default function AdminMatchesPage() {
                     </div>
                 </div>
 
-                {/* 3. RIGHT: Video & Actions */}
+                {/* 3. RIGHT: Live Media Center (Updated) */}
                 <div className="p-5 lg:w-1/3 bg-slate-50/30 flex flex-col justify-between">
                     <div>
-                         <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3">Media & Settings</h4>
-                         <div className="relative mb-3">
-                            <Video size={12} className="absolute left-2.5 top-2.5 text-slate-400" />
-                            <input 
-                                type="text" 
-                                placeholder="Video URL (e.g. YouTube/M3U8)" 
-                                className="w-full pl-8 border rounded-lg py-2 text-xs"
-                                value={match.video_url || ''}
-                                onChange={(e) => handleUpdateChange(match.id, 'video_url', e.target.value)}
-                            />
-                        </div>
-                        
-                        <div className="space-y-2">
-                             <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border border-slate-100">
+                         <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3 flex items-center gap-1">
+                            <Radio size={12} className="text-red-500" /> Live Media Center
+                         </h4>
+                         
+                         <div className="space-y-2 mb-3">
+                            {/* YouTube Livestream */}
+                            <div className="relative">
+                                <Video size={12} className="absolute left-2.5 top-2.5 text-red-500" />
+                                <input 
+                                    type="text" 
+                                    placeholder="🔴 Live Stream URL (YouTube)" 
+                                    className="w-full pl-8 border border-red-100 rounded-lg py-2 text-xs bg-red-50/30 focus:bg-white transition"
+                                    value={match.livestream_url || ''}
+                                    onChange={(e) => handleUpdateChange(match.id, 'livestream_url', e.target.value)}
+                                />
+                            </div>
+
+                            {/* Radio Audio */}
+                            <div className="relative">
+                                <Mic size={12} className="absolute left-2.5 top-2.5 text-blue-500" />
+                                <input 
+                                    type="text" 
+                                    placeholder="🎙️ Live Radio URL (Zeno/Mixlr)" 
+                                    className="w-full pl-8 border border-blue-100 rounded-lg py-2 text-xs bg-blue-50/30 focus:bg-white transition"
+                                    value={match.audio_url || ''}
+                                    onChange={(e) => handleUpdateChange(match.id, 'audio_url', e.target.value)}
+                                />
+                            </div>
+
+                            {/* Highlights (Post Match) */}
+                            <div className="relative">
+                                <ImageIcon size={12} className="absolute left-2.5 top-2.5 text-slate-400" />
+                                <input 
+                                    type="text" 
+                                    placeholder="📺 Highlights URL (Post-Game)" 
+                                    className="w-full pl-8 border rounded-lg py-2 text-xs text-slate-500"
+                                    value={match.video_url || ''}
+                                    onChange={(e) => handleUpdateChange(match.id, 'video_url', e.target.value)}
+                                />
+                            </div>
+                         </div>
+                         
+                         <div className="space-y-2">
+                            <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border border-slate-100">
                                 <input 
                                     type="checkbox" 
                                     checked={match.is_featured_video || false}
                                     onChange={(e) => handleUpdateChange(match.id, 'is_featured_video', e.target.checked)}
                                 />
-                                <span className="text-xs font-bold text-slate-600">Feature on Homepage</span>
+                                <span className="text-xs font-bold text-slate-600">Feature Video on Homepage</span>
                             </label>
 
-                            {/* ✅ NEW: Reset Points Toggle (Lifesaver for bugs) */}
                             <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border border-slate-100">
                                 <input 
                                     type="checkbox" 
