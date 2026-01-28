@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle } from "lucide-react";
+import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, ShieldCheck } from "lucide-react";
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import NewsArtwork from '@/app/components/NewsArtwork';
 
@@ -74,9 +74,10 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             <Link href="/" className="text-xl font-black tracking-tighter text-white">FactSport</Link>
           </div>
           <div className="flex items-center space-x-3">
-            <Link href="/login" className="px-4 py-1.5 text-[10px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition">Login</Link>
+             {/* ✅ UPDATED: Link points to /privacy-policy now */}
+            <a href="/privacy-policy" className="text-[10px] font-bold text-slate-400 hover:text-white transition uppercase">Privacy Policy</a>
             
-            {/* ✅ UPDATED: "Predict & Win" Button */}
+            <Link href="/login" className="px-4 py-1.5 text-[10px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition hidden md:block">Login</Link>
             <Link href="/vip/upgrade" className="flex items-center gap-1 px-4 py-1.5 text-[10px] font-bold bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 rounded-full shadow-lg shadow-red-900/50 transition">
                 <Trophy size={11} /> Predict & Win
             </Link>
@@ -248,9 +249,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             </div>
         </div>
       </div>
-
-    {/* ✅ CLEANED: Double Footer Removed. Only the main footer from layout.tsx will show. */}
-
     </div>
   );
 }
