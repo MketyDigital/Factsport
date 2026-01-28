@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, ShieldCheck, FileText } from "lucide-react";
+import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle } from "lucide-react";
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import NewsArtwork from '@/app/components/NewsArtwork';
 
@@ -74,10 +74,9 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             <Link href="/" className="text-xl font-black tracking-tighter text-white">FactSport</Link>
           </div>
           <div className="flex items-center space-x-3">
-            {/* ✅ UPDATED: Removed Privacy Link */}
             <Link href="/login" className="px-4 py-1.5 text-[10px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition">Login</Link>
             
-            {/* ✅ UPDATED: Text Changed to "Predict & Win" */}
+            {/* ✅ UPDATED: "Predict & Win" Button */}
             <Link href="/vip/upgrade" className="flex items-center gap-1 px-4 py-1.5 text-[10px] font-bold bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 rounded-full shadow-lg shadow-red-900/50 transition">
                 <Trophy size={11} /> Predict & Win
             </Link>
@@ -250,25 +249,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </div>
 
-      {/* ✅ GOOGLE REQUIREMENT: COMPLIANCE FOOTER */}
-      <footer className="bg-[#0a1428] text-slate-400 py-10 px-4 mt-8 border-t border-white/10">
-        <div className="flex flex-col items-center text-center space-y-6">
-           <div className="flex items-center space-x-2 opacity-80 scale-125">
-                <div className="relative flex items-center justify-center w-6 h-6"><div className="absolute w-full h-full bg-gradient-to-r from-red-600 to-blue-800 clip-hexagon"></div><span className="relative font-bold italic text-white text-[9px]">FS</span></div>
-                <span className="text-lg font-black tracking-tighter text-white">FactSport</span>
-           </div>
-           
-           <div className="flex flex-wrap justify-center gap-8 text-[11px] font-bold uppercase tracking-wider text-slate-300">
-               <Link href="/privacy" className="hover:text-white hover:underline transition flex items-center gap-2"><ShieldCheck size={14}/> Privacy Policy</Link>
-               <Link href="/terms" className="hover:text-white hover:underline transition flex items-center gap-2"><FileText size={14}/> Terms of Service</Link>
-           </div>
-
-           <p className="text-[10px] text-slate-500 max-w-sm leading-relaxed">
-             © {new Date().getFullYear()} FactSport. All rights reserved. <br/>
-             Gambling involves risk. Please gamble responsibly.
-           </p>
-        </div>
-      </footer>
+    {/* ✅ CLEANED: Double Footer Removed. Only the main footer from layout.tsx will show. */}
 
     </div>
   );
