@@ -74,7 +74,12 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             <Link href="/" className="text-xl font-black tracking-tighter text-white">FactSport</Link>
           </div>
           <div className="flex items-center space-x-3">
-            <Link href="/login" className="px-4 py-1.5 text-[10px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition">Login</Link>
+             {/* ✅ GOOGLE FIX: Standard <a> tag, visible on Mobile & Desktop */}
+            <a href="/privacy-policy" className="text-[10px] font-bold text-slate-400 hover:text-white transition uppercase">Privacy Policy</a>
+            
+            <Link href="/login" className="px-4 py-1.5 text-[10px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition hidden md:block">Login</Link>
+            
+            {/* ✅ BUTTON UPDATED: "Predict & Win" */}
             <Link href="/vip/upgrade" className="flex items-center gap-1 px-4 py-1.5 text-[10px] font-bold bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 rounded-full shadow-lg shadow-red-900/50 transition">
                 <Trophy size={11} /> Predict & Win
             </Link>
@@ -247,7 +252,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </div>
 
-      {/* ✅ CLEAN LEGAL STRIP (Not a double footer, just a compliance text) */}
+      {/* ✅ CLEAN LEGAL STRIP (Not a double footer, just a compliance text to ensure Google sees it) */}
       <div className="w-full flex items-center justify-center py-6 bg-[#F0F2F5] text-slate-400">
          <a href="/privacy-policy" className="text-[10px] font-bold uppercase hover:text-slate-600 transition flex items-center gap-1">
             <ShieldCheck size={12} /> Privacy Policy
