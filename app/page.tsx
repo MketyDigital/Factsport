@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Clock, ShieldCheck, FileText } from "lucide-react";
+import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle } from "lucide-react";
 // ✅ IMPORT THE LIVE LABEL
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 // ✅ IMPORT THE NEW ARTWORK COMPONENT
@@ -55,7 +55,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
 
   // News Sorting Logic
   const breakingNews = news.filter(n => n.is_breaking); 
-  const headlines = news.filter(n => n.is_headline).slice(0, 3); // Removed strict image_url check so artwork works
+  const headlines = news.filter(n => n.is_headline).slice(0, 3);
   const headlineIds = headlines.map(h => h.id);
   const latestNews = news.filter(n => !headlineIds.includes(n.id) && !n.is_breaking).slice(0, 5);
 
@@ -77,7 +77,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             <Link href="/" className="text-xl font-black tracking-tighter text-white">FactSport</Link>
           </div>
           <div className="flex items-center space-x-3">
-            {/* ✅ TEMPORARY PRIVACY LINK FOR GOOGLE VERIFICATION */}
+             {/* ✅ KEPT: Top Privacy Link (Good for Verification, barely visible) */}
             <Link href="/privacy" className="text-[10px] font-bold text-slate-300 hover:text-white transition">Privacy</Link>
             
             <Link href="/login" className="px-4 py-1.5 text-[10px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition">Login</Link>
@@ -94,13 +94,12 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       )}
 
-      {/* 2. HEADLINES SLIDER (UPDATED WITH ARTWORK) */}
+      {/* 2. HEADLINES SLIDER */}
       {headlines.length > 0 && (
         <div className="mt-3 px-3">
             <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-4 scrollbar-hide">
                 {headlines.map((item) => (
                     <Link href={`/news/${item.slug || '#'}`} key={item.id} className="snap-center shrink-0 w-[85%] md:w-[400px] h-48 relative rounded-2xl overflow-hidden shadow-lg border border-white/20">
-                        {/* ✅ SMART ARTWORK REPLACES STATIC IMG */}
                         <NewsArtwork 
                            image={item.image_url} 
                            team1Logo={item.team_1_logo} 
@@ -108,7 +107,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                            title={item.title}
                            className="absolute inset-0 w-full h-full"
                         />
-                        
                         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"></div>
                         <div className="absolute bottom-0 left-0 p-4 w-full">
                             <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase mb-1.5 inline-block shadow-sm">Top Story</span>
@@ -144,7 +142,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       )}
 
-      {/* 4. LATEST NEWS (UPDATED WITH ARTWORK) */}
+      {/* 4. LATEST NEWS */}
       <div className="px-4 mb-4 mt-6">
         <div className="flex justify-between items-center mb-2">
             <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">Latest News</h3>
@@ -154,7 +152,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             {latestNews.length > 0 ? latestNews.map((item) => (
                 <Link href={`/news/${item.slug || '#'}`} key={item.id} className="flex gap-3 items-center p-3 active:bg-slate-50 transition">
                     <div className="w-14 h-14 bg-slate-100 rounded-lg shrink-0 overflow-hidden relative">
-                        {/* ✅ SMART ARTWORK REPLACES THUMBNAIL */}
                         <NewsArtwork 
                            image={item.image_url} 
                            team1Logo={item.team_1_logo} 
@@ -181,7 +178,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         <div className="bg-white border-y border-slate-200 sticky top-14 z-30 overflow-x-auto scrollbar-hide py-2 shadow-sm">
             <div className="flex px-4 space-x-2 min-w-max">
             {['All', 'Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Champions League'].map((league) => (
-                // ✅ FIXED SCROLL ISSUE: Added scroll={false}
                 <Link 
                   key={league} 
                   href={`/?league=${league}`} 
@@ -196,7 +192,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         <div className="px-4 py-4 space-y-3">
              {displayMatches.map((match) => (
                   <div key={match.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-3">
-                      {/* HEADER */}
                       <div className="bg-slate-50 px-3 py-1.5 flex justify-between items-center border-b border-slate-100">
                            <div className="flex items-center gap-1">
                               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[150px] truncate">{match.league || 'Football Match'}</span>
@@ -206,7 +201,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                       
                       <Link href={`/match/${match.id}`}>
                           <div className="p-4 flex justify-between items-center active:bg-slate-50 transition">
-                              {/* Home */}
                               <div className="flex-1 flex items-center gap-3 overflow-hidden">
                                   <div className="w-8 h-8 flex items-center justify-center shrink-0">
                                       {match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}
@@ -214,7 +208,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                   <span className="text-xs font-bold text-slate-800 truncate">{match.home_team}</span>
                               </div>
 
-                              {/* ✅ CENTER: THE SMART LIVE LABEL */}
                               <div className="px-4 min-w-[80px] flex justify-center border-x border-slate-50">
                                   <LiveScoreLabel 
                                     matchId={match.id}
@@ -225,7 +218,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                   />
                               </div>
 
-                              {/* Away */}
                               <div className="flex-1 flex items-center gap-3 flex-row-reverse text-right overflow-hidden">
                                   <div className="w-8 h-8 flex items-center justify-center shrink-0">
                                       {match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}
@@ -259,28 +251,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </div>
 
-      {/* ✅ 7. FOOTER (REQUIRED FOR GOOGLE VERIFICATION) */}
-      <footer className="bg-[#0a1428] text-slate-400 py-8 px-4 mt-8 border-t border-white/10">
-        <div className="flex flex-col items-center text-center space-y-4">
-           {/* Logo */}
-           <div className="flex items-center space-x-2 opacity-80">
-                <div className="relative flex items-center justify-center w-6 h-6"><div className="absolute w-full h-full bg-gradient-to-r from-red-600 to-blue-800 clip-hexagon"></div><span className="relative font-bold italic text-white text-[9px]">FS</span></div>
-                <span className="text-lg font-black tracking-tighter text-white">FactSport</span>
-           </div>
-           
-           {/* Mandatory Links */}
-           <div className="flex flex-wrap justify-center gap-6 text-[10px] font-bold uppercase tracking-wider">
-               <Link href="/privacy" className="hover:text-white transition flex items-center gap-1"><ShieldCheck size={12}/> Privacy Policy</Link>
-               <Link href="/terms" className="hover:text-white transition flex items-center gap-1"><FileText size={12}/> Terms of Service</Link>
-           </div>
-
-           <p className="text-[10px] text-slate-600 max-w-xs leading-relaxed">
-             © {new Date().getFullYear()} FactSport. All rights reserved. 
-             <br /> Gambling involves risk. Please gamble responsibly.
-           </p>
-        </div>
-      </footer>
-
+      {/* ✅ REMOVED: Site-Wide Footer (It is already in layout.tsx) */}
     </div>
   );
 }
