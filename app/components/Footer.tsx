@@ -34,7 +34,7 @@ export default function Footer() {
             <ul className="space-y-2 text-xs">
                 <li><Link href="/how-to-play" className="hover:text-white transition">How to Play</Link></li>
                 <li><Link href="/terms" className="hover:text-white transition">Terms & Conditions</Link></li>
-                <li><Link href="/privacy" className="hover:text-white transition">Privacy Policy</Link></li>
+                <li><Link href="/privacy-policy" className="hover:text-white transition">Privacy Policy</Link></li>
                 <li><Link href="/disclaimer" className="hover:text-white transition">Disclaimer</Link></li>
                 <li className="text-red-500 font-bold mt-3 border-t border-white/5 pt-2">18+ Gamble Responsibly</li>
             </ul>
