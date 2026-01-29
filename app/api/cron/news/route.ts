@@ -8,7 +8,15 @@ const RSS_FEED = 'https://www.skysports.com/rss/12040';
 
 async function fetchRSS() {
   try {
-    const res = await fetch(RSS_FEED);
+    // ✅ FIX 1: Add User-Agent so SkySports thinks we are a real browser
+    const res = await fetch(RSS_FEED, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+    });
+
+    if (!res.ok) throw new Error(`RSS Source returned ${res.status}`);
+    
     const text = await res.text();
     const items = [];
     const rawItems = text.split('<item>').slice(1); 
@@ -17,7 +25,9 @@ async function fetchRSS() {
       const title = raw.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1] || raw.match(/<title>(.*?)<\/title>/)?.[1];
       const link = raw.match(/<link>(.*?)<\/link>/)?.[1];
       const desc = raw.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/)?.[1] || raw.match(/<description>(.*?)<\/description>/)?.[1];
-      const imgMatch = raw.match(/url="(https:\/\/[^"]+jpg|[^"]+png|[^"]+jpeg)"/);
+      
+      // ✅ FIX 2: Relaxed Image Regex (Captures any URL inside url="")
+      const imgMatch = raw.match(/url="([^"]+)"/);
 
       if (title && link) {
         items.push({
@@ -28,18 +38,24 @@ async function fetchRSS() {
         });
       }
     }
-    return items.slice(0, 10);
-  } catch (e) {
+    return items.slice(0, 15); // Check top 15 items
+  } catch (e: any) {
     console.error("RSS Fetch Error:", e);
-    return [];
+    return []; // Return empty if failed
   }
 }
 
 export async function GET(request: NextRequest) {
   
-  // 🔒 SECURITY CHECK: Verify CRON_KEY
+  // 🔒 SECURITY CHECK
   const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_KEY}`) {
+  const urlKey = request.nextUrl.searchParams.get('key');
+  const validKey = process.env.CRON_KEY;
+
+  const isValidHeader = authHeader === `Bearer ${validKey}`;
+  const isValidParam = urlKey === validKey;
+
+  if (!isValidHeader && !isValidParam) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -50,11 +66,21 @@ export async function GET(request: NextRequest) {
 
   try {
     const articles = await fetchRSS();
-    let newCount = 0;
+    let addedCount = 0;
+    let duplicateCount = 0;
+
+    // Log what we found to help debug
+    if (articles.length === 0) {
+        return NextResponse.json({ success: false, message: "Bot ran but found 0 articles in RSS Feed. Source might be blocking us." });
+    }
 
     for (const item of articles) {
       const { data: existing } = await supabase.from('news').select('id').eq('title', item.title).single();
-      if (existing) continue;
+      
+      if (existing) {
+          duplicateCount++;
+          continue;
+      }
 
       let team1Logo = null;
       let team2Logo = null;
@@ -90,12 +116,13 @@ export async function GET(request: NextRequest) {
         slug: slug,
       });
 
-      if (!error) newCount++;
+      if (!error) addedCount++;
     }
 
+    // ✅ FIX 3: Detailed Status Report
     return NextResponse.json({ 
       success: true, 
-      message: `Bot finished. Added ${newCount} new articles.` 
+      message: `Scan Complete. Found ${articles.length} items. Added: ${addedCount}. Duplicates: ${duplicateCount}.` 
     });
 
   } catch (error: any) {
