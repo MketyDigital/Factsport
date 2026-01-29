@@ -134,7 +134,12 @@ export default function AdminNewsPage() {
                   const btn = document.getElementById('bot-btn');
                   if(btn) btn.innerHTML = '⚙️ Running...';
                   try {
-                    const res = await fetch('/api/cron/news');
+                    // ✅ Updated to use Secure Key Header
+                    const res = await fetch('/api/cron/news', {
+                        headers: {
+                            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_CRON_KEY}` 
+                        }
+                    });
                     const json = await res.json();
                     if(json.success) {
                         alert(json.message);
