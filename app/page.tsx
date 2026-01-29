@@ -43,9 +43,9 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
 
   // Sorting
   const breakingNews = news.filter(n => n.is_breaking); 
-  // We duplicate ticker items to create the seamless infinite loop effect
   const rawTicker = breakingNews.length > 0 ? breakingNews : news.slice(0, 5);
-  const tickerNews = [...rawTicker, ...rawTicker, ...rawTicker]; // Tripled for safety
+  // Duplicate 4 times to ensure no gaps on wide screens
+  const tickerNews = [...rawTicker, ...rawTicker, ...rawTicker, ...rawTicker]; 
 
   const headlines = news.filter(n => n.is_headline).slice(0, 5);
   const finalHeadlines = headlines.length > 0 ? headlines : news.slice(0, 3);
@@ -64,19 +64,20 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       <style>{`
         @keyframes scroll {
           0% { transform: translateX(0); }
-          100% { transform: translateX(-33.33%); } /* Move 1/3 because we tripled content */
+          100% { transform: translateX(-50%); } 
         }
         .animate-scroll {
           display: flex;
           width: max-content;
-          animation: scroll 40s linear infinite; /* Slow & Smooth */
+          animation: scroll 60s linear infinite; /* Slower (60s) */
         }
-        .animate-scroll:hover {
-          animation-play-state: paused; /* Optional: Pause on hover to read */
+        /* Stop the text from wrapping */
+        .ticker-item {
+          white-space: nowrap; 
         }
       `}</style>
 
-      {/* NAVBAR (Fixed Login Button) */}
+      {/* NAVBAR */}
       <nav className="sticky top-0 z-50 bg-[#0a1428] text-white border-b border-white/10 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -84,9 +85,9 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             <Link href="/" className="text-xl font-black tracking-tighter text-white">FactSport</Link>
           </div>
           <div className="flex items-center gap-3">
-             {/* ✅ LOGIN BUTTON (Always Visible Now) */}
-            <Link href="/login" className="flex items-center gap-2 px-4 py-1.5 text-[11px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition">
-                <User size={12} /> <span className="hidden sm:inline">Login</span>
+             {/* ✅ LOGIN BUTTON (Text Visible on Mobile) */}
+            <Link href="/login" className="flex items-center gap-1 px-4 py-1.5 text-[11px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition">
+                <User size={12} /> <span>Login</span>
             </Link>
             <Link href="/vip/upgrade" className="flex items-center gap-1 px-4 py-1.5 text-[10px] font-bold bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 rounded-full shadow-lg shadow-red-900/50 transition">
                 <Trophy size={11} /> Predict
@@ -95,22 +96,24 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </nav>
 
-      {/* 1. SEAMLESS TV TICKER */}
+      {/* 1. SEAMLESS TV TICKER (Fixed Layout) */}
       {tickerNews.length > 0 && (
-        <div className="bg-yellow-400 text-black text-[10px] font-black py-2 overflow-hidden relative flex items-center shadow-md z-40 border-b border-yellow-500">
-            <div className="absolute left-0 h-full bg-yellow-500 px-3 flex items-center z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)] border-r border-yellow-600">
+        <div className="bg-yellow-400 text-black text-[10px] font-black h-9 overflow-hidden relative flex items-center shadow-md z-40 border-b border-yellow-500">
+            {/* Breaking Label */}
+            <div className="absolute left-0 h-full bg-yellow-500 px-3 flex items-center z-20 shadow-[4px_0_10px_rgba(0,0,0,0.1)] border-r border-yellow-600 whitespace-nowrap">
                 <Activity size={12} className="mr-1 animate-pulse text-red-600" /> BREAKING
             </div>
+            
             {/* The Infinite Wrapper */}
-            <div className="w-full overflow-hidden flex ml-20">
-                <div className="animate-scroll flex items-center gap-8">
+            <div className="w-full overflow-hidden flex pl-24"> 
+                <div className="animate-scroll flex items-center">
                     {tickerNews.map((n, i) => ( 
-                        <span key={`${n.id}-${i}`} className="flex items-center gap-2">
+                        <div key={`${n.id}-${i}`} className="ticker-item flex items-center mx-6">
                             <Link href={`/news/${n.slug}`} className="uppercase tracking-wide hover:underline hover:text-red-700 transition">
                                 🚨 {n.title}
                             </Link>
-                            <span className="text-yellow-700/50">•</span>
-                        </span> 
+                            <span className="text-yellow-700/50 ml-6">•</span>
+                        </div> 
                     ))}
                 </div>
             </div>
