@@ -1,13 +1,13 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
-export const revalidate = 0; // ✅ FIX: Forces page to rebuild instantly so new News shows up
+export const revalidate = 60; // Refresh every 60s
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, ShieldCheck } from "lucide-react";
+import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle } from "lucide-react";
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import NewsArtwork from '@/app/components/NewsArtwork';
-import HeadlinesSlider from '@/app/components/HeadlinesSlider'; // ✅ IMPORT NEW SLIDER
+import HeadlinesSlider from '@/app/components/HeadlinesSlider';
 
 // SEO Metadata
 export const metadata = {
@@ -55,13 +55,9 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
 
   // Sorting Logic
   const breakingNews = news.filter(n => n.is_breaking); 
-  // If no manually set breaking news, use the latest 3 regular news items
   const tickerNews = breakingNews.length > 0 ? breakingNews : news.slice(0, 5);
-
   const headlines = news.filter(n => n.is_headline).slice(0, 5);
-  // Fallback: If no headlines set, grab top 3 latest
   const finalHeadlines = headlines.length > 0 ? headlines : news.slice(0, 3);
-  
   const headlineIds = finalHeadlines.map(h => h.id);
   const latestNews = news.filter(n => !headlineIds.includes(n.id) && !n.is_breaking).slice(0, 5);
 
@@ -72,9 +68,8 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const displayMatches = [...live, ...upcoming, ...finished];
 
   return (
-    <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-24 overflow-x-hidden">
+    <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-12 overflow-x-hidden">
       
-      {/* ✅ CSS FOR SCROLLING TICKER */}
       <style>{`
         @keyframes marquee {
           0% { transform: translateX(100%); }
@@ -94,7 +89,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             <Link href="/" className="text-xl font-black tracking-tighter text-white">FactSport</Link>
           </div>
           <div className="flex items-center space-x-3">
-            <a href="/privacy-policy" className="text-[10px] font-bold text-slate-400 hover:text-white transition uppercase">Privacy Policy</a>
             <Link href="/login" className="px-4 py-1.5 text-[10px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition hidden md:block">Login</Link>
             <Link href="/vip/upgrade" className="flex items-center gap-1 px-4 py-1.5 text-[10px] font-bold bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 rounded-full shadow-lg shadow-red-900/50 transition">
                 <Trophy size={11} /> Predict & Win
@@ -103,7 +97,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </nav>
 
-      {/* 1. ✅ SCROLLING NEWS TICKER */}
+      {/* 1. TICKER */}
       {tickerNews.length > 0 && (
         <div className="bg-yellow-400 text-black text-[10px] font-black py-2 overflow-hidden relative flex items-center shadow-md z-40 border-b border-yellow-500">
             <div className="absolute left-0 h-full bg-yellow-500 px-3 flex items-center z-10 shadow-r-xl border-r border-yellow-600"><Activity size={12} className="mr-1 animate-pulse text-red-600" /> BREAKING</div>
@@ -122,7 +116,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       )}
 
-      {/* 2. ✅ AUTO-SLIDING HEADLINES */}
+      {/* 2. AUTO-SLIDER */}
       {finalHeadlines.length > 0 && (
         <div className="mt-4 px-4">
             <HeadlinesSlider headlines={finalHeadlines} />
@@ -247,7 +241,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </section>
 
-      {/* 6. VIP REWARD SECTION */}
+      {/* 6. VIP REWARD */}
       <div className="mx-4 mb-4">
         <div className="rounded-2xl overflow-hidden relative shadow-2xl group cursor-pointer bg-black p-6 text-center">
             <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 blur-[60px] opacity-20 group-hover:opacity-30 transition"></div>
@@ -260,13 +254,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                 <Link href="/vip/upgrade" className="inline-flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-sm uppercase px-8 py-3 rounded-xl transition shadow-lg active:scale-95">Join Winners Circle <ArrowRight size={16} /></Link>
             </div>
         </div>
-      </div>
-
-      {/* ✅ CLEAN LEGAL STRIP */}
-      <div className="w-full flex items-center justify-center py-6 bg-[#F0F2F5] text-slate-400">
-         <a href="/privacy-policy" className="text-[10px] font-bold uppercase hover:text-slate-600 transition flex items-center gap-1">
-            <ShieldCheck size={12} /> Privacy Policy
-         </a>
       </div>
 
     </div>
