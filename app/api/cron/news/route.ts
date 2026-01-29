@@ -8,7 +8,6 @@ const RSS_FEED = 'https://www.skysports.com/rss/12040';
 
 async function fetchRSS() {
   try {
-    // ✅ FIX 1: Add User-Agent so SkySports thinks we are a real browser
     const res = await fetch(RSS_FEED, {
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -25,8 +24,6 @@ async function fetchRSS() {
       const title = raw.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1] || raw.match(/<title>(.*?)<\/title>/)?.[1];
       const link = raw.match(/<link>(.*?)<\/link>/)?.[1];
       const desc = raw.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/)?.[1] || raw.match(/<description>(.*?)<\/description>/)?.[1];
-      
-      // ✅ FIX 2: Relaxed Image Regex (Captures any URL inside url="")
       const imgMatch = raw.match(/url="([^"]+)"/);
 
       if (title && link) {
@@ -38,25 +35,26 @@ async function fetchRSS() {
         });
       }
     }
-    return items.slice(0, 15); // Check top 15 items
+    return items.slice(0, 15);
   } catch (e: any) {
     console.error("RSS Fetch Error:", e);
-    return []; // Return empty if failed
+    return [];
   }
 }
 
 export async function GET(request: NextRequest) {
-  
-  // 🔒 SECURITY CHECK
+  // 1. Check Auth
   const authHeader = request.headers.get('authorization');
   const urlKey = request.nextUrl.searchParams.get('key');
   const validKey = process.env.CRON_KEY;
 
-  const isValidHeader = authHeader === `Bearer ${validKey}`;
-  const isValidParam = urlKey === validKey;
-
-  if (!isValidHeader && !isValidParam) {
+  if ((authHeader !== `Bearer ${validKey}`) && (urlKey !== validKey)) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // 2. Check Service Role Key Availability
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json({ success: false, error: "CRITICAL: SUPABASE_SERVICE_ROLE_KEY is missing in Environment Variables." });
   }
 
   const supabase = createClient(
@@ -68,11 +66,7 @@ export async function GET(request: NextRequest) {
     const articles = await fetchRSS();
     let addedCount = 0;
     let duplicateCount = 0;
-
-    // Log what we found to help debug
-    if (articles.length === 0) {
-        return NextResponse.json({ success: false, message: "Bot ran but found 0 articles in RSS Feed. Source might be blocking us." });
-    }
+    let lastError = null; // Store the last error to show you
 
     for (const item of articles) {
       const { data: existing } = await supabase.from('news').select('id').eq('title', item.title).single();
@@ -82,47 +76,31 @@ export async function GET(request: NextRequest) {
           continue;
       }
 
-      let team1Logo = null;
-      let team2Logo = null;
-      const titleLower = item.title.toLowerCase();
-
-      const { data: knownTeams } = await supabase.from('matches').select('home_team, home_logo, away_team, away_logo').limit(50);
-
-      if (knownTeams) {
-        for (const match of knownTeams) {
-          if (titleLower.includes(match.home_team.toLowerCase())) {
-            if (!team1Logo) team1Logo = match.home_logo;
-            else if (team1Logo !== match.home_logo) team2Logo = match.home_logo;
-          }
-          if (titleLower.includes(match.away_team.toLowerCase())) {
-             if (!team1Logo) team1Logo = match.away_logo;
-             else if (team1Logo !== match.away_logo && team1Logo !== match.home_logo) team2Logo = match.away_logo;
-          }
-          if (team1Logo && team2Logo) break;
-        }
-      }
-
       const slug = item.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
       
+      // Try to insert
       const { error } = await supabase.from('news').insert({
         title: item.title,
         body: item.content || "Read full story on SkySports.",
         image_url: item.image, 
-        team_1_logo: team1Logo,
-        team_2_logo: team2Logo,
         is_breaking: false,
         is_headline: false,
-        category: 'Football',
         slug: slug,
       });
 
-      if (!error) addedCount++;
+      if (!error) {
+          addedCount++;
+      } else {
+          console.error("Supabase Insert Error:", error);
+          lastError = error.message; // Capture the error message
+      }
     }
 
-    // ✅ FIX 3: Detailed Status Report
+    // Return detailed report
     return NextResponse.json({ 
       success: true, 
-      message: `Scan Complete. Found ${articles.length} items. Added: ${addedCount}. Duplicates: ${duplicateCount}.` 
+      message: `Found ${articles.length}. Added: ${addedCount}. Duplicates: ${duplicateCount}.`,
+      lastError: lastError ? `DB Error: ${lastError}` : "None"
     });
 
   } catch (error: any) {
