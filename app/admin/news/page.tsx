@@ -3,11 +3,12 @@ export const runtime = 'edge';
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
-import { Loader2, Plus, Trash2, Star, Activity, Search, Shield, Bot } from 'lucide-react';
+import { Loader2, Plus, Trash2, Star, Activity, Search, Shield, Bot, Pencil, X, Save } from 'lucide-react';
 
 export default function AdminNewsPage() {
   const [news, setNews] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null); // Track which article we are editing
   
   // Form State
   const [formData, setFormData] = useState({ 
@@ -26,6 +27,9 @@ export default function AdminNewsPage() {
 
   // 🪄 AUTO-SUGGEST LOGOS FROM TITLE
   useEffect(() => {
+    // Only run auto-suggest if we are NOT editing (to avoid overwriting existing data)
+    if (editingId) return;
+
     const findLogos = async () => {
         if (!formData.title || formData.title.length < 5) return;
         if (formData.team1Logo && formData.team2Logo) return;
@@ -59,11 +63,30 @@ export default function AdminNewsPage() {
     
     const timeoutId = setTimeout(findLogos, 1000);
     return () => clearTimeout(timeoutId);
-  }, [formData.title]);
+  }, [formData.title, editingId]);
 
   const fetchNews = async () => {
     const { data } = await supabase.from('news').select('*').order('created_at', { ascending: false });
     setNews(data || []);
+  };
+
+  const handleEdit = (item: any) => {
+    setEditingId(item.id);
+    setFormData({
+        title: item.title,
+        body: item.body,
+        imageUrl: item.image_url || '',
+        team1Logo: item.team_1_logo || '',
+        team2Logo: item.team_2_logo || '',
+        isBreaking: item.is_breaking,
+        isHeadline: item.is_headline
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setFormData({ title: '', body: '', imageUrl: '', team1Logo: '', team2Logo: '', isBreaking: false, isHeadline: false });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,7 +94,7 @@ export default function AdminNewsPage() {
     setLoading(true);
     const slug = formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     
-    await supabase.from('news').insert({
+    const payload = {
         title: formData.title, 
         body: formData.body, 
         image_url: formData.imageUrl,
@@ -80,7 +103,16 @@ export default function AdminNewsPage() {
         is_breaking: formData.isBreaking, 
         is_headline: formData.isHeadline, 
         slug: slug
-    });
+    };
+
+    if (editingId) {
+        // UPDATE Existing
+        await supabase.from('news').update(payload).eq('id', editingId);
+        setEditingId(null);
+    } else {
+        // CREATE New
+        await supabase.from('news').insert(payload);
+    }
     
     setFormData({ title: '', body: '', imageUrl: '', team1Logo: '', team2Logo: '', isBreaking: false, isHeadline: false });
     fetchNews();
@@ -122,23 +154,34 @@ export default function AdminNewsPage() {
           </button>
       </div>
       
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+      <div className={`p-6 rounded-2xl shadow-sm border transition-all ${editingId ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-slate-100'}`}>
+        <div className="flex justify-between items-center mb-4">
+            <h2 className="font-bold text-lg flex items-center gap-2">
+                {editingId ? <><Pencil size={18} className="text-yellow-600"/> Editing Article</> : "Create New Article"}
+            </h2>
+            {editingId && (
+                <button onClick={handleCancelEdit} className="text-xs font-bold text-slate-500 flex items-center gap-1 hover:text-red-500">
+                    <X size={14}/> Cancel
+                </button>
+            )}
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
             {/* Title Input */}
             <div>
                  <input 
                     type="text" 
                     placeholder="Article Headline (e.g. Man Utd vs Chelsea Preview)" 
-                    className="w-full text-lg font-bold border-b pb-2 outline-none focus:border-black transition" 
+                    className="w-full text-lg font-bold border-b pb-2 outline-none focus:border-black transition bg-transparent" 
                     value={formData.title} 
                     onChange={(e) => setFormData({...formData, title: e.target.value})} 
                     required 
                  />
-                 <p className="text-[10px] text-slate-400 mt-1">💡 Pro Tip: Type team names clearly to auto-detect logos.</p>
+                 {!editingId && <p className="text-[10px] text-slate-400 mt-1">💡 Pro Tip: Type team names clearly to auto-detect logos.</p>}
             </div>
 
-            {/* Logo Inputs (The "Smart Artwork" Section) */}
-            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
+            {/* Logo Inputs */}
+            <div className="grid grid-cols-2 gap-4 bg-white/50 p-3 rounded-xl border border-slate-200/60">
                  <div className="flex items-center gap-2">
                      <div className="w-8 h-8 bg-white rounded border flex items-center justify-center shrink-0">
                          {formData.team1Logo ? <img src={formData.team1Logo} className="w-6 h-6 object-contain" /> : <Shield size={14} className="text-slate-300"/>}
@@ -168,14 +211,14 @@ export default function AdminNewsPage() {
             {/* Standard Options */}
             <div className="flex gap-4">
                 <input type="text" placeholder="Cover Image URL (Optional - overrides logos)" className="flex-1 border rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500" value={formData.imageUrl} onChange={(e) => setFormData({...formData, imageUrl: e.target.value})} />
-                <label className={`flex gap-2 px-3 py-2 rounded-lg border cursor-pointer select-none transition ${formData.isHeadline ? 'bg-blue-50 text-blue-700 border-blue-200' : 'hover:bg-slate-50'}`}><input type="checkbox" className="hidden" checked={formData.isHeadline} onChange={(e) => setFormData({...formData, isHeadline: e.target.checked})} /><Star size={16}/> Slider</label>
-                <label className={`flex gap-2 px-3 py-2 rounded-lg border cursor-pointer select-none transition ${formData.isBreaking ? 'bg-red-50 text-red-700 border-red-200' : 'hover:bg-slate-50'}`}><input type="checkbox" className="hidden" checked={formData.isBreaking} onChange={(e) => setFormData({...formData, isBreaking: e.target.checked})} /><Activity size={16}/> Ticker</label>
+                <label className={`flex gap-2 px-3 py-2 rounded-lg border cursor-pointer select-none transition ${formData.isHeadline ? 'bg-blue-50 text-blue-700 border-blue-200' : 'hover:bg-slate-50 bg-white'}`}><input type="checkbox" className="hidden" checked={formData.isHeadline} onChange={(e) => setFormData({...formData, isHeadline: e.target.checked})} /><Star size={16}/> Slider</label>
+                <label className={`flex gap-2 px-3 py-2 rounded-lg border cursor-pointer select-none transition ${formData.isBreaking ? 'bg-red-50 text-red-700 border-red-200' : 'hover:bg-slate-50 bg-white'}`}><input type="checkbox" className="hidden" checked={formData.isBreaking} onChange={(e) => setFormData({...formData, isBreaking: e.target.checked})} /><Activity size={16}/> Ticker</label>
             </div>
 
             <textarea placeholder="Article content..." className="w-full h-32 border rounded-lg p-3 text-sm outline-none focus:border-blue-500" value={formData.body} onChange={(e) => setFormData({...formData, body: e.target.value})}></textarea>
             
-            <button type="submit" disabled={loading} className="bg-black text-white px-6 py-2 rounded-lg font-bold text-sm flex gap-2 hover:bg-slate-800 transition active:scale-95 shadow-lg">
-                {loading ? <Loader2 className="animate-spin" size={16}/> : <><Plus size={16}/> Publish Article</>}
+            <button type="submit" disabled={loading} className={`px-6 py-2 rounded-lg font-bold text-sm flex gap-2 transition active:scale-95 shadow-lg text-white ${editingId ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-black hover:bg-slate-800'}`}>
+                {loading ? <Loader2 className="animate-spin" size={16}/> : (editingId ? <><Save size={16}/> Update Article</> : <><Plus size={16}/> Publish Article</>)}
             </button>
         </form>
       </div>
@@ -186,9 +229,8 @@ export default function AdminNewsPage() {
             <div className="p-10 text-center text-slate-400 text-sm">No news yet. Try running the bot!</div>
         ) : (
             news.map((item) => (
-                <div key={item.id} className="p-4 border-b last:border-0 flex justify-between items-center hover:bg-slate-50 transition">
+                <div key={item.id} className={`p-4 border-b last:border-0 flex justify-between items-center transition ${editingId === item.id ? 'bg-yellow-50' : 'hover:bg-slate-50'}`}>
                     <div className="flex gap-3 items-center">
-                        {/* Preview Thumbnail Logic */}
                         <div className="w-10 h-10 rounded bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
                             {item.image_url ? (
                                 <img src={item.image_url} className="w-full h-full object-cover" />
@@ -202,10 +244,23 @@ export default function AdminNewsPage() {
                         </div>
                         <div className="flex flex-col">
                             <span className="font-bold text-sm line-clamp-1">{item.title}</span>
-                            <span className="text-[10px] text-slate-400">{new Date(item.created_at).toLocaleDateString()}</span>
+                            <span className="text-[10px] text-slate-400 flex gap-2">
+                                <span>{new Date(item.created_at).toLocaleDateString()}</span>
+                                {item.is_breaking && <span className="text-red-500 font-bold">• Breaking</span>}
+                                {item.is_headline && <span className="text-blue-500 font-bold">• Headline</span>}
+                            </span>
                         </div>
                     </div>
-                    <button onClick={() => deleteNews(item.id)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 text-slate-400 hover:text-red-600 transition shrink-0"><Trash2 size={16}/></button>
+                    <div className="flex gap-2">
+                        {/* EDIT BUTTON */}
+                        <button onClick={() => handleEdit(item)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-yellow-100 text-slate-400 hover:text-yellow-600 transition shrink-0 border border-transparent hover:border-yellow-200">
+                            <Pencil size={14}/>
+                        </button>
+                        {/* DELETE BUTTON */}
+                        <button onClick={() => deleteNews(item.id)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 text-slate-400 hover:text-red-600 transition shrink-0 border border-transparent hover:border-red-200">
+                            <Trash2 size={14}/>
+                        </button>
+                    </div>
                 </div>
             ))
         )}
