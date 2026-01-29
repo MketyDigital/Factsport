@@ -1,11 +1,13 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+export const revalidate = 0; // ✅ FIX: Forces page to rebuild instantly so new News shows up
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
 import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, ShieldCheck } from "lucide-react";
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import NewsArtwork from '@/app/components/NewsArtwork';
+import HeadlinesSlider from '@/app/components/HeadlinesSlider'; // ✅ IMPORT NEW SLIDER
 
 // SEO Metadata
 export const metadata = {
@@ -53,8 +55,14 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
 
   // Sorting Logic
   const breakingNews = news.filter(n => n.is_breaking); 
-  const headlines = news.filter(n => n.is_headline).slice(0, 3);
-  const headlineIds = headlines.map(h => h.id);
+  // If no manually set breaking news, use the latest 3 regular news items
+  const tickerNews = breakingNews.length > 0 ? breakingNews : news.slice(0, 5);
+
+  const headlines = news.filter(n => n.is_headline).slice(0, 5);
+  // Fallback: If no headlines set, grab top 3 latest
+  const finalHeadlines = headlines.length > 0 ? headlines : news.slice(0, 3);
+  
+  const headlineIds = finalHeadlines.map(h => h.id);
   const latestNews = news.filter(n => !headlineIds.includes(n.id) && !n.is_breaking).slice(0, 5);
 
   const live = matches.filter(m => m.status === 'LIVE' || m.status === 'in' || m.status === '1H' || m.status === '2H' || m.status === 'HT');
@@ -64,8 +72,20 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const displayMatches = [...live, ...upcoming, ...finished];
 
   return (
-    <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-24">
+    <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-24 overflow-x-hidden">
       
+      {/* ✅ CSS FOR SCROLLING TICKER */}
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translateX(100%); }
+          100% { transform: translateX(-100%); }
+        }
+        .animate-marquee {
+          display: inline-block;
+          animation: marquee 20s linear infinite;
+        }
+      `}</style>
+
       {/* NAVBAR */}
       <nav className="sticky top-0 z-50 bg-[#0a1428] text-white border-b border-white/10 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
@@ -74,12 +94,8 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             <Link href="/" className="text-xl font-black tracking-tighter text-white">FactSport</Link>
           </div>
           <div className="flex items-center space-x-3">
-             {/* ✅ GOOGLE FIX: Standard <a> tag, visible on Mobile & Desktop */}
             <a href="/privacy-policy" className="text-[10px] font-bold text-slate-400 hover:text-white transition uppercase">Privacy Policy</a>
-            
             <Link href="/login" className="px-4 py-1.5 text-[10px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition hidden md:block">Login</Link>
-            
-            {/* ✅ BUTTON UPDATED: "Predict & Win" */}
             <Link href="/vip/upgrade" className="flex items-center gap-1 px-4 py-1.5 text-[10px] font-bold bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 rounded-full shadow-lg shadow-red-900/50 transition">
                 <Trophy size={11} /> Predict & Win
             </Link>
@@ -87,41 +103,35 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </nav>
 
-      {/* 1. BREAKING NEWS TICKER */}
-      {breakingNews.length > 0 && (
-        <div className="bg-yellow-400 text-black text-[10px] font-black py-2 overflow-hidden relative flex items-center shadow-md z-40">
+      {/* 1. ✅ SCROLLING NEWS TICKER */}
+      {tickerNews.length > 0 && (
+        <div className="bg-yellow-400 text-black text-[10px] font-black py-2 overflow-hidden relative flex items-center shadow-md z-40 border-b border-yellow-500">
             <div className="absolute left-0 h-full bg-yellow-500 px-3 flex items-center z-10 shadow-r-xl border-r border-yellow-600"><Activity size={12} className="mr-1 animate-pulse text-red-600" /> BREAKING</div>
-            <div className="whitespace-nowrap animate-marquee pl-28 flex space-x-8">{breakingNews.map(n => ( <Link href={`/news/${n.slug}`} key={n.id} className="uppercase tracking-wide hover:underline">🚨 {n.title}</Link> ))}</div>
+            <div className="w-full overflow-hidden">
+                <div className="whitespace-nowrap animate-marquee">
+                    {tickerNews.map((n, i) => ( 
+                        <span key={n.id} className="mx-6">
+                            <Link href={`/news/${n.slug}`} className="uppercase tracking-wide hover:underline hover:text-red-700 transition">
+                                🚨 {n.title}
+                            </Link>
+                            {i < tickerNews.length - 1 && <span className="ml-6 text-yellow-700">|</span>}
+                        </span> 
+                    ))}
+                </div>
+            </div>
         </div>
       )}
 
-      {/* 2. HEADLINES SLIDER */}
-      {headlines.length > 0 && (
-        <div className="mt-3 px-3">
-            <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-4 scrollbar-hide">
-                {headlines.map((item) => (
-                    <Link href={`/news/${item.slug || '#'}`} key={item.id} className="snap-center shrink-0 w-[85%] md:w-[400px] h-48 relative rounded-2xl overflow-hidden shadow-lg border border-white/20">
-                        <NewsArtwork 
-                           image={item.image_url} 
-                           team1Logo={item.team_1_logo} 
-                           team2Logo={item.team_2_logo}
-                           title={item.title}
-                           className="absolute inset-0 w-full h-full"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"></div>
-                        <div className="absolute bottom-0 left-0 p-4 w-full">
-                            <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase mb-1.5 inline-block shadow-sm">Top Story</span>
-                            <h3 className="text-white font-bold text-base leading-tight line-clamp-2 drop-shadow-md">{item.title}</h3>
-                        </div>
-                    </Link>
-                ))}
-            </div>
+      {/* 2. ✅ AUTO-SLIDING HEADLINES */}
+      {finalHeadlines.length > 0 && (
+        <div className="mt-4 px-4">
+            <HeadlinesSlider headlines={finalHeadlines} />
         </div>
       )}
 
       {/* 3. HIGHLIGHTS */}
       {highlights.length > 0 && (
-        <div className="mt-2 px-4">
+        <div className="mt-4 px-4">
              <div className="flex justify-between items-center mb-3">
                 <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2"><PlayCircle size={14} className="text-red-600" /> Highlights</h3>
             </div>
@@ -252,7 +262,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </div>
 
-      {/* ✅ CLEAN LEGAL STRIP (Not a double footer, just a compliance text to ensure Google sees it) */}
+      {/* ✅ CLEAN LEGAL STRIP */}
       <div className="w-full flex items-center justify-center py-6 bg-[#F0F2F5] text-slate-400">
          <a href="/privacy-policy" className="text-[10px] font-bold uppercase hover:text-slate-600 transition flex items-center gap-1">
             <ShieldCheck size={12} /> Privacy Policy
