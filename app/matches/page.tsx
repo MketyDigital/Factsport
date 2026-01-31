@@ -5,7 +5,7 @@ import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { ChevronLeft, BarChart2, Calendar, Zap, Ticket, ExternalLink, Video, Mic, Radio, Trophy, Youtube, Newspaper } from 'lucide-react';
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
-import FreeTipsBanner from '@/app/components/FreeTipsBanner'; // ✅ IMPORTED
+import FreeTipsBanner from '@/app/components/FreeTipsBanner'; 
 
 // 🟢 CONFIG: Default 1xBet Link
 const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599"; 
@@ -17,27 +17,40 @@ export default async function AllMatchesPage() {
   const startDate = new Date(); startDate.setDate(startDate.getDate() - 1);
   const endDate = new Date(); endDate.setDate(endDate.getDate() + 2);
 
-  const { data: matches } = await supabase
+  let { data: matches } = await supabase
     .from('matches')
     .select('*')
     .gte('match_date', startDate.toISOString())
     .lte('match_date', endDate.toISOString())
     .order('match_date', { ascending: true });
 
-  // 2. Group by League
+  // 2. FALLBACK: If no matches found, fetch recent FINISHED matches
+  if (!matches || matches.length === 0) {
+      const { data: recent } = await supabase
+        .from('matches')
+        .select('*')
+        .in('status', ['FT', 'FINISHED', 'post'])
+        .order('match_date', { ascending: false })
+        .limit(15);
+      matches = recent || [];
+  }
+
+  // 3. Group by League
   const leagues: { [key: string]: any[] } = {};
   matches?.forEach(match => {
     if (!leagues[match.league]) leagues[match.league] = [];
     leagues[match.league].push(match);
   });
 
-  // 3. Sorting Helper
+  // 4. Sorting Helper
   const sortMatches = (leagueMatches: any[]) => {
     const live = leagueMatches.filter(m => m.status === 'LIVE' || m.status === 'in');
-    const upcoming = leagueMatches.filter(m => m.status !== 'LIVE' && m.status !== 'in' && m.status !== 'FINISHED' && m.status !== 'FT');
-    const finished = leagueMatches.filter(m => m.status === 'FINISHED' || m.status === 'FT');
+    const upcoming = leagueMatches.filter(m => m.status !== 'LIVE' && m.status !== 'in' && m.status !== 'FINISHED' && m.status !== 'FT' && m.status !== 'post');
+    const finished = leagueMatches.filter(m => m.status === 'FINISHED' || m.status === 'FT' || m.status === 'post');
 
+    // Sort upcoming by time ascending
     upcoming.sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
+    // Sort finished by time descending (newest first)
     finished.sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
 
     return [...live, ...upcoming, ...finished];
@@ -57,7 +70,7 @@ export default async function AllMatchesPage() {
 
       <div className="p-3 space-y-6">
         
-        {/* 🟢 NEW: FREE TIPS BANNER (High Visibility) */}
+        {/* FREE TIPS BANNER */}
         <FreeTipsBanner />
 
         {Object.keys(leagues).length === 0 ? (

@@ -5,11 +5,13 @@ import { createClient } from '@/app/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  Trophy, TrendingUp, History, Star, User as UserIcon, 
-  ExternalLink, Zap, Crown, CheckCircle, AlertCircle, Lock,
-  Send, DollarSign, Globe, CalendarClock, Minus
+  Trophy, Star, User as UserIcon, 
+  Crown, CheckCircle, AlertCircle, Lock,
+  MessageCircle, Settings, Clock, Zap
 } from 'lucide-react';
 import SignOutButton from '@/app/components/SignOutButton';
+import DashboardHistory from '@/app/components/DashboardHistory'; 
+import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 
 async function getUserData() {
   const supabase = createClient();
@@ -29,8 +31,8 @@ async function getUserData() {
     .eq('id', user.id)
     .single();
 
-  // 3. Fetch Predictions (Now including REAL SCORES)
-  const { data: predictions } = await supabase
+  // 3. Fetch Current Month Predictions
+  const { data: currentPredictions } = await supabase
     .from('user_predictions')
     .select(`
         id, predicted_outcome, predicted_home_score, predicted_away_score, points_awarded, status, created_at,
@@ -39,9 +41,26 @@ async function getUserData() {
     .eq('user_id', user.id)
     .gte('created_at', startOfMonth.toISOString())
     .order('created_at', { ascending: false })
-    .limit(7);
+    .limit(50);
 
-  return { user, profile, predictions };
+  // 4. FALLBACK: If no activity this month, fetch Last 5 Wins
+  let pastWins: any[] = [];
+  if (!currentPredictions || currentPredictions.length === 0) {
+      const { data: wins } = await supabase
+        .from('user_predictions')
+        .select(`
+            id, predicted_outcome, predicted_home_score, predicted_away_score, points_awarded, status, created_at,
+            match:matches ( home_team, away_team, home_score, away_score, status ) 
+        `)
+        .eq('user_id', user.id)
+        .lt('created_at', startOfMonth.toISOString()) // Before this month
+        .or('status.eq.Won,points_awarded.gt.0') // Only Wins
+        .order('created_at', { ascending: false })
+        .limit(5);
+      pastWins = wins || [];
+  }
+
+  return { user, profile, predictions: currentPredictions, pastWins };
 }
 
 export default async function Dashboard() {
@@ -49,7 +68,7 @@ export default async function Dashboard() {
 
   if (!data) redirect('/login');
 
-  const { profile, predictions } = data;
+  const { profile, predictions, pastWins } = data;
     
   // VIP & Stats Logic
   const expiryDate = profile?.vip_expires_at ? new Date(profile.vip_expires_at) : null;
@@ -65,14 +84,11 @@ export default async function Dashboard() {
   const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
   const daysLeft = lastDay.getDate() - today.getDate();
 
-  const TELEGRAM_LINK = "https://t.me/factsportlive"; 
-  const BETTING_PARTNER_LINK = "https://melbet.com"; 
-  const PARTNER_NAME = "Melbet";
-
-  // Form Guide
-  const formGuide = predictions?.slice(0, 5).map((p: any) => {
+  // Form Guide (Use recent predictions if available, else empty)
+  const formSource = (predictions && predictions.length > 0) ? predictions : pastWins;
+  const formGuide = formSource?.slice(0, 5).map((p: any) => {
       const s = p.status?.toLowerCase();
-      if(s === 'won') return 'W';
+      if(s === 'won' || p.points_awarded > 0) return 'W';
       if(s === 'lost') return 'L';
       return 'P';
   }).reverse() || [];
@@ -80,7 +96,7 @@ export default async function Dashboard() {
   return (
     <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans text-slate-900">
         
-      {/* --- 1. HEADER --- */}
+      {/* HEADER */}
       <div className="bg-[#0a1428] text-white pt-8 pb-24 px-6 rounded-b-[2.5rem] relative overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600 rounded-full blur-[100px] opacity-20"></div>
         <div className="relative z-10 flex justify-between items-start mb-6">
@@ -110,11 +126,17 @@ export default async function Dashboard() {
                     )}
                 </div>
             </div>
-            <SignOutButton />
+            
+            <div className="flex items-center gap-2">
+                <Link href="/dashboard/settings" className="w-9 h-9 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition backdrop-blur-sm">
+                    <Settings size={18} className="text-white" />
+                </Link>
+                <SignOutButton />
+            </div>
         </div>
       </div>
 
-      {/* --- 2. STATS --- */}
+      {/* STATS */}
       <div className="grid grid-cols-2 gap-3 px-4 -mt-16 relative z-20 mb-4">
             <div className="bg-white p-4 rounded-2xl shadow-lg border border-slate-100 relative overflow-hidden group">
                 <div className="absolute right-0 top-0 w-16 h-16 bg-yellow-50 rounded-bl-full -mr-2 -mt-2 transition group-hover:bg-yellow-100"></div>
@@ -124,7 +146,7 @@ export default async function Dashboard() {
                             <Star size={12} className="text-yellow-500 fill-yellow-500" /> Monthly
                         </div>
                         <span className="text-[9px] font-bold text-slate-300 flex items-center gap-1">
-                            <CalendarClock size={10} /> {daysLeft} days left
+                            <Clock size={10} /> {daysLeft} days left
                         </span>
                     </div>
                     <div className="text-3xl font-black text-slate-900 tracking-tighter">{profile?.monthly_points || 0}</div>
@@ -138,7 +160,7 @@ export default async function Dashboard() {
                 <div className="absolute right-0 top-0 w-16 h-16 bg-blue-50 rounded-bl-full -mr-2 -mt-2 transition group-hover:bg-blue-100"></div>
                 <div className="relative z-10">
                     <div className="text-[10px] font-bold uppercase text-slate-400 mb-1 flex items-center gap-1">
-                        <History size={12} className="text-blue-500" /> All-Time
+                        <Trophy size={12} className="text-blue-500" /> All-Time
                     </div>
                     <div className="text-3xl font-black text-slate-900 tracking-tighter">{profile?.points || 0}</div>
                     <div className="text-[10px] text-slate-400 mt-1">Total Lifetime Points</div>
@@ -146,7 +168,7 @@ export default async function Dashboard() {
             </div>
       </div>
 
-      {/* --- 3. QUALIFICATION --- */}
+      {/* QUALIFICATION */}
       <div className="px-4 mb-4">
         <div className={`rounded-2xl border p-4 shadow-sm relative overflow-hidden ${isFullyQualified ? 'bg-gradient-to-r from-green-900 to-emerald-900 border-green-700 text-white' : 'bg-white border-slate-200'}`}>
             <div className="flex justify-between items-start mb-2 relative z-10">
@@ -177,125 +199,41 @@ export default async function Dashboard() {
                     <span>{isVipActive ? 'VIP Active' : 'VIP Required'}</span>
                 </div>
             </div>
-            {!isVipActive && isCsQualified && (
-                <div className="mt-3 bg-red-100 text-red-800 text-[10px] font-bold px-3 py-2 rounded-lg flex items-center gap-2 border border-red-200">
-                    <AlertCircle size={14} /> You have the scores, but you need VIP to win!
-                </div>
-            )}
         </div>
       </div>
 
-      {/* --- 4. COMMUNITY --- */}
+      {/* REVENUE */}
       <div className="px-4 mb-6">
-        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 pl-1">Community & Offers</h3>
-        <div className="grid grid-cols-2 gap-3">
-            <a href={TELEGRAM_LINK} target="_blank" rel="noopener noreferrer" className="bg-[#229ED9] hover:bg-[#1e8dbf] text-white p-3 rounded-xl shadow-lg shadow-blue-200 transition active:scale-95 flex flex-col justify-between h-20 relative overflow-hidden">
-                 <div className="absolute -right-2 -bottom-2 opacity-20"><Send size={48} /></div>
-                 <div className="flex items-center gap-2"><Send size={16} /><span className="text-[10px] font-bold uppercase opacity-80">Join Channel</span></div>
-                 <span className="text-xs font-black">Get Live Tips 🚀</span>
-            </a>
-            <a href={BETTING_PARTNER_LINK} target="_blank" rel="noopener noreferrer" className="bg-slate-900 hover:bg-black text-white p-3 rounded-xl shadow-lg shadow-slate-200 transition active:scale-95 flex flex-col justify-between h-20 relative overflow-hidden border border-slate-700">
-                 <div className="absolute -right-2 -bottom-2 opacity-20 text-yellow-500"><DollarSign size={48} /></div>
-                 <div className="flex items-center gap-2"><Globe size={16} className="text-yellow-500" /><span className="text-[10px] font-bold uppercase opacity-80 text-yellow-500">Partner</span></div>
-                 <span className="text-xs font-black">Bet on {PARTNER_NAME}</span>
-            </a>
+        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 pl-1">Premium Tools</h3>
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <div className="grid grid-cols-2 gap-3 mb-4">
+                 <Link href="/vip/upgrade" className="bg-[#0a1428] p-3 rounded-xl flex flex-col items-center justify-center text-center gap-1.5 group relative overflow-hidden active:scale-95 transition">
+                    <div className="absolute inset-0 bg-yellow-500/10 group-hover:bg-yellow-500/20 transition"></div>
+                    <Lock size={18} className="text-yellow-500" />
+                    <div>
+                        <div className="text-white font-black text-[10px] uppercase">Get 50+ Odds</div>
+                        <div className="text-slate-400 text-[8px]">Upgrade to VIP</div>
+                    </div>
+                </Link>
+
+                <a href="https://t.me/factsportlive" target="_blank" className="bg-blue-500 p-3 rounded-xl flex flex-col items-center justify-center text-center gap-1.5 hover:bg-blue-600 transition shadow-lg shadow-blue-500/30 active:scale-95">
+                    <MessageCircle size={18} className="text-white" />
+                    <div>
+                        <div className="text-white font-black text-[10px] uppercase">Join Channel</div>
+                        <div className="text-blue-100 text-[8px]">Free Codes Daily</div>
+                    </div>
+                </a>
+            </div>
+            <FreeTipsBanner />
         </div>
       </div>
 
-      {/* --- 5. PREDICTION HISTORY (UPDATED) --- */}
-      <div className="px-4">
-          <div className="flex items-center justify-between mb-3 px-1">
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                 <TrendingUp size={14} /> Monthly Activity
-              </h3>
-              <Link href="/leaderboard" className="text-[10px] font-bold text-blue-600 flex items-center gap-1">
-                  View Leaderboard <ExternalLink size={10} />
-              </Link>
-          </div>
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden min-h-[150px]">
-             {predictions && predictions.length > 0 ? (
-                 <>
-                 {predictions.map((pred: any) => {
-                     // Check if we have real scores
-                     const hasRealScore = pred.match?.status === 'FT' || pred.match?.status === 'LIVE' || (pred.match?.home_score !== null);
-                     
-                     return (
-                     <div key={pred.id} className="p-4 border-b border-slate-50 last:border-0 flex justify-between items-center hover:bg-slate-50 transition">
-                        <div>
-                            {/* Match Title */}
-                            <div className="text-xs font-bold text-slate-800 mb-2 flex items-center gap-1.5">
-                                {pred.match ? (
-                                    <>{pred.match.home_team} <span className="text-slate-300 text-[10px] font-normal">vs</span> {pred.match.away_team}</>
-                                ) : <span className="text-slate-400 italic">Match Data Unavailable</span>}
-                            </div>
-
-                            {/* ✨ NEW: Side-by-Side Comparison */}
-                            <div className="flex items-center gap-4">
-                                {/* User Prediction */}
-                                <div>
-                                    <span className="text-[9px] text-slate-400 font-bold uppercase block mb-0.5">Your Pick</span>
-                                    <span className="text-xs font-black text-slate-700 bg-slate-100 px-2 py-1 rounded border border-slate-200">
-                                        {pred.predicted_home_score} - {pred.predicted_away_score}
-                                    </span>
-                                </div>
-                                
-                                {/* Divider */}
-                                {hasRealScore && <Minus size={12} className="text-slate-300 rotate-90" />}
-
-                                {/* Real Result (Conditional) */}
-                                {hasRealScore ? (
-                                    <div>
-                                        <span className="text-[9px] text-slate-400 font-bold uppercase block mb-0.5">Result</span>
-                                        <span className={`text-xs font-black px-2 py-1 rounded border ${
-                                            pred.points_awarded === 10 ? 'bg-green-100 text-green-700 border-green-200' : 'bg-white text-slate-900 border-slate-200'
-                                        }`}>
-                                            {pred.match?.home_score} - {pred.match?.away_score}
-                                        </span>
-                                    </div>
-                                ) : (
-                                    // If no score yet, show status
-                                    <div>
-                                        <span className="text-[9px] text-slate-400 font-bold uppercase block mb-0.5">Status</span>
-                                        <span className="text-[10px] font-medium text-slate-500 italic">
-                                            {pred.match?.status === 'SCHEDULED' ? 'Upcoming' : pred.match?.status}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Status Badge (Won/Lost/Pending) */}
-                        <div className="text-right pl-2">
-                            {pred.status?.toLowerCase() === 'pending' ? (
-                                <div className="flex flex-col items-end">
-                                    <span className="text-[9px] font-black text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-100">PENDING</span>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-end">
-                                    <span className={`text-[9px] font-black px-2 py-1 rounded border ${pred.points_awarded > 0 ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
-                                         {pred.points_awarded > 0 ? `+${pred.points_awarded} PTS` : 'LOST'}
-                                    </span>
-                                </div>
-                            )}
-                            <div className="text-[9px] text-slate-300 mt-2 font-medium">{new Date(pred.created_at).toLocaleDateString()}</div>
-                        </div>
-                     </div>
-                 )})}
-                 
-                 <div className="p-3 bg-slate-50 text-center border-t border-slate-100">
-                    <p className="text-[10px] text-slate-400">Showing last 7 entries for {new Date().toLocaleString('default', { month: 'long' })}</p>
-                 </div>
-                 </>
-             ) : (
-                 <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3 text-slate-300"><Zap size={24} /></div>
-                    <p className="text-xs font-bold text-slate-600">No predictions this month</p>
-                    <p className="text-[10px] text-slate-400 mb-4 max-w-[200px]">New month, new opportunities! Start predicting.</p>
-                    <Link href="/" className="text-xs font-black bg-slate-900 text-white px-5 py-2.5 rounded-xl shadow-lg active:scale-95 transition">Predict Matches</Link>
-                 </div>
-             )}
-          </div>
-      </div>
+      {/* HISTORY WITH FALLBACK LOGIC */}
+      <DashboardHistory 
+          predictions={predictions || []} 
+          pastWins={pastWins || []} 
+      />
+      
     </div>
   );
 }

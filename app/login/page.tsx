@@ -16,6 +16,9 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   
+  // ✅ NEW STATE: Tracks failed attempts
+  const [attempts, setAttempts] = useState(0);
+
   // ✅ NEW STATE: Tracks if we need to show the "Verify Email" screen
   const [needsVerification, setNeedsVerification] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
@@ -59,9 +62,11 @@ export default function LoginPage() {
     if (error) {
       // ⚠️ CATCH THE "UNCONFIRMED" ERROR
       if (error.message.includes("Email not confirmed")) {
-        setNeedsVerification(true); // Switch UI to Verification Mode
+        setNeedsVerification(true); 
       } else {
         setError(error.message); // Show standard error
+        // 🟢 SMART LOGIC: Increment failed attempts
+        setAttempts((prev) => prev + 1);
       }
       setLoading(false);
     } else {
@@ -187,6 +192,18 @@ export default function LoginPage() {
 
         {/* Email Form */}
         <form onSubmit={handleLogin} className="space-y-4">
+          
+          {/* 🔴 SMART TROUBLE ALERT (Shows after 3 fails) */}
+          {attempts >= 3 && (
+            <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-yellow-400 text-xs text-center animate-in fade-in slide-in-from-top-2">
+                <p className="font-bold mb-2">Trouble logging in?</p>
+                <div className="flex justify-center gap-3">
+                    <Link href="/forgot-password" className="underline hover:text-white">Reset Password</Link>
+                    <button type="button" onClick={handleGoogleLogin} className="underline hover:text-white">Use Google</button>
+                </div>
+            </div>
+          )}
+
           {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-bold text-center">{error}</div>}
           
           <div className="space-y-2">
@@ -198,7 +215,13 @@ export default function LoginPage() {
           </div>
           
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-300 uppercase ml-1">Password</label>
+            <div className="flex justify-between items-center ml-1">
+                 <label className="text-xs font-bold text-slate-300 uppercase">Password</label>
+                 {/* 🟢 NEW: FORGOT PASSWORD LINK */}
+                 <Link href="/forgot-password" className="text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors">
+                    Forgot?
+                 </Link>
+            </div>
             <div className="relative">
               <Lock className="absolute left-4 top-3.5 text-slate-500" size={18} />
               <input type="password" required className="w-full bg-[#050b16] border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-red-600" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
