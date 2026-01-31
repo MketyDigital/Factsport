@@ -4,7 +4,7 @@ export const revalidate = 60;
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, User, Mic, Video, ExternalLink, Youtube, Newspaper, Radio } from "lucide-react";
+import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Video, ExternalLink, Youtube, Newspaper, Radio } from "lucide-react";
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import NewsArtwork from '@/app/components/NewsArtwork';
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
@@ -14,7 +14,7 @@ const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&s
 
 export const metadata = {
   title: 'FactSport | Live Scores, News & Predictions',
-  description: 'The #1 Platform for sports predictions, live scores, and breaking news. Join VIP to win monthly prizes.',
+  description: 'The #1 Platform for sports predictions, live scores, and breaking news.',
 };
 
 async function getHomepageData(leagueFilter: string | null) {
@@ -81,26 +81,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
           align-items: center;
         }
       `}</style>
-
-      {/* NAVBAR */}
-      <nav className="sticky top-0 z-50 bg-[#0a1428] text-white border-b border-white/10 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="relative flex items-center justify-center w-8 h-8"><div className="absolute w-full h-full bg-gradient-to-r from-red-600 to-blue-800 clip-hexagon"></div><span className="relative font-bold italic text-white text-[10px]">FS</span></div>
-            <Link href="/" className="text-xl font-black tracking-tighter text-white">FactSport</Link>
-          </div>
-          <div className="flex items-center gap-3">
-             {/* ✅ LOGIN BUTTON */}
-            <Link href="/login" className="flex items-center gap-1 px-4 py-1.5 text-[11px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition">
-                <User size={12} /> <span>Login</span>
-            </Link>
-            {/* ✅ UPDATED TEXT: Predict & Win */}
-            <Link href="/vip/upgrade" className="flex items-center gap-1 px-4 py-1.5 text-[10px] font-bold bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 rounded-full shadow-lg shadow-red-900/50 transition">
-                <Trophy size={11} /> Predict & Win
-            </Link>
-          </div>
-        </div>
-      </nav>
 
       {/* 1. SEAMLESS TV TICKER */}
       {tickerNews.length > 0 && (
