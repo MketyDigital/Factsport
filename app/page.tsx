@@ -4,7 +4,7 @@ export const revalidate = 60;
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Video, ExternalLink, Youtube, Newspaper, Radio } from "lucide-react";
+import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Video, ExternalLink, Youtube, Newspaper, Radio, Award } from "lucide-react";
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import NewsArtwork from '@/app/components/NewsArtwork';
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
@@ -222,12 +222,12 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </section>
 
-      {/* 🟢 NEW: FREE TIPS BANNER */}
+      {/* 🟢 FREE TIPS BANNER */}
       <div className="px-4">
         <FreeTipsBanner />
       </div>
 
-      {/* 6. VIP REWARD (Moved Above Quick Actions) */}
+      {/* 6. VIP REWARD */}
       <div className="mx-4 mb-4 mt-6">
         <div className="rounded-2xl overflow-hidden relative shadow-2xl group cursor-pointer bg-black p-6 text-center">
             <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 blur-[60px] opacity-20 group-hover:opacity-30 transition"></div>
@@ -242,27 +242,29 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </div>
 
-      {/* 🚀 QUICK ACTION LINKS (Now at the End) */}
+      {/* 🚀 QUICK ACTION LINKS (Updated for Single Line) */}
       <div className="px-4 mb-8">
           <div className="bg-[#0a1428] rounded-2xl p-6 shadow-xl relative overflow-hidden">
               <div className="absolute top-0 right-0 w-26 h-26 bg-blue-500 blur-[80px] opacity-20"></div>
               <h3 className="text-white font-black text-lg italic mb-4 relative z-10 flex items-center gap-2"><Zap className="text-yellow-500"/> QUICK ACTIONS</h3>
-              <div className="grid grid-cols-3 gap-3 relative z-10">
-                  <Link href="/matches" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
-                      <Trophy className="text-yellow-500" size={20} />
-                      <span className="text-[10px] font-bold text-white">Predictions</span>
+              
+              {/* ✅ GRID CHANGED TO 4 COLUMNS, GAP REDUCED, SIZES REDUCED */}
+              <div className="grid grid-cols-4 gap-2 relative z-10">
+                  <Link href="/matches" className="bg-white/10 hover:bg-white/20 p-2 rounded-xl flex flex-col items-center justify-center gap-1.5 transition border border-white/5 active:scale-95">
+                      <Trophy className="text-yellow-500" size={18} />
+                      <span className="text-[9px] font-bold text-white">Predict</span>
                   </Link>
-                  <Link href="/leaderboard" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
-                      <Trophy className="text-yellow-500" size={20} />
-                      <span className="text-[10px] font-bold text-white">Leaderboard</span>
+                  <Link href="/leaderboard" className="bg-white/10 hover:bg-white/20 p-2 rounded-xl flex flex-col items-center justify-center gap-1.5 transition border border-white/5 active:scale-95">
+                      <Award className="text-yellow-500" size={18} />
+                      <span className="text-[9px] font-bold text-white">Leaders</span>
                   </Link>
-                  <Link href="/news" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
-                      <Newspaper className="text-blue-400" size={20} />
-                      <span className="text-[10px] font-bold text-white">Latest News</span>
+                  <Link href="/news" className="bg-white/10 hover:bg-white/20 p-2 rounded-xl flex flex-col items-center justify-center gap-1.5 transition border border-white/5 active:scale-95">
+                      <Newspaper className="text-blue-400" size={18} />
+                      <span className="text-[9px] font-bold text-white">News</span>
                   </Link>
-                  <a href="https://youtube.com/@factsportlive" target="_blank" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
-                      <Youtube className="text-red-500" size={20} />
-                      <span className="text-[10px] font-bold text-white">YouTube</span>
+                  <a href="https://youtube.com/@factsportlive" target="_blank" className="bg-white/10 hover:bg-white/20 p-2 rounded-xl flex flex-col items-center justify-center gap-1.5 transition border border-white/5 active:scale-95">
+                      <Youtube className="text-red-500" size={18} />
+                      <span className="text-[9px] font-bold text-white">YouTube</span>
                   </a>
               </div>
           </div>
