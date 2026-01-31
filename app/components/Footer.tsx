@@ -21,7 +21,7 @@ export default function Footer() {
         <div>
             <h3 className="text-white text-xs font-bold uppercase tracking-widest mb-4">Platform</h3>
             <ul className="space-y-2 text-xs">
-                <li><Link href="/" className="hover:text-white transition">Matches</Link></li>
+                <li><Link href="/matches" className="hover:text-white transition">Matches</Link></li>
                 <li><Link href="/news" className="hover:text-white transition">News</Link></li>
                 <li><Link href="/leaderboard" className="hover:text-white transition">Leaderboard</Link></li>
                 <li><Link href="/vip/upgrade" className="hover:text-yellow-400 transition font-bold text-yellow-500">VIP Upgrade</Link></li>
