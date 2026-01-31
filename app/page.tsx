@@ -18,31 +18,45 @@ export const metadata = {
   description: 'The #1 Platform for sports predictions, live scores, and breaking news.',
 };
 
-async function getHomepageData(leagueFilter: string | null) {
+async function getHomepageData(leagueFilter: string) {
   const supabase = createClient();
   const startDate = new Date(); startDate.setDate(startDate.getDate() - 1); 
   const endDate = new Date(); endDate.setDate(endDate.getDate() + 3); 
 
-  // Matches
+  // 1. Try to fetch UPCOMING/LIVE matches first
   let matchQuery = supabase.from('matches').select('*')
     .gte('match_date', startDate.toISOString())
     .lte('match_date', endDate.toISOString())
+    .ilike('league', `%${leagueFilter}%`) // Strict League Filter
     .order('match_date', { ascending: true });
-  if (leagueFilter && leagueFilter !== 'All') matchQuery = matchQuery.ilike('league', `%${leagueFilter}%`);
 
-  // News & Highlights
   const [matchesRes, newsRes, highlightsRes] = await Promise.all([
     matchQuery,
     supabase.from('news').select('*').order('created_at', { ascending: false }).limit(20),
     supabase.from('matches').select('*').not('video_url', 'is', null).order('match_date', { ascending: false }).limit(10)
   ]);
 
-  return { matches: matchesRes.data || [], news: newsRes.data || [], highlights: highlightsRes.data || [] };
+  let matches = matchesRes.data || [];
+
+  // 2. FALLBACK: If no upcoming matches, fetch LAST FINISHED (Latest Results)
+  if (matches.length === 0) {
+      const { data: finishedMatches } = await supabase.from('matches').select('*')
+        .ilike('league', `%${leagueFilter}%`)
+        .in('status', ['FT', 'FINISHED', 'post'])
+        .order('match_date', { ascending: false }) // Get latest first
+        .limit(10); // Show last 10 results
+      
+      if (finishedMatches) matches = finishedMatches;
+  }
+
+  return { matches, news: newsRes.data || [], highlights: highlightsRes.data || [] };
 }
 
 export default async function Home({ searchParams }: { searchParams: { league?: string } }) {
   const resolvedParams = await searchParams;
-  const selectedLeague = resolvedParams.league || 'All';
+  // ✅ CHANGED: Default is now 'Premier League', not 'All'
+  const selectedLeague = resolvedParams.league || 'Premier League';
+  
   const { matches, news, highlights } = await getHomepageData(selectedLeague);
 
   // Sorting
@@ -54,14 +68,11 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const finalHeadlines = headlines.length > 0 ? headlines : news.slice(0, 3);
   const latestNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id) && !n.is_breaking).slice(0, 5);
 
-  const displayMatches = [
-    ...matches.filter(m => ['LIVE','in','1H','2H','HT'].includes(m.status)),
-    ...matches.filter(m => ['SCHEDULED','UPCOMING','PRE'].includes(m.status)),
-    ...matches.filter(m => ['FINISHED','FT','post'].includes(m.status))
-  ];
+  // Display Logic: If mixed list, sort nicely. If fallback (all finished), they are already sorted.
+  const displayMatches = matches; 
 
   return (
-    <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-12 overflow-x-hidden">
+    <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-0 overflow-x-hidden">
       
       {/* CSS FOR SEAMLESS TICKER */}
       <style>{`
@@ -72,9 +83,8 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         .animate-scroll {
           display: flex;
           width: max-content;
-          animation: scroll 60s linear infinite; /* Slower (60s) */
+          animation: scroll 60s linear infinite;
         }
-        /* Stop the text from wrapping */
         .ticker-item {
           white-space: nowrap; 
           display: flex;
@@ -85,12 +95,9 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       {/* 1. SEAMLESS TV TICKER */}
       {tickerNews.length > 0 && (
         <div className="bg-yellow-400 text-black text-[10px] font-black h-9 overflow-hidden relative flex items-center shadow-md z-40 border-b border-yellow-500">
-            {/* Breaking Label */}
             <div className="absolute left-0 h-full bg-yellow-500 px-3 flex items-center z-20 shadow-[4px_0_10px_rgba(0,0,0,0.1)] border-r border-yellow-600 whitespace-nowrap">
                 <Activity size={12} className="mr-1 animate-pulse text-red-600" /> BREAKING
             </div>
-            
-            {/* The Infinite Wrapper */}
             <div className="w-full overflow-hidden flex pl-24"> 
                 <div className="animate-scroll flex items-center">
                     {tickerNews.map((n, i) => ( 
@@ -158,26 +165,29 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       <section className="mt-6">
          <div className="px-4 flex justify-between items-center mb-2">
             <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">Match Center</h3>
-            <Link href="/matches" className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded flex items-center gap-1">View All <ArrowRight size={10} /></Link>
+            {/* ✅ CHANGED: Bigger Button & New Text */}
+            <Link href="/matches" className="text-[10px] font-black bg-[#0a1428] text-white px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-md active:scale-95 transition">
+                Go to All Fixtures <ArrowRight size={10} />
+            </Link>
         </div>
+        
+        {/* ✅ CHANGED: Removed 'All' tab, kept only specific leagues */}
         <div className="bg-white border-y border-slate-200 sticky top-14 z-30 overflow-x-auto scrollbar-hide py-2 shadow-sm">
             <div className="flex px-4 space-x-2 min-w-max">
-            {['All', 'Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Champions League'].map((league) => (
+            {['Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Champions League'].map((league) => (
                 <Link key={league} href={`/?league=${league}`} scroll={false} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all ${selectedLeague === league ? 'bg-[#0a1428] text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200'}`}>{league === 'Premier League' ? 'EPL' : league}</Link>
             ))}
             </div>
         </div>
+        
         <div className="px-4 py-4 space-y-3">
-             {displayMatches.map((match) => (
+             {displayMatches.length > 0 ? displayMatches.map((match) => (
                   <div key={match.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-3">
-                      
-                      {/* Match Header with LIVE INDICATORS */}
                       <div className="bg-slate-50 px-3 py-1.5 flex justify-between items-center border-b border-slate-100">
                            <div className="flex items-center gap-2">
                               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[120px] truncate">{match.league || 'Football Match'}</span>
                            </div>
                            <div className="flex items-center gap-2">
-                                {/* 🔴 LIVE WATCH & RADIO INDICATORS */}
                                 {match.livestream_url && <span className="flex items-center gap-1 text-[8px] font-black text-red-600 animate-pulse bg-red-50 px-1.5 py-0.5 rounded border border-red-100"><Video size={8}/> WATCH LIVE</span>}
                                 {match.audio_url && <span className="flex items-center gap-1 text-[8px] font-black text-blue-600 animate-pulse bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100"><Radio size={8}/> RADIO</span>}
                            </div>
@@ -199,10 +209,8 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                           </div>
                       </Link>
 
-                      {/* AFFILIATE BUTTON LOGIC */}
                       <div className="px-3 py-2 border-t border-slate-100 grid grid-cols-2 gap-3 bg-slate-50/50">
                           <Link href={`/match/${match.id}`} className="flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:border-blue-200 rounded-lg py-2 shadow-sm text-[10px] font-bold text-slate-700 active:scale-95 transition"><Zap size={12} className="text-blue-500" /> Predict</Link>
-                          
                           {match.booking_code ? (
                               <button className="flex items-center justify-center gap-1.5 bg-[#1A1A1A] text-yellow-400 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition">
                                   <Ticket size={12} /> {match.booking_code}
@@ -218,7 +226,11 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                           )}
                       </div>
                   </div>
-              ))}
+              )) : (
+                <div className="text-center py-10 opacity-50">
+                   <p className="text-xs font-bold">No recent matches found.</p>
+                </div>
+              )}
         </div>
       </section>
 
@@ -242,13 +254,12 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </div>
 
-      {/* 🚀 QUICK ACTION LINKS (Updated for Single Line) */}
-      <div className="px-4 mb-8">
+      {/* 🚀 QUICK ACTION LINKS */}
+      <div className="px-4 mb-4">
           <div className="bg-[#0a1428] rounded-2xl p-6 shadow-xl relative overflow-hidden">
               <div className="absolute top-0 right-0 w-26 h-26 bg-blue-500 blur-[80px] opacity-20"></div>
               <h3 className="text-white font-black text-lg italic mb-4 relative z-10 flex items-center gap-2"><Zap className="text-yellow-500"/> QUICK ACTIONS</h3>
               
-              {/* ✅ GRID CHANGED TO 4 COLUMNS, GAP REDUCED, SIZES REDUCED */}
               <div className="grid grid-cols-4 gap-2 relative z-10">
                   <Link href="/matches" className="bg-white/10 hover:bg-white/20 p-2 rounded-xl flex flex-col items-center justify-center gap-1.5 transition border border-white/5 active:scale-95">
                       <Trophy className="text-yellow-500" size={18} />
