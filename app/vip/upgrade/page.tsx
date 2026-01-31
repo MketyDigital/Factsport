@@ -212,9 +212,6 @@ export default function VipUpgradePage() {
              </div>
         </div>
 
-        {/* 🟢 NEW: FREE TIPS BANNER (Here is the taste!) */}
-        <FreeTipsBanner />
-
         {/* --- PENDING WARNING (Anti-Spam) --- */}
         {hasPending && (
             <div className="bg-yellow-500/10 border border-yellow-500/50 p-6 rounded-2xl text-center backdrop-blur-md">
