@@ -252,6 +252,10 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                       <Trophy className="text-yellow-500" size={24} />
                       <span className="text-[10px] font-bold text-white">Predictions</span>
                   </Link>
+                  <Link href="/leaderboard" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
+                      <Trophy className="text-yellow-500" size={24} />
+                      <span className="text-[10px] font-bold text-white">Leaderboard</span>
+                  </Link>
                   <Link href="/news" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
                       <Newspaper className="text-blue-400" size={24} />
                       <span className="text-[10px] font-bold text-white">Latest News</span>
