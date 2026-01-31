@@ -4,10 +4,13 @@ export const revalidate = 60;
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, User } from "lucide-react";
+import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, User, Mic, Video, ExternalLink, Youtube, Newspaper, Radio } from "lucide-react";
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import NewsArtwork from '@/app/components/NewsArtwork';
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
+
+// 🟢 CONFIG: Your Default 1xBet Link
+const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599"; 
 
 export const metadata = {
   title: 'FactSport | Live Scores, News & Predictions',
@@ -74,6 +77,8 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         /* Stop the text from wrapping */
         .ticker-item {
           white-space: nowrap; 
+          display: flex;
+          align-items: center;
         }
       `}</style>
 
@@ -85,18 +90,19 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             <Link href="/" className="text-xl font-black tracking-tighter text-white">FactSport</Link>
           </div>
           <div className="flex items-center gap-3">
-             {/* ✅ LOGIN BUTTON (Text Visible on Mobile) */}
+             {/* ✅ LOGIN BUTTON */}
             <Link href="/login" className="flex items-center gap-1 px-4 py-1.5 text-[11px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition">
                 <User size={12} /> <span>Login</span>
             </Link>
+            {/* ✅ UPDATED TEXT: Predict & Win */}
             <Link href="/vip/upgrade" className="flex items-center gap-1 px-4 py-1.5 text-[10px] font-bold bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 rounded-full shadow-lg shadow-red-900/50 transition">
-                <Trophy size={11} /> Predict
+                <Trophy size={11} /> Predict & Win
             </Link>
           </div>
         </div>
       </nav>
 
-      {/* 1. SEAMLESS TV TICKER (Fixed Layout) */}
+      {/* 1. SEAMLESS TV TICKER */}
       {tickerNews.length > 0 && (
         <div className="bg-yellow-400 text-black text-[10px] font-black h-9 overflow-hidden relative flex items-center shadow-md z-40 border-b border-yellow-500">
             {/* Breaking Label */}
@@ -184,10 +190,19 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         <div className="px-4 py-4 space-y-3">
              {displayMatches.map((match) => (
                   <div key={match.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-3">
+                      
+                      {/* Match Header with LIVE INDICATORS */}
                       <div className="bg-slate-50 px-3 py-1.5 flex justify-between items-center border-b border-slate-100">
-                           <div className="flex items-center gap-1"><span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[150px] truncate">{match.league || 'Football Match'}</span></div>
-                           <span className="text-[8px] font-bold text-slate-300 uppercase tracking-widest italic">FactSport Exclusive</span>
+                           <div className="flex items-center gap-2">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[120px] truncate">{match.league || 'Football Match'}</span>
+                           </div>
+                           <div className="flex items-center gap-2">
+                                {/* 🔴 LIVE WATCH & RADIO INDICATORS */}
+                                {match.livestream_url && <span className="flex items-center gap-1 text-[8px] font-black text-red-600 animate-pulse bg-red-50 px-1.5 py-0.5 rounded border border-red-100"><Video size={8}/> WATCH LIVE</span>}
+                                {match.audio_url && <span className="flex items-center gap-1 text-[8px] font-black text-blue-600 animate-pulse bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100"><Radio size={8}/> RADIO</span>}
+                           </div>
                       </div>
+                      
                       <Link href={`/match/${match.id}`}>
                           <div className="p-4 flex justify-between items-center active:bg-slate-50 transition">
                               <div className="flex-1 flex items-center gap-3 overflow-hidden">
@@ -203,14 +218,51 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                               </div>
                           </div>
                       </Link>
+
+                      {/* AFFILIATE BUTTON LOGIC (Default 1xBet vs Admin Override) */}
                       <div className="px-3 py-2 border-t border-slate-100 grid grid-cols-2 gap-3 bg-slate-50/50">
                           <Link href={`/match/${match.id}`} className="flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:border-blue-200 rounded-lg py-2 shadow-sm text-[10px] font-bold text-slate-700 active:scale-95 transition"><Zap size={12} className="text-blue-500" /> Predict</Link>
-                          {match.booking_code ? (<button className="flex items-center justify-center gap-1.5 bg-[#1A1A1A] text-yellow-400 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition"><Ticket size={12} /> {match.booking_code}</button>) : (<Link href="/vip/upgrade" className="flex items-center justify-center gap-1.5 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition"><Ticket size={12} /> Bet Now</Link>)}
+                          
+                          {match.booking_code ? (
+                              <button className="flex items-center justify-center gap-1.5 bg-[#1A1A1A] text-yellow-400 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition">
+                                  <Ticket size={12} /> {match.booking_code}
+                              </button>
+                          ) : (
+                              <a 
+                                href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} 
+                                target="_blank"
+                                className="flex items-center justify-center gap-1.5 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition"
+                              >
+                                  <ExternalLink size={12} /> Bet Now
+                              </a>
+                          )}
                       </div>
                   </div>
               ))}
         </div>
       </section>
+
+      {/* 🚀 QUICK ACTION LINKS (Before Footer) */}
+      <div className="px-4 mb-8 mt-4">
+          <div className="bg-[#0a1428] rounded-2xl p-6 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500 blur-[80px] opacity-20"></div>
+              <h3 className="text-white font-black text-lg italic mb-4 relative z-10 flex items-center gap-2"><Zap className="text-yellow-500"/> QUICK ACTIONS</h3>
+              <div className="grid grid-cols-3 gap-3 relative z-10">
+                  <Link href="/matches" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
+                      <Trophy className="text-yellow-500" size={24} />
+                      <span className="text-[10px] font-bold text-white">Predictions</span>
+                  </Link>
+                  <Link href="/news" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
+                      <Newspaper className="text-blue-400" size={24} />
+                      <span className="text-[10px] font-bold text-white">Latest News</span>
+                  </Link>
+                  <a href="https://youtube.com/@factsportlive" target="_blank" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
+                      <Youtube className="text-red-500" size={24} />
+                      <span className="text-[10px] font-bold text-white">YouTube</span>
+                  </a>
+              </div>
+          </div>
+      </div>
 
       {/* 6. VIP REWARD */}
       <div className="mx-4 mb-4">
