@@ -10,7 +10,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
   const resolvedParams = await params;
   const supabase = createClient();
 
-  // 1. Fetch Article by SLUG
+  // 1. Fetch Article
   const { data: article } = await supabase
     .from('news')
     .select('*')
@@ -19,14 +19,14 @@ export default async function ArticlePage({ params }: { params: { slug: string }
     
   if (!article) return notFound();
 
-  // 2. Fetch Latest 3 Matches for Sidebar (Cross-sell)
+  // 2. Fetch Sidebar Matches
   const { data: matches } = await supabase.from('matches').select('*').eq('status', 'SCHEDULED').limit(3);
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans text-slate-900">
       
-      {/* HERO SECTION */}
-      <div className="relative h-64 md:h-80 w-full bg-slate-900 overflow-hidden group">
+      {/* HERO SECTION (Increased Height for better spacing) */}
+      <div className="relative h-[26rem] md:h-[30rem] w-full bg-slate-900 overflow-hidden group">
          <NewsArtwork 
             image={article.image_url} 
             team1Logo={article.team_1_logo} 
@@ -34,22 +34,27 @@ export default async function ArticlePage({ params }: { params: { slug: string }
             title={article.title}
             className="w-full h-full transition duration-700 group-hover:scale-105"
          />
-         <div className="absolute inset-0 bg-gradient-to-t from-[#F0F2F5] via-black/20 to-black/40"></div>
+         {/* Smoother Gradient Fade */}
+         <div className="absolute inset-0 bg-gradient-to-t from-[#F0F2F5] via-[#F0F2F5]/40 to-black/30"></div>
          
-         <div className="absolute top-4 left-4 z-20">
+         {/* Back Button */}
+         <div className="absolute top-6 left-4 z-20">
              <Link href="/" className="bg-white/20 backdrop-blur-md text-white p-2 rounded-full hover:bg-white/30 transition inline-flex shadow-lg">
                 <ChevronLeft size={20} />
              </Link>
          </div>
 
+         {/* Title Block (Pushed to bottom) */}
          <div className="absolute bottom-0 left-0 w-full p-6 z-20">
-            <div className="flex gap-2 mb-2">
+            <div className="flex gap-2 mb-3">
                 {article.is_breaking && <span className="bg-red-600 text-white text-[10px] font-black px-2 py-1 rounded uppercase shadow-sm animate-pulse">Breaking</span>}
                 <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-1 rounded uppercase shadow-sm">{article.category || 'News'}</span>
             </div>
-            <h1 className="text-2xl md:text-4xl font-black text-slate-900 leading-tight drop-shadow-sm mb-2">
+            
+            <h1 className="text-2xl md:text-4xl font-black text-slate-900 leading-tight drop-shadow-sm mb-3">
                 {article.title}
             </h1>
+            
             <div className="flex items-center gap-4 text-xs font-bold text-slate-600">
                 <span className="flex items-center gap-1"><Calendar size={12}/> {new Date(article.created_at).toLocaleDateString()}</span>
                 <span className="flex items-center gap-1"><Clock size={12}/> {new Date(article.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
@@ -57,7 +62,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
          </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 mt-6 grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="max-w-4xl mx-auto px-4 mt-8 grid grid-cols-1 md:grid-cols-3 gap-8">
          
          {/* MAIN CONTENT */}
          <div className="md:col-span-2">
@@ -66,7 +71,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                     {article.body || article.content || "No content available."}
                 </div>
                 
-                {/* 🏆 NEW: PREDICT & WIN BANNER (End of Article) */}
+                {/* 🏆 PREDICT & WIN BANNER */}
                 <div className="mt-8 mb-4 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-xl p-6 text-black relative overflow-hidden group shadow-lg">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-20 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
                     <div className="relative z-10">
@@ -88,9 +93,8 @@ export default async function ArticlePage({ params }: { params: { slug: string }
             </div>
          </div>
 
-         {/* SIDEBAR (Betting Conversion) */}
+         {/* SIDEBAR */}
          <div className="space-y-6">
-            {/* CTA Card */}
             <div className="bg-[#0a1428] rounded-2xl p-6 text-white text-center shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600 rounded-full blur-[60px] opacity-20"></div>
                 <h3 className="text-lg font-black italic mb-2">Make Money?</h3>
@@ -100,7 +104,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                 </Link>
             </div>
 
-            {/* Upcoming Matches */}
             {matches && matches.length > 0 && (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
                     <h3 className="text-xs font-black uppercase text-slate-400 mb-4 tracking-widest">Upcoming Matches</h3>
@@ -124,7 +127,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
 
       </div>
 
-      {/* 🚀 QUICK ACTIONS FOOTER (Added) */}
+      {/* QUICK ACTIONS FOOTER */}
       <div className="px-4 mt-12 mb-4">
           <div className="bg-[#0a1428] rounded-2xl p-6 shadow-xl relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500 blur-[80px] opacity-20"></div>

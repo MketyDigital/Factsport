@@ -8,6 +8,7 @@ import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Video, ExternalL
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import NewsArtwork from '@/app/components/NewsArtwork';
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
+import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 
 // 🟢 CONFIG: Your Default 1xBet Link
 const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599"; 
@@ -47,7 +48,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   // Sorting
   const breakingNews = news.filter(n => n.is_breaking); 
   const rawTicker = breakingNews.length > 0 ? breakingNews : news.slice(0, 5);
-  // Duplicate 4 times to ensure no gaps on wide screens
   const tickerNews = [...rawTicker, ...rawTicker, ...rawTicker, ...rawTicker]; 
 
   const headlines = news.filter(n => n.is_headline).slice(0, 5);
@@ -199,7 +199,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                           </div>
                       </Link>
 
-                      {/* AFFILIATE BUTTON LOGIC (Default 1xBet vs Admin Override) */}
+                      {/* AFFILIATE BUTTON LOGIC */}
                       <div className="px-3 py-2 border-t border-slate-100 grid grid-cols-2 gap-3 bg-slate-50/50">
                           <Link href={`/match/${match.id}`} className="flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:border-blue-200 rounded-lg py-2 shadow-sm text-[10px] font-bold text-slate-700 active:scale-95 transition"><Zap size={12} className="text-blue-500" /> Predict</Link>
                           
@@ -222,8 +222,28 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </section>
 
-      {/* 🚀 QUICK ACTION LINKS (Before Footer) */}
-      <div className="px-4 mb-8 mt-4">
+      {/* 🟢 NEW: FREE TIPS BANNER */}
+      <div className="px-4">
+        <FreeTipsBanner />
+      </div>
+
+      {/* 6. VIP REWARD (Moved Above Quick Actions) */}
+      <div className="mx-4 mb-4 mt-6">
+        <div className="rounded-2xl overflow-hidden relative shadow-2xl group cursor-pointer bg-black p-6 text-center">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 blur-[60px] opacity-20 group-hover:opacity-30 transition"></div>
+            <div className="relative z-10">
+                <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-[0_0_15px_rgba(234,179,8,0.4)]">
+                    <Trophy className="text-black fill-black" size={24} />
+                </div>
+                <h2 className="text-white font-black text-xl uppercase italic tracking-tighter mb-2">Monthly <span className="text-yellow-500">Jackpot</span></h2>
+                <p className="text-slate-400 text-xs mb-6 px-4">Correctly predict 3 matches to share the ₦500,000 prize pool. Exclusive to VIP members.</p>
+                <Link href="/vip/upgrade" className="inline-flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-sm uppercase px-8 py-3 rounded-xl transition shadow-lg active:scale-95">Join Winners Circle <ArrowRight size={16} /></Link>
+            </div>
+        </div>
+      </div>
+
+      {/* 🚀 QUICK ACTION LINKS (Now at the End) */}
+      <div className="px-4 mb-8">
           <div className="bg-[#0a1428] rounded-2xl p-6 shadow-xl relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500 blur-[80px] opacity-20"></div>
               <h3 className="text-white font-black text-lg italic mb-4 relative z-10 flex items-center gap-2"><Zap className="text-yellow-500"/> QUICK ACTIONS</h3>
@@ -242,21 +262,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                   </a>
               </div>
           </div>
-      </div>
-
-      {/* 6. VIP REWARD */}
-      <div className="mx-4 mb-4">
-        <div className="rounded-2xl overflow-hidden relative shadow-2xl group cursor-pointer bg-black p-6 text-center">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 blur-[60px] opacity-20 group-hover:opacity-30 transition"></div>
-            <div className="relative z-10">
-                <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-[0_0_15px_rgba(234,179,8,0.4)]">
-                    <Trophy className="text-black fill-black" size={24} />
-                </div>
-                <h2 className="text-white font-black text-xl uppercase italic tracking-tighter mb-2">Monthly <span className="text-yellow-500">Jackpot</span></h2>
-                <p className="text-slate-400 text-xs mb-6 px-4">Correctly predict 3 matches to share the ₦500,000 prize pool. Exclusive to VIP members.</p>
-                <Link href="/vip/upgrade" className="inline-flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-sm uppercase px-8 py-3 rounded-xl transition shadow-lg active:scale-95">Join Winners Circle <ArrowRight size={16} /></Link>
-            </div>
-        </div>
       </div>
 
     </div>

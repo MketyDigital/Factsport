@@ -1,8 +1,8 @@
 export const runtime = 'edge';
 
 import { createClient } from '@/app/lib/supabase/server';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import { ChevronLeft, Zap, ExternalLink, AlertCircle, Activity, Mic, AlignLeft, Radio, PlayCircle, Video } from 'lucide-react';
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
@@ -26,10 +26,12 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const data = await getExternalData(dbData);
 
   // 🧠 SMART MEDIA LOGIC
-  // 1. If livestream_url exists (Admin set it), use it -> LIVE MODE
-  // 2. If not, check video_url (Highlights) -> HIGHLIGHT MODE
   const activeVideoUrl = dbData.livestream_url || dbData.video_url;
   const isLiveStream = !!dbData.livestream_url; 
+
+  // 🕒 STATUS LOGIC (HT FIX)
+  const isHalfTime = data.status === 'HT' || data.status === 'Half Time' || data.status === 'Break';
+  const isLive = ['LIVE', '1H', '2H', 'ET', 'P', 'in'].includes(data.status) && !isHalfTime;
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
@@ -46,15 +48,16 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         </div>
 
         <div className="relative z-10 px-4 mt-2">
-          {/* Status Badge */}
+          
+          {/* ✅ FIXED STATUS BADGE */}
           <div className="flex justify-center mb-6">
-            {['LIVE', 'in', '1H', '2H'].includes(data.status) ? (
+            {isHalfTime ? (
+               <span className="bg-slate-200 text-slate-900 text-[10px] font-black px-4 py-1.5 rounded-full flex items-center gap-1 shadow-lg animate-pulse border border-white/20">
+                 HALF TIME
+               </span>
+            ) : isLive ? (
                <span className="bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-full animate-pulse flex items-center gap-1 shadow-lg">
                  <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE {data.displayClock}'
-               </span>
-            ) : data.status === 'HT' ? (
-               <span className="bg-slate-200 text-slate-800 text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-1 shadow-lg animate-pulse">
-                 HALF TIME
                </span>
             ) : (
                <span className="bg-white/10 text-slate-300 text-[10px] font-bold px-3 py-1 rounded-full border border-white/10 backdrop-blur-md">
@@ -90,7 +93,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         {/* 1. VIDEO PLAYER (Youtube Live or Highlights) */}
         {activeVideoUrl && (
             <div className="rounded-xl overflow-hidden shadow-2xl border border-white/20 relative bg-black">
-                {/* Badge Overlay */}
                 <div className="absolute top-3 left-3 z-30 pointer-events-none">
                     {isLiveStream ? (
                         <div className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded flex items-center gap-1 animate-pulse shadow-md">
@@ -106,29 +108,36 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             </div>
         )}
 
-        {/* 2. AUDIO PLAYER (Only if radio_url exists) */}
-        {dbData.audio_url && (
-            <div className="bg-[#0f172a] rounded-xl p-3 border border-slate-800 shadow-xl flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                     <div className="w-10 h-10 rounded-full bg-red-600 animate-pulse flex items-center justify-center shadow-lg shadow-red-900/50">
-                        <Mic className="text-white" size={20} />
-                     </div>
-                     <div>
-                        <h3 className="text-white font-bold text-xs">Live Radio Commentary</h3>
-                        <p className="text-slate-400 text-[10px]">Broadcasting Live • FactSport</p>
-                     </div>
-                </div>
-                <Link 
-                   href={dbData.audio_url} 
-                   target="_blank"
-                   className="bg-white text-black hover:bg-slate-200 text-[10px] font-black px-4 py-2 rounded-full shadow-lg transition transform active:scale-95 flex items-center gap-1"
-                >
-                   LISTEN <ExternalLink size={10} />
-                </Link>
-            </div>
-        )}
+        {/* 2. AUDIO PLAYER */}
+        <div className="bg-[#0f172a] rounded-xl p-3 border border-slate-800 shadow-xl flex items-center justify-between">
+             <div className="flex items-center gap-3">
+                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${dbData.audio_url ? 'bg-red-600 animate-pulse shadow-lg shadow-red-900/50' : 'bg-slate-800'}`}>
+                    <Mic className="text-white" size={20} />
+                 </div>
+                 <div>
+                    <h3 className="text-white font-bold text-xs">Live Audio Commentary</h3>
+                    <p className="text-slate-400 text-[10px]">
+                        {dbData.audio_url ? "Radio is currently LIVE" : "Tune in when match starts"}
+                    </p>
+                 </div>
+             </div>
+             
+             {dbData.audio_url ? (
+                 <Link 
+                    href={dbData.audio_url} 
+                    target="_blank"
+                    className="bg-white text-black hover:bg-slate-200 text-[10px] font-black px-4 py-2 rounded-full shadow-lg transition transform active:scale-95 flex items-center gap-1"
+                 >
+                    LISTEN LIVE <ExternalLink size={10} />
+                 </Link>
+             ) : (
+                 <button disabled className="bg-slate-700 text-slate-500 text-[10px] font-bold px-3 py-1.5 rounded-full cursor-not-allowed border border-white/5 opacity-50">
+                      OFF AIR
+                 </button>
+             )}
+        </div>
 
-        {/* 3. BETTING BANNER (Dynamic: Melbet vs 1xBet) */}
+        {/* 3. BETTING BANNER */}
         <BettingPromo affiliateLink={dbData.affiliate_link} />
 
         {/* 4. PREDICTIONS */}
@@ -165,7 +174,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                 </div>
             )}
 
-            {/* ✅ FIXED: AUTOMATED COMMENTARY */}
+            {/* AUTOMATED COMMENTARY */}
             {data.commentary.length > 0 && (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
                     <h3 className="text-xs font-black uppercase text-slate-400 mb-4 flex items-center gap-2">
@@ -174,7 +183,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                     <div className="space-y-4 max-h-60 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200">
                         {data.commentary.map((c: any) => (
                             <div key={c.id || Math.random()} className="flex gap-3 text-xs">
-                                {/* FIX: Check if time exists. If not, show bullet point */}
                                 <div className="font-mono font-bold text-blue-600 min-w-[24px] pt-0.5 text-right">
                                     {c.time ? `${c.time}'` : <span className="text-slate-300 text-lg leading-none">•</span>}
                                 </div>
@@ -204,7 +212,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   );
 }
 
-// Helper Components
+// Helper Components (Keep these as they were)
 function StatBar({ label, h, a, suffix = "" }: any) {
     const total = (h + a) || 1;
     const pct = (h / total) * 100;

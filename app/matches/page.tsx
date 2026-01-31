@@ -5,6 +5,7 @@ import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { ChevronLeft, BarChart2, Calendar, Zap, Ticket, ExternalLink, Video, Mic, Radio, Trophy, Youtube, Newspaper } from 'lucide-react';
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
+import FreeTipsBanner from '@/app/components/FreeTipsBanner'; // ✅ IMPORTED
 
 // 🟢 CONFIG: Default 1xBet Link
 const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599"; 
@@ -55,6 +56,10 @@ export default async function AllMatchesPage() {
       </div>
 
       <div className="p-3 space-y-6">
+        
+        {/* 🟢 NEW: FREE TIPS BANNER (High Visibility) */}
+        <FreeTipsBanner />
+
         {Object.keys(leagues).length === 0 ? (
             <div className="text-center py-20 opacity-50">
                 <Calendar className="w-12 h-12 mx-auto mb-3 text-slate-400" />
