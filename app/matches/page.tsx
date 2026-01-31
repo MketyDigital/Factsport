@@ -3,18 +3,18 @@ export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
-import { ChevronLeft, BarChart2, Calendar } from 'lucide-react';
-// ✅ IMPORT THE NEW COMPONENT
-import MatchRow from '@/app/components/MatchRow';
+import { ChevronLeft, BarChart2, Calendar, Zap, Ticket, ExternalLink, Video, Mic, Radio, Trophy, Youtube, Newspaper } from 'lucide-react';
+import LiveScoreLabel from '@/app/components/LiveScoreLabel';
+
+// 🟢 CONFIG: Default 1xBet Link
+const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599"; 
 
 export default async function AllMatchesPage() {
   const supabase = createClient();
   
   // 1. Fetch matches (Last 24h to Next 48h)
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - 1);
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() + 2);
+  const startDate = new Date(); startDate.setDate(startDate.getDate() - 1);
+  const endDate = new Date(); endDate.setDate(endDate.getDate() + 2);
 
   const { data: matches } = await supabase
     .from('matches')
@@ -75,16 +75,92 @@ export default async function AllMatchesPage() {
                         </Link>
                     </div>
 
-                    {/* Matches - NOW USING THE SMART COMPONENT */}
+                    {/* Match Rows */}
                     <div className="divide-y divide-slate-50">
                         {sortMatches(leagues[leagueName]).map((match) => (
-                            <MatchRow key={match.id} match={match} />
+                            <div key={match.id} className="block hover:bg-slate-50 transition">
+                                <Link href={`/match/${match.id}`} className="block p-4">
+                                    <div className="flex items-center justify-between">
+                                        
+                                        {/* Teams */}
+                                        <div className="flex-1 space-y-2">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-6 h-6 flex items-center justify-center shrink-0">
+                                                    {match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain" /> : <div className="w-5 h-5 bg-slate-200 rounded-full"/>}
+                                                </div>
+                                                <span className={`text-xs ${match.home_score > match.away_score ? 'font-black text-slate-900' : 'font-medium text-slate-600'}`}>{match.home_team}</span>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-6 h-6 flex items-center justify-center shrink-0">
+                                                    {match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain" /> : <div className="w-5 h-5 bg-slate-200 rounded-full"/>}
+                                                </div>
+                                                <span className={`text-xs ${match.away_score > match.home_score ? 'font-black text-slate-900' : 'font-medium text-slate-600'}`}>{match.away_team}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Score/Status & Indicators */}
+                                        <div className="flex flex-col items-end gap-1">
+                                            <div className="flex items-center gap-2">
+                                                {/* 🔴 MEDIA ICONS */}
+                                                {match.livestream_url && <Video size={10} className="text-red-500 animate-pulse"/>}
+                                                {match.audio_url && <Radio size={10} className="text-blue-500 animate-pulse"/>}
+                                                
+                                                <LiveScoreLabel matchId={match.id} initialStatus={match.status} homeScore={match.home_score} awayScore={match.away_score} matchDate={match.match_date} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                {/* Action Bar (Betting Logic) */}
+                                <div className="px-4 pb-3 flex gap-2">
+                                    <Link href={`/match/${match.id}`} className="flex-1 bg-slate-100 text-slate-600 rounded-lg py-2 text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-slate-200">
+                                        <Zap size={10}/> Predict
+                                    </Link>
+                                    
+                                    {match.booking_code ? (
+                                        <button className="flex-1 bg-[#1A1A1A] text-yellow-400 rounded-lg py-2 text-[10px] font-bold flex items-center justify-center gap-1">
+                                            <Ticket size={10}/> {match.booking_code}
+                                        </button>
+                                    ) : (
+                                        <a 
+                                            href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} 
+                                            target="_blank" 
+                                            className="flex-1 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 text-[10px] font-bold flex items-center justify-center gap-1"
+                                        >
+                                            <ExternalLink size={10}/> Bet Now
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
                         ))}
                     </div>
                 </div>
             ))
         )}
       </div>
+
+      {/* 🚀 QUICK ACTIONS FOOTER */}
+      <div className="px-4 mb-4 mt-6">
+          <div className="bg-[#0a1428] rounded-2xl p-6 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500 blur-[80px] opacity-20"></div>
+              <h3 className="text-white font-black text-lg italic mb-4 relative z-10 flex items-center gap-2"><Zap className="text-yellow-500"/> QUICK ACTIONS</h3>
+              <div className="grid grid-cols-3 gap-3 relative z-10">
+                  <Link href="/matches" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
+                      <Trophy className="text-yellow-500" size={24} />
+                      <span className="text-[10px] font-bold text-white">Predictions</span>
+                  </Link>
+                  <Link href="/news" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
+                      <Newspaper className="text-blue-400" size={24} />
+                      <span className="text-[10px] font-bold text-white">Latest News</span>
+                  </Link>
+                  <a href="https://youtube.com/@factsportlive" target="_blank" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
+                      <Youtube className="text-red-500" size={24} />
+                      <span className="text-[10px] font-bold text-white">YouTube</span>
+                  </a>
+              </div>
+          </div>
+      </div>
+
     </div>
   );
 }
