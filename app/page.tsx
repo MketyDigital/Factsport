@@ -1,13 +1,14 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+export const revalidate = 60; 
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, ShieldCheck } from "lucide-react";
+import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, User } from "lucide-react";
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import NewsArtwork from '@/app/components/NewsArtwork';
+import HeadlinesSlider from '@/app/components/HeadlinesSlider';
 
-// SEO Metadata
 export const metadata = {
   title: 'FactSport | Live Scores, News & Predictions',
   description: 'The #1 Platform for sports predictions, live scores, and breaking news. Join VIP to win monthly prizes.',
@@ -18,31 +19,20 @@ async function getHomepageData(leagueFilter: string | null) {
   const startDate = new Date(); startDate.setDate(startDate.getDate() - 1); 
   const endDate = new Date(); endDate.setDate(endDate.getDate() + 3); 
 
-  // 1. Matches
-  let matchQuery = supabase.from('matches')
-    .select('*')
+  // Matches
+  let matchQuery = supabase.from('matches').select('*')
     .gte('match_date', startDate.toISOString())
     .lte('match_date', endDate.toISOString())
     .order('match_date', { ascending: true });
-    
-  if (leagueFilter && leagueFilter !== 'All') {
-      matchQuery = matchQuery.ilike('league', `%${leagueFilter}%`);
-  }
+  if (leagueFilter && leagueFilter !== 'All') matchQuery = matchQuery.ilike('league', `%${leagueFilter}%`);
 
-  // 2. News 
-  const newsQuery = supabase.from('news')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(20); 
+  // News & Highlights
+  const [matchesRes, newsRes, highlightsRes] = await Promise.all([
+    matchQuery,
+    supabase.from('news').select('*').order('created_at', { ascending: false }).limit(20),
+    supabase.from('matches').select('*').not('video_url', 'is', null).order('match_date', { ascending: false }).limit(10)
+  ]);
 
-  // 3. Highlights
-  const highlightsQuery = supabase.from('matches')
-    .select('*')
-    .not('video_url', 'is', null)
-    .order('match_date', { ascending: false })
-    .limit(10);
-
-  const [matchesRes, newsRes, highlightsRes] = await Promise.all([matchQuery, newsQuery, highlightsQuery]);
   return { matches: matchesRes.data || [], news: newsRes.data || [], highlights: highlightsRes.data || [] };
 }
 
@@ -51,21 +41,42 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const selectedLeague = resolvedParams.league || 'All';
   const { matches, news, highlights } = await getHomepageData(selectedLeague);
 
-  // Sorting Logic
+  // Sorting
   const breakingNews = news.filter(n => n.is_breaking); 
-  const headlines = news.filter(n => n.is_headline).slice(0, 3);
-  const headlineIds = headlines.map(h => h.id);
-  const latestNews = news.filter(n => !headlineIds.includes(n.id) && !n.is_breaking).slice(0, 5);
+  const rawTicker = breakingNews.length > 0 ? breakingNews : news.slice(0, 5);
+  // Duplicate 4 times to ensure no gaps on wide screens
+  const tickerNews = [...rawTicker, ...rawTicker, ...rawTicker, ...rawTicker]; 
 
-  const live = matches.filter(m => m.status === 'LIVE' || m.status === 'in' || m.status === '1H' || m.status === '2H' || m.status === 'HT');
-  const upcoming = matches.filter(m => m.status === 'SCHEDULED' || m.status === 'UPCOMING' || m.status === 'PRE');
-  const finished = matches.filter(m => m.status === 'FINISHED' || m.status === 'FT' || m.status === 'post');
-  
-  const displayMatches = [...live, ...upcoming, ...finished];
+  const headlines = news.filter(n => n.is_headline).slice(0, 5);
+  const finalHeadlines = headlines.length > 0 ? headlines : news.slice(0, 3);
+  const latestNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id) && !n.is_breaking).slice(0, 5);
+
+  const displayMatches = [
+    ...matches.filter(m => ['LIVE','in','1H','2H','HT'].includes(m.status)),
+    ...matches.filter(m => ['SCHEDULED','UPCOMING','PRE'].includes(m.status)),
+    ...matches.filter(m => ['FINISHED','FT','post'].includes(m.status))
+  ];
 
   return (
-    <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-24">
+    <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-12 overflow-x-hidden">
       
+      {/* CSS FOR SEAMLESS TICKER */}
+      <style>{`
+        @keyframes scroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); } 
+        }
+        .animate-scroll {
+          display: flex;
+          width: max-content;
+          animation: scroll 60s linear infinite; /* Slower (60s) */
+        }
+        /* Stop the text from wrapping */
+        .ticker-item {
+          white-space: nowrap; 
+        }
+      `}</style>
+
       {/* NAVBAR */}
       <nav className="sticky top-0 z-50 bg-[#0a1428] text-white border-b border-white/10 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
@@ -73,54 +84,48 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             <div className="relative flex items-center justify-center w-8 h-8"><div className="absolute w-full h-full bg-gradient-to-r from-red-600 to-blue-800 clip-hexagon"></div><span className="relative font-bold italic text-white text-[10px]">FS</span></div>
             <Link href="/" className="text-xl font-black tracking-tighter text-white">FactSport</Link>
           </div>
-          <div className="flex items-center space-x-3">
-             {/* ✅ GOOGLE FIX 1: Visible on MOBILE, Standard <a> Tag */}
-             {/* We use a standard <a> tag instead of <Link> to force the bot to see it immediately */}
-            <a href="/privacy" className="text-[10px] font-bold text-slate-400 hover:text-white transition uppercase">Privacy Policy</a>
-            
-            <Link href="/login" className="px-4 py-1.5 text-[10px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition hidden md:block">Login</Link>
+          <div className="flex items-center gap-3">
+             {/* ✅ LOGIN BUTTON (Text Visible on Mobile) */}
+            <Link href="/login" className="flex items-center gap-1 px-4 py-1.5 text-[11px] font-bold bg-white/10 hover:bg-white/20 rounded-full transition">
+                <User size={12} /> <span>Login</span>
+            </Link>
             <Link href="/vip/upgrade" className="flex items-center gap-1 px-4 py-1.5 text-[10px] font-bold bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 rounded-full shadow-lg shadow-red-900/50 transition">
-                <Trophy size={11} /> Predict & Win
+                <Trophy size={11} /> Predict
             </Link>
           </div>
         </div>
       </nav>
 
-      {/* 1. BREAKING NEWS TICKER */}
-      {breakingNews.length > 0 && (
-        <div className="bg-yellow-400 text-black text-[10px] font-black py-2 overflow-hidden relative flex items-center shadow-md z-40">
-            <div className="absolute left-0 h-full bg-yellow-500 px-3 flex items-center z-10 shadow-r-xl border-r border-yellow-600"><Activity size={12} className="mr-1 animate-pulse text-red-600" /> BREAKING</div>
-            <div className="whitespace-nowrap animate-marquee pl-28 flex space-x-8">{breakingNews.map(n => ( <Link href={`/news/${n.slug}`} key={n.id} className="uppercase tracking-wide hover:underline">🚨 {n.title}</Link> ))}</div>
-        </div>
-      )}
-
-      {/* 2. HEADLINES SLIDER */}
-      {headlines.length > 0 && (
-        <div className="mt-3 px-3">
-            <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-4 scrollbar-hide">
-                {headlines.map((item) => (
-                    <Link href={`/news/${item.slug || '#'}`} key={item.id} className="snap-center shrink-0 w-[85%] md:w-[400px] h-48 relative rounded-2xl overflow-hidden shadow-lg border border-white/20">
-                        <NewsArtwork 
-                           image={item.image_url} 
-                           team1Logo={item.team_1_logo} 
-                           team2Logo={item.team_2_logo}
-                           title={item.title}
-                           className="absolute inset-0 w-full h-full"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"></div>
-                        <div className="absolute bottom-0 left-0 p-4 w-full">
-                            <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase mb-1.5 inline-block shadow-sm">Top Story</span>
-                            <h3 className="text-white font-bold text-base leading-tight line-clamp-2 drop-shadow-md">{item.title}</h3>
-                        </div>
-                    </Link>
-                ))}
+      {/* 1. SEAMLESS TV TICKER (Fixed Layout) */}
+      {tickerNews.length > 0 && (
+        <div className="bg-yellow-400 text-black text-[10px] font-black h-9 overflow-hidden relative flex items-center shadow-md z-40 border-b border-yellow-500">
+            {/* Breaking Label */}
+            <div className="absolute left-0 h-full bg-yellow-500 px-3 flex items-center z-20 shadow-[4px_0_10px_rgba(0,0,0,0.1)] border-r border-yellow-600 whitespace-nowrap">
+                <Activity size={12} className="mr-1 animate-pulse text-red-600" /> BREAKING
+            </div>
+            
+            {/* The Infinite Wrapper */}
+            <div className="w-full overflow-hidden flex pl-24"> 
+                <div className="animate-scroll flex items-center">
+                    {tickerNews.map((n, i) => ( 
+                        <div key={`${n.id}-${i}`} className="ticker-item flex items-center mx-6">
+                            <Link href={`/news/${n.slug}`} className="uppercase tracking-wide hover:underline hover:text-red-700 transition">
+                                🚨 {n.title}
+                            </Link>
+                            <span className="text-yellow-700/50 ml-6">•</span>
+                        </div> 
+                    ))}
+                </div>
             </div>
         </div>
       )}
 
+      {/* 2. AUTO-SLIDER */}
+      {finalHeadlines.length > 0 && <div className="mt-4 px-4"><HeadlinesSlider headlines={finalHeadlines} /></div>}
+
       {/* 3. HIGHLIGHTS */}
       {highlights.length > 0 && (
-        <div className="mt-2 px-4">
+        <div className="mt-4 px-4">
              <div className="flex justify-between items-center mb-3">
                 <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2"><PlayCircle size={14} className="text-red-600" /> Highlights</h3>
             </div>
@@ -152,13 +157,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             {latestNews.length > 0 ? latestNews.map((item) => (
                 <Link href={`/news/${item.slug || '#'}`} key={item.id} className="flex gap-3 items-center p-3 active:bg-slate-50 transition">
                     <div className="w-14 h-14 bg-slate-100 rounded-lg shrink-0 overflow-hidden relative">
-                        <NewsArtwork 
-                           image={item.image_url} 
-                           team1Logo={item.team_1_logo} 
-                           team2Logo={item.team_2_logo}
-                           title={item.title}
-                           className="w-full h-full"
-                        />
+                        <NewsArtwork image={item.image_url} team1Logo={item.team_1_logo} team2Logo={item.team_2_logo} title={item.title} className="w-full h-full" />
                     </div>
                     <div>
                         <h4 className="text-xs font-bold leading-tight line-clamp-2 text-slate-800">{item.title}</h4>
@@ -178,14 +177,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         <div className="bg-white border-y border-slate-200 sticky top-14 z-30 overflow-x-auto scrollbar-hide py-2 shadow-sm">
             <div className="flex px-4 space-x-2 min-w-max">
             {['All', 'Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Champions League'].map((league) => (
-                <Link 
-                  key={league} 
-                  href={`/?league=${league}`} 
-                  scroll={false} 
-                  className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all ${selectedLeague === league ? 'bg-[#0a1428] text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200'}`}
-                >
-                  {league === 'Premier League' ? 'EPL' : league}
-                </Link>
+                <Link key={league} href={`/?league=${league}`} scroll={false} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all ${selectedLeague === league ? 'bg-[#0a1428] text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200'}`}>{league === 'Premier League' ? 'EPL' : league}</Link>
             ))}
             </div>
         </div>
@@ -193,40 +185,24 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
              {displayMatches.map((match) => (
                   <div key={match.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-3">
                       <div className="bg-slate-50 px-3 py-1.5 flex justify-between items-center border-b border-slate-100">
-                           <div className="flex items-center gap-1">
-                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[150px] truncate">{match.league || 'Football Match'}</span>
-                           </div>
+                           <div className="flex items-center gap-1"><span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[150px] truncate">{match.league || 'Football Match'}</span></div>
                            <span className="text-[8px] font-bold text-slate-300 uppercase tracking-widest italic">FactSport Exclusive</span>
                       </div>
-                      
                       <Link href={`/match/${match.id}`}>
                           <div className="p-4 flex justify-between items-center active:bg-slate-50 transition">
                               <div className="flex-1 flex items-center gap-3 overflow-hidden">
-                                  <div className="w-8 h-8 flex items-center justify-center shrink-0">
-                                      {match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}
-                                  </div>
+                                  <div className="w-8 h-8 flex items-center justify-center shrink-0">{match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}</div>
                                   <span className="text-xs font-bold text-slate-800 truncate">{match.home_team}</span>
                               </div>
-
                               <div className="px-4 min-w-[80px] flex justify-center border-x border-slate-50">
-                                  <LiveScoreLabel 
-                                    matchId={match.id}
-                                    initialStatus={match.status}
-                                    homeScore={match.home_score}
-                                    awayScore={match.away_score}
-                                    matchDate={match.match_date}
-                                  />
+                                  <LiveScoreLabel matchId={match.id} initialStatus={match.status} homeScore={match.home_score} awayScore={match.away_score} matchDate={match.match_date} />
                               </div>
-
                               <div className="flex-1 flex items-center gap-3 flex-row-reverse text-right overflow-hidden">
-                                  <div className="w-8 h-8 flex items-center justify-center shrink-0">
-                                      {match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}
-                                  </div>
+                                  <div className="w-8 h-8 flex items-center justify-center shrink-0">{match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}</div>
                                   <span className="text-xs font-bold text-slate-800 truncate">{match.away_team}</span>
                               </div>
                           </div>
                       </Link>
-
                       <div className="px-3 py-2 border-t border-slate-100 grid grid-cols-2 gap-3 bg-slate-50/50">
                           <Link href={`/match/${match.id}`} className="flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:border-blue-200 rounded-lg py-2 shadow-sm text-[10px] font-bold text-slate-700 active:scale-95 transition"><Zap size={12} className="text-blue-500" /> Predict</Link>
                           {match.booking_code ? (<button className="flex items-center justify-center gap-1.5 bg-[#1A1A1A] text-yellow-400 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition"><Ticket size={12} /> {match.booking_code}</button>) : (<Link href="/vip/upgrade" className="flex items-center justify-center gap-1.5 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition"><Ticket size={12} /> Bet Now</Link>)}
@@ -236,8 +212,8 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </section>
 
-      {/* 6. VIP REWARD SECTION */}
-      <div className="mx-4 mb-8">
+      {/* 6. VIP REWARD */}
+      <div className="mx-4 mb-4">
         <div className="rounded-2xl overflow-hidden relative shadow-2xl group cursor-pointer bg-black p-6 text-center">
             <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 blur-[60px] opacity-20 group-hover:opacity-30 transition"></div>
             <div className="relative z-10">

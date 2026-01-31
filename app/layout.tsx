@@ -2,15 +2,14 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "@/app/components/AuthProvider";
-import Footer from '@/app/components/Footer'; // ✅ Added Footer
+import Footer from '@/app/components/Footer'; // ✅ IMPORT RESTORED
 
 const inter = Inter({ subsets: ["latin"] });
 
-// ✅ Improved SEO Metadata
 export const metadata: Metadata = {
   title: "FactSport | Live Scores, News & Predictions",
   description: "The #1 Platform for sports predictions, live scores, and breaking news. Join VIP to win monthly prizes.",
-  metadataBase: new URL('https://factsport.com'), // Replace with your actual Vercel domain later
+  metadataBase: new URL('https://factsport.com'), 
   openGraph: {
     title: "FactSport - Predict & Win",
     description: "Watch highlights, get expert tips, and win monthly prizes.",
@@ -18,6 +17,7 @@ export const metadata: Metadata = {
     locale: 'en_US',
     type: 'website',
   },
+  robots: "index, follow",
 };
 
 export default function RootLayout({
@@ -27,14 +27,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
-        {/* Wrap everything inside AuthProvider */}
+      <body className={`${inter.className} bg-[#F0F2F5] text-slate-900`}>
         <AuthProvider>
           <div className="flex flex-col min-h-screen">
             <main className="flex-grow">
               {children}
             </main>
-            <Footer /> {/* ✅ Footer added here */}
+            <Footer /> {/* ✅ COMPONENT RESTORED */}
           </div>
         </AuthProvider>
       </body>
