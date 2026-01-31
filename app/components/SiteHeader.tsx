@@ -10,13 +10,12 @@ export default async function SiteHeader() {
     <header className="sticky top-0 z-50 bg-[#0a1428] text-white border-b border-white/10 shadow-lg font-sans">
       <div className="max-w-7xl mx-auto px-3 h-16 flex items-center justify-between gap-1 md:gap-4">
         
-        {/* 1. LOGO AREA */}
+        {/* 1. LOGO AREA (Increased Size) */}
         <Link href="/" className="flex items-center shrink-0">
-            {/* Ensure 'logo.png' is inside the 'public' folder! */}
             <img 
               src="/logo.png" 
               alt="FactSport" 
-              className="h-8 w-auto object-contain" 
+              className="h-10 w-auto object-contain" 
             />
         </Link>
 
@@ -29,7 +28,7 @@ export default async function SiteHeader() {
                 <span className="text-[10px] font-bold">Live</span>
             </Link>
 
-            {/* PREDICT & WIN BUTTON (Forced Visible) */}
+            {/* PREDICT & WIN BUTTON */}
             <Link href="/vip/upgrade" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-yellow-500 to-yellow-600 text-black hover:from-yellow-400 transition shadow-lg active:scale-95 shrink-0 whitespace-nowrap">
                 <Trophy size={14} />
                 <span className="text-[10px] font-black">Predict & Win</span>
