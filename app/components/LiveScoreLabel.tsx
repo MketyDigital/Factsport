@@ -1,132 +1,112 @@
 'use client';
 
-import { createClient } from '@/app/lib/supabase/client';
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function LiveScoreLabel({ matchId, initialStatus, homeScore, awayScore, matchDate }: any) {
-  const [status, setStatus] = useState(initialStatus);
-  const [hScore, setHScore] = useState(homeScore);
-  const [aScore, setAScore] = useState(awayScore);
-  const [minute, setMinute] = useState(0);
+  const [data, setData] = useState({ 
+    status: initialStatus, 
+    home: homeScore, 
+    away: awayScore,
+    clock: '' 
+  });
 
   useEffect(() => {
-    const supabase = createClient();
+    // 1. Define the Fetch Function
+    const fetchScore = async () => {
+      const now = new Date();
+      const matchTime = new Date(matchDate);
+      
+      // LOGIC FIX: Check if we SHOULD fetch
+      // We fetch if:
+      // A. Status is already LIVE/HT
+      // B. It is currently past the match start time (even if status says SCHEDULED)
+      // C. It is within 10 minutes of kickoff (Warmup phase)
+      const shouldPoll = 
+         ['LIVE', 'in', '1H', '2H', 'HT'].includes(data.status) || 
+         (now >= new Date(matchTime.getTime() - 10 * 60000) && !['FT', 'post', 'FINISHED'].includes(data.status));
 
-    // 1. Calculate Initial Minute
-    const calculateMinute = () => {
-        const start = new Date(matchDate).getTime();
-        const now = new Date().getTime();
-        const diffMins = Math.floor((now - start) / 60000);
-        return diffMins > 0 ? diffMins : 0;
-    };
-    setMinute(calculateMinute());
+      if (!shouldPoll) return;
 
-    // 2. PRIMARY: Realtime Subscription (Instant Updates)
-    const channel = supabase.channel(`match-${matchId}`)
-      .on('postgres_changes', { 
-          event: 'UPDATE', 
-          schema: 'public', 
-          table: 'matches', 
-          filter: `id=eq.${matchId}` 
-      }, (payload) => {
-          setStatus(payload.new.status);
-          setHScore(payload.new.home_score);
-          setAScore(payload.new.away_score);
-      })
-      .subscribe();
-
-    // 3. SECONDARY: Polling Backup (Every 30 Seconds)
-    // ✅ CHANGED: 60000 -> 30000
-    const backupInterval = setInterval(async () => {
-        const isGameActive = ['LIVE', '1H', '2H', 'in', 'HT'].includes(status);
-        const isAboutToStart = new Date() >= new Date(matchDate);
-
-        // Only fetch if game is active or starting (saves resources)
-        if (isGameActive || isAboutToStart) {
-            const { data } = await supabase
-                .from('matches')
-                .select('status, home_score, away_score')
-                .eq('id', matchId)
-                .single();
-            
-            if (data) {
-                setStatus(data.status);
-                setHScore(data.home_score);
-                setAScore(data.away_score);
-            }
+      try {
+        const res = await fetch(`/api/match/${matchId}`);
+        if (res.ok) {
+          const json = await res.json();
+          setData({
+            status: json.status, 
+            home: json.home.score,
+            away: json.away.score,
+            clock: json.displayClock
+          });
         }
-
-        // Local Timer Tick (Keep this visual update smooth)
-        if (['LIVE', '1H', '2H', 'in'].includes(status)) {
-            setMinute(prev => prev + 1);
-        }
-    }, 30000); // 👈 NOW RUNS EVERY 30 SECONDS
-
-    return () => {
-        supabase.removeChannel(channel);
-        clearInterval(backupInterval);
+      } catch (e) {}
     };
-  }, [matchId, matchDate, status]);
 
-  // --- UI RENDERING ---
+    // 2. Set Interval (Run every 60s)
+    // We set the interval regardless, but the fetchScore logic decides if it actually hits the API.
+    // This ensures that if a user sits on the page, it will eventually "wake up" when the match starts.
+    const interval = setInterval(fetchScore, 60000);
+    
+    return () => clearInterval(interval);
+  }, [matchId, matchDate, data.status]); // Added dependencies to keep logic fresh
 
-  // 1. HALF TIME
-  if (['HT', 'HALF TIME', 'BREAK', 'Half Time', 'Halftime'].includes(status)) {
-      return (
-        <div className="flex flex-col items-center min-w-[60px]">
-            <div className="text-lg font-black tracking-tighter leading-none text-slate-900 mb-1">
-                {hScore} - {aScore}
-            </div>
-            <span className="bg-slate-200 text-slate-700 text-[10px] font-black px-2 py-0.5 rounded animate-pulse whitespace-nowrap">
-                HT
+  // 1. UI for HALF TIME
+  if (['HT', 'HALF TIME', 'BREAK', 'Half Time'].includes(data.status)) {
+    return (
+      <div className="flex flex-col items-center">
+        <div className="text-lg font-black tracking-tighter leading-none text-slate-900">
+          {data.home} - {data.away}
+        </div>
+        <span className="text-[10px] font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded mt-1 animate-pulse">
+          Half Time
+        </span>
+      </div>
+    );
+  }
+
+  // 2. UI for LIVE Matches (With Pulsing Dot)
+  if (['LIVE', 'in', '1H', '2H', 'ET'].includes(data.status)) {
+    return (
+      <div className="flex flex-col items-center">
+        {/* Pulsing Dot & Time */}
+        <div className="flex items-center gap-1.5 mb-0.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-600"></span>
+            </span>
+            <span className="text-red-600 font-bold text-[10px] animate-pulse whitespace-nowrap">
+               {data.clock ? `${data.clock}'` : 'LIVE'}
             </span>
         </div>
-      );
-  }
-
-  // 2. LIVE MATCH
-  if (['LIVE', '1H', '2H', 'in', 'ET'].includes(status)) {
-      const displayMin = (status === '2H' && minute < 45) ? 45 + minute : minute;
-      
-      return (
-        <div className="flex flex-col items-center min-w-[60px]">
-            <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-600"></span>
-                </span>
-                <span className="text-red-600 font-bold text-[10px] animate-pulse whitespace-nowrap">
-                    {displayMin}'
-                </span>
-            </div>
-            <div className="text-lg font-black tracking-tighter leading-none text-red-600">
-                {hScore} - {aScore}
-            </div>
+        
+        {/* Score */}
+        <div className="text-lg font-black tracking-tighter leading-none text-red-600">
+          {data.home} - {data.away}
         </div>
-      );
+      </div>
+    );
   }
 
-  // 3. FINISHED
-  if (['FT', 'post', 'FINISHED', 'FULL TIME'].includes(status)) {
-      return (
-        <div className="flex flex-col items-center min-w-[60px] opacity-70">
-            <div className="text-lg font-black tracking-tighter text-slate-800 leading-none mb-1">
-                {hScore} - {aScore}
-            </div>
-            <span className="text-slate-500 font-bold text-[10px]">FT</span>
+  // 3. UI for FINISHED Matches
+  if (['FT', 'post', 'FINISHED', 'FULL TIME'].includes(data.status)) {
+    return (
+      <div className="flex flex-col items-center">
+        <div className="text-lg font-black tracking-tighter text-slate-800 leading-none">
+          {data.home} - {data.away}
         </div>
-      );
+        <span className="text-slate-400 font-bold text-[10px]">FT</span>
+      </div>
+    );
   }
 
-  // 4. UPCOMING
+  // 4. UI for UPCOMING Matches
   return (
-    <div className="flex flex-col items-center min-w-[60px]">
-       <span className="text-[8px] font-black text-slate-400 uppercase tracking-tight mb-0.5">
-         {new Date(matchDate).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })}
-       </span>
-       <div className="bg-slate-100 px-2 py-1 rounded text-[10px] font-black text-slate-500 border border-slate-200">
-         {new Date(matchDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-       </div>
+    <div className="flex flex-col items-center min-w-[70px]">
+      <span className="text-[8px] font-black text-slate-400 uppercase tracking-tight mb-1">
+        {new Date(matchDate).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })}
+      </span>
+      <div className="bg-slate-100 px-3 py-1 rounded-lg text-[10px] font-black text-slate-600 whitespace-nowrap border border-slate-200/50">
+        {new Date(matchDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+      </div>
     </div>
   );
 }
