@@ -1,4 +1,4 @@
-// ✅ HELPER 1: Extracts Goals from Main Details
+// ✅ HELPER 1: Extracts Goals from Main Details (Standard)
 const formatMatchEvents = (details: any[], homeId: string) => {
   if (!details) return [];
   return details
@@ -17,7 +17,7 @@ const formatMatchEvents = (details: any[], homeId: string) => {
     });
 };
 
-// ✅ HELPER 2: Fallback - Extract Goals from Commentary (If main details fail)
+// ✅ HELPER 2: Fallback - Extract Clean Names from Commentary
 const fallbackGoalsFromCommentary = (playByPlay: any[], homeId: string, awayId: string) => {
     if (!playByPlay) return [];
     
@@ -25,27 +25,36 @@ const fallbackGoalsFromCommentary = (playByPlay: any[], homeId: string, awayId: 
     return playByPlay
         .filter((p: any) => p.type?.text === 'Goal' || p.text?.startsWith('Goal!'))
         .map((p: any) => {
-            // Logic: Try to guess team based on ID, otherwise assume based on text context (optional)
-            // Usually p.team.id is present in commentary objects
             const isHome = String(p.team?.id) === String(homeId);
-            
-            // Extract player name from text (e.g., "Goal!  Player Name...")
-            // Simple cleaner: Remove "Goal! " and split by space usually works for simple display
             let playerName = "Goal";
+
+            // STRATEGY 1: Use the athlete object if available (Best/Cleanest)
             if (p.participants?.[0]?.athlete?.displayName) {
                 playerName = p.participants[0].athlete.displayName;
-            } else {
-                // Fallback text parsing
-                const textParts = p.text?.split('.');
-                if (textParts.length > 1) playerName = textParts[1].trim(); // Rough estimate
+            } 
+            // STRATEGY 2: Smart Text Cleaning (Fixes the "Messy Text" issue)
+            else if (p.text) {
+                // Example: "Goal! Liverpool 4, Newcastle 1. Anthony Gordon (Newcastle) right footed shot..."
+                
+                // 1. Remove the "Goal! Score. " prefix
+                let cleanText = p.text.replace(/^Goal!.*?\.\s*/, '');
+                
+                // 2. Extract name before the first parenthesis "(" which usually starts team name
+                // "Anthony Gordon (Newcastle)..." -> "Anthony Gordon"
+                if (cleanText.includes('(')) {
+                    cleanText = cleanText.split('(')[0];
+                }
+
+                // 3. Cleanup whitespace
+                playerName = cleanText.trim();
             }
 
             return {
-                player: playerName,
+                player: playerName, 
                 time: p.clock?.displayValue || "",
                 type: 'goal',
                 team: isHome ? 'home' : 'away',
-                assist: null // Hard to get assist from just text
+                assist: null 
             };
         });
 };
@@ -117,10 +126,9 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
                 return team ? team.roster : (json.rosters?.[idx]?.roster || []);
             };
 
-            // ✅ SMART GOAL LOGIC: Try Details first, then Commentary
+            // ✅ SMART GOAL LOGIC: Try Details first, then Clean Commentary
             let finalGoals = formatMatchEvents(comp?.details, homeId);
             if (finalGoals.length === 0 && json.commentary) {
-                // Fallback: Try to find goals in commentary if main list is empty
                 finalGoals = fallbackGoalsFromCommentary(json.commentary, homeId, awayId);
             }
 
@@ -139,7 +147,7 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
                     score: awayComp?.score ?? baseData.away.score,
                     id: awayComp?.team?.id
                 },
-                goals: finalGoals, // 👈 Uses the smart list
+                goals: finalGoals, 
                 
                 commentary: formatCommentary(json.commentary || []), 
 
