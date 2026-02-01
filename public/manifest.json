@@ -1,0 +1,18 @@
+{
+  "name": "FactSport",
+  "short_name": "FactSport",
+  "description": "Live Football, News, Predict & Win big with FactSport",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a1428",
+  "theme_color": "#0a1428",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
