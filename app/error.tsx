@@ -1,5 +1,7 @@
 'use client'; // Error components must be Client Components
  
+export const runtime = 'edge';
+
 import { useEffect, useState } from 'react';
 import { MonitorPlay, RefreshCw, AlertTriangle } from 'lucide-react';
  

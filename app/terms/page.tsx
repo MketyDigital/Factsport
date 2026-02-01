@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { ChevronLeft, BookOpen } from 'lucide-react';
 
+export const runtime = 'edge';
+
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-[#F0F2F5] p-6 font-sans text-slate-800">
