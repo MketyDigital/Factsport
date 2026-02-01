@@ -1,17 +1,59 @@
-// app/lib/matchService.ts
+import { createClient } from '@/app/lib/supabase/client';
 
-// ✅ HELPER 1: Extracts Goals & Assists
+// ✅ HELPER 1: Text Cleaner (Removes "right footed shot", "following corner", etc.)
+const cleanPlayerName = (text: string) => {
+    if (!text) return "Goal";
+    
+    // 1. Remove prefixes like "Goal! Team 1-0." or "Own Goal by"
+    let clean = text.replace(/^Goal!.*?\.\s*/, '').replace(/^Own Goal by\s*/i, '');
+
+    // 2. Stop at the first parenthesis (Team Name)
+    if (clean.includes('(')) {
+        clean = clean.split('(')[0];
+    }
+
+    // 3. Stop at "junk" phrases to keep it clean
+    const stopWords = [
+        'right footed', 'left footed', 'header', 'penalty', 'shot', 
+        'from the', 'following', 'conceded', 'deflected', ' with '
+    ];
+    let lowestIndex = clean.length;
+    stopWords.forEach(word => {
+        const idx = clean.indexOf(word);
+        if (idx !== -1 && idx < lowestIndex) lowestIndex = idx;
+    });
+    
+    return clean.substring(0, lowestIndex).trim();
+};
+
+// ✅ HELPER 2: Assist Extractor
+const extractAssist = (text: string) => {
+    if (!text || !text.toLowerCase().includes('assisted by')) return null;
+    
+    const parts = text.split(/Assisted by/i);
+    if (parts.length > 1) {
+        let assistPart = parts[1].trim();
+        const stopWords = ['with a', 'following', 'header', 'via', '.', ','];
+        let lowestIndex = assistPart.length;
+        stopWords.forEach(word => {
+            const idx = assistPart.indexOf(word);
+            if (idx !== -1 && idx < lowestIndex) lowestIndex = idx;
+        });
+        return assistPart.substring(0, lowestIndex).trim();
+    }
+    return null;
+};
+
+// ✅ HELPER 3: Format Goals (Standard API)
 const formatMatchEvents = (details: any[], homeId: string) => {
   if (!details) return [];
   return details
-    .filter((e: any) => e.type?.text?.toLowerCase().includes('goal') && 
-                       !e.type?.text?.toLowerCase().includes('missed') && 
-                       !e.type?.text?.toLowerCase().includes('saved'))
+    .filter((e: any) => e.type?.text?.toLowerCase().includes('goal') && !e.type?.text?.toLowerCase().includes('missed'))
     .map((e: any) => {
        const isHome = String(e.team?.id) === String(homeId);
        return {
-         player: e.participants?.[0]?.athlete?.displayName || e.participants?.[0]?.athlete?.shortName || "Unknown",
-         time: e.clock?.displayValue || "0'",
+         player: e.participants?.[0]?.athlete?.displayName || "Goal",
+         time: e.clock?.displayValue || "",
          type: 'goal',
          team: isHome ? 'home' : 'away',
          assist: e.participants?.[1]?.athlete?.displayName || null
@@ -19,14 +61,44 @@ const formatMatchEvents = (details: any[], homeId: string) => {
     });
 };
 
-// ✅ HELPER 2: Extracts Text Commentary (NEW)
+// ✅ HELPER 4: Commentary Fallback (Uses Cleaner)
+const fallbackGoalsFromCommentary = (playByPlay: any[], homeId: string, awayId: string, homeName: string) => {
+    if (!playByPlay) return [];
+    return playByPlay
+        .filter((p: any) => {
+            const t = (p.text || "").toLowerCase();
+            return p.type?.text === 'Goal' || t.startsWith('goal') || t.includes('own goal');
+        })
+        .map((p: any) => {
+            const text = p.text || "";
+            const isOwnGoal = text.toLowerCase().includes("own goal");
+            let isHome = false;
+
+            if (p.team?.id) isHome = String(p.team.id) === String(homeId);
+            else if (text.includes(homeName)) isHome = true;
+            
+            if (isOwnGoal) isHome = !isHome; // Flip side for own goals
+
+            let time = p.clock?.displayValue || "";
+            if (!time && text.match(/^(\d+)'/)) time = text.match(/^(\d+)'/)[0];
+
+            return {
+                player: cleanPlayerName(text),
+                time: time,
+                type: 'goal',
+                team: isHome ? 'home' : 'away',
+                assist: extractAssist(text)
+            };
+        });
+};
+
 const formatCommentary = (playByPlay: any[]) => {
     if (!playByPlay) return [];
-    // Take the last 20 events so the list isn't huge
-    return playByPlay.slice(0, 30).map((p: any) => ({
+    return playByPlay.slice(0, 50).map((p: any) => ({
         id: p.id,
         time: p.clock?.displayValue || "",
-        text: p.text || "No commentary available."
+        text: p.text || "No commentary available.",
+        type: p.type?.text || "General" 
     }));
 };
 
@@ -36,13 +108,8 @@ export interface UnifiedMatchData {
     home: { name: string; logo: string; score: number | string; id: string };
     away: { name: string; logo: string; score: number | string; id: string };
     goals: any[];
-    commentary: any[]; // 👈 NEW FIELD
-    stats: {
-        possession: { h: number; a: number };
-        shots: { h: number; a: number };
-        corners: { h: number; a: number };
-        fouls: { h: number; a: number };
-    };
+    commentary: any[];
+    stats: { possession: { h: number; a: number }; shots: { h: number; a: number }; corners: { h: number; a: number }; fouls: { h: number; a: number }; };
     lineups: { home: any[]; away: any[]; };
     hasExternalData: boolean;
 }
@@ -54,18 +121,16 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
         home: { name: dbData.home_team, logo: dbData.home_logo, score: dbData.home_score ?? 0, id: 'home' },
         away: { name: dbData.away_team, logo: dbData.away_logo, score: dbData.away_score ?? 0, id: 'away' },
         goals: dbData.match_events || [], 
-        commentary: [], // Default empty
+        commentary: [], 
         stats: { possession: { h:0, a:0 }, shots: { h:0, a:0 }, corners: { h:0, a:0 }, fouls: { h:0, a:0 } },
         lineups: { home: [], away: [] },
         hasExternalData: false
     };
 
     try {
-        const fetchOptions: any = { next: { revalidate: 45 }, signal: AbortSignal.timeout(5000) };
+        const fetchOptions: any = { next: { revalidate: 30 }, signal: AbortSignal.timeout(5000) };
         let json = null;
-
         if (dbData.api_id) {
-            // ✅ We fetch 'commentary' now via the 'playByPlay' option
             const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${dbData.api_id}`, fetchOptions);
             if (res.ok) json = await res.json();
         }
@@ -75,13 +140,20 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
             const homeComp = comp?.competitors?.find((c: any) => c.homeAway === 'home');
             const awayComp = comp?.competitors?.find((c: any) => c.homeAway === 'away');
             const box = json.boxscore;
-            const homeId = homeComp?.team?.id;
+            
+            const homeId = homeComp?.team?.id || 'home';
+            const awayId = awayComp?.team?.id || 'away';
+            
+            let finalGoals = formatMatchEvents(comp?.details, homeId);
+            // ✅ Only fallback if details are missing, and use new cleaner logic
+            if (finalGoals.length === 0 && json.commentary) {
+                finalGoals = fallbackGoalsFromCommentary(json.commentary, homeId, awayId, homeComp?.team?.name);
+            }
 
             const getStat = (teamId: string, statName: string) => {
                 const team = box?.teams?.find((t: any) => String(t.team?.id) === String(teamId));
                 return parseInt(team?.statistics?.find((s: any) => s.name === statName)?.displayValue || '0');
             };
-
             const getRoster = (teamId: string, idx: number) => {
                 const team = json.rosters?.find((r: any) => String(r.team?.id) === String(teamId));
                 return team ? team.roster : (json.rosters?.[idx]?.roster || []);
@@ -90,32 +162,19 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
             return {
                 status: comp?.status?.type?.state || baseData.status,
                 displayClock: comp?.status?.displayClock || '',
-                home: { 
-                    name: homeComp?.team?.name || baseData.home.name, 
-                    logo: homeComp?.team?.logos?.[0]?.href || baseData.home.logo, 
-                    score: homeComp?.score ?? baseData.home.score,
-                    id: homeComp?.team?.id
-                },
-                away: { 
-                    name: awayComp?.team?.name || baseData.away.name, 
-                    logo: awayComp?.team?.logos?.[0]?.href || baseData.away.logo, 
-                    score: awayComp?.score ?? baseData.away.score,
-                    id: awayComp?.team?.id
-                },
-                goals: formatMatchEvents(comp?.details, homeId),
-                
-                // ✅ NEW: Map the commentary
+                home: { name: homeComp?.team?.name, logo: homeComp?.team?.logos?.[0]?.href, score: homeComp?.score, id: homeId },
+                away: { name: awayComp?.team?.name, logo: awayComp?.team?.logos?.[0]?.href, score: awayComp?.score, id: awayId },
+                goals: finalGoals, 
                 commentary: formatCommentary(json.commentary || []), 
-
                 stats: {
-                    possession: { h: getStat(homeComp?.team?.id, 'possessionPct'), a: getStat(awayComp?.team?.id, 'possessionPct') },
-                    shots: { h: getStat(homeComp?.team?.id, 'shotsSummary'), a: getStat(awayComp?.team?.id, 'shotsSummary') },
-                    corners: { h: getStat(homeComp?.team?.id, 'corners'), a: getStat(awayComp?.team?.id, 'corners') },
-                    fouls: { h: getStat(homeComp?.team?.id, 'foulsCommitted'), a: getStat(awayComp?.team?.id, 'foulsCommitted') },
+                    possession: { h: getStat(homeId, 'possessionPct'), a: getStat(awayId, 'possessionPct') },
+                    shots: { h: getStat(homeId, 'shotsSummary'), a: getStat(awayId, 'shotsSummary') },
+                    corners: { h: getStat(homeId, 'corners'), a: getStat(awayId, 'corners') },
+                    fouls: { h: getStat(homeId, 'foulsCommitted'), a: getStat(awayId, 'foulsCommitted') },
                 },
                 lineups: {
-                    home: getRoster(homeComp?.team?.id, 0)?.filter((p:any) => p.starter) || [],
-                    away: getRoster(awayComp?.team?.id, 1)?.filter((p:any) => p.starter) || []
+                    home: getRoster(homeId, 0)?.filter((p:any) => p.starter) || [],
+                    away: getRoster(awayId, 1)?.filter((p:any) => p.starter) || []
                 },
                 hasExternalData: true
             };
@@ -125,11 +184,6 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
 }
 
 export async function getLeagueMatches(leagueId: string, leagueName: string, dateStr: string) {
-    // ... (Keep this function EXACTLY as it was in the previous code, no changes needed here) ...
-    // Copy the getLeagueMatches function from the previous response if you need it again, 
-    // but the changes above are only for getExternalData which powers the Match Page.
-    // I will include a placeholder here to keep the file valid.
-    
     const matches: any[] = [];
     try {
         const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueId}/scoreboard?dates=${dateStr}`, { next: { revalidate: 0 } });
@@ -141,23 +195,16 @@ export async function getLeagueMatches(leagueId: string, leagueName: string, dat
                 const home = competition.competitors.find((c: any) => c.homeAway === 'home');
                 const away = competition.competitors.find((c: any) => c.homeAway === 'away');
                 const state = event.status.type.state;
-                let status = 'SCHEDULED';
-                if (state === 'in') status = 'LIVE';
-                if (state === 'post') status = 'FT';
-                if (event.status.type.shortDetail === 'HT') status = 'HT';
-
                 if (['pre', 'in', 'post'].includes(state)) {
-                     // Reuse the helper to format events for DB
-                     const matchEvents = formatMatchEvents(competition.details, home.team.id);
-                     matches.push({
+                      const matchEvents = formatMatchEvents(competition.details, home.team.id);
+                      matches.push({
                         api_id: event.id, league: leagueName,
-                        home_team: home.team.shortDisplayName || home.team.name,
-                        away_team: away.team.shortDisplayName || away.team.name,
+                        home_team: home.team.shortDisplayName, 
+                        away_team: competition.competitors.find((c: any) => c.homeAway === 'away').team.shortDisplayName,
                         home_score: parseInt(home.score) || 0,
-                        away_score: parseInt(away.score) || 0,
-                        match_date: event.date, status: status,
-                        home_logo: home.team.logo || home.team.logos?.[0]?.href || null,
-                        away_logo: away.team.logo || away.team.logos?.[0]?.href || null,
+                        away_score: parseInt(competition.competitors.find((c: any) => c.homeAway === 'away').score) || 0,
+                        match_date: event.date, status: state === 'in' ? 'LIVE' : (state === 'post' ? 'FT' : 'SCHEDULED'),
+                        home_logo: home.team.logo, away_logo: competition.competitors.find((c: any) => c.homeAway === 'away').team.logo,
                         updated_at: new Date().toISOString(),
                         match_events: matchEvents
                     });

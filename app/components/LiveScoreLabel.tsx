@@ -11,22 +11,28 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
   });
 
   useEffect(() => {
-    const now = new Date();
-    const matchTime = new Date(matchDate);
-    
-    // Logic: Only poll the API if match is currently Live or about to start
-    const isLive = ['LIVE', 'in', '1H', '2H', 'HT'].includes(data.status) || 
-                   (now >= matchTime && !['FT', 'post', 'FINISHED'].includes(data.status));
-
-    if (!isLive) return;
-
+    // 1. Define the Fetch Function
     const fetchScore = async () => {
+      const now = new Date();
+      const matchTime = new Date(matchDate);
+      
+      // LOGIC FIX: Check if we SHOULD fetch
+      // We fetch if:
+      // A. Status is already LIVE/HT
+      // B. It is currently past the match start time (even if status says SCHEDULED)
+      // C. It is within 10 minutes of kickoff (Warmup phase)
+      const shouldPoll = 
+         ['LIVE', 'in', '1H', '2H', 'HT'].includes(data.status) || 
+         (now >= new Date(matchTime.getTime() - 10 * 60000) && !['FT', 'post', 'FINISHED'].includes(data.status));
+
+      if (!shouldPoll) return;
+
       try {
         const res = await fetch(`/api/match/${matchId}`);
         if (res.ok) {
           const json = await res.json();
           setData({
-            status: json.status, // This needs to return "HT" from your bot for the HT logic to work
+            status: json.status, 
             home: json.home.score,
             away: json.away.score,
             clock: json.displayClock
@@ -35,13 +41,15 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
       } catch (e) {}
     };
 
-    fetchScore();
-    const interval = setInterval(fetchScore, 60000); // Check every 60 seconds
+    // 2. Set Interval (Run every 60s)
+    // We set the interval regardless, but the fetchScore logic decides if it actually hits the API.
+    // This ensures that if a user sits on the page, it will eventually "wake up" when the match starts.
+    const interval = setInterval(fetchScore, 60000);
+    
     return () => clearInterval(interval);
-  }, []); // Empty dependency array to run once on mount
+  }, [matchId, matchDate, data.status]); // Added dependencies to keep logic fresh
 
-  // 1. ✅ NEW: UI for HALF TIME
-  // Checks for various HT strings to be safe
+  // 1. UI for HALF TIME
   if (['HT', 'HALF TIME', 'BREAK', 'Half Time'].includes(data.status)) {
     return (
       <div className="flex flex-col items-center">
@@ -55,8 +63,8 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
     );
   }
 
-  // 2. ✅ UPDATED: UI for LIVE Matches (With Pulsing Dot)
-  if (['LIVE', 'in', '1H', '2H'].includes(data.status)) {
+  // 2. UI for LIVE Matches (With Pulsing Dot)
+  if (['LIVE', 'in', '1H', '2H', 'ET'].includes(data.status)) {
     return (
       <div className="flex flex-col items-center">
         {/* Pulsing Dot & Time */}
@@ -78,7 +86,7 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
     );
   }
 
-  // 3. UI for FINISHED Matches (Your existing logic)
+  // 3. UI for FINISHED Matches
   if (['FT', 'post', 'FINISHED', 'FULL TIME'].includes(data.status)) {
     return (
       <div className="flex flex-col items-center">
@@ -90,7 +98,7 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
     );
   }
 
-  // 4. UI for UPCOMING Matches (Your existing custom design)
+  // 4. UI for UPCOMING Matches
   return (
     <div className="flex flex-col items-center min-w-[70px]">
       <span className="text-[8px] font-black text-slate-400 uppercase tracking-tight mb-1">

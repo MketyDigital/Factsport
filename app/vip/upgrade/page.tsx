@@ -11,6 +11,7 @@ import {
   Gift, MessageCircle, Ticket, TrendingUp, Tv 
 } from 'lucide-react';
 import Link from 'next/link';
+import FreeTipsBanner from '@/app/components/FreeTipsBanner'; // ✅ IMPORTED
 
 export default function VipUpgradePage() {
   const [loading, setLoading] = useState(false);
@@ -183,7 +184,7 @@ export default function VipUpgradePage() {
 
       <div className="max-w-md mx-auto px-4 -mt-6 relative z-10 space-y-6">
         
-        {/* --- BENEFITS GRID (NEW) --- */}
+        {/* --- BENEFITS GRID --- */}
         <div className="grid grid-cols-2 gap-3">
              <div className="bg-[#1A1A1A] border border-white/5 p-4 rounded-xl flex flex-col items-center text-center">
                  <div className="w-8 h-8 bg-yellow-500/10 rounded-full flex items-center justify-center mb-2"><Trophy size={16} className="text-yellow-500"/></div>
@@ -229,7 +230,7 @@ export default function VipUpgradePage() {
         {!hasPending && (
             <>
                 {/* --- PAYMENT METHOD TOGGLE --- */}
-                <div className="grid grid-cols-2 gap-3 mt-4">
+                <div className="grid grid-cols-2 gap-3">
                     <button onClick={() => setPaymentMethod('bank')} className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition active:scale-95 ${paymentMethod === 'bank' ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-[#111] border-white/10 text-slate-400'}`}>
                         <CreditCard size={24} /><span className="text-[10px] font-black uppercase tracking-wide">Bank Transfer</span>
                     </button>
@@ -240,15 +241,15 @@ export default function VipUpgradePage() {
 
                 {/* --- PAYMENT DETAILS CARD --- */}
                 <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-                     {/* Background Glow */}
-                     <div className="absolute -right-10 -top-10 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none"></div>
-                     
-                     <div className="text-center mb-6">
+                      {/* Background Glow */}
+                      <div className="absolute -right-10 -top-10 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none"></div>
+                      
+                      <div className="text-center mb-6">
                         <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Amount to Pay</span>
                         <h2 className="text-3xl font-black text-white mt-1">{paymentMethod === 'bank' ? BANK_DETAILS.price : CRYPTO_DETAILS.price}</h2>
-                     </div>
+                      </div>
 
-                     <div className="space-y-4">
+                      <div className="space-y-4">
                         {paymentMethod === 'bank' ? (
                             <>
                                 <div className="flex justify-between items-center border-b border-white/5 pb-2">
@@ -278,7 +279,7 @@ export default function VipUpgradePage() {
                             <>
                                 <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-lg mb-4">
                                      <p className="text-[10px] text-yellow-200 text-center font-bold">
-                                        ⚠️ Please ensure you send ONLY <br/> {CRYPTO_DETAILS.network}
+                                       ⚠️ Please ensure you send ONLY <br/> {CRYPTO_DETAILS.network}
                                      </p>
                                 </div>
                                 <div>
@@ -297,7 +298,7 @@ export default function VipUpgradePage() {
                                 </div>
                             </>
                         )}
-                     </div>
+                      </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-xl">
