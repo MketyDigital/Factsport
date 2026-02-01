@@ -11,18 +11,13 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
   });
 
   useEffect(() => {
-    // 1. Define the Fetch Function
     const fetchScore = async () => {
       const now = new Date();
       const matchTime = new Date(matchDate);
       
-      // LOGIC FIX: Check if we SHOULD fetch
-      // We fetch if:
-      // A. Status is already LIVE/HT
-      // B. It is currently past the match start time (even if status says SCHEDULED)
-      // C. It is within 10 minutes of kickoff (Warmup phase)
+      // ✅ LOGIC: Keep polling during Halftime (HT) so we know when 2nd Half starts
       const shouldPoll = 
-         ['LIVE', 'in', '1H', '2H', 'HT'].includes(data.status) || 
+         ['LIVE', 'in', '1H', '2H', 'HT', 'Halftime'].includes(data.status) || 
          (now >= new Date(matchTime.getTime() - 10 * 60000) && !['FT', 'post', 'FINISHED'].includes(data.status));
 
       if (!shouldPoll) return;
@@ -41,33 +36,28 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
       } catch (e) {}
     };
 
-    // 2. Set Interval (Run every 60s)
-    // We set the interval regardless, but the fetchScore logic decides if it actually hits the API.
-    // This ensures that if a user sits on the page, it will eventually "wake up" when the match starts.
     const interval = setInterval(fetchScore, 60000);
-    
     return () => clearInterval(interval);
-  }, [matchId, matchDate, data.status]); // Added dependencies to keep logic fresh
+  }, [matchId, matchDate, data.status]);
 
-  // 1. UI for HALF TIME
-  if (['HT', 'HALF TIME', 'BREAK', 'Half Time'].includes(data.status)) {
+  // 1. UI for HALF TIME (Now triggered correctly!)
+  if (['HT', 'HALF TIME', 'BREAK', 'Half Time', 'STATUS_HALFTIME'].includes(data.status)) {
     return (
       <div className="flex flex-col items-center">
         <div className="text-lg font-black tracking-tighter leading-none text-slate-900">
           {data.home} - {data.away}
         </div>
-        <span className="text-[10px] font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded mt-1 animate-pulse">
-          Half Time
+        <span className="text-[10px] font-bold bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded mt-1 animate-pulse border border-yellow-200">
+          HT
         </span>
       </div>
     );
   }
 
-  // 2. UI for LIVE Matches (With Pulsing Dot)
+  // 2. UI for LIVE Matches
   if (['LIVE', 'in', '1H', '2H', 'ET'].includes(data.status)) {
     return (
       <div className="flex flex-col items-center">
-        {/* Pulsing Dot & Time */}
         <div className="flex items-center gap-1.5 mb-0.5">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -78,7 +68,6 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
             </span>
         </div>
         
-        {/* Score */}
         <div className="text-lg font-black tracking-tighter leading-none text-red-600">
           {data.home} - {data.away}
         </div>
