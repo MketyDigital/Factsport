@@ -1,35 +1,25 @@
 import { createClient } from '@/app/lib/supabase/client';
 
-// ✅ HELPER 1: Text Cleaner (Removes "right footed shot", "following corner", etc.)
+// ... (Your Helper Functions: cleanPlayerName, extractAssist, etc. remain the same) ...
+// ... Copy them from your previous code to keep this file concise ...
+
+// ✅ HELPER 1: Text Cleaner
 const cleanPlayerName = (text: string) => {
     if (!text) return "Goal";
-    
-    // 1. Remove prefixes like "Goal! Team 1-0." or "Own Goal by"
     let clean = text.replace(/^Goal!.*?\.\s*/, '').replace(/^Own Goal by\s*/i, '');
-
-    // 2. Stop at the first parenthesis (Team Name)
-    if (clean.includes('(')) {
-        clean = clean.split('(')[0];
-    }
-
-    // 3. Stop at "junk" phrases to keep it clean
-    const stopWords = [
-        'right footed', 'left footed', 'header', 'penalty', 'shot', 
-        'from the', 'following', 'conceded', 'deflected', ' with '
-    ];
+    if (clean.includes('(')) clean = clean.split('(')[0];
+    const stopWords = ['right footed', 'left footed', 'header', 'penalty', 'shot', 'from the', 'following', 'conceded', 'deflected', ' with '];
     let lowestIndex = clean.length;
     stopWords.forEach(word => {
         const idx = clean.indexOf(word);
         if (idx !== -1 && idx < lowestIndex) lowestIndex = idx;
     });
-    
     return clean.substring(0, lowestIndex).trim();
 };
 
 // ✅ HELPER 2: Assist Extractor
 const extractAssist = (text: string) => {
     if (!text || !text.toLowerCase().includes('assisted by')) return null;
-    
     const parts = text.split(/Assisted by/i);
     if (parts.length > 1) {
         let assistPart = parts[1].trim();
@@ -44,7 +34,7 @@ const extractAssist = (text: string) => {
     return null;
 };
 
-// ✅ HELPER 3: Format Goals (Standard API)
+// ✅ HELPER 3: Format Goals
 const formatMatchEvents = (details: any[], homeId: string) => {
   if (!details) return [];
   return details
@@ -61,7 +51,7 @@ const formatMatchEvents = (details: any[], homeId: string) => {
     });
 };
 
-// ✅ HELPER 4: Commentary Fallback (Uses Cleaner)
+// ✅ HELPER 4: Commentary Fallback
 const fallbackGoalsFromCommentary = (playByPlay: any[], homeId: string, awayId: string, homeName: string) => {
     if (!playByPlay) return [];
     return playByPlay
@@ -73,15 +63,11 @@ const fallbackGoalsFromCommentary = (playByPlay: any[], homeId: string, awayId: 
             const text = p.text || "";
             const isOwnGoal = text.toLowerCase().includes("own goal");
             let isHome = false;
-
             if (p.team?.id) isHome = String(p.team.id) === String(homeId);
             else if (text.includes(homeName)) isHome = true;
-            
-            if (isOwnGoal) isHome = !isHome; // Flip side for own goals
-
+            if (isOwnGoal) isHome = !isHome; 
             let time = p.clock?.displayValue || "";
             if (!time && text.match(/^(\d+)'/)) time = text.match(/^(\d+)'/)[0];
-
             return {
                 player: cleanPlayerName(text),
                 time: time,
@@ -102,6 +88,8 @@ const formatCommentary = (playByPlay: any[]) => {
     }));
 };
 
+// --- MAIN LOGIC UPDATED BELOW ---
+
 export interface UnifiedMatchData {
     status: string;
     displayClock: string;
@@ -109,7 +97,7 @@ export interface UnifiedMatchData {
     away: { name: string; logo: string; score: number | string; id: string };
     goals: any[];
     commentary: any[];
-    stats: { possession: { h: number; a: number }; shots: { h: number; a: number }; corners: { h: number; a: number }; fouls: { h: number; a: number }; };
+    stats: any;
     lineups: { home: any[]; away: any[]; };
     hasExternalData: boolean;
 }
@@ -145,7 +133,6 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
             const awayId = awayComp?.team?.id || 'away';
             
             let finalGoals = formatMatchEvents(comp?.details, homeId);
-            // ✅ Only fallback if details are missing, and use new cleaner logic
             if (finalGoals.length === 0 && json.commentary) {
                 finalGoals = fallbackGoalsFromCommentary(json.commentary, homeId, awayId, homeComp?.team?.name);
             }
@@ -159,8 +146,16 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
                 return team ? team.roster : (json.rosters?.[idx]?.roster || []);
             };
 
+            // 🟢 FIX: DETECT HALFTIME CORRECTLY
+            let finalStatus = comp?.status?.type?.state || baseData.status;
+            const shortStatus = comp?.status?.type?.shortDetail; // "HT", "FT", "45+2"
+            
+            if (shortStatus === 'HT' || comp?.status?.type?.name === 'STATUS_HALFTIME') {
+                finalStatus = 'HT';
+            }
+
             return {
-                status: comp?.status?.type?.state || baseData.status,
+                status: finalStatus,
                 displayClock: comp?.status?.displayClock || '',
                 home: { name: homeComp?.team?.name, logo: homeComp?.team?.logos?.[0]?.href, score: homeComp?.score, id: homeId },
                 away: { name: awayComp?.team?.name, logo: awayComp?.team?.logos?.[0]?.href, score: awayComp?.score, id: awayId },
@@ -194,16 +189,32 @@ export async function getLeagueMatches(leagueId: string, leagueName: string, dat
                 const competition = event.competitions[0];
                 const home = competition.competitors.find((c: any) => c.homeAway === 'home');
                 const away = competition.competitors.find((c: any) => c.homeAway === 'away');
-                const state = event.status.type.state;
+                const state = event.status.type.state; // 'pre', 'in', 'post'
+                const shortStatus = event.status.type.shortDetail; // "HT", "FT"
+
                 if (['pre', 'in', 'post'].includes(state)) {
                       const matchEvents = formatMatchEvents(competition.details, home.team.id);
+                      
+                      // 🟢 FIX: PRESERVE 'HT' STATUS
+                      let finalStatus = 'SCHEDULED';
+                      if (state === 'post') finalStatus = 'FT';
+                      else if (state === 'in') {
+                          // Check for Halftime explicitly
+                          if (shortStatus === 'HT' || event.status.type.name === 'STATUS_HALFTIME') {
+                              finalStatus = 'HT';
+                          } else {
+                              finalStatus = 'LIVE';
+                          }
+                      }
+
                       matches.push({
                         api_id: event.id, league: leagueName,
                         home_team: home.team.shortDisplayName, 
                         away_team: competition.competitors.find((c: any) => c.homeAway === 'away').team.shortDisplayName,
                         home_score: parseInt(home.score) || 0,
                         away_score: parseInt(competition.competitors.find((c: any) => c.homeAway === 'away').score) || 0,
-                        match_date: event.date, status: state === 'in' ? 'LIVE' : (state === 'post' ? 'FT' : 'SCHEDULED'),
+                        match_date: event.date, 
+                        status: finalStatus, // 👈 Using the fixed status
                         home_logo: home.team.logo, away_logo: competition.competitors.find((c: any) => c.homeAway === 'away').team.logo,
                         updated_at: new Date().toISOString(),
                         match_events: matchEvents

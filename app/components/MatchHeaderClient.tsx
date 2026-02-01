@@ -9,7 +9,10 @@ export default function MatchHeaderClient({ matchId, initialData, initialGoals =
 
   useEffect(() => {
     const supabase = createClient();
+    
+    // 🟢 UPDATED: Calculate minute, but clamp or reset based on status
     const calculateMinute = () => {
+        if (data.status === 'HT') return 45; // Freeze at 45 for HT
         const start = new Date(data.match_date).getTime();
         const now = new Date().getTime();
         const diffMins = Math.floor((now - start) / 60000);
@@ -19,19 +22,25 @@ export default function MatchHeaderClient({ matchId, initialData, initialGoals =
 
     const channel = supabase.channel(`match-header-${matchId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches', filter: `id=eq.${matchId}` }, async (payload) => {
+          // Update local state with new DB data
           setData((prev:any) => ({ ...prev, status: payload.new.status, home_score: payload.new.home_score, away_score: payload.new.away_score }));
           const { data: fresh } = await supabase.from('matches').select('*').eq('id', matchId).single();
           if (fresh && fresh.match_events) setGoals(fresh.match_events); 
       }).subscribe();
 
     const interval = setInterval(async () => {
-        if (['LIVE', '1H', '2H', 'in'].includes(data.status)) setMinute(prev => prev + 1);
+        // 🟢 FIX: Don't increment minute if it is HT
+        if (['LIVE', '1H', '2H', 'in'].includes(data.status)) {
+            setMinute(prev => prev + 1);
+        }
     }, 30000);
 
     return () => { supabase.removeChannel(channel); clearInterval(interval); };
   }, [matchId, data.status]);
 
-  const isLive = ['LIVE', '1H', '2H', 'in'].includes(data.status);
+  // 🟢 FIX: Ensure HT is NOT considered "Live" for the red badge
+  const isLive = ['LIVE', '1H', '2H', 'in'].includes(data.status) && data.status !== 'HT';
+  
   const displayMin = (data.status === '2H' && minute < 45) ? 45 + minute : minute;
 
   return (
@@ -43,7 +52,8 @@ export default function MatchHeaderClient({ matchId, initialData, initialGoals =
                     <span className="w-1 h-1 bg-white rounded-full"></span> LIVE {displayMin}'
                 </span>
             ) : (
-                <span className="bg-white/10 text-slate-300 text-[9px] font-bold px-2 py-0.5 rounded-full border border-white/10">
+                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border border-white/10 ${data.status === 'HT' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-white/10 text-slate-300'}`}>
+                    {/* 🟢 FIX: Explicitly show HT */}
                     {data.status === 'HT' ? 'HT' : (['FT','post','FINISHED'].includes(data.status) ? 'FT' : new Date(data.match_date).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}))}
                 </span>
             )}
@@ -72,7 +82,7 @@ export default function MatchHeaderClient({ matchId, initialData, initialGoals =
             </div>
         </div>
 
-        {/* 🟢 SCORERS (Perfectly Centered List) */}
+        {/* Scorers */}
         {goals.length > 0 && (
             <div className="flex flex-col items-center space-y-1 mt-2">
                 {goals.map((g: any, i: number) => (
