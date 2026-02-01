@@ -35,7 +35,7 @@ export default function MatchHeaderClient({ matchId, initialData, initialGoals =
   const displayMin = (data.status === '2H' && minute < 45) ? 45 + minute : minute;
 
   return (
-    <div className="relative z-10 px-4 mt-2">
+    <div className="relative z-10 px-4 mt-1">
         {/* Status */}
         <div className="flex justify-center mb-2">
             {isLive ? (
@@ -72,13 +72,18 @@ export default function MatchHeaderClient({ matchId, initialData, initialGoals =
             </div>
         </div>
 
-        {/* 🟢 SCORERS (Tiny & Compact) */}
+        {/* 🟢 SCORERS (Fixed: Tiny, Compact, Centered) */}
         {goals.length > 0 && (
-            <div className="flex flex-col items-center space-y-0.5 w-full mt-1">
+            <div className="flex flex-col items-center space-y-0.5 mt-1 w-full max-w-[200px] mx-auto">
                 {goals.map((g: any, i: number) => (
-                    <div key={i} className="flex items-center gap-1.5 text-[9px] text-slate-400 bg-black/20 px-2 py-0.5 rounded-full backdrop-blur-sm">
-                        <span className="text-white font-bold">{g.player}</span>
-                        <span className="text-green-400 font-mono text-[8px]">{g.time || '⚽'}</span>
+                    <div key={i} className="flex items-center justify-center gap-1.5 w-full">
+                        <span className={`text-[9px] font-bold text-right truncate w-1/2 ${g.team === 'home' ? 'text-white' : 'text-slate-500'}`}>
+                            {g.team === 'home' ? g.player : ''}
+                        </span>
+                        <span className="text-[8px] font-mono text-green-400 bg-white/5 px-1 rounded">{g.time || '⚽'}</span>
+                        <span className={`text-[9px] font-bold text-left truncate w-1/2 ${g.team === 'away' ? 'text-white' : 'text-slate-500'}`}>
+                            {g.team === 'away' ? g.player : ''}
+                        </span>
                     </div>
                 ))}
             </div>

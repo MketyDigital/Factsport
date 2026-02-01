@@ -3,7 +3,7 @@ export const runtime = 'edge';
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft, Zap, ExternalLink, AlertCircle, Activity, Mic, AlignLeft, Radio, PlayCircle, Link as LinkIcon } from 'lucide-react';
+import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon } from 'lucide-react';
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
 import MatchHeaderClient from '@/app/components/MatchHeaderClient'; 
@@ -32,8 +32,8 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       
-      {/* 1. HEADER (Sticky) */}
-      <div className="sticky top-0 z-50 bg-[#0a1428] text-white pb-4 rounded-b-[2rem] overflow-hidden shadow-2xl">
+      {/* 1. HEADER (Sticky - Stays at top) */}
+      <div className="sticky top-0 z-50 bg-[#0a1428] text-white pb-6 rounded-b-[2rem] overflow-hidden shadow-2xl">
         <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
         <div className="relative z-10 p-4 flex items-center justify-between">
           <Link href="/" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
@@ -43,11 +43,12 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           <div className="w-10"></div>
         </div>
 
-        {/* 🟢 REALTIME SCOREBOARD + TINY SCORERS */}
+        {/* 🟢 REALTIME SCOREBOARD */}
         <MatchHeaderClient matchId={dbData.id} initialData={dbData} initialGoals={data.goals} />
       </div>
 
-      <div className="mx-4 -mt-6 relative z-20 space-y-4">
+      {/* 🟢 FIX: Changed '-mt-6' to 'mt-4' to push content AWAY from header */}
+      <div className="mx-4 mt-4 relative z-20 space-y-4">
         
         {/* 2. VIDEO PLAYER */}
         {activeVideoUrl && (
@@ -93,7 +94,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
            <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
         </div>
 
-        {/* 5. 🟢 NEW 1XBET BANNER (COMPACT VERSION) */}
+        {/* 5. 🟢 COMPACT NEW BANNER (Placed here as requested) */}
         <div className="bg-[#1A1A1A] rounded-xl p-3 shadow-lg border border-white/5 flex items-center justify-between relative overflow-hidden">
             <div className="absolute top-0 right-0 bg-blue-600 w-16 h-full blur-[40px] opacity-20"></div>
             <div className="flex items-center gap-3 relative z-10">
@@ -112,13 +113,12 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       {/* 6. CONTENT SECTION */}
       {!data.hasExternalData ? (
           <div className="mx-4 mt-6 bg-white p-6 rounded-xl border border-slate-100 text-center shadow-sm">
-              <AlertCircle className="mx-auto text-slate-300 mb-2" />
               <p className="text-xs font-bold text-slate-500">Detailed stats unavailable.</p>
           </div>
       ) : (
         <div className="px-4 mt-8 space-y-6">
             
-            {/* 7. LIVE FEED (Separate) */}
+            {/* 7. LIVE FEED */}
             {data.commentary.length > 0 && (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
                     <h3 className="text-xs font-black uppercase text-slate-400 mb-4 flex items-center gap-2">
@@ -135,7 +135,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                 </div>
             )}
             
-            {/* 8. TABS: STATS & LINEUPS */}
+            {/* 8. TABS */}
             <StatsLineupsTabs data={data} />
         </div>
       )}
