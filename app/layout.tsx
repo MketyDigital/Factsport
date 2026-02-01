@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "@/app/components/AuthProvider";
-import Footer from '@/app/components/Footer'; // ✅ IMPORT RESTORED
+import Footer from '@/app/components/Footer'; 
+import SiteHeader from '@/app/components/SiteHeader'; // ✅ IMPORTED
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -30,10 +31,14 @@ export default function RootLayout({
       <body className={`${inter.className} bg-[#F0F2F5] text-slate-900`}>
         <AuthProvider>
           <div className="flex flex-col min-h-screen">
+            {/* ✅ HEADER ADDED HERE (Visible on ALL pages) */}
+            <SiteHeader /> 
+            
             <main className="flex-grow">
               {children}
             </main>
-            <Footer /> {/* ✅ COMPONENT RESTORED */}
+            
+            <Footer />
           </div>
         </AuthProvider>
       </body>

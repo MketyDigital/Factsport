@@ -6,12 +6,12 @@ import { createClient } from '@/app/lib/supabase/client';
 import { 
   Search, Plus, Save, Trash2, Calculator, 
   Loader2, Link as LinkIcon, Video, Calendar, Image as ImageIcon,
-  CheckCircle, RefreshCw, Mic, Radio
+  CheckCircle, Radio, Mic
 } from 'lucide-react';
 
 export default function AdminMatchesPage() {
   const supabase = createClient();
-   
+    
   // States
   const [loading, setLoading] = useState(false);
   const [matches, setMatches] = useState<any[]>([]);
@@ -37,7 +37,7 @@ export default function AdminMatchesPage() {
   const fetchMatches = async () => {
     setLoading(true);
     let query = supabase.from('matches').select('*').order('match_date', { ascending: false }).limit(50);
-    
+     
     if (search) {
       query = query.or(`home_team.ilike.%${search}%,away_team.ilike.%${search}%`);
     }
@@ -54,13 +54,11 @@ export default function AdminMatchesPage() {
         return;
     }
     setLoading(true);
-    // Use the state directly
     const { error } = await supabase.from('matches').insert([{
         ...newMatch,
-        // Ensure status defaults to SCHEDULED
         status: 'SCHEDULED' 
     }]);
-    
+     
     if (error) alert("Error creating match: " + error.message);
     else {
         setIsCreating(false);
@@ -84,9 +82,9 @@ export default function AdminMatchesPage() {
         api_id: match.api_id, 
         booking_code: match.booking_code,
         affiliate_link: match.affiliate_link,
-        video_url: match.video_url,         // Highlights
-        livestream_url: match.livestream_url, // ✅ NEW: Live Youtube
-        audio_url: match.audio_url,         // ✅ NEW: Live Radio
+        video_url: match.video_url,         
+        livestream_url: match.livestream_url, 
+        audio_url: match.audio_url,         
         is_featured_video: match.is_featured_video,
         points_distributed: match.points_distributed 
     }).eq('id', match.id);
@@ -100,14 +98,17 @@ export default function AdminMatchesPage() {
   const settlePoints = async (matchId: string) => {
     if (!confirm("⚠️ CONFIRM SETTLEMENT: \n\nAre you sure the match is finished? \nThis will calculate points for all users.")) return;
     
-    const { error } = await supabase.rpc('settle_match_points', { target_match_id: matchId });
+    // ✅ Keep 'target_match_id' exactly as requested to match your existing backend
+    const { error } = await supabase.rpc('settle_match_points', { 
+        target_match_id: matchId 
+    });
     
     if (error) {
         alert("Error: " + error.message);
     } else {
         alert("✅ Success! Points distributed.");
-        // Auto-update local state to show it's done
         handleUpdateChange(matchId, 'points_distributed', true);
+        await supabase.from('matches').update({ points_distributed: true }).eq('id', matchId);
     }
   };
 
@@ -152,7 +153,6 @@ export default function AdminMatchesPage() {
                     <option>Ligue 1</option>
                     <option>Other</option>
                 </select>
-                {/* Added Logo Inputs */}
                 <input type="text" placeholder="Home Logo URL (Optional)" className="border p-3 rounded-xl text-xs" value={newMatch.home_logo} onChange={e => setNewMatch({...newMatch, home_logo: e.target.value})} />
                 <input type="text" placeholder="Away Logo URL (Optional)" className="border p-3 rounded-xl text-xs" value={newMatch.away_logo} onChange={e => setNewMatch({...newMatch, away_logo: e.target.value})} />
             </div>
@@ -283,7 +283,6 @@ export default function AdminMatchesPage() {
                          </h4>
                          
                          <div className="space-y-2 mb-3">
-                            {/* YouTube Livestream */}
                             <div className="relative">
                                 <Video size={12} className="absolute left-2.5 top-2.5 text-red-500" />
                                 <input 
@@ -294,8 +293,6 @@ export default function AdminMatchesPage() {
                                     onChange={(e) => handleUpdateChange(match.id, 'livestream_url', e.target.value)}
                                 />
                             </div>
-
-                            {/* Radio Audio */}
                             <div className="relative">
                                 <Mic size={12} className="absolute left-2.5 top-2.5 text-blue-500" />
                                 <input 
@@ -306,8 +303,6 @@ export default function AdminMatchesPage() {
                                     onChange={(e) => handleUpdateChange(match.id, 'audio_url', e.target.value)}
                                 />
                             </div>
-
-                            {/* Highlights (Post Match) */}
                             <div className="relative">
                                 <ImageIcon size={12} className="absolute left-2.5 top-2.5 text-slate-400" />
                                 <input 
@@ -368,13 +363,6 @@ export default function AdminMatchesPage() {
 
             </div>
         ))}
-
-        {!loading && matches.length === 0 && (
-            <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
-                <p className="text-slate-400 font-bold">No matches found.</p>
-                <button onClick={() => setIsCreating(true)} className="text-blue-600 text-sm font-bold mt-2 hover:underline">Create your first match</button>
-            </div>
-        )}
       </div>
     </div>
   );
