@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import Link from 'next/link';
 import { ChevronLeft, Trophy, Target, Star, ShieldAlert } from 'lucide-react';
 
