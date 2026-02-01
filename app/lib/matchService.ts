@@ -19,52 +19,82 @@ const formatMatchEvents = (details: any[], homeId: string) => {
     });
 };
 
-// ✅ HELPER 2: Fallback - Smart Text Parsing (Fixes Alignment & Assists)
+// ✅ HELPER 2: Fallback - Advanced Text Parsing (Fixes Own Goals & Messy Text)
 const fallbackGoalsFromCommentary = (playByPlay: any[], homeId: string, awayId: string, homeName: string, awayName: string) => {
     if (!playByPlay) return [];
     
-    // Filter for Goal events
     return playByPlay
-        .filter((p: any) => p.type?.text === 'Goal' || p.text?.startsWith('Goal!') || p.text?.includes('Goal'))
+        .filter((p: any) => {
+            const t = (p.text || "").toLowerCase();
+            return p.type?.text === 'Goal' || t.startsWith('goal') || t.includes('own goal');
+        })
         .map((p: any) => {
-            let isHome = false; 
             const text = p.text || "";
+            const lowerText = text.toLowerCase();
+            const isOwnGoal = lowerText.includes("own goal");
 
-            // 1. DETERMINE TEAM (Strict Logic to fix one-sided issue)
-            const teamInParensMatch = text.match(/\((.*?)\)/);
+            // 1. DETERMINE TEAM
+            let isHome = false; 
             
+            // Priority A: API Team ID
             if (p.team?.id) {
-                // If API provides ID, use it (Most accurate)
                 isHome = String(p.team.id) === String(homeId);
             } 
-            else if (teamInParensMatch && teamInParensMatch[1]) {
-                // If text has (Team Name), check it against home/away names
-                const teamFound = teamInParensMatch[1].toLowerCase();
-                const h = homeName.toLowerCase();
-                const a = awayName.toLowerCase();
-
-                if (teamFound.includes(h) || h.includes(teamFound)) isHome = true;
-                else if (teamFound.includes(a) || a.includes(teamFound)) isHome = false;
+            // Priority B: Check for Team Name in text
+            else {
+                // If text contains Home Name (e.g. "Leeds United"), assume Home... 
+                // BUT if it's an Own Goal, we will flip this later.
+                if (lowerText.includes(homeName.toLowerCase())) isHome = true;
+                else if (lowerText.includes(awayName.toLowerCase())) isHome = false;
             }
 
-            // 2. EXTRACT PLAYER NAME
+            // ⚡ CRITICAL FIX: FLIP SIDE FOR OWN GOALS
+            // If "Own Goal by [HomePlayer]", the point goes to [AwayTeam].
+            if (isOwnGoal) {
+                isHome = !isHome;
+            }
+
+            // 2. EXTRACT PLAYER NAME (Aggressive Cleaning)
             let playerName = "Goal";
+
             if (p.participants?.[0]?.athlete?.displayName) {
                 playerName = p.participants[0].athlete.displayName;
-            } else {
-                // Remove "Goal! ..." prefix and take text before first parenthesis
-                let cleanText = text.replace(/^Goal!.*?\.\s*/, '');
-                if (cleanText.includes('(')) cleanText = cleanText.split('(')[0];
-                playerName = cleanText.trim();
+            } 
+            else if (isOwnGoal) {
+                // Format: "Own Goal by Karl Darlow, Leeds United. Leeds United 0..."
+                // Regex: Match text between "by" and the first comma/dot
+                const match = text.match(/Own Goal by (.*?)(,|\.| \d)/);
+                if (match && match[1]) playerName = match[1].trim();
+                else playerName = "Own Goal"; // Fallback
+            } 
+            else {
+                // Format: "Goal!  Liverpool 4, Newcastle 1. Anthony Gordon (Newcastle)..."
+                // Step A: Remove the "Goal! ... Score." prefix part
+                // We look for the first occurrence of a Period followed by Space + Letter, or a parenthesis
+                let clean = text.replace(/^Goal!.*?\.\s+/, ''); 
+                
+                // If text still starts with Score (e.g. "Liverpool 4..."), strip it manually
+                // Look for the first player-like string (text before '(', 'right footed', 'header')
+                const splitMarkers = ['(', 'right footed', 'left footed', 'header', 'penalty', 'shot'];
+                let cutIndex = clean.length;
+                
+                splitMarkers.forEach(marker => {
+                    const idx = clean.indexOf(marker);
+                    if (idx !== -1 && idx < cutIndex) cutIndex = idx;
+                });
+
+                playerName = clean.substring(0, cutIndex).trim();
+
+                // Final cleanup: If name still contains numbers or "Goal", just say "Goal"
+                if (playerName.match(/\d/) || playerName.length > 25) playerName = "Goal";
             }
 
-            // 3. EXTRACT ASSIST (Fixes missing assists)
+            // 3. EXTRACT ASSIST
             let assistName = null;
-            if (text.toLowerCase().includes('assisted by')) {
+            if (lowerText.includes('assisted by')) {
                 const parts = text.split(/Assisted by/i);
                 if (parts.length > 1) {
-                    let assistRaw = parts[1].trim();
-                    assistName = assistRaw.split(/[.,]/)[0].trim();
+                    assistName = parts[1].split(/[.,]/)[0].trim();
                 }
             }
 
@@ -84,7 +114,7 @@ const fallbackGoalsFromCommentary = (playByPlay: any[], homeId: string, awayId: 
         });
 };
 
-// ✅ HELPER 3: Extracts Text Commentary
+// ✅ HELPER 3: Commentary
 const formatCommentary = (playByPlay: any[]) => {
     if (!playByPlay) return [];
     return playByPlay.slice(0, 50).map((p: any) => ({
@@ -112,7 +142,6 @@ export interface UnifiedMatchData {
     hasExternalData: boolean;
 }
 
-// 🟢 MAIN FUNCTION 1: Get Details for Match Page
 export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
     const baseData: UnifiedMatchData = {
         status: dbData.status === 'SCHEDULED' ? 'PRE' : (dbData.status === 'FT' ? 'FT' : 'LIVE'),
@@ -141,7 +170,6 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
             const awayComp = comp?.competitors?.find((c: any) => c.homeAway === 'away');
             const box = json.boxscore;
             
-            // Use IDs or fallback to 'home'/'away' string
             const homeId = homeComp?.team?.id || 'home';
             const awayId = awayComp?.team?.id || 'away';
             
@@ -158,7 +186,7 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
                 return team ? team.roster : (json.rosters?.[idx]?.roster || []);
             };
 
-            // ✅ MERGE LOGIC: Standard Events + Commentary Fallback
+            // ✅ MERGE LOGIC
             let finalGoals = formatMatchEvents(comp?.details, homeId);
             if (finalGoals.length === 0 && json.commentary) {
                 finalGoals = fallbackGoalsFromCommentary(json.commentary, homeId, awayId, homeName, awayName);
@@ -197,8 +225,6 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
     } catch (e) { }
     return baseData;
 }
-
-// 🟢 MAIN FUNCTION 2: Get Matches for Homepage (FULLY RESTORED)
 export async function getLeagueMatches(leagueId: string, leagueName: string, dateStr: string) {
     const matches: any[] = [];
     try {
@@ -215,11 +241,8 @@ export async function getLeagueMatches(leagueId: string, leagueName: string, dat
                 if (state === 'in') status = 'LIVE';
                 if (state === 'post') status = 'FT';
                 if (event.status.type.shortDetail === 'HT') status = 'HT';
-
                 if (['pre', 'in', 'post'].includes(state)) {
-                      // Reuse the helper to format events for DB (Basic Version)
                       const matchEvents = formatMatchEvents(competition.details, home.team.id);
-                      
                       matches.push({
                         api_id: event.id, league: leagueName,
                         home_team: home.team.shortDisplayName || home.team.name,

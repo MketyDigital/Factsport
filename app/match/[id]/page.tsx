@@ -7,7 +7,6 @@ import { getExternalData } from '@/app/lib/matchService';
 import MatchDetailsClient from '@/app/components/MatchDetailsClient';
 import MatchHeaderClient from '@/app/components/MatchHeaderClient';
 
-// 🟢 CONFIG
 const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599";
 
 export default async function MatchDetailsPage({ params }: { params: { id: string } }) {
@@ -27,23 +26,22 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   // 2. Fetch External Data (ESPN)
   const unifiedData = await getExternalData(matchData);
 
-  const isLive = unifiedData.status === 'LIVE' || unifiedData.status === 'in';
-
   return (
-    <div className="min-h-screen bg-[#F0F2F5] pb-20 font-sans text-slate-900">
+    // ✅ FIX: "h-screen" here + "overflow-hidden" ensures the page structure is fixed
+    // The scrolling will happen inside the Child Components
+    <div className="h-screen flex flex-col bg-[#F0F2F5] font-sans text-slate-900 overflow-hidden">
       
-      {/* HEADER & SCOREBOARD (Realtime) */}
-      <div className="bg-[#0a1428] text-white sticky top-0 z-50 shadow-lg">
+      {/* 🟢 HEADER (Fixed - Does Not Scroll) */}
+      <div className="bg-[#0a1428] text-white shadow-lg flex-shrink-0 relative z-50">
           <div className="p-4 flex items-center justify-between">
               <Link href="/" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md"><ChevronLeft size={20}/></Link>
               <div className="text-center">
                  <h1 className="text-xs font-bold text-slate-400 uppercase tracking-widest">{matchData.league}</h1>
-                 {isLive && <span className="text-[10px] font-black text-red-500 animate-pulse bg-red-500/10 px-2 py-0.5 rounded mt-1 inline-block">LIVE NOW</span>}
+                 {/* ❌ REMOVED: Static 'LIVE NOW' text. MatchHeaderClient now handles this logic to avoid glitches. */}
               </div>
               <button className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md"><Share2 size={20}/></button>
           </div>
 
-          {/* 🟢 REALTIME HEADER CLIENT (Handles Score, Timer, Scorer Alignment) */}
           <MatchHeaderClient 
               matchId={matchId} 
               initialData={matchData} 
@@ -52,9 +50,9 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           <div className="h-4"></div>
       </div>
 
-      {/* MEDIA BAR (Live Stream / Radio / Highlights) */}
+      {/* 🟢 MEDIA BAR (Fixed - Does Not Scroll) */}
       {(matchData.livestream_url || matchData.audio_url || matchData.video_url) && (
-          <div className="bg-[#111] border-b border-white/10 p-3 flex gap-3 overflow-x-auto scrollbar-hide sticky top-[100px] z-40">
+          <div className="bg-[#111] border-b border-white/10 p-3 flex gap-3 overflow-x-auto scrollbar-hide flex-shrink-0 z-40">
               {matchData.livestream_url && (
                   <a href={matchData.livestream_url} target="_blank" className="flex items-center gap-2 bg-red-600/20 text-red-500 px-4 py-2 rounded-full text-xs font-black uppercase whitespace-nowrap hover:bg-red-600 hover:text-white transition border border-red-600/30">
                       <Video size={14} className="animate-pulse"/> Watch Live
@@ -73,7 +71,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           </div>
       )}
 
-      {/* CLIENT INTERACTIVE SECTION (Tabs, Prediction, Stats, Betting) */}
+      {/* 🟢 SCROLLABLE BODY (Client Component Handles Inner Scroll) */}
       <MatchDetailsClient 
           matchData={matchData} 
           unifiedData={unifiedData} 

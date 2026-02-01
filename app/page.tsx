@@ -255,10 +255,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       </div>
 
       {/* 🚀 QUICK ACTION LINKS */}
-      <div className="px-4 mb-4">
-          <div className="bg-[#0a1428] rounded-2xl p-6 shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-26 h-26 bg-blue-500 blur-[80px] opacity-20"></div>
-              <h3 className="text-white font-black text-lg italic mb-4 relative z-10 flex items-center gap-2"><Zap className="text-yellow-500"/> QUICK ACTIONS</h3>
               
               <div className="grid grid-cols-4 gap-2 relative z-10">
                   <Link href="/matches" className="bg-white/10 hover:bg-white/20 p-2 rounded-xl flex flex-col items-center justify-center gap-1.5 transition border border-white/5 active:scale-95">
