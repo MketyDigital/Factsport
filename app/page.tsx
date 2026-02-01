@@ -280,5 +280,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
               <span className="text-[10px] font-bold text-slate-700">YouTube</span>
           </a>
       </div>
+
+    </div>
   );
 }
