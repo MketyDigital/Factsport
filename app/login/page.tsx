@@ -3,11 +3,13 @@
 // ✅ RUNS ON EDGE
 export const runtime = 'edge';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Lock, Mail, Loader2, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react';
+// 🟢 NEW: Import Turnstile
+import { Turnstile, TurnstileInstance } from '@marsidev/react-turnstile';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -16,12 +18,16 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   
-  // ✅ NEW STATE: Tracks failed attempts
+  // ✅ TRACK FAILED ATTEMPTS
   const [attempts, setAttempts] = useState(0);
 
-  // ✅ NEW STATE: Tracks if we need to show the "Verify Email" screen
+  // ✅ VERIFICATION STATE
   const [needsVerification, setNeedsVerification] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
+
+  // 🟢 NEW: CAPTCHA STATE
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance>(null);
 
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -40,7 +46,7 @@ export default function LoginPage() {
     checkUser();
   }, [router, supabase]);
 
-  // 2. GOOGLE LOGIN (The "Fast Lane")
+  // 2. GOOGLE LOGIN
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     await supabase.auth.signInWithOAuth({
@@ -51,23 +57,39 @@ export default function LoginPage() {
     });
   };
 
-  // 3. EMAIL LOGIN (With Smart Error Handling)
+  // 3. EMAIL LOGIN (With Captcha & Smart Error Handling)
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 🟢 SECURITY CHECK
+    if (!captchaToken) {
+        setError("Please complete the security check.");
+        return;
+    }
+
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password,
+        options: {
+            captchaToken: captchaToken, // 🚀 Required by Supabase
+        }
+    });
 
     if (error) {
-      // ⚠️ CATCH THE "UNCONFIRMED" ERROR
+      // ⚠️ CATCH "UNCONFIRMED" ERROR
       if (error.message.includes("Email not confirmed")) {
         setNeedsVerification(true); 
       } else {
-        setError(error.message); // Show standard error
-        // 🟢 SMART LOGIC: Increment failed attempts
+        setError(error.message); 
         setAttempts((prev) => prev + 1);
       }
+      
+      // 🟢 RESET CAPTCHA ON ERROR
+      turnstileRef.current?.reset();
+      setCaptchaToken(null);
       setLoading(false);
     } else {
       router.refresh();
@@ -81,6 +103,8 @@ export default function LoginPage() {
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email: email,
+      // Note: Resend might also require captcha depending on strictness settings, 
+      // but usually standard login protection covers the session entry.
     });
     setResendLoading(false);
     
@@ -97,7 +121,7 @@ export default function LoginPage() {
     );
   }
 
-  // ✅ SMART UI: "NEEDS VERIFICATION" SCREEN
+  // ✅ "NEEDS VERIFICATION" SCREEN
   if (needsVerification) {
     return (
       <div className="min-h-screen bg-[#0a1428] flex items-center justify-center p-4">
@@ -217,15 +241,29 @@ export default function LoginPage() {
           <div className="space-y-2">
             <div className="flex justify-between items-center ml-1">
                  <label className="text-xs font-bold text-slate-300 uppercase">Password</label>
-                 {/* 🟢 NEW: FORGOT PASSWORD LINK */}
                  <Link href="/forgot-password" className="text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors">
-                    Forgot?
+                   Forgot?
                  </Link>
             </div>
             <div className="relative">
               <Lock className="absolute left-4 top-3.5 text-slate-500" size={18} />
               <input type="password" required className="w-full bg-[#050b16] border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-red-600" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
             </div>
+          </div>
+
+          {/* 🛡️ CLOUDFLARE TURNSTILE WIDGET */}
+          <div className="flex justify-center my-2 min-h-[65px]">
+             <Turnstile
+                ref={turnstileRef}
+                siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+                onSuccess={(token) => setCaptchaToken(token)}
+                onError={() => setCaptchaToken(null)}
+                onExpire={() => setCaptchaToken(null)}
+                options={{
+                    theme: 'dark', // Matches your dark UI
+                    size: 'flexible'
+                }}
+             />
           </div>
           
           <button type="submit" disabled={loading} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
