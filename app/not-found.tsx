@@ -1,5 +1,7 @@
 'use client'; // Needed for the mini-game state
 
+export const runtime = 'edge';
+
 import Link from 'next/link';
 import { Home, Flag, Trophy } from 'lucide-react';
 import { useState } from 'react';
