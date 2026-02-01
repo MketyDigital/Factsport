@@ -72,17 +72,14 @@ export default function MatchHeaderClient({ matchId, initialData, initialGoals =
             </div>
         </div>
 
-        {/* 🟢 SCORERS (Fixed: Tiny, Compact, Centered) */}
+        {/* 🟢 SCORERS (Perfectly Centered List) */}
         {goals.length > 0 && (
-            <div className="flex flex-col items-center space-y-0.5 mt-1 w-full max-w-[200px] mx-auto">
+            <div className="flex flex-col items-center space-y-1 mt-2">
                 {goals.map((g: any, i: number) => (
-                    <div key={i} className="flex items-center justify-center gap-1.5 w-full">
-                        <span className={`text-[9px] font-bold text-right truncate w-1/2 ${g.team === 'home' ? 'text-white' : 'text-slate-500'}`}>
-                            {g.team === 'home' ? g.player : ''}
-                        </span>
-                        <span className="text-[8px] font-mono text-green-400 bg-white/5 px-1 rounded">{g.time || '⚽'}</span>
-                        <span className={`text-[9px] font-bold text-left truncate w-1/2 ${g.team === 'away' ? 'text-white' : 'text-slate-500'}`}>
-                            {g.team === 'away' ? g.player : ''}
+                    <div key={i} className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm px-3 py-0.5 rounded-full border border-white/5">
+                        <span className="text-[9px] font-bold text-white">{g.player}</span>
+                        <span className={`text-[8px] font-mono px-1 rounded ${g.team === 'home' ? 'text-blue-400' : 'text-red-400'}`}>
+                           {g.time || '⚽'}'
                         </span>
                     </div>
                 ))}
