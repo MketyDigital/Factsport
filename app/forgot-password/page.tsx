@@ -3,10 +3,12 @@
 // ✅ RUNS ON EDGE
 export const runtime = 'edge';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
 import Link from 'next/link';
 import { Mail, ArrowLeft, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+// 🟢 NEW: Import Turnstile
+import { Turnstile, TurnstileInstance } from '@marsidev/react-turnstile';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -14,20 +16,36 @@ export default function ForgotPassword() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // 🟢 NEW: Captcha State
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance>(null);
+  
   const supabase = createClient();
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 🟢 SECURITY CHECK
+    if (!captchaToken) {
+        setError("Please complete the security check.");
+        return;
+    }
+
     setLoading(true);
     setError(null);
 
     // ✅ IMPORTANT: Points to the callback route first to handle the session exchange
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${location.origin}/auth/callback?next=/auth/update-password`,
+      // 🟢 PASS TOKEN TO SUPABASE
+      captchaToken: captchaToken, 
     });
 
     if (error) {
       setError(error.message);
+      // 🟢 RESET WIDGET ON ERROR
+      turnstileRef.current?.reset();
+      setCaptchaToken(null);
     } else {
       setSuccess(true);
     }
@@ -82,6 +100,21 @@ export default function ForgotPassword() {
                         <AlertCircle size={14} /> {error}
                     </div>
                 )}
+
+                {/* 🛡️ CLOUDFLARE TURNSTILE WIDGET */}
+                <div className="flex justify-center my-2 min-h-[65px]">
+                    <Turnstile
+                        ref={turnstileRef}
+                        siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+                        onSuccess={(token) => setCaptchaToken(token)}
+                        onError={() => setCaptchaToken(null)}
+                        onExpire={() => setCaptchaToken(null)}
+                        options={{
+                            theme: 'dark', // Matches your dark UI
+                            size: 'flexible'
+                        }}
+                    />
+                </div>
 
                 <button 
                     disabled={loading}

@@ -48,9 +48,9 @@ export default function HowToPlay() {
                 The leaderboard resets every month. To win 1st, 2nd, or 3rd place, you must meet the <b>VIP Criteria</b>:
             </p>
             <div className="bg-black/30 p-4 rounded-xl text-xs space-y-2 border border-white/5">
-                <div className="flex justify-between"><span>🥇 1st Place</span> <span className="font-bold text-yellow-400">Highest Pts + 2 Correct Scores</span></div>
-                <div className="flex justify-between"><span>🥈 2nd Place</span> <span className="font-bold text-slate-300">2nd Highest + 2 Correct Scores</span></div>
-                <div className="flex justify-between"><span>🥉 3rd Place</span> <span className="font-bold text-orange-400">3rd Highest + 1 Correct Score</span></div>
+                <div className="flex justify-between"><span>🥇 1st Place</span> <span className="font-bold text-yellow-400">Highest Pts + 3 Correct Scores</span></div>
+                <div className="flex justify-between"><span>🥈 2nd Place</span> <span className="font-bold text-slate-300">2nd Highest + 3 Correct Scores</span></div>
+                <div className="flex justify-between"><span>🥉 3rd Place</span> <span className="font-bold text-orange-400">3rd Highest + 3 Correct Score</span></div>
             </div>
             <p className="text-[10px] text-slate-500 mt-2 italic">*Only VIP Members are eligible for ranking prizes.</p>
         </div>
