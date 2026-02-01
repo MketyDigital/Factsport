@@ -3,8 +3,7 @@ export const runtime = 'edge';
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-// 🟢 FIX: Added 'AlignLeft' to the imports below
-import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon, AlignLeft } from 'lucide-react';
+import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon } from 'lucide-react';
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
 import MatchHeaderClient from '@/app/components/MatchHeaderClient'; 
@@ -37,9 +36,12 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       <div className="sticky top-0 z-50 bg-[#0a1428] text-white pb-6 rounded-b-[2rem] overflow-hidden shadow-2xl">
         <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
         <div className="relative z-10 p-4 flex items-center justify-between">
-          <Link href="/" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
+          
+          {/* 🟢 BACK BUTTON UPDATED: Links to /matches now */}
+          <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
             <ChevronLeft size={24} />
           </Link>
+          
           <span className="text-xs font-bold tracking-widest opacity-70 uppercase">{dbData.league}</span>
           <div className="w-10"></div>
         </div>
@@ -48,7 +50,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         <MatchHeaderClient matchId={dbData.id} initialData={dbData} initialGoals={data.goals} />
       </div>
 
-      {/* 🟢 FIX: Changed '-mt-6' to 'mt-4' to push content AWAY from header */}
       <div className="mx-4 mt-4 relative z-20 space-y-4">
         
         {/* 2. VIDEO PLAYER */}
@@ -95,7 +96,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
            <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
         </div>
 
-        {/* 5. 🟢 COMPACT NEW BANNER (Placed here as requested) */}
+        {/* 5. 🟢 COMPACT NEW BANNER */}
         <div className="bg-[#1A1A1A] rounded-xl p-3 shadow-lg border border-white/5 flex items-center justify-between relative overflow-hidden">
             <div className="absolute top-0 right-0 bg-blue-600 w-16 h-full blur-[40px] opacity-20"></div>
             <div className="flex items-center gap-3 relative z-10">
@@ -122,9 +123,11 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             {/* 7. LIVE FEED */}
             {data.commentary.length > 0 && (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
-                    <h3 className="text-xs font-black uppercase text-slate-400 mb-4 flex items-center gap-2">
-                        <AlignLeft size={14} className="text-blue-500" /> Live Feed
-                    </h3>
+                    <div className="flex items-center gap-2 mb-4 text-slate-400">
+                        {/* Simple Header for Feed Section */}
+                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
+                        <h3 className="text-xs font-black uppercase tracking-wider">Live Feed</h3>
+                    </div>
                     <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200">
                         {data.commentary.map((c: any) => (
                             <div key={c.id || Math.random()} className="flex gap-3 text-xs">
