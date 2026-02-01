@@ -1,4 +1,6 @@
-// ✅ HELPER 1: Extracts Goals from Main Details (Standard)
+import { createClient } from '@/app/lib/supabase/client';
+
+// ✅ HELPER 1: Extracts Goals from Main Details (Standard API Data)
 const formatMatchEvents = (details: any[], homeId: string) => {
   if (!details) return [];
   return details
@@ -9,7 +11,7 @@ const formatMatchEvents = (details: any[], homeId: string) => {
        const isHome = String(e.team?.id) === String(homeId);
        return {
          player: e.participants?.[0]?.athlete?.displayName || e.participants?.[0]?.athlete?.shortName || "Unknown",
-         time: e.clock?.displayValue || "0'",
+         time: e.clock?.displayValue || "",
          type: 'goal',
          team: isHome ? 'home' : 'away',
          assist: e.participants?.[1]?.athlete?.displayName || null
@@ -17,44 +19,51 @@ const formatMatchEvents = (details: any[], homeId: string) => {
     });
 };
 
-// ✅ HELPER 2: Fallback - Extract Clean Names from Commentary
-const fallbackGoalsFromCommentary = (playByPlay: any[], homeId: string, awayId: string) => {
+// ✅ HELPER 2: Fallback - Smart Text Parsing (Fixes Alignment & Assists)
+const fallbackGoalsFromCommentary = (playByPlay: any[], homeId: string, awayId: string, homeName: string, awayName: string) => {
     if (!playByPlay) return [];
     
-    // Look for "Goal" events in commentary
+    // Look for "Goal" events
     return playByPlay
-        .filter((p: any) => p.type?.text === 'Goal' || p.text?.startsWith('Goal!'))
+        .filter((p: any) => p.type?.text === 'Goal' || p.text?.startsWith('Goal!') || p.text?.includes('Goal'))
         .map((p: any) => {
-            const isHome = String(p.team?.id) === String(homeId);
-            let playerName = "Goal";
+            let isHome = false; // Default
+            let teamId = p.team?.id;
 
-            // STRATEGY 1: Use the athlete object if available (Best/Cleanest)
+            // 1. DETERMINE TEAM (Fixes Right-Side Alignment Issue)
+            if (teamId) {
+                isHome = String(teamId) === String(homeId);
+            } else if (p.text) {
+                // Check if text contains team name (e.g., "Liverpool score...")
+                if (p.text.includes(homeName)) isHome = true;
+                else if (p.text.includes(awayName)) isHome = false;
+            }
+
+            // 2. EXTRACT PLAYER NAME
+            let playerName = "Goal";
             if (p.participants?.[0]?.athlete?.displayName) {
                 playerName = p.participants[0].athlete.displayName;
-            } 
-            // STRATEGY 2: Smart Text Cleaning (Fixes the "Messy Text" issue)
-            else if (p.text) {
-                // Example: "Goal! Liverpool 4, Newcastle 1. Anthony Gordon (Newcastle) right footed shot..."
-                
-                // 1. Remove the "Goal! Score. " prefix
+            } else if (p.text) {
+                // Remove prefix "Goal! Team A 1-0 Team B."
                 let cleanText = p.text.replace(/^Goal!.*?\.\s*/, '');
-                
-                // 2. Extract name before the first parenthesis "(" which usually starts team name
-                // "Anthony Gordon (Newcastle)..." -> "Anthony Gordon"
-                if (cleanText.includes('(')) {
-                    cleanText = cleanText.split('(')[0];
-                }
-
-                // 3. Cleanup whitespace
+                // Extract name before parentheses
+                if (cleanText.includes('(')) cleanText = cleanText.split('(')[0];
                 playerName = cleanText.trim();
+            }
+
+            // 3. EXTRACT TIME (Handle missing minutes)
+            let time = p.clock?.displayValue || p.time?.displayValue || "";
+            // If API gives empty time, try to find it in text like "45' Goal..."
+            if (!time && p.text && p.text.match(/^(\d+)'/)) {
+                time = p.text.match(/^(\d+)'/)[0];
             }
 
             return {
                 player: playerName, 
-                time: p.clock?.displayValue || "",
+                time: time, // Can be "" if unknown
                 type: 'goal',
                 team: isHome ? 'home' : 'away',
-                assist: null 
+                assist: null // Simplified as requested
             };
         });
 };
@@ -62,10 +71,11 @@ const fallbackGoalsFromCommentary = (playByPlay: any[], homeId: string, awayId: 
 // ✅ HELPER 3: Extracts Text Commentary
 const formatCommentary = (playByPlay: any[]) => {
     if (!playByPlay) return [];
-    return playByPlay.slice(0, 30).map((p: any) => ({
+    return playByPlay.slice(0, 50).map((p: any) => ({
         id: p.id,
         time: p.clock?.displayValue || "",
-        text: p.text || "No commentary available."
+        text: p.text || "No commentary available.",
+        type: p.type?.text || "General" // Helps with icons later
     }));
 };
 
@@ -115,6 +125,10 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
             const box = json.boxscore;
             const homeId = homeComp?.team?.id;
             const awayId = awayComp?.team?.id;
+            
+            // Get names for text fallback
+            const homeName = homeComp?.team?.name || baseData.home.name;
+            const awayName = awayComp?.team?.name || baseData.away.name;
 
             const getStat = (teamId: string, statName: string) => {
                 const team = box?.teams?.find((t: any) => String(t.team?.id) === String(teamId));
@@ -126,23 +140,23 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
                 return team ? team.roster : (json.rosters?.[idx]?.roster || []);
             };
 
-            // ✅ SMART GOAL LOGIC: Try Details first, then Clean Commentary
+            // ✅ SMART GOAL LOGIC
             let finalGoals = formatMatchEvents(comp?.details, homeId);
             if (finalGoals.length === 0 && json.commentary) {
-                finalGoals = fallbackGoalsFromCommentary(json.commentary, homeId, awayId);
+                finalGoals = fallbackGoalsFromCommentary(json.commentary, homeId, awayId, homeName, awayName);
             }
 
             return {
                 status: comp?.status?.type?.state || baseData.status,
                 displayClock: comp?.status?.displayClock || '',
                 home: { 
-                    name: homeComp?.team?.name || baseData.home.name, 
+                    name: homeName, 
                     logo: homeComp?.team?.logos?.[0]?.href || baseData.home.logo, 
                     score: homeComp?.score ?? baseData.home.score,
                     id: homeComp?.team?.id
                 },
                 away: { 
-                    name: awayComp?.team?.name || baseData.away.name, 
+                    name: awayName, 
                     logo: awayComp?.team?.logos?.[0]?.href || baseData.away.logo, 
                     score: awayComp?.score ?? baseData.away.score,
                     id: awayComp?.team?.id
