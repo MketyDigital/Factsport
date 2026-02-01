@@ -254,29 +254,31 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </div>
 
-      {/* 🚀 QUICK ACTION LINKS */}
-              
-              <div className="grid grid-cols-4 gap-2 relative z-10">
-                  <Link href="/matches" className="bg-white/10 hover:bg-white/20 p-2 rounded-xl flex flex-col items-center justify-center gap-1.5 transition border border-white/5 active:scale-95">
-                      <Trophy className="text-yellow-500" size={18} />
-                      <span className="text-[9px] font-bold text-white">Predict</span>
-                  </Link>
-                  <Link href="/leaderboard" className="bg-white/10 hover:bg-white/20 p-2 rounded-xl flex flex-col items-center justify-center gap-1.5 transition border border-white/5 active:scale-95">
-                      <Award className="text-yellow-500" size={18} />
-                      <span className="text-[9px] font-bold text-white">Leaders</span>
-                  </Link>
-                  <Link href="/news" className="bg-white/10 hover:bg-white/20 p-2 rounded-xl flex flex-col items-center justify-center gap-1.5 transition border border-white/5 active:scale-95">
-                      <Newspaper className="text-blue-400" size={18} />
-                      <span className="text-[9px] font-bold text-white">News</span>
-                  </Link>
-                  <a href="https://youtube.com/@factsportlive" target="_blank" className="bg-white/10 hover:bg-white/20 p-2 rounded-xl flex flex-col items-center justify-center gap-1.5 transition border border-white/5 active:scale-95">
-                      <Youtube className="text-red-500" size={18} />
-                      <span className="text-[9px] font-bold text-white">YouTube</span>
-                  </a>
-              </div>
-          </div>
-      </div>
+{/* 🚀 QUICK ACTION LINKS (Clean Buttons Only) */}
+      <div className="grid grid-cols-4 gap-3 px-4 py-6">
+          {/* Predict */}
+          <Link href="/matches" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
+              <Trophy className="text-yellow-500" size={20} />
+              <span className="text-[10px] font-bold text-slate-700">Predict</span>
+          </Link>
 
-    </div>
+          {/* Leaders */}
+          <Link href="/leaderboard" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
+              <Award className="text-yellow-500" size={20} />
+              <span className="text-[10px] font-bold text-slate-700">Leaders</span>
+          </Link>
+
+          {/* News */}
+          <Link href="/news" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
+              <Newspaper className="text-blue-500" size={20} />
+              <span className="text-[10px] font-bold text-slate-700">News</span>
+          </Link>
+
+          {/* YouTube */}
+          <a href="https://youtube.com/@factsportlive" target="_blank" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
+              <Youtube className="text-red-600" size={20} />
+              <span className="text-[10px] font-bold text-slate-700">YouTube</span>
+          </a>
+      </div>
   );
 }
