@@ -3,19 +3,26 @@
 // ✅ RUNS ON EDGE
 export const runtime = 'edge';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { User, Mail, Phone, Lock, Loader2, ArrowRight, CheckCircle } from 'lucide-react';
+// 🟢 NEW: Import Turnstile
+import { Turnstile, TurnstileInstance } from '@marsidev/react-turnstile';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({ fullName: '', email: '', phone: '', password: '' });
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false); // Track Google click
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
-  const [signupSuccess, setSignupSuccess] = useState(false); // Track if email sent
+  const [signupSuccess, setSignupSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // 🟢 NEW: Captcha State
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance>(null);
+
   const router = useRouter();
   const supabase = createClient();
 
@@ -32,7 +39,7 @@ export default function RegisterPage() {
     checkSession();
   }, [router, supabase]);
 
-  // 2. GOOGLE LOGIN HANDLER (The "Fast Lane")
+  // 2. GOOGLE LOGIN HANDLER
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     await supabase.auth.signInWithOAuth({
@@ -43,9 +50,16 @@ export default function RegisterPage() {
     });
   };
 
-  // 3. EMAIL REGISTER HANDLER (The "Brevo Lane")
+  // 3. EMAIL REGISTER HANDLER
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 🟢 SECURITY CHECK
+    if (!captchaToken) {
+        setError("Please complete the security check.");
+        return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -53,6 +67,8 @@ export default function RegisterPage() {
       email: formData.email,
       password: formData.password,
       options: {
+        // 🟢 SECURITY: Pass token to Supabase
+        captchaToken: captchaToken,
         data: {
           full_name: formData.fullName,
           phone: formData.phone,
@@ -63,11 +79,12 @@ export default function RegisterPage() {
     if (authError) {
       setError(authError.message);
       setLoading(false);
+      // 🟢 RESET CAPTCHA ON ERROR
+      turnstileRef.current?.reset();
+      setCaptchaToken(null);
       return;
     }
 
-    // SUCCESS: Do NOT redirect to dashboard yet. 
-    // Show the "Check Email" screen instead.
     setSignupSuccess(true);
     setLoading(false);
   };
@@ -81,7 +98,7 @@ export default function RegisterPage() {
     );
   }
 
-  // ✅ SUCCESS SCREEN (After Email Signup)
+  // ✅ SUCCESS SCREEN
   if (signupSuccess) {
     return (
       <div className="min-h-screen bg-[#0a1428] flex items-center justify-center p-4 font-sans">
@@ -129,7 +146,7 @@ export default function RegisterPage() {
           <p className="text-slate-400 text-xs mt-1 font-medium">Start winning with premium predictions today</p>
         </div>
 
-        {/* GOOGLE BUTTON (Primary Option) */}
+        {/* GOOGLE BUTTON */}
         <button
           onClick={handleGoogleLogin}
           disabled={googleLoading || loading}
@@ -219,6 +236,21 @@ export default function RegisterPage() {
                 onChange={(e) => setFormData({...formData, password: e.target.value})} 
               />
             </div>
+          </div>
+
+          {/* 🛡️ CLOUDFLARE TURNSTILE WIDGET */}
+          <div className="flex justify-center my-2 min-h-[65px]">
+             <Turnstile
+                ref={turnstileRef}
+                siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+                onSuccess={(token) => setCaptchaToken(token)}
+                onError={() => setCaptchaToken(null)}
+                onExpire={() => setCaptchaToken(null)}
+                options={{
+                    theme: 'dark', // Matches your dark UI
+                    size: 'flexible'
+                }}
+             />
           </div>
 
           <button 
