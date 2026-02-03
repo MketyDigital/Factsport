@@ -30,30 +30,50 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const activeVideoUrl = dbData.livestream_url || dbData.video_url;
   const isLiveStream = !!dbData.livestream_url;
 
-  // Logic: Only show Fallback Stats if Widget is MISSING
-  const showFallbackStats = !dbData.widget_id; 
+  // 🟢 LOGIC: 
+  // 1. If Widget exists, we HIDE the fallback stats.
+  // 2. We ALSO hide the main Scoreboard Header to avoid duplicates.
+  const hasWidget = !!dbData.widget_id; 
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       
       {/* 1. HEADER */}
-      <div className="relative bg-[#0a1428] text-white pb-6 rounded-b-[2rem] overflow-hidden shadow-2xl">
-        <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-        <div className="relative z-10 p-4 flex items-center justify-between">
-          <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
-            <ChevronLeft size={24} />
-          </Link>
-          <span className="text-xs font-bold tracking-widest opacity-70 uppercase">{dbData.league}</span>
-          <div className="w-10"></div>
-        </div>
-        <MatchHeaderClient matchId={dbData.id} initialData={dbData} initialGoals={data.goals} />
-      </div>
+      {/* If Widget exists, we show a "Slim Header" (Just Back Button & League). */}
+      {/* If Widget missing, we show the "Full Scoreboard". */}
+      
+      {hasWidget ? (
+          // 🟢 SLIM HEADER (Used when Widget is present)
+          <div className="bg-[#0a1428] text-white p-4 shadow-md flex items-center justify-between sticky top-0 z-40">
+              <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
+                <ChevronLeft size={20} />
+              </Link>
+              <span className="text-xs font-bold tracking-widest uppercase opacity-90">{dbData.league}</span>
+              <div className="w-9"></div> {/* Spacer for alignment */}
+          </div>
+      ) : (
+          // 🔴 FULL HEADER (Used when Widget is missing)
+          <div className="relative bg-[#0a1428] text-white pb-6 rounded-b-[2rem] overflow-hidden shadow-2xl">
+            <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+            <div className="relative z-10 p-4 flex items-center justify-between">
+              <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
+                <ChevronLeft size={24} />
+              </Link>
+              <span className="text-xs font-bold tracking-widest opacity-70 uppercase">{dbData.league}</span>
+              <div className="w-10"></div>
+            </div>
+            {/* Realtime Scoreboard */}
+            <MatchHeaderClient matchId={dbData.id} initialData={dbData} initialGoals={data.goals} />
+          </div>
+      )}
 
       <div className="mx-4 mt-4 relative z-20 space-y-4">
         
-        {/* 🟢 2. SCOREAXIS WIDGET (With Integrated Bet Button) */}
-        {dbData.widget_id && (
-             <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={dbData.affiliate_link} />
+        {/* 🟢 2. SCOREAXIS WIDGET */}
+        {hasWidget && (
+             <div className="-mt-2"> {/* Pull it up slightly to sit under the slim header */}
+                 <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={dbData.affiliate_link} />
+             </div>
         )}
 
         {/* 3. VIDEO PLAYER */}
@@ -100,11 +120,27 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
            <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
         </div>
 
-        {/* 🔴 REMOVED: The old "1xBet Official" banner is gone from here. */}
+        {/* 6. BETTING BANNER (Only show if Widget is missing, because Widget has its own button now) */}
+        {!hasWidget && (
+            <div className="bg-[#1A1A1A] rounded-xl p-3 shadow-lg border border-white/5 flex items-center justify-between relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-blue-600 w-16 h-full blur-[40px] opacity-20"></div>
+                <div className="flex items-center gap-3 relative z-10">
+                    <div className="bg-blue-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded">1X</div>
+                    <div>
+                        <div className="text-white font-bold text-xs">1xBet Official</div>
+                        <div className="text-[9px] text-slate-400">Code: <span className="text-white font-bold tracking-wider">{dbData.booking_code || "FACTSPORT"}</span></div>
+                    </div>
+                </div>
+                <a href={dbData.affiliate_link || "#"} target="_blank" className="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase px-4 py-2 rounded-lg shadow-lg text-[10px] flex items-center gap-1 active:scale-95 transition">
+                    Bet <LinkIcon size={10} />
+                </a>
+            </div>
+        )}
       </div>
 
-      {/* 6. CONDITIONAL CONTENT SECTION */}
-      {showFallbackStats && (
+      {/* 🟢 7. CONDITIONAL CONTENT SECTION */}
+      {/* Logic: Only show Football API Stats/Tabs if the Widget is MISSING */}
+      {!hasWidget && (
           <>
             {!data.hasExternalData ? (
                 <div className="mx-4 mt-6 bg-white p-6 rounded-xl border border-slate-100 text-center shadow-sm">
@@ -134,7 +170,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           </>
       )}
 
-      {/* 7. FREE TIPS (Kept at bottom) */}
+      {/* 8. FREE TIPS */}
       <div className="px-4 mt-6">
         <FreeTipsBanner />
       </div>

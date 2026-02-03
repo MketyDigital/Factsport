@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Video, ExternalLink, Youtube, Newspaper, Radio, TrendingUp } from "lucide-react";
+import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Video, ExternalLink, Youtube, Newspaper, Radio, TrendingUp, Calendar, BarChart2 } from "lucide-react";
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import NewsArtwork from '@/app/components/NewsArtwork';
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
@@ -28,10 +28,22 @@ const formatDateLabel = (dateString: string) => {
     return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 };
 
+// Helper: Group matches by Date
+const groupByDate = (matchList: any[]) => {
+    const groups: { [date: string]: any[] } = {};
+    matchList.forEach(m => {
+        const dateObj = new Date(m.match_date);
+        const dateKey = dateObj.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+        if (!groups[dateKey]) groups[dateKey] = [];
+        groups[dateKey].push(m);
+    });
+    return groups;
+};
+
 async function getHomepageData(leagueFilter: string | undefined) {
   const supabase = createClient();
   const today = new Date().toISOString().split('T')[0];
-  
+   
   let matchQuery = supabase.from('matches').select('*');
 
   if (leagueFilter) {
@@ -73,7 +85,7 @@ async function getHomepageData(leagueFilter: string | undefined) {
 export default async function Home({ searchParams }: { searchParams: { league?: string } }) {
   const resolvedParams = await searchParams;
   const selectedLeague = resolvedParams.league;
-  
+   
   const { matches, news, highlights } = await getHomepageData(selectedLeague);
 
   const breakingNews = news.filter(n => n.is_breaking); 
@@ -85,15 +97,13 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const latestNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id) && !n.is_breaking).slice(0, 5);
 
   // ⚡ SMART HERO LOGIC ⚡
-  // 1. Must have Widget ID (scoreaxis).
-  // 2. Must have Audio OR Video (Broadcasting).
-  // 3. Limit to 2 matches max.
   const heroMatches = matches
     .filter(m => m.widget_id && (m.audio_url || m.livestream_url))
     .slice(0, 2);
-  
+   
   // Filter hero matches out of the main list so they don't show twice
   const displayMatches = matches.filter(m => !heroMatches.some(h => h.id === m.id));
+  const groupedMatches = groupByDate(displayMatches);
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-0 overflow-x-hidden">
@@ -245,56 +255,110 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
          </div>
         )}
         
+        {/* 🟢 MAIN MATCH LIST (WITH UPDATED BUTTONS) */}
         <div className="px-4 py-0 space-y-3">
-             {displayMatches.length > 0 ? displayMatches.map((match) => (
-                  <div key={match.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-3 hover:shadow-md transition">
-                      <div className="bg-slate-50 px-3 py-1.5 flex justify-between items-center border-b border-slate-100">
-                           <div className="flex items-center gap-2">
-                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[100px] truncate">{match.league}</span>
-                              <span className="text-[9px] font-bold text-slate-300">•</span>
-                              <span className="text-[9px] font-bold text-slate-500">{formatDateLabel(match.match_date)}</span>
-                           </div>
-                           <div className="flex items-center gap-2">
-                                {match.livestream_url && <span className="flex items-center gap-1 text-[8px] font-black text-red-600 animate-pulse bg-red-50 px-1.5 py-0.5 rounded border border-red-100"><Video size={8}/> LIVE</span>}
-                           </div>
-                      </div>
-                      
-                      <Link href={`/match/${match.id}`}>
-                          <div className="p-4 flex justify-between items-center active:bg-slate-50 transition">
-                              <div className="flex-1 flex items-center gap-3 overflow-hidden">
-                                  <div className="w-8 h-8 flex items-center justify-center shrink-0">{match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}</div>
-                                  <span className="text-xs font-bold text-slate-800 truncate">{match.home_team}</span>
-                              </div>
-                              <div className="px-4 min-w-[80px] flex justify-center border-x border-slate-50">
-                                  <LiveScoreLabel matchId={match.id} initialStatus={match.status} homeScore={match.home_score} awayScore={match.away_score} matchDate={match.match_date} />
-                              </div>
-                              <div className="flex-1 flex items-center gap-3 flex-row-reverse text-right overflow-hidden">
-                                  <div className="w-8 h-8 flex items-center justify-center shrink-0">{match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}</div>
-                                  <span className="text-xs font-bold text-slate-800 truncate">{match.away_team}</span>
-                              </div>
-                          </div>
-                      </Link>
+             <FreeTipsBanner />
 
-                      <div className="px-3 py-2 border-t border-slate-100 grid grid-cols-2 gap-3 bg-slate-50/50">
-                          <Link href={`/match/${match.id}`} className="flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:border-blue-200 rounded-lg py-2 shadow-sm text-[10px] font-bold text-slate-700 active:scale-95 transition hover:bg-blue-50">
-                                <Zap size={12} className="text-blue-500" /> Predict / Analysis
-                          </Link>
-                          {match.booking_code ? (
-                              <button className="flex items-center justify-center gap-1.5 bg-[#1A1A1A] text-yellow-400 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition hover:bg-black">
-                                  <Ticket size={12} /> {match.booking_code}
-                              </button>
-                          ) : (
-                              <a href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} target="_blank" className="flex items-center justify-center gap-1.5 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition hover:bg-green-200">
-                                  <ExternalLink size={12} /> Bet Now
-                              </a>
-                          )}
-                      </div>
-                  </div>
-              )) : (
+             {Object.keys(groupedMatches).length > 0 ? (
+                 Object.keys(groupedMatches).map((dateKey) => (
+                    <div key={dateKey}>
+                        {/* Date Header */}
+                        <div className="flex items-center gap-2 mb-3 mt-4 px-1">
+                            <Calendar size={12} className="text-slate-400"/>
+                            <span className="text-xs font-black text-slate-500 uppercase tracking-wider">{dateKey}</span>
+                            <div className="h-px bg-slate-200 flex-1"></div>
+                        </div>
+
+                        {groupedMatches[dateKey].map((match) => {
+                            const isLive = ['LIVE', 'HT', 'IN_PLAY'].includes(match.status);
+                            const isScheduled = match.status === 'SCHEDULED' || match.status === 'PRE';
+                            const isFinished = ['FT', 'FINISHED', 'ABD'].includes(match.status);
+
+                            return (
+                                <div key={match.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-3 hover:shadow-md transition">
+                                    <div className="bg-slate-50 px-3 py-1.5 flex justify-between items-center border-b border-slate-100">
+                                         <div className="flex items-center gap-2">
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[100px] truncate">{match.league}</span>
+                                            <span className="text-[9px] font-bold text-slate-300">•</span>
+                                            <span className="text-[9px] font-bold text-slate-500">{formatDateLabel(match.match_date)}</span>
+                                         </div>
+                                         <div className="flex items-center gap-2">
+                                             {match.livestream_url && <span className="flex items-center gap-1 text-[8px] font-black text-red-600 animate-pulse bg-red-50 px-1.5 py-0.5 rounded border border-red-100"><Video size={8}/> LIVE</span>}
+                                         </div>
+                                    </div>
+                                    
+                                    <Link href={`/match/${match.id}`}>
+                                        <div className="p-4 flex justify-between items-center active:bg-slate-50 transition">
+                                            <div className="flex-1 flex items-center gap-3 overflow-hidden">
+                                                <div className="w-8 h-8 flex items-center justify-center shrink-0">{match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}</div>
+                                                <span className="text-xs font-bold text-slate-800 truncate">{match.home_team}</span>
+                                            </div>
+                                            <div className="px-4 min-w-[80px] flex justify-center border-x border-slate-50">
+                                                <LiveScoreLabel matchId={match.id} initialStatus={match.status} homeScore={match.home_score} awayScore={match.away_score} matchDate={match.match_date} />
+                                            </div>
+                                            <div className="flex-1 flex items-center gap-3 flex-row-reverse text-right overflow-hidden">
+                                                <div className="w-8 h-8 flex items-center justify-center shrink-0">{match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}</div>
+                                                <span className="text-xs font-bold text-slate-800 truncate">{match.away_team}</span>
+                                            </div>
+                                        </div>
+                                    </Link>
+
+                                    {/* 🟢 ACTION BAR (UPDATED LOGIC) */}
+                                    <div className="px-3 py-2 border-t border-slate-100 bg-slate-50/50">
+                                        
+                                        {/* SCENARIO 1: SCHEDULED -> [Predict] + [Bet] */}
+                                        {isScheduled && (
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <Link href={`/match/${match.id}`} className="flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:border-blue-200 rounded-lg py-2 shadow-sm text-[10px] font-bold text-slate-700 active:scale-95 transition hover:bg-blue-50">
+                                                    <Zap size={12} className="text-blue-500" /> Predict
+                                                </Link>
+                                                {match.booking_code ? (
+                                                    <button className="flex items-center justify-center gap-1.5 bg-[#1A1A1A] text-yellow-400 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition hover:bg-black">
+                                                        <Ticket size={12} /> {match.booking_code}
+                                                    </button>
+                                                ) : (
+                                                    <a href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} target="_blank" className="flex items-center justify-center gap-1.5 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition hover:bg-green-200">
+                                                        <ExternalLink size={12} /> Bet Now
+                                                    </a>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* SCENARIO 2: LIVE -> [Bet] (Full Width) */}
+                                        {isLive && (
+                                            <div className="w-full">
+                                                {match.booking_code ? (
+                                                    <button className="w-full flex items-center justify-center gap-1.5 bg-[#1A1A1A] text-yellow-400 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition hover:bg-black">
+                                                        <Ticket size={12} /> {match.booking_code}
+                                                    </button>
+                                                ) : (
+                                                    <a href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} target="_blank" className="w-full flex items-center justify-center gap-1.5 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition hover:bg-green-200">
+                                                        <ExternalLink size={12} /> Bet Now
+                                                    </a>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* SCENARIO 3: FINISHED -> [View Stats] (Full Width) */}
+                                        {isFinished && (
+                                            <div className="w-full">
+                                                <Link href={`/match/${match.id}`} className="w-full flex items-center justify-center gap-1.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition hover:bg-blue-100">
+                                                    <BarChart2 size={12} /> View Stats
+                                                </Link>
+                                            </div>
+                                        )}
+
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                 ))
+             ) : (
                 <div className="text-center py-10 opacity-50 bg-white rounded-xl border border-dashed border-slate-300">
                    <p className="text-xs font-bold text-slate-500">No matches found.</p>
                 </div>
-              )}
+             )}
         </div>
       </section>
 
