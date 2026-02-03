@@ -6,7 +6,7 @@ import { createClient } from '@/app/lib/supabase/client';
 import { 
   Search, Plus, Save, Trash2, Calculator, 
   Loader2, Link as LinkIcon, Video, Calendar, Image as ImageIcon,
-  CheckCircle, Radio, Mic, Hash
+  CheckCircle, Radio, Mic, Code
 } from 'lucide-react';
 
 export default function AdminMatchesPage() {
@@ -20,12 +20,7 @@ export default function AdminMatchesPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
 
   const [newMatch, setNewMatch] = useState({
-    home_team: '',
-    away_team: '',
-    league: 'Premier League',
-    match_date: '',
-    home_logo: '', 
-    away_logo: ''
+    home_team: '', away_team: '', league: 'Premier League', match_date: '', home_logo: '', away_logo: ''
   });
 
   useEffect(() => { fetchMatches(); }, []);
@@ -40,18 +35,11 @@ export default function AdminMatchesPage() {
   };
 
   const handleCreate = async () => {
-    if (!newMatch.home_team || !newMatch.away_team || !newMatch.match_date) {
-        alert("Please fill in Team Names and Date");
-        return;
-    }
+    if (!newMatch.home_team || !newMatch.away_team || !newMatch.match_date) return alert("Please fill required fields");
     setLoading(true);
     const { error } = await supabase.from('matches').insert([{ ...newMatch, status: 'SCHEDULED' }]);
-    if (error) alert("Error creating match: " + error.message);
-    else {
-        setIsCreating(false);
-        setNewMatch({ home_team: '', away_team: '', league: 'Premier League', match_date: '', home_logo: '', away_logo: '' });
-        fetchMatches(); 
-    }
+    if (error) alert("Error: " + error.message);
+    else { setIsCreating(false); fetchMatches(); }
     setLoading(false);
   };
 
@@ -66,7 +54,7 @@ export default function AdminMatchesPage() {
         away_score: match.away_score,
         status: match.status,
         api_id: match.api_id, 
-        widget_id: match.widget_id,
+        widget_id: match.widget_id, // We use this column to store the FULL CODE now
         booking_code: match.booking_code,
         affiliate_link: match.affiliate_link,
         video_url: match.video_url,         
@@ -81,7 +69,7 @@ export default function AdminMatchesPage() {
   };
 
   const settlePoints = async (matchId: string) => {
-    if (!confirm("⚠️ CONFIRM SETTLEMENT: \n\nAre you sure the match is finished? \nThis will calculate points for all users.")) return;
+    if (!confirm("⚠️ CONFIRM SETTLEMENT: \n\nAre you sure the match is finished?")) return;
     const { error } = await supabase.rpc('settle_match_points', { target_match_id: matchId });
     if (error) alert("Error: " + error.message);
     else {
@@ -92,7 +80,7 @@ export default function AdminMatchesPage() {
   };
 
   const deleteMatch = async (id: string) => {
-    if (!confirm("Are you sure? This will delete all predictions associated with this match!")) return;
+    if (!confirm("Delete this match?")) return;
     await supabase.from('matches').delete().eq('id', id);
     fetchMatches();
   };
@@ -120,14 +108,15 @@ export default function AdminMatchesPage() {
                 <input type="text" placeholder="Away Team" className="border p-3 rounded-xl font-bold" value={newMatch.away_team} onChange={e => setNewMatch({...newMatch, away_team: e.target.value})} />
                 <input type="datetime-local" className="border p-3 rounded-xl" value={newMatch.match_date} onChange={e => setNewMatch({...newMatch, match_date: e.target.value})} />
                 
-                {/* 🟢 CUSTOM LEAGUE INPUT */}
                 <div className="relative">
                     <input list="leagues" type="text" placeholder="League (Type or Select)" className="border p-3 rounded-xl w-full bg-white" value={newMatch.league} onChange={e => setNewMatch({...newMatch, league: e.target.value})} />
-                    <datalist id="leagues"><option value="Premier League"/><option value="La Liga"/><option value="Champions League"/><option value="Serie A"/><option value="Bundesliga"/><option value="Ligue 1"/><option value="FA Cup"/><option value="Carabao Cup"/><option value="Europa League"/></datalist>
+                    <datalist id="leagues">
+                        <option value="Premier League"/><option value="La Liga"/><option value="Champions League"/><option value="Serie A"/>
+                        <option value="Bundesliga"/><option value="Ligue 1"/><option value="FA Cup"/><option value="Carabao Cup"/>
+                    </datalist>
                 </div>
-
-                <input type="text" placeholder="Home Logo URL (Optional)" className="border p-3 rounded-xl text-xs" value={newMatch.home_logo} onChange={e => setNewMatch({...newMatch, home_logo: e.target.value})} />
-                <input type="text" placeholder="Away Logo URL (Optional)" className="border p-3 rounded-xl text-xs" value={newMatch.away_logo} onChange={e => setNewMatch({...newMatch, away_logo: e.target.value})} />
+                <input type="text" placeholder="Home Logo URL" className="border p-3 rounded-xl text-xs" value={newMatch.home_logo} onChange={e => setNewMatch({...newMatch, home_logo: e.target.value})} />
+                <input type="text" placeholder="Away Logo URL" className="border p-3 rounded-xl text-xs" value={newMatch.away_logo} onChange={e => setNewMatch({...newMatch, away_logo: e.target.value})} />
             </div>
             <div className="flex justify-end">
                 <button onClick={handleCreate} disabled={loading} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold">
@@ -148,29 +137,24 @@ export default function AdminMatchesPage() {
 
       {/* MATCH LIST */}
       <div className="space-y-4">
-        {loading && <div className="text-center py-10"><Loader2 className="animate-spin mx-auto text-blue-600" /></div>}
-        
         {matches.map((match) => (
             <div key={match.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col lg:flex-row">
                 
-                {/* 1. LEFT: Match Info & Score */}
+                {/* 1. LEFT: Match Info */}
                 <div className="p-5 lg:w-1/3 border-b lg:border-b-0 lg:border-r border-slate-100 bg-slate-50/50">
                     <div className="flex justify-between items-start mb-2">
                         <span className="text-[10px] font-bold uppercase text-slate-400 bg-white px-2 py-1 rounded border border-slate-200">{match.league}</span>
                         <span className="text-[10px] font-mono text-slate-400">{new Date(match.match_date).toLocaleDateString()}</span>
                     </div>
-                    
                     <h3 className="text-lg font-black text-slate-800 mb-4">{match.home_team} <span className="text-slate-400 font-normal">vs</span> {match.away_team}</h3>
-                    
                     <div className="flex items-center gap-2 mb-4">
-                        <input type="number" className="w-12 h-10 text-center font-black text-lg border rounded-lg" value={match.home_score ?? 0} onChange={(e) => handleUpdateChange(match.id, 'home_score', e.target.value)}/>
+                        <input type="number" className="w-12 h-10 text-center font-black text-lg border rounded-lg" value={match.home_score ?? 0} onChange={(e) => handleUpdateChange(match.id, 'home_score', e.target.value)} />
                         <span className="font-black text-slate-300">-</span>
-                        <input type="number" className="w-12 h-10 text-center font-black text-lg border rounded-lg" value={match.away_score ?? 0} onChange={(e) => handleUpdateChange(match.id, 'away_score', e.target.value)}/>
+                        <input type="number" className="w-12 h-10 text-center font-black text-lg border rounded-lg" value={match.away_score ?? 0} onChange={(e) => handleUpdateChange(match.id, 'away_score', e.target.value)} />
                          <select className={`h-10 border rounded-lg text-xs font-bold px-2 ${match.status === 'LIVE' ? 'text-red-600 bg-red-50 border-red-200' : 'bg-white'}`} value={match.status} onChange={(e) => handleUpdateChange(match.id, 'status', e.target.value)}>
                             <option value="SCHEDULED">SCHEDULED</option><option value="LIVE">LIVE</option><option value="HT">HALF TIME</option><option value="FT">FINISHED</option>
                         </select>
                     </div>
-
                     <div className="flex gap-2">
                          <button onClick={() => saveMatch(match)} disabled={savingId === match.id} className={`flex-1 py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition ${savingId === match.id ? 'bg-green-600 text-white' : 'bg-slate-900 text-white hover:bg-black'}`}>
                             <Save size={14} /> {savingId === match.id ? 'Saved' : 'Save'}
@@ -179,63 +163,54 @@ export default function AdminMatchesPage() {
                     </div>
                 </div>
 
-                {/* 2. MIDDLE: Automation & Links */}
+                {/* 2. MIDDLE: AUTOMATION & WIDGET */}
                 <div className="p-5 lg:w-1/3 border-b lg:border-b-0 lg:border-r border-slate-100">
-                    <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3">Automation & Revenue</h4>
+                    <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3">Automation & Widget</h4>
                     <div className="space-y-3">
                         <div>
-                            {/* 🟢 CHANGED LABEL TO API MATCH ID */}
                             <label className="text-[10px] font-bold text-slate-500 mb-1 block">API Match ID (Auto-Sync)</label>
-                            <div className="relative">
-                                <LinkIcon size={12} className="absolute left-2.5 top-2.5 text-slate-400" />
-                                <input type="text" placeholder="e.g. 690564" className="w-full pl-8 border rounded-lg py-2 text-xs font-mono bg-blue-50/50 border-blue-100" value={match.api_id || ''} onChange={(e) => handleUpdateChange(match.id, 'api_id', e.target.value)} />
-                            </div>
+                            <input type="text" placeholder="e.g. 690564" className="w-full border rounded-lg py-2 px-3 text-xs font-mono bg-blue-50/50 border-blue-100" value={match.api_id || ''} onChange={(e) => handleUpdateChange(match.id, 'api_id', e.target.value)} />
                         </div>
 
+                        {/* 🟢 CHANGED: LARGE TEXT AREA FOR FULL WIDGET CODE */}
                         <div>
-                            <label className="text-[10px] font-bold text-slate-500 mb-1 flex justify-between">ScoreAxis Widget ID <a href="https://www.scoreaxis.com/widget/live-match-widget" target="_blank" className="text-blue-500 hover:underline">Get ID</a></label>
-                            <div className="relative">
-                                <Hash size={12} className="absolute left-2.5 top-2.5 text-slate-400" />
-                                <input type="text" placeholder="e.g. 12345" className="w-full pl-8 border rounded-lg py-2 text-xs font-mono" value={match.widget_id || ''} onChange={(e) => handleUpdateChange(match.id, 'widget_id', e.target.value)} />
-                            </div>
+                            <label className="text-[10px] font-bold text-slate-500 mb-1 flex items-center gap-1">
+                                <Code size={10} /> Custom Widget Code (Embed)
+                            </label>
+                            <textarea 
+                                placeholder="Paste the full <iframe> or <script> code here..." 
+                                className="w-full h-20 border rounded-lg p-2 text-[10px] font-mono bg-slate-50 focus:bg-white resize-none"
+                                value={match.widget_id || ''} 
+                                onChange={(e) => handleUpdateChange(match.id, 'widget_id', e.target.value)}
+                            />
                         </div>
 
                         <div className="grid grid-cols-2 gap-2">
                             <div>
                                 <label className="text-[10px] font-bold text-slate-500 mb-1 block">Booking Code</label>
-                                <input type="text" className="w-full border rounded-lg py-2 px-3 text-xs font-mono" value={match.booking_code || ''} onChange={(e) => handleUpdateChange(match.id, 'booking_code', e.target.value)}/>
+                                <input type="text" className="w-full border rounded-lg py-2 px-3 text-xs font-mono" value={match.booking_code || ''} onChange={(e) => handleUpdateChange(match.id, 'booking_code', e.target.value)} />
                             </div>
                             <div>
                                 <label className="text-[10px] font-bold text-slate-500 mb-1 block">Affiliate Link</label>
-                                <input type="text" className="w-full border rounded-lg py-2 px-3 text-xs" value={match.affiliate_link || ''} onChange={(e) => handleUpdateChange(match.id, 'affiliate_link', e.target.value)}/>
+                                <input type="text" className="w-full border rounded-lg py-2 px-3 text-xs" value={match.affiliate_link || ''} onChange={(e) => handleUpdateChange(match.id, 'affiliate_link', e.target.value)} />
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* 3. RIGHT: Live Media Center */}
+                {/* 3. RIGHT: Live Media */}
                 <div className="p-5 lg:w-1/3 bg-slate-50/30 flex flex-col justify-between">
                     <div>
                          <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3 flex items-center gap-1"><Radio size={12} className="text-red-500" /> Live Media Center</h4>
                          <div className="space-y-2 mb-3">
-                            <div className="relative">
-                                <Video size={12} className="absolute left-2.5 top-2.5 text-red-500" />
-                                <input type="text" placeholder="🔴 Live Stream URL (YouTube)" className="w-full pl-8 border border-red-100 rounded-lg py-2 text-xs bg-red-50/30 focus:bg-white transition" value={match.livestream_url || ''} onChange={(e) => handleUpdateChange(match.id, 'livestream_url', e.target.value)}/>
-                            </div>
-                            <div className="relative">
-                                <Mic size={12} className="absolute left-2.5 top-2.5 text-blue-500" />
-                                <input type="text" placeholder="🎙️ Live Radio URL (Zeno/Mixlr)" className="w-full pl-8 border border-blue-100 rounded-lg py-2 text-xs bg-blue-50/30 focus:bg-white transition" value={match.audio_url || ''} onChange={(e) => handleUpdateChange(match.id, 'audio_url', e.target.value)}/>
-                            </div>
-                            <div className="relative">
-                                <ImageIcon size={12} className="absolute left-2.5 top-2.5 text-slate-400" />
-                                <input type="text" placeholder="📺 Highlights URL (Post-Game)" className="w-full pl-8 border rounded-lg py-2 text-xs text-slate-500" value={match.video_url || ''} onChange={(e) => handleUpdateChange(match.id, 'video_url', e.target.value)}/>
-                            </div>
+                            <input type="text" placeholder="🔴 Live Stream URL" className="w-full border border-red-100 rounded-lg py-2 px-3 text-xs" value={match.livestream_url || ''} onChange={(e) => handleUpdateChange(match.id, 'livestream_url', e.target.value)}/>
+                            <input type="text" placeholder="🎙️ Audio URL" className="w-full border border-blue-100 rounded-lg py-2 px-3 text-xs" value={match.audio_url || ''} onChange={(e) => handleUpdateChange(match.id, 'audio_url', e.target.value)}/>
+                            <input type="text" placeholder="📺 Highlights URL" className="w-full border rounded-lg py-2 px-3 text-xs" value={match.video_url || ''} onChange={(e) => handleUpdateChange(match.id, 'video_url', e.target.value)}/>
                          </div>
-                         
                          <div className="space-y-2">
                             <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border border-slate-100">
                                 <input type="checkbox" checked={match.is_featured_video || false} onChange={(e) => handleUpdateChange(match.id, 'is_featured_video', e.target.checked)}/>
-                                <span className="text-xs font-bold text-slate-600">Feature Video on Homepage</span>
+                                <span className="text-xs font-bold text-slate-600">Feature Video</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border border-slate-100">
                                 <input type="checkbox" checked={match.points_distributed || false} onChange={(e) => handleUpdateChange(match.id, 'points_distributed', e.target.checked)}/>
@@ -243,18 +218,10 @@ export default function AdminMatchesPage() {
                             </label>
                         </div>
                     </div>
-
                     <div className="mt-6 pt-4 border-t border-slate-200">
-                        {match.points_distributed ? (
-                             <button onClick={() => settlePoints(match.id)} className="w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-green-100 text-green-700 cursor-default">
-                                <CheckCircle size={16} /> POINTS DISTRIBUTED
-                             </button>
-                        ) : (
-                             <button onClick={() => settlePoints(match.id)} className="w-full py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-200 hover:shadow-xl hover:scale-[1.02] transition">
-                                <Calculator size={16} /> DISTRIBUTE POINTS
-                             </button>
-                        )}
-                        <p className="text-[9px] text-center text-slate-400 mt-2">{match.points_distributed ? "Uncheck 'Points Distributed' above to re-run." : "Click when match is finished."}</p>
+                         <button onClick={() => settlePoints(match.id)} className={`w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 ${match.points_distributed ? 'bg-green-100 text-green-700' : 'bg-slate-900 text-white'}`}>
+                            {match.points_distributed ? <><CheckCircle size={16} /> POINTS DISTRIBUTED</> : <><Calculator size={16} /> DISTRIBUTE POINTS</>}
+                         </button>
                     </div>
                 </div>
 
