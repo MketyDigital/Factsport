@@ -3,7 +3,7 @@ export const runtime = 'edge';
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
-import { Search, Plus, Save, Trash2, Calendar, Link as LinkIcon, Video, ExternalLink, Star, Filter } from 'lucide-react';
+import { Search, Plus, Save, Trash2, Calendar, Link as LinkIcon, Video, ExternalLink, Filter } from 'lucide-react';
 
 export default function AdminMatchesPage() {
   const supabase = createClient();
@@ -15,10 +15,9 @@ export default function AdminMatchesPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   
-  // Default to 'future' to see upcoming games easily
+  // Filter defaults to 'future'
   const [filterMode, setFilterMode] = useState<'week' | 'future' | 'finished'>('future');
 
-  // 🟢 UPDATED: 'league' is now a text input for flexibility (FA Cup, Friendly, etc.)
   const [newMatch, setNewMatch] = useState({
     home_team: '', away_team: '', league: 'FA Cup', match_date: '', home_logo: '', away_logo: ''
   });
@@ -82,6 +81,12 @@ export default function AdminMatchesPage() {
     }).eq('id', match.id);
 
     if (error) alert("Save failed: " + error.message);
+    
+    // Auto-settle points if match is finished
+    if (match.status === 'FT' || match.status === 'FINISHED') {
+        await settlePoints(match);
+    }
+
     setTimeout(() => setSavingId(null), 1000);
   };
 
@@ -89,6 +94,37 @@ export default function AdminMatchesPage() {
     if (!confirm("Delete this match?")) return;
     await supabase.from('matches').delete().eq('id', id);
     fetchMatches();
+  };
+
+  // 🟢 Helper to settle points (Predictions)
+  const settlePoints = async (match: any) => {
+      // 1. Fetch predictions for this match
+      const { data: predictions } = await supabase.from('predictions').select('*').eq('match_id', match.id);
+      if (!predictions) return;
+
+      const updates = predictions.map(async (p) => {
+          let points = 0;
+          let isCorrect = false;
+
+          // Simple Logic: 1X2 Prediction
+          const result = match.home_score > match.away_score ? '1' : match.home_score < match.away_score ? '2' : 'X';
+          if (p.prediction === result) {
+              points = 3; 
+              isCorrect = true;
+          }
+
+          // Update Prediction Status
+          await supabase.from('predictions').update({ status: isCorrect ? 'won' : 'lost', points_earned: points }).eq('id', p.id);
+          
+          // Update User Leaderboard
+          if (isCorrect) {
+             const { data: profile } = await supabase.from('profiles').select('total_points').eq('id', p.user_id).single();
+             if (profile) {
+                 await supabase.from('profiles').update({ total_points: profile.total_points + points }).eq('id', p.user_id);
+             }
+          }
+      });
+      await Promise.all(updates);
   };
 
   const groupedMatches: { [key: string]: any[] } = {};
@@ -126,7 +162,6 @@ export default function AdminMatchesPage() {
                 <input type="text" placeholder="Home Team (e.g. Man City)" className="border p-3 rounded-xl font-bold" value={newMatch.home_team} onChange={e => setNewMatch({...newMatch, home_team: e.target.value})} />
                 <input type="text" placeholder="Away Team (e.g. Chelsea)" className="border p-3 rounded-xl font-bold" value={newMatch.away_team} onChange={e => setNewMatch({...newMatch, away_team: e.target.value})} />
                 <input type="datetime-local" className="border p-3 rounded-xl" value={newMatch.match_date} onChange={e => setNewMatch({...newMatch, match_date: e.target.value})} />
-                {/* 🟢 CHANGED: Regular Input to allow typing "FA Cup" or "Friendly" */}
                 <div className="relative">
                     <input list="leagues" type="text" placeholder="League Name (Type or Select)" className="border p-3 rounded-xl w-full" value={newMatch.league} onChange={e => setNewMatch({...newMatch, league: e.target.value})} />
                     <datalist id="leagues">
