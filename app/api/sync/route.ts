@@ -1,61 +1,77 @@
 export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
 
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/app/lib/supabase/server';
 import { getLeagueMatches } from '@/app/lib/matchService';
+import { NextResponse } from 'next/server';
 
-export async function GET(req: Request) {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const key = searchParams.get('key');
+  const type = searchParams.get('type') || 'live'; // Default to 'live' if missing
+
+  if (key !== process.env.CRON_KEY) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const supabase = createClient();
+
+  const leagues = [
+    { id: 'PL', name: 'Premier League' },
+    { id: 'PD', name: 'La Liga' },
+    { id: 'BL1', name: 'Bundesliga' },
+    { id: 'SA', name: 'Serie A' },
+    { id: 'FL1', name: 'Ligue 1' },
+    { id: 'CL', name: 'Champions League' }
+  ];
+
+  // ⚡ SMART DATE LOGIC ⚡
+  const daysToSync = [];
+  
+  if (type === 'full') {
+      // FULL MODE: Sync Yesterday + Next 14 Days (Heavy, run rarely)
+      for (let i = -1; i <= 14; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() + i);
+        daysToSync.push(date.toISOString().split('T')[0]);
+      }
+  } else {
+      // LIVE MODE: Sync Yesterday + Today + Tomorrow (Light, run often)
+      // We include Yesterday to catch late-night games that just finished
+      for (let i = -1; i <= 1; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() + i);
+        daysToSync.push(date.toISOString().split('T')[0]);
+      }
+  }
+
   try {
-    const { searchParams } = new URL(req.url);
-    if (searchParams.get('key') !== process.env.CRON_KEY) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+      // Run sync in parallel
+      const syncPromises = leagues.map(async (league) => {
+          let leagueMatchCount = 0;
+          const dayPromises = daysToSync.map(async (dateStr) => {
+              const matches = await getLeagueMatches(league.id, league.name, dateStr);
+              if (matches.length > 0) {
+                  const { error } = await supabase.from('matches').upsert(matches, { 
+                      onConflict: 'api_id',
+                      ignoreDuplicates: false 
+                  });
+                  if (!error) leagueMatchCount += matches.length;
+              }
+          });
+          await Promise.all(dayPromises);
+          return leagueMatchCount;
+      });
 
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { auth: { persistSession: false } }
-    );
+      const results = await Promise.all(syncPromises);
+      const totalUpserted = results.reduce((a, b) => a + b, 0);
 
-    // List of leagues to sync. The ID param is ignored by the new adapter, only name matters.
-    const leagues = [
-      { id: 'ignored', name: 'Premier League' },
-      { id: 'ignored', name: 'La Liga' },
-      { id: 'ignored', name: 'Bundesliga' },
-      { id: 'ignored', name: 'Serie A' },
-      { id: 'ignored', name: 'Ligue 1' },
-      { id: 'ignored', name: 'Champions League' },
-    ];
-
-    // Fetch yesterday, today, tomorrow to be safe
-    const dates = [0].map(offset => {
-        const d = new Date();
-        d.setDate(d.getDate() + offset);
-        return d.toISOString().split('T')[0];
-    });
-
-    let allMatches: any[] = [];
-
-    // Loop through dates and leagues
-    for (const date of dates) {
-        const requests = leagues.map(l => getLeagueMatches(l.id, l.name, date));
-        const results = await Promise.all(requests);
-        allMatches = [...allMatches, ...results.flat()];
-    }
-
-    if (allMatches.length > 0) {
-      // Upsert using the new API_ID column
-      const { error } = await supabase.from('matches').upsert(allMatches, { 
-          onConflict: 'api_id',
-          ignoreDuplicates: false 
-      }); 
-      if (error) throw error;
-    }
-
-    return NextResponse.json({ success: true, synced: allMatches.length });
+      return NextResponse.json({ 
+          success: true, 
+          mode: type,
+          message: `Synced ${totalUpserted} matches (${type} mode)` 
+      });
 
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
