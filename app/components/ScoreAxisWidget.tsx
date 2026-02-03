@@ -1,20 +1,16 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
+  const widgetRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    if (!matchId) return;
+    if (!matchId || !widgetRef.current) return;
 
-    // 1. Target the specific container for this match
-    const containerId = `scoreaxis-widget-${matchId}`;
-    const container = document.getElementById(containerId);
-    
-    if (!container) return;
+    // 1. Cleanup: Clear previous widget content
+    widgetRef.current.innerHTML = '';
 
-    // 2. Clear previous content
-    container.innerHTML = '';
-
-    // 3. Create the widget wrapper
+    // 2. Setup the widget container
     const widgetDiv = document.createElement('div');
     widgetDiv.className = "scoreaxis-widget";
     widgetDiv.setAttribute('data-widget-id', matchId);
@@ -23,23 +19,29 @@ export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
     widgetDiv.setAttribute('data-body-background', 'FFFFFF');
     widgetDiv.setAttribute('data-text-color', '000000');
     widgetDiv.setAttribute('data-links', '0');
-    widgetDiv.setAttribute('data-inst', '1181253'); // Your provided instruction ID
+    
+    // 3. Append container first
+    widgetRef.current.appendChild(widgetDiv);
 
-    container.appendChild(widgetDiv);
+    // 4. Inject script with a tiny delay to ensure React has rendered the Div
+    const timer = setTimeout(() => {
+        const script = document.createElement('script');
+        script.src = "https://www.scoreaxis.com/widget/live-match-widget.js";
+        script.async = true;
+        if (widgetRef.current) {
+            widgetRef.current.appendChild(script);
+        }
+    }, 100);
 
-    // 4. Inject script
-    const script = document.createElement('script');
-    script.src = "https://www.scoreaxis.com/widget/live-match-widget.js";
-    script.async = true;
-    container.appendChild(script);
-
+    return () => clearTimeout(timer);
   }, [matchId]);
 
   if (!matchId) return null;
 
   return (
     <div className="w-full bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm my-4 min-h-[150px]">
-       <div id={`scoreaxis-widget-${matchId}`} className="w-full"></div>
+       {/* Widget Container */}
+       <div ref={widgetRef} className="w-full"></div>
     </div>
   );
 }
