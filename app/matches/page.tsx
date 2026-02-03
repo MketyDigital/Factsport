@@ -3,17 +3,15 @@ export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
-import { ChevronLeft, BarChart2, Calendar, Zap, Ticket, ExternalLink, Video, Mic, Radio, Trophy, Youtube, Newspaper } from 'lucide-react';
+import { ChevronLeft, BarChart2, Calendar, Zap, Ticket, ExternalLink, Video, Mic, Radio, Trophy, Youtube, Newspaper, Link as LinkIcon } from 'lucide-react';
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner'; 
 
-// 🟢 CONFIG: Default 1xBet Link
 const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599"; 
 
 export default async function AllMatchesPage() {
   const supabase = createClient();
   
-  // 1. Fetch matches (Last 24h to Next 48h)
   const startDate = new Date(); startDate.setDate(startDate.getDate() - 1);
   const endDate = new Date(); endDate.setDate(endDate.getDate() + 2);
 
@@ -24,7 +22,7 @@ export default async function AllMatchesPage() {
     .lte('match_date', endDate.toISOString())
     .order('match_date', { ascending: true });
 
-  // 2. FALLBACK: If no matches found, fetch recent FINISHED matches
+  // FALLBACK: If no active matches, show recent finished ones (Logic from your original code)
   if (!matches || matches.length === 0) {
       const { data: recent } = await supabase
         .from('matches')
@@ -35,31 +33,27 @@ export default async function AllMatchesPage() {
       matches = recent || [];
   }
 
-  // 3. Group by League
+  // Group by League
   const leagues: { [key: string]: any[] } = {};
   matches?.forEach(match => {
     if (!leagues[match.league]) leagues[match.league] = [];
     leagues[match.league].push(match);
   });
 
-  // 4. Sorting Helper
+  // Sort Logic (Live -> Upcoming -> Finished)
   const sortMatches = (leagueMatches: any[]) => {
-    const live = leagueMatches.filter(m => m.status === 'LIVE' || m.status === 'in');
-    const upcoming = leagueMatches.filter(m => m.status !== 'LIVE' && m.status !== 'in' && m.status !== 'FINISHED' && m.status !== 'FT' && m.status !== 'post');
-    const finished = leagueMatches.filter(m => m.status === 'FINISHED' || m.status === 'FT' || m.status === 'post');
-
-    // Sort upcoming by time ascending
+    const live = leagueMatches.filter(m => ['LIVE','in','HT'].includes(m.status));
+    const upcoming = leagueMatches.filter(m => !['LIVE','in','HT','FT','FINISHED','post'].includes(m.status));
+    const finished = leagueMatches.filter(m => ['FT','FINISHED','post'].includes(m.status));
     upcoming.sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
-    // Sort finished by time descending (newest first)
     finished.sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
-
     return [...live, ...upcoming, ...finished];
   };
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-20 font-sans">
       
-      {/* Header */}
+      {/* HEADER */}
       <div className="bg-[#0a1428] text-white p-4 flex items-center gap-4 sticky top-0 z-50 shadow-md">
           <Link href="/" className="p-1 rounded-full hover:bg-white/10 transition"><ChevronLeft /></Link>
           <div>
@@ -69,10 +63,8 @@ export default async function AllMatchesPage() {
       </div>
 
       <div className="p-3 space-y-6">
-        
-        {/* FREE TIPS BANNER */}
         <FreeTipsBanner />
-
+        
         {Object.keys(leagues).length === 0 ? (
             <div className="text-center py-20 opacity-50">
                 <Calendar className="w-12 h-12 mx-auto mb-3 text-slate-400" />
@@ -82,25 +74,22 @@ export default async function AllMatchesPage() {
             Object.keys(leagues).map((leagueName) => (
                 <div key={leagueName} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                     
-                    {/* League Header */}
+                    {/* LEAGUE HEADER */}
                     <div className="bg-slate-50 px-4 py-3 flex justify-between items-center border-b border-slate-100">
                         <h2 className="font-black text-xs uppercase text-slate-800 tracking-wider truncate mr-2">{leagueName}</h2>
-                        <Link 
-                            href={`/standings?league=${encodeURIComponent(leagueName)}`}
-                            className="flex items-center gap-1.5 text-[9px] font-bold text-blue-700 bg-blue-100/50 px-3 py-1.5 rounded-full hover:bg-blue-100 transition whitespace-nowrap"
-                        >
+                        <Link href={`/standings?league=${encodeURIComponent(leagueName)}`} className="flex items-center gap-1.5 text-[9px] font-bold text-blue-700 bg-blue-100/50 px-3 py-1.5 rounded-full hover:bg-blue-100 transition whitespace-nowrap">
                             <BarChart2 size={12} /> Table
                         </Link>
                     </div>
 
-                    {/* Match Rows */}
+                    {/* MATCH LIST */}
                     <div className="divide-y divide-slate-50">
                         {sortMatches(leagues[leagueName]).map((match) => (
                             <div key={match.id} className="block hover:bg-slate-50 transition">
                                 <Link href={`/match/${match.id}`} className="block p-4">
                                     <div className="flex items-center justify-between">
                                         
-                                        {/* Teams */}
+                                        {/* TEAMS */}
                                         <div className="flex-1 space-y-2">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-6 h-6 flex items-center justify-center shrink-0">
@@ -116,20 +105,18 @@ export default async function AllMatchesPage() {
                                             </div>
                                         </div>
 
-                                        {/* Score/Status & Indicators */}
+                                        {/* SCORE & STATUS */}
                                         <div className="flex flex-col items-end gap-1">
                                             <div className="flex items-center gap-2">
-                                                {/* 🔴 MEDIA ICONS */}
                                                 {match.livestream_url && <Video size={10} className="text-red-500 animate-pulse"/>}
                                                 {match.audio_url && <Radio size={10} className="text-blue-500 animate-pulse"/>}
-                                                
                                                 <LiveScoreLabel matchId={match.id} initialStatus={match.status} homeScore={match.home_score} awayScore={match.away_score} matchDate={match.match_date} />
                                             </div>
                                         </div>
                                     </div>
                                 </Link>
 
-                                {/* Action Bar (Betting Logic) */}
+                                {/* 🟢 RESTORED: ACTION BAR (Betting Logic) */}
                                 <div className="px-4 pb-3 flex gap-2">
                                     <Link href={`/match/${match.id}`} className="flex-1 bg-slate-100 text-slate-600 rounded-lg py-2 text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-slate-200">
                                         <Zap size={10}/> Predict
@@ -140,11 +127,7 @@ export default async function AllMatchesPage() {
                                             <Ticket size={10}/> {match.booking_code}
                                         </button>
                                     ) : (
-                                        <a 
-                                            href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} 
-                                            target="_blank" 
-                                            className="flex-1 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 text-[10px] font-bold flex items-center justify-center gap-1"
-                                        >
+                                        <a href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} target="_blank" className="flex-1 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 text-[10px] font-bold flex items-center justify-center gap-1">
                                             <ExternalLink size={10}/> Bet Now
                                         </a>
                                     )}
@@ -157,7 +140,7 @@ export default async function AllMatchesPage() {
         )}
       </div>
 
-      {/* 🚀 QUICK ACTIONS FOOTER */}
+      {/* 🟢 RESTORED: QUICK ACTIONS FOOTER */}
       <div className="px-4 mb-4 mt-6">
           <div className="bg-[#0a1428] rounded-2xl p-6 shadow-xl relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500 blur-[80px] opacity-20"></div>
