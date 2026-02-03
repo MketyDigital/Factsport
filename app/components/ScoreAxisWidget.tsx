@@ -2,41 +2,39 @@
 import { useEffect, useRef } from 'react';
 
 export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const widgetContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // 1. Safety Check
-    if (!matchId || !containerRef.current) return;
+    if (!matchId || !widgetContainerRef.current) return;
 
-    // 2. Clear previous widget to prevent duplicates
-    containerRef.current.innerHTML = '';
+    // 1. Clear any existing widget to prevent duplicates
+    widgetContainerRef.current.innerHTML = '';
 
-    // 3. Create the widget container required by ScoreAxis
-    // Their script looks for a div with a specific class or ID usually, 
-    // but the modern script creates an iframe inside the script tag's location.
+    // 2. Create the wrapper DIV that ScoreAxis looks for
     const widgetDiv = document.createElement('div');
-    widgetDiv.className = "scoreaxis-widget";
-    widgetDiv.setAttribute('data-react-widget', 'true');
-    containerRef.current.appendChild(widgetDiv);
+    // This class and attribute are vital for their script to find the element
+    widgetDiv.className = "scoreaxis-widget"; 
+    widgetDiv.setAttribute('data-widget-id', matchId);
+    widgetDiv.setAttribute('data-auto-height', '1'); // Auto-resize height
+    widgetDiv.setAttribute('data-font', '0'); // System font
+    widgetDiv.setAttribute('data-body-background', 'FFFFFF');
+    widgetDiv.setAttribute('data-text-color', '000000');
+    widgetDiv.setAttribute('data-links', '0'); // Disable external links if possible
 
-    // 4. Create the Script
+    // 3. Append the wrapper to our container
+    widgetContainerRef.current.appendChild(widgetDiv);
+
+    // 4. Inject the Script
     const script = document.createElement('script');
     script.src = "https://www.scoreaxis.com/widget/live-match-widget.js";
     script.async = true;
-    
-    // 5. Set Attributes (Crucial for the "New Version")
-    script.setAttribute('data-widget-id', matchId);
-    script.setAttribute('data-auto-height', '1'); // Fixes the height/overlap issue!
-    script.setAttribute('data-font', '0');
-    script.setAttribute('data-body-background', 'FFFFFF');
-    script.setAttribute('data-text-color', '000000');
-    
-    // 6. Append to our container
-    widgetDiv.appendChild(script);
+    widgetContainerRef.current.appendChild(script);
 
     return () => {
-      // Cleanup
-      if (containerRef.current) containerRef.current.innerHTML = '';
+      // Cleanup on unmount
+      if (widgetContainerRef.current) {
+        widgetContainerRef.current.innerHTML = '';
+      }
     };
   }, [matchId]);
 
@@ -44,10 +42,10 @@ export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
 
   return (
     <div 
-        ref={containerRef} 
-        className="w-full bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm my-4 min-h-[100px]"
+      ref={widgetContainerRef} 
+      className="w-full bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm my-4 min-h-[200px]"
     >
-        {/* The Script will inject the widget here automatically */}
+      {/* Widget loads here */}
     </div>
   );
 }

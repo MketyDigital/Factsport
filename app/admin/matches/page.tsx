@@ -3,7 +3,7 @@ export const runtime = 'edge';
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
-import { Search, Plus, Save, Trash2, Calendar, Link as LinkIcon, Video, ExternalLink, Filter } from 'lucide-react';
+import { Search, Plus, Save, Trash2, Calendar, Link as LinkIcon, Video, ExternalLink, Filter, CheckCircle } from 'lucide-react';
 
 export default function AdminMatchesPage() {
   const supabase = createClient();
@@ -15,9 +15,10 @@ export default function AdminMatchesPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   
-  // Filter defaults to 'future'
+  // Filter defaults to 'future' to see upcoming games easily
   const [filterMode, setFilterMode] = useState<'week' | 'future' | 'finished'>('future');
 
+  // New Match Form State
   const [newMatch, setNewMatch] = useState({
     home_team: '', away_team: '', league: 'FA Cup', match_date: '', home_logo: '', away_logo: ''
   });
@@ -81,12 +82,6 @@ export default function AdminMatchesPage() {
     }).eq('id', match.id);
 
     if (error) alert("Save failed: " + error.message);
-    
-    // Auto-settle points if match is finished
-    if (match.status === 'FT' || match.status === 'FINISHED') {
-        await settlePoints(match);
-    }
-
     setTimeout(() => setSavingId(null), 1000);
   };
 
@@ -96,11 +91,16 @@ export default function AdminMatchesPage() {
     fetchMatches();
   };
 
-  // 🟢 Helper to settle points (Predictions)
-  const settlePoints = async (match: any) => {
-      // 1. Fetch predictions for this match
-      const { data: predictions } = await supabase.from('predictions').select('*').eq('match_id', match.id);
-      if (!predictions) return;
+  // 🟢 SETTLE POINTS FUNCTION (Restored)
+  const settlePoints = async (matchId: string) => {
+      if (!confirm("⚠️ Confirm Result? This distributes points to users.")) return;
+      
+      const { data: match } = await supabase.from('matches').select('*').eq('id', matchId).single();
+      if (!match) return;
+
+      // 1. Fetch predictions
+      const { data: predictions } = await supabase.from('predictions').select('*').eq('match_id', matchId);
+      if (!predictions) return alert("No predictions found for this match.");
 
       const updates = predictions.map(async (p) => {
           let points = 0;
@@ -108,23 +108,30 @@ export default function AdminMatchesPage() {
 
           // Simple Logic: 1X2 Prediction
           const result = match.home_score > match.away_score ? '1' : match.home_score < match.away_score ? '2' : 'X';
+          
           if (p.prediction === result) {
               points = 3; 
               isCorrect = true;
           }
 
-          // Update Prediction Status
+          // Update Prediction
           await supabase.from('predictions').update({ status: isCorrect ? 'won' : 'lost', points_earned: points }).eq('id', p.id);
           
-          // Update User Leaderboard
+          // Update User Profile Points
           if (isCorrect) {
              const { data: profile } = await supabase.from('profiles').select('total_points').eq('id', p.user_id).single();
              if (profile) {
-                 await supabase.from('profiles').update({ total_points: profile.total_points + points }).eq('id', p.user_id);
+                 await supabase.from('profiles').update({ total_points: (profile.total_points || 0) + points }).eq('id', p.user_id);
              }
           }
       });
+
       await Promise.all(updates);
+      
+      // Mark match as distributed
+      await supabase.from('matches').update({ points_distributed: true }).eq('id', matchId);
+      alert("✅ Points distributed successfully.");
+      fetchMatches();
   };
 
   const groupedMatches: { [key: string]: any[] } = {};
@@ -137,6 +144,7 @@ export default function AdminMatchesPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 sticky top-0 bg-slate-50 z-20 py-2">
         <div>
             <h1 className="text-2xl font-black text-slate-900">Match Manager</h1>
@@ -162,6 +170,8 @@ export default function AdminMatchesPage() {
                 <input type="text" placeholder="Home Team (e.g. Man City)" className="border p-3 rounded-xl font-bold" value={newMatch.home_team} onChange={e => setNewMatch({...newMatch, home_team: e.target.value})} />
                 <input type="text" placeholder="Away Team (e.g. Chelsea)" className="border p-3 rounded-xl font-bold" value={newMatch.away_team} onChange={e => setNewMatch({...newMatch, away_team: e.target.value})} />
                 <input type="datetime-local" className="border p-3 rounded-xl" value={newMatch.match_date} onChange={e => setNewMatch({...newMatch, match_date: e.target.value})} />
+                
+                {/* 🟢 CUSTOM LEAGUE INPUT */}
                 <div className="relative">
                     <input list="leagues" type="text" placeholder="League Name (Type or Select)" className="border p-3 rounded-xl w-full" value={newMatch.league} onChange={e => setNewMatch({...newMatch, league: e.target.value})} />
                     <datalist id="leagues">
@@ -170,6 +180,7 @@ export default function AdminMatchesPage() {
                         <option value="Champions League"/>
                         <option value="Premier League"/>
                         <option value="Europa League"/>
+                        <option value="Friendly"/>
                     </datalist>
                 </div>
             </div>
@@ -237,9 +248,11 @@ export default function AdminMatchesPage() {
                                 </div>
                             </div>
 
-                            {/* 3. MEDIA */}
+                            {/* 3. MEDIA & ACTIONS */}
                             <div className="p-4 lg:w-[30%] bg-slate-50/20 flex flex-col gap-2">
                                 <input type="text" placeholder="🔴 Live Stream URL" className="w-full border rounded px-2 py-1 text-xs" value={match.livestream_url || ''} onChange={(e) => handleUpdateChange(match.id, 'livestream_url', e.target.value)} />
+                                <input type="text" placeholder="🎧 Audio URL" className="w-full border rounded px-2 py-1 text-xs" value={match.audio_url || ''} onChange={(e) => handleUpdateChange(match.id, 'audio_url', e.target.value)} />
+                                
                                 <div className="flex items-center justify-between mt-1">
                                     <label className="flex items-center gap-1 cursor-pointer">
                                         <input type="checkbox" checked={match.is_featured_video || false} onChange={(e) => handleUpdateChange(match.id, 'is_featured_video', e.target.checked)} />
@@ -247,6 +260,13 @@ export default function AdminMatchesPage() {
                                     </label>
                                     <button onClick={() => deleteMatch(match.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
                                 </div>
+
+                                {/* 🟢 SETTLE POINTS BUTTON */}
+                                {match.status === 'FT' && !match.points_distributed && (
+                                    <button onClick={() => settlePoints(match.id)} className="w-full mt-2 bg-purple-600 hover:bg-purple-700 text-white py-1.5 rounded text-[10px] font-bold flex items-center justify-center gap-1">
+                                        <CheckCircle size={12}/> Distribute Points
+                                    </button>
+                                )}
                             </div>
 
                         </div>
