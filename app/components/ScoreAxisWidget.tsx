@@ -1,16 +1,18 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
 export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
-    if (!matchId || !containerRef.current) return;
+    if (!matchId) return;
 
-    // 1. Wipe container clean
-    containerRef.current.innerHTML = '';
+    // 1. Find the container
+    const container = document.getElementById(`scoreaxis-widget-${matchId}`);
+    if (!container) return;
 
-    // 2. Create the wrapper DIV
+    // 2. Clear it completely (Hard Reset)
+    container.innerHTML = '';
+
+    // 3. Create the ScoreAxis specific DIV
     const widgetDiv = document.createElement('div');
     widgetDiv.className = "scoreaxis-widget";
     widgetDiv.setAttribute('data-widget-id', matchId);
@@ -18,29 +20,29 @@ export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
     widgetDiv.setAttribute('data-font', '0');
     widgetDiv.setAttribute('data-body-background', 'FFFFFF');
     widgetDiv.setAttribute('data-text-color', '000000');
-    widgetDiv.setAttribute('data-links', '0'); 
+    widgetDiv.setAttribute('data-links', '0'); // Remove external links
+    widgetDiv.setAttribute('data-inst', '1181253'); // Your provided instruction ID
     
-    // 3. Append DIV first
-    containerRef.current.appendChild(widgetDiv);
+    container.appendChild(widgetDiv);
 
-    // 4. Inject Script (Force Reload)
+    // 4. Inject Script Freshly
     const script = document.createElement('script');
     script.src = "https://www.scoreaxis.com/widget/live-match-widget.js";
     script.async = true;
-    containerRef.current.appendChild(script);
+    container.appendChild(script);
 
   }, [matchId]);
 
   if (!matchId) return null;
 
   return (
-    <div className="w-full bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm my-4 min-h-[400px]">
-       {/* 🟢 Container for the widget */}
-       <div ref={containerRef} className="w-full"></div>
+    <div className="w-full bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm my-4 min-h-[150px]">
+       {/* Unique ID ensures the script finds the right box */}
+       <div id={`scoreaxis-widget-${matchId}`} className="w-full"></div>
        
-       {/* 🟢 Fallback Text (Shows only if widget is loading slowly) */}
-       <div className="text-center py-2 text-[10px] text-slate-300">
-          Loading Match Data...
+       {/* Helper text if it takes too long */}
+       <div className="text-center py-4 text-[10px] text-slate-300 pointer-events-none">
+          Loading Live Data...
        </div>
     </div>
   );
