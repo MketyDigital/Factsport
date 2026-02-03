@@ -30,14 +30,9 @@ export default function ScoreAxisWidget({ matchId, affiliateLink }: { matchId?: 
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            body { margin: 0; padding: 0; overflow-x: hidden; width: 100%; font-family: sans-serif; }
+            body { margin: 0; padding: 0; overflow-x: hidden; width: 100%; font-family: sans-serif; background: white; }
             .scoreaxis-widget, iframe { width: 100% !important; max-width: 100vw !important; display: block; }
-            
-            /* Disable clicks inside the widget to prevent leaving the site */
-            a { pointer-events: none !important; cursor: default !important; text-decoration: none !important; color: inherit !important; }
-            
-            /* Make footer tiny so it's easier to cover */
-            .sa-footer, .sa-copyright { font-size: 10px !important; opacity: 1; }
+            a { pointer-events: none !important; cursor: default !important; }
         </style>
       </head>
       <body>
@@ -47,19 +42,21 @@ export default function ScoreAxisWidget({ matchId, affiliateLink }: { matchId?: 
   `;
 
   return (
-    <div className="w-full bg-white rounded-xl border border-slate-200 shadow-sm my-4 overflow-hidden relative group">
+    <div className="w-full bg-white rounded-xl border border-slate-200 shadow-sm my-4 overflow-hidden relative">
+      
       {/* 1. THE WIDGET */}
       <iframe
         srcDoc={widgetHtml}
-        style={{ width: '100%', height: '450px', border: 'none', display: 'block' }}
+        style={{ width: '100%', height: '500px', border: 'none', display: 'block' }}
         title="Match Widget"
         loading="lazy"
+        scrolling="no"
       />
 
-      {/* 🟢 2. MASKING BET BUTTON (Floats on top of the footer) */}
-      {/* Position 'absolute bottom-0' makes it stick to the bottom, covering the logo. */}
+      {/* 🟢 2. MASKING BAR (Only appears if we have an affiliate link) */}
+      {/* This sits absolutely at the bottom to COVER the logo */}
       {affiliateLink && (
-        <div className="absolute bottom-0 left-0 w-full bg-white/95 backdrop-blur-sm border-t border-slate-100 p-2 flex justify-between items-center z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+        <div className="absolute bottom-0 left-0 w-full bg-white border-t border-slate-100 p-2 flex justify-between items-center z-50 shadow-[0_-5px_15px_rgba(0,0,0,0.1)]">
             <div className="flex items-center gap-2 pl-2">
                 <div className="bg-green-500 text-white p-1 rounded-full animate-pulse">
                     <DollarSign size={10} />
