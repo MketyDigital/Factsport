@@ -3,7 +3,7 @@ export const runtime = 'edge';
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
-import { Search, Plus, Save, Trash2, Calendar, Link as LinkIcon, Video, ExternalLink, Filter, CheckCircle, Hash } from 'lucide-react';
+import { Search, Plus, Save, Trash2, Calendar, Link as LinkIcon, Video, ExternalLink, Filter, CheckCircle, Hash, Mic, Ticket, PlayCircle, Trophy } from 'lucide-react';
 
 export default function AdminMatchesPage() {
   const supabase = createClient();
@@ -14,10 +14,8 @@ export default function AdminMatchesPage() {
   const [search, setSearch] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
-  
   const [filterMode, setFilterMode] = useState<'week' | 'future' | 'finished'>('future');
 
-  // 🟢 NEW MATCH FORM (With API ID)
   const [newMatch, setNewMatch] = useState({
     home_team: '', away_team: '', league: 'FA Cup', match_date: '', home_logo: '', away_logo: '', api_id: ''
   });
@@ -39,7 +37,6 @@ export default function AdminMatchesPage() {
     }
 
     if (search) query = query.or(`home_team.ilike.%${search}%,away_team.ilike.%${search}%`);
-    
     const { data } = await query;
     if (data) setMatches(data);
     setLoading(false);
@@ -64,7 +61,7 @@ export default function AdminMatchesPage() {
         home_score: match.home_score,
         away_score: match.away_score,
         status: match.status,
-        api_id: match.api_id,        // 🟢 SAVES API ID
+        api_id: match.api_id,        
         widget_id: match.widget_id,  
         booking_code: match.booking_code,
         affiliate_link: match.affiliate_link,
@@ -90,7 +87,7 @@ export default function AdminMatchesPage() {
       if (!match) return;
 
       const { data: predictions } = await supabase.from('predictions').select('*').eq('match_id', matchId);
-      if (!predictions || predictions.length === 0) return alert("No predictions found for this match.");
+      if (!predictions || predictions.length === 0) return alert("No predictions found.");
 
       const updates = predictions.map(async (p) => {
           let points = 0;
@@ -148,11 +145,12 @@ export default function AdminMatchesPage() {
                 <input type="text" placeholder="Home Team (e.g. Man City)" className="border p-3 rounded-xl font-bold" value={newMatch.home_team} onChange={e => setNewMatch({...newMatch, home_team: e.target.value})} />
                 <input type="text" placeholder="Away Team (e.g. Chelsea)" className="border p-3 rounded-xl font-bold" value={newMatch.away_team} onChange={e => setNewMatch({...newMatch, away_team: e.target.value})} />
                 <input type="datetime-local" className="border p-3 rounded-xl" value={newMatch.match_date} onChange={e => setNewMatch({...newMatch, match_date: e.target.value})} />
-                <div className="flex gap-2">
-                    <input list="leagues" type="text" placeholder="League" className="border p-3 rounded-xl w-full" value={newMatch.league} onChange={e => setNewMatch({...newMatch, league: e.target.value})} />
-                    <datalist id="leagues"><option value="FA Cup"/><option value="Carabao Cup"/><option value="Champions League"/><option value="Premier League"/><option value="Europa League"/></datalist>
+                
+                <div className="relative">
+                    <input list="leagues" type="text" placeholder="League Name" className="border p-3 rounded-xl w-full" value={newMatch.league} onChange={e => setNewMatch({...newMatch, league: e.target.value})} />
+                    <datalist id="leagues"><option value="FA Cup"/><option value="Carabao Cup"/><option value="Champions League"/><option value="Premier League"/></datalist>
                 </div>
-                {/* 🟢 NEW API ID FIELD IN CREATE */}
+                
                 <input type="text" placeholder="API ID (Optional)" className="border p-3 rounded-xl font-mono text-sm" value={newMatch.api_id} onChange={e => setNewMatch({...newMatch, api_id: e.target.value})} />
             </div>
             <div className="flex justify-end">
@@ -169,80 +167,113 @@ export default function AdminMatchesPage() {
          <input type="text" placeholder="Search matches..." className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition shadow-sm" value={search} onChange={(e) => setSearch(e.target.value)}/>
       </div>
 
-      {/* MATCH LIST */}
+      {/* MATCH LIST (Increased Spacing & Better Grid) */}
       <div className="space-y-8">
         {Object.keys(groupedMatches).map((dateKey) => (
             <div key={dateKey}>
                 <h3 className="font-black text-slate-400 uppercase text-xs tracking-wider mb-3 sticky top-20 bg-slate-50/90 backdrop-blur py-2 z-10 w-fit px-3 rounded">{dateKey}</h3>
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-6"> {/* Cards are now full width with spacing */}
                     {groupedMatches[dateKey].map((match) => (
-                        <div key={match.id} className={`bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col lg:flex-row ${match.status === 'FT' ? 'opacity-70 border-slate-200' : 'border-blue-100'}`}>
+                        <div key={match.id} className={`bg-white rounded-xl shadow-md border overflow-hidden p-6 ${match.status === 'FT' ? 'opacity-80 border-slate-200' : 'border-blue-100'}`}>
                             
-                            {/* 1. TEAMS & SCORES */}
-                            <div className="p-4 lg:w-[35%] border-b lg:border-b-0 lg:border-r border-slate-100 bg-slate-50/30">
-                                <div className="flex justify-between mb-2">
-                                    <span className="text-[9px] font-bold uppercase text-slate-500 border px-1.5 rounded">{match.league}</span>
-                                    <span className="text-[9px] font-mono text-slate-400">{new Date(match.match_date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-2 mb-3">
-                                    <div className="font-bold text-sm text-slate-800 w-full truncate text-right">{match.home_team}</div>
-                                    <div className="flex gap-1 shrink-0">
-                                        <input type="number" className="w-8 h-8 text-center font-bold border rounded bg-white" value={match.home_score} onChange={(e) => handleUpdateChange(match.id, 'home_score', e.target.value)} />
-                                        <input type="number" className="w-8 h-8 text-center font-bold border rounded bg-white" value={match.away_score} onChange={(e) => handleUpdateChange(match.id, 'away_score', e.target.value)} />
+                            {/* TOP ROW: Match Basic Info */}
+                            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 pb-6 border-b border-slate-100">
+                                {/* Teams */}
+                                <div className="flex items-center gap-4 flex-1 w-full justify-center md:justify-start">
+                                    <span className="text-[10px] font-bold uppercase text-slate-500 bg-slate-100 px-2 py-1 rounded shrink-0">{match.league}</span>
+                                    <div className="flex items-center gap-3 text-lg font-bold text-slate-800">
+                                        <span>{match.home_team}</span>
+                                        <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded">
+                                            <input type="number" className="w-10 text-center bg-transparent outline-none" value={match.home_score} onChange={(e) => handleUpdateChange(match.id, 'home_score', e.target.value)} />
+                                            <span>-</span>
+                                            <input type="number" className="w-10 text-center bg-transparent outline-none" value={match.away_score} onChange={(e) => handleUpdateChange(match.id, 'away_score', e.target.value)} />
+                                        </div>
+                                        <span>{match.away_team}</span>
                                     </div>
-                                    <div className="font-bold text-sm text-slate-800 w-full truncate">{match.away_team}</div>
                                 </div>
-                                <div className="flex gap-2">
-                                    <select className="h-8 border rounded text-xs font-bold px-1 bg-white flex-1" value={match.status} onChange={(e) => handleUpdateChange(match.id, 'status', e.target.value)}>
+
+                                {/* Status & Save */}
+                                <div className="flex items-center gap-3 w-full md:w-auto">
+                                    <select className="h-10 border rounded px-3 font-bold bg-white text-sm" value={match.status} onChange={(e) => handleUpdateChange(match.id, 'status', e.target.value)}>
                                         <option value="SCHEDULED">SCHEDULED</option><option value="LIVE">LIVE</option><option value="HT">HT</option><option value="FT">FT</option>
                                     </select>
-                                    <button onClick={() => saveMatch(match)} disabled={savingId === match.id} className={`px-4 py-1 rounded text-xs font-bold text-white transition ${savingId === match.id ? 'bg-green-500' : 'bg-slate-900'}`}>
-                                        {savingId === match.id ? 'Saved' : 'Save'}
+                                    <button onClick={() => saveMatch(match)} disabled={savingId === match.id} className={`h-10 px-6 rounded font-bold text-white transition ${savingId === match.id ? 'bg-green-500' : 'bg-slate-900'}`}>
+                                        {savingId === match.id ? 'Saved!' : 'Save Changes'}
                                     </button>
                                 </div>
                             </div>
 
-                            {/* 2. WIDGET & API LINKS */}
-                            <div className="p-4 lg:w-[35%] border-b lg:border-b-0 lg:border-r border-slate-100">
-                                <div className="flex flex-col gap-3 h-full justify-center">
-                                     {/* 🟢 API ID FIELD */}
-                                     <div className="flex items-center gap-2">
-                                        <Hash size={12} className="text-slate-400"/>
-                                        <input type="text" placeholder="API ID" className="w-full border rounded px-2 py-1 text-xs font-mono bg-slate-50" value={match.api_id || ''} onChange={(e) => handleUpdateChange(match.id, 'api_id', e.target.value)} />
-                                     </div>
-
-                                     <div className={`p-2 rounded border ${match.widget_id ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                         <div className="flex justify-between mb-1">
-                                            <label className="text-[9px] font-bold text-slate-600">Widget ID (ScoreAxis)</label>
-                                            <a href="https://www.scoreaxis.com/widget/live-match-widget" target="_blank" className="text-[9px] text-blue-600 underline font-bold">Get ID</a>
-                                         </div>
-                                         <input type="text" placeholder="Paste ID (e.g. 123456)..." className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs font-mono" value={match.widget_id || ''} onChange={(e) => handleUpdateChange(match.id, 'widget_id', e.target.value)} />
-                                     </div>
-                                </div>
-                            </div>
-
-                            {/* 3. ACTIONS */}
-                            <div className="p-4 lg:w-[30%] bg-slate-50/20 flex flex-col gap-2">
-                                <input type="text" placeholder="🔴 Stream URL" className="w-full border rounded px-2 py-1 text-xs" value={match.livestream_url || ''} onChange={(e) => handleUpdateChange(match.id, 'livestream_url', e.target.value)} />
+                            {/* BOTTOM ROW: Inputs Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 
-                                <div className="flex items-center justify-between mt-1">
-                                    <label className="flex items-center gap-1 cursor-pointer">
-                                        <input type="checkbox" checked={match.is_featured_video || false} onChange={(e) => handleUpdateChange(match.id, 'is_featured_video', e.target.checked)} />
-                                        <span className="text-[10px] font-bold text-slate-500">Feature</span>
-                                    </label>
-                                    <button onClick={() => deleteMatch(match.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
+                                {/* COLUMN 1: IDs & Codes */}
+                                <div className="space-y-3 p-4 bg-slate-50 rounded-xl">
+                                     <h4 className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2"><Hash size={12}/> IDs & Codes</h4>
+                                     
+                                     <div>
+                                        <label className="text-[10px] font-bold text-slate-500 block mb-1">API ID</label>
+                                        <input type="text" className="w-full border rounded px-3 py-2 text-xs font-mono bg-white" value={match.api_id || ''} onChange={(e) => handleUpdateChange(match.id, 'api_id', e.target.value)} />
+                                     </div>
+                                     
+                                     <div>
+                                        <label className="text-[10px] font-bold text-slate-500 block mb-1">Widget ID (ScoreAxis)</label>
+                                        <input type="text" className="w-full border rounded px-3 py-2 text-xs font-mono bg-white" value={match.widget_id || ''} onChange={(e) => handleUpdateChange(match.id, 'widget_id', e.target.value)} />
+                                     </div>
+                                     
+                                     <div>
+                                        <label className="text-[10px] font-bold text-slate-500 block mb-1">Booking Code</label>
+                                        <input type="text" className="w-full border rounded px-3 py-2 text-xs font-mono bg-white" value={match.booking_code || ''} onChange={(e) => handleUpdateChange(match.id, 'booking_code', e.target.value)} />
+                                     </div>
                                 </div>
 
-                                {/* 🟢 SETTLE POINTS BUTTON (ALWAYS VISIBLE BUT DISABLED IF NOT FT) */}
-                                <button 
-                                    onClick={() => settlePoints(match.id)} 
-                                    disabled={match.status !== 'FT' && match.status !== 'FINISHED'}
-                                    className={`w-full mt-2 py-1.5 rounded text-[10px] font-bold flex items-center justify-center gap-1 ${match.status === 'FT' || match.status === 'FINISHED' ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
-                                >
-                                    <CheckCircle size={12}/> {match.points_distributed ? 'Redistribute Points' : 'Settle Points'}
-                                </button>
-                            </div>
+                                {/* COLUMN 2: Media Links */}
+                                <div className="space-y-3 p-4 bg-slate-50 rounded-xl">
+                                     <h4 className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2"><Video size={12}/> Media</h4>
+                                     
+                                     <div>
+                                        <label className="text-[10px] font-bold text-slate-500 block mb-1">Live Stream URL</label>
+                                        <input type="text" className="w-full border rounded px-3 py-2 text-xs bg-white" value={match.livestream_url || ''} onChange={(e) => handleUpdateChange(match.id, 'livestream_url', e.target.value)} />
+                                     </div>
+                                     
+                                     <div>
+                                        <label className="text-[10px] font-bold text-slate-500 block mb-1">Audio URL</label>
+                                        <input type="text" className="w-full border rounded px-3 py-2 text-xs bg-white" value={match.audio_url || ''} onChange={(e) => handleUpdateChange(match.id, 'audio_url', e.target.value)} />
+                                     </div>
+                                     
+                                     <div>
+                                        <label className="text-[10px] font-bold text-slate-500 block mb-1">Highlights Video</label>
+                                        <input type="text" className="w-full border rounded px-3 py-2 text-xs bg-white" value={match.video_url || ''} onChange={(e) => handleUpdateChange(match.id, 'video_url', e.target.value)} />
+                                     </div>
+                                </div>
 
+                                {/* COLUMN 3: Actions */}
+                                <div className="space-y-3 p-4 bg-slate-50 rounded-xl flex flex-col justify-between">
+                                     <h4 className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2"><Trophy size={12}/> Actions</h4>
+
+                                     <div>
+                                        <label className="text-[10px] font-bold text-slate-500 block mb-1">Affiliate Link</label>
+                                        <input type="text" className="w-full border rounded px-3 py-2 text-xs bg-white" value={match.affiliate_link || ''} onChange={(e) => handleUpdateChange(match.id, 'affiliate_link', e.target.value)} />
+                                     </div>
+                                     
+                                     <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border border-slate-200 hover:border-blue-300">
+                                        <input type="checkbox" checked={match.is_featured_video || false} onChange={(e) => handleUpdateChange(match.id, 'is_featured_video', e.target.checked)} />
+                                        <span className="text-xs font-bold text-slate-700">Feature Video on Homepage</span>
+                                     </label>
+
+                                     <div className="grid grid-cols-2 gap-2 mt-auto">
+                                        <button onClick={() => deleteMatch(match.id)} className="flex items-center justify-center gap-2 bg-red-100 text-red-600 hover:bg-red-200 py-2 rounded text-xs font-bold">
+                                            <Trash2 size={14} /> Delete
+                                        </button>
+                                        <button 
+                                            onClick={() => settlePoints(match.id)} 
+                                            className={`flex items-center justify-center gap-2 py-2 rounded text-xs font-bold text-white ${match.points_distributed ? 'bg-green-500' : 'bg-purple-600 hover:bg-purple-700'}`}
+                                        >
+                                            <CheckCircle size={14} /> {match.points_distributed ? 'Done' : 'Settle'}
+                                        </button>
+                                     </div>
+                                </div>
+
+                            </div>
                         </div>
                     ))}
                 </div>
