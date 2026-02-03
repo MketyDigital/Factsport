@@ -1,41 +1,40 @@
 'use client';
-import { useEffect, useRef } from 'react';
 
 export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!matchId || !containerRef.current) return;
-
-    // 1. Clean up previous instance
-    containerRef.current.innerHTML = '';
-
-    // 2. Create the widget container
-    const widgetDiv = document.createElement('div');
-    widgetDiv.className = "scoreaxis-widget";
-    widgetDiv.setAttribute('data-widget-id', matchId);
-    widgetDiv.setAttribute('data-auto-height', '1'); // Keeps it responsive
-    widgetDiv.setAttribute('data-font', '0');
-    widgetDiv.setAttribute('data-body-background', 'FFFFFF');
-    widgetDiv.setAttribute('data-text-color', '000000');
-    // 🔴 REMOVED 'data-links="0"' - This causes blank screens on free plans
-    
-    containerRef.current.appendChild(widgetDiv);
-
-    // 3. Inject Script
-    const script = document.createElement('script');
-    script.src = "https://www.scoreaxis.com/widget/live-match-widget.js";
-    script.async = true;
-    containerRef.current.appendChild(script);
-
-  }, [matchId]);
-
   if (!matchId) return null;
 
+  // We write the HTML exactly as ScoreAxis wants it, inside a sealed box.
+  const widgetHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+            body { margin: 0; padding: 0; display: flex; justify-content: center; background: transparent; }
+            .scoreaxis-widget { width: 100% !important; }
+        </style>
+      </head>
+      <body>
+        <div class="scoreaxis-widget" 
+             data-widget-id="${matchId}" 
+             data-auto-height="1" 
+             data-font="0" 
+             data-body-background="FFFFFF" 
+             data-text-color="000000">
+        </div>
+        <script src="https://www.scoreaxis.com/widget/live-match-widget.js"></script>
+      </body>
+    </html>
+  `;
+
   return (
-    <div className="w-full bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm my-4 min-h-[200px]">
-       <div ref={containerRef} className="w-full"></div>
-       <p className="text-center text-[9px] text-slate-300 py-2">Loading Live Data...</p>
+    <div className="w-full bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm my-4">
+      <iframe
+        srcDoc={widgetHtml}
+        style={{ width: '100%', height: '500px', border: 'none' }}
+        title={`Match Widget ${matchId}`}
+        loading="lazy"
+      />
     </div>
   );
 }
