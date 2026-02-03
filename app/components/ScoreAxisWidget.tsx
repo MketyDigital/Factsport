@@ -23,7 +23,7 @@ export default function ScoreAxisWidget({ matchId, affiliateLink }: { matchId?: 
       <script src="https://www.scoreaxis.com/widget/live-match-widget.js"></script>
     `;
   } else {
-    // 🟢 FULL CODE STRATEGY (Uses your exact embed code)
+    // 🟢 FULL CODE STRATEGY
     widgetContent = matchId;
   }
 
@@ -34,36 +34,41 @@ export default function ScoreAxisWidget({ matchId, affiliateLink }: { matchId?: 
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            /* 1. Page Layout */
+            /* 1. FLEXBOX LAYOUT (The Safer Fix) */
+            /* This forces the footer to the bottom naturally */
             body { 
                 margin: 0; 
                 padding: 0; 
                 background: white; 
                 font-family: sans-serif;
-                overflow: hidden; /* No scrollbars on the iframe itself */
-                padding-bottom: 60px; /* 🟢 Push content up so it doesn't hide behind button */
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                /* Hide scrollbar but allow scrolling */
+                scrollbar-width: none; 
+                -ms-overflow-style: none;
             }
+            body::-webkit-scrollbar { display: none; }
 
+            /* 2. Widget Expands */
             .scoreaxis-widget, iframe { 
                 width: 100% !important; 
                 display: block; 
+                flex: 1; /* Pushes footer down */
             }
 
-            /* 2. 🟢 GRAVITY FIX (Targeting your specific class) */
-            /* This grabs the 'Live data by Scoreaxis' text and pins it to the bottom */
+            /* 3. PUSH FOOTER DOWN & ADD PADDING */
+            /* We target the footer class you provided */
             .widget-main-link, .sa-footer, .sa-copyright {
-                position: fixed !important;
-                bottom: 0px !important;
-                left: 0 !important;
-                width: 100% !important;
+                margin-top: auto !important; /* Flexbox trick to push to bottom */
+                padding-bottom: 80px !important; /* 🟢 Giant padding ensures it sits BEHIND our button */
                 text-align: center !important;
-                background: white !important; /* White background to cover anything behind */
-                z-index: 0 !important;
-                padding-top: 10px !important;
-                padding-bottom: 10px !important;
+                background: white;
+                width: 100%;
+                display: block;
             }
 
-            /* 3. Disable Clicks */
+            /* 4. Disable Clicks */
             a { pointer-events: none !important; cursor: default !important; text-decoration: none !important; }
         </style>
       </head>
@@ -81,23 +86,25 @@ export default function ScoreAxisWidget({ matchId, affiliateLink }: { matchId?: 
         srcDoc={widgetHtml}
         style={{ 
             width: '100%', 
-            height: '550px', // Adjust this if your "Mini Widget" is shorter
+            height: '600px', // Tall enough for your "Mini" layout
             border: 'none', 
             display: 'block' 
         }}
         title="Match Widget"
         loading="lazy"
-        scrolling="no" // No scrollbars
+        scrolling="yes" // Allowed, but hidden via CSS
       />
 
       {/* 🟢 2. MASKING BUTTON (Pins to Bottom) */}
-      {/* This sits perfectly on top of the pinned '.widget-main-link' */}
-      <div className="absolute bottom-0 left-0 w-full bg-white border-t border-slate-100 p-2 flex justify-between items-center z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.1)] h-[55px]">
+      <div className="absolute bottom-0 left-0 w-full bg-white border-t border-slate-100 p-2 flex justify-between items-center z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.1)] h-[60px]">
           <div className="flex items-center gap-2 pl-2">
-              <div className="bg-green-500 text-white p-1 rounded-full animate-pulse">
-                  <DollarSign size={10} />
+              <div className="bg-green-500 text-white p-1.5 rounded-full animate-pulse">
+                  <DollarSign size={12} />
               </div>
-              <span className="text-[10px] font-black text-slate-800 uppercase tracking-wide">Live Odds</span>
+              <div className="flex flex-col">
+                  <span className="text-[10px] font-black text-slate-800 uppercase tracking-wide leading-none">Best Odds</span>
+                  <span className="text-[8px] font-bold text-slate-400">Instant Payouts</span>
+              </div>
           </div>
           <a 
               href={finalLink} 
