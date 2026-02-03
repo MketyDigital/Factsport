@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Video, ExternalLink, Youtube, Newspaper, Radio, Award, Calendar, TrendingUp } from "lucide-react";
+import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Video, ExternalLink, Youtube, Newspaper, Radio, TrendingUp } from "lucide-react";
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import NewsArtwork from '@/app/components/NewsArtwork';
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
@@ -46,7 +46,7 @@ async function getHomepageData(leagueFilter: string | undefined) {
       matchQuery = matchQuery
         .or(`status.eq.LIVE,status.eq.IN_PLAY,status.eq.HT,match_date.gte.${today}`)
         .order('match_date', { ascending: true })
-        .limit(20);
+        .limit(30);
   }
 
   const [matchesRes, newsRes, highlightsRes] = await Promise.all([
@@ -84,12 +84,15 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const finalHeadlines = headlines.length > 0 ? headlines : news.slice(0, 3);
   const latestNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id) && !n.is_breaking).slice(0, 5);
 
-  // ⚡ HERO LOGIC: "Smart Broadcasting"
-  // 1. Must have Widget ID.
-  // 2. Must have EITHER Audio URL OR Livestream URL.
-  const heroMatches = matches.filter(m => m.widget_id && (m.audio_url || m.livestream_url)).slice(0, 2);
+  // ⚡ SMART HERO LOGIC ⚡
+  // 1. Must have Widget ID (scoreaxis).
+  // 2. Must have Audio OR Video (Broadcasting).
+  // 3. Limit to 2 matches max.
+  const heroMatches = matches
+    .filter(m => m.widget_id && (m.audio_url || m.livestream_url))
+    .slice(0, 2);
   
-  // The rest of the matches go in the list (exclude the hero matches from the list)
+  // Filter hero matches out of the main list so they don't show twice
   const displayMatches = matches.filter(m => !heroMatches.some(h => h.id === m.id));
 
   return (
@@ -170,7 +173,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </div>
 
-      {/* 5. MATCH CENTER (With Smart Hero Section) */}
+      {/* 5. MATCH CENTER (Smart Hero Section) */}
       <section className="mt-6">
          <div className="px-4 flex justify-between items-center mb-2">
             <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2">
@@ -181,6 +184,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             </Link>
         </div>
         
+        {/* League Tabs */}
         <div className="bg-white border-y border-slate-200 sticky top-0 z-30 overflow-x-auto scrollbar-hide py-2 shadow-sm mb-4">
             <div className="flex px-4 space-x-2 min-w-max">
             <Link href="/" scroll={false} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all ${!selectedLeague ? 'bg-[#0a1428] text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200'}`}>For You</Link>
@@ -190,26 +194,33 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             </div>
         </div>
 
-        {/* 🟢 HERO SECTION: Handles 1 or 2 Matches */}
+        {/* 🟢 HERO SECTION: Handles 1 or 2 Matches Side-by-Side */}
         {!selectedLeague && heroMatches.length > 0 && (
-         <div className={`px-4 mb-4 grid gap-3 ${heroMatches.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+         <div className="px-4 mb-4 flex gap-2 overflow-x-auto">
              {heroMatches.map((match) => (
-                <Link key={match.id} href={`/match/${match.id}`} className="block relative z-10">
+                <Link key={match.id} href={`/match/${match.id}`} className={`block relative z-10 ${heroMatches.length > 1 ? 'w-[85%] shrink-0' : 'w-full'}`}>
                     <div className="bg-gradient-to-br from-blue-600 to-blue-900 rounded-2xl p-4 shadow-xl border border-white/10 relative overflow-hidden group hover:scale-[1.01] transition-transform">
+                        {/* Status Tag */}
                         {['LIVE','HT','IN_PLAY'].includes(match.status) && (
                             <div className="absolute top-3 right-3 bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1 shadow-lg">
                                 <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE
                             </div>
                         )}
                         
-                        <div className="flex justify-between items-center mt-2">
-                            {/* Home Team */}
+                        {/* Media Indicator */}
+                        <div className="absolute top-3 left-3 bg-black/40 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1">
+                             {match.livestream_url ? <Video size={8} /> : <Radio size={8} />}
+                             {match.livestream_url ? 'WATCH' : 'AUDIO'}
+                        </div>
+
+                        <div className="flex justify-between items-center mt-6">
+                            {/* Home */}
                             <div className="flex flex-col items-center w-[30%]">
                                 {match.home_logo ? <img src={match.home_logo} className="w-10 h-10 object-contain mb-2 drop-shadow-md"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px]">H</div>}
                                 <span className="text-[10px] font-bold text-center leading-tight text-white line-clamp-1">{match.home_team}</span>
                             </div>
 
-                            {/* Score/Time */}
+                            {/* Score */}
                             <div className="flex flex-col items-center w-[40%]">
                                 <div className="text-xl font-black tabular-nums tracking-widest bg-black/30 px-2 py-1 rounded-lg backdrop-blur-md border border-white/5 shadow-inner text-white whitespace-nowrap">
                                     {match.status === 'SCHEDULED' || match.status === 'PRE' ? <span className="text-sm">VS</span> : `${match.home_score}-${match.away_score}`}
@@ -222,7 +233,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                 </span>
                             </div>
 
-                            {/* Away Team */}
+                            {/* Away */}
                             <div className="flex flex-col items-center w-[30%]">
                                 {match.away_logo ? <img src={match.away_logo} className="w-10 h-10 object-contain mb-2 drop-shadow-md"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px]">A</div>}
                                 <span className="text-[10px] font-bold text-center leading-tight text-white line-clamp-1">{match.away_team}</span>
