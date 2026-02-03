@@ -3,15 +3,13 @@
 export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
   if (!matchId) return null;
 
-  // 1. Check if user pasted a simple ID (12345) or full code (<iframe...)
   const isRawId = /^\d+$/.test(matchId.trim());
 
   let widgetContent = '';
 
   if (isRawId) {
     // 🟢 RAW ID STRATEGY
-    // We construct the HTML manually. Note: data-links="1" is REQUIRED to prevent blank screen.
-    // We will hide the actual links via CSS instead.
+    // We MUST set data-links="1" to avoid the blank screen.
     widgetContent = `
       <div class="scoreaxis-widget" 
            data-widget-id="${matchId}" 
@@ -25,11 +23,10 @@ export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
     `;
   } else {
     // 🟢 FULL EMBED CODE STRATEGY
-    // We use exactly what you pasted in Admin
     widgetContent = matchId;
   }
 
-  // ⚡ CSS INJECTION TO FIX SIZE & HIDE LOGO ⚡
+  // ⚡ THE "FREEZE" CSS INJECTION ⚡
   const widgetHtml = `
     <!DOCTYPE html>
     <html>
@@ -37,7 +34,7 @@ export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            /* 1. Force Responsive Container */
+            /* 1. Basic Reset */
             body { margin: 0; padding: 0; overflow-x: hidden; width: 100%; font-family: sans-serif; }
             
             /* 2. Constrain the Widget */
@@ -47,13 +44,20 @@ export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
                 display: block; 
             }
 
-            /* 3. 🔴 HIDE LOGO & FOOTER LINKS 🔴 */
-            /* We use !important to override their inline styles */
-            a[href*="scoreaxis.com"] { display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none; }
-            .sa-footer, .sa-copyright { display: none !important; height: 0 !important; overflow: hidden !important; }
+            /* 3. 🔴 DISABLE CLICKS ON LOGO 🔴 */
+            /* We target all links (<a> tags) inside the widget */
+            a { 
+                pointer-events: none !important; /* Makes it unclickable */
+                cursor: default !important;      /* Keeps the mouse pointer normal (not a hand) */
+                text-decoration: none !important; 
+                color: inherit !important;
+            }
             
-            /* Target generic footer containers based on common styles */
-            div[style*="font-size: 10px"], div[style*="text-align: right"] { display: none !important; }
+            /* Optional: Make the footer smaller/greyer so it's less noticeable */
+            .sa-footer, .sa-copyright {
+                opacity: 0.5;
+                filter: grayscale(100%);
+            }
         </style>
       </head>
       <body>
@@ -68,7 +72,7 @@ export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
         srcDoc={widgetHtml}
         style={{ 
             width: '100%', 
-            height: '650px', // Tall enough for stats, scrollable if needed
+            height: '500px', 
             border: 'none',
             display: 'block'
         }}
