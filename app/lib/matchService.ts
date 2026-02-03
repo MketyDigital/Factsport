@@ -57,7 +57,7 @@ export async function getLeagueMatches(leagueId: string, leagueName: string, dat
   try {
     const res = await fetch(`${BASE_URL}/competitions/${code}/matches?dateFrom=${dateStr}&dateTo=${dateStr}`, {
       headers: { 'X-Auth-Token': API_KEY },
-      next: { revalidate: 60 }
+      cache: 'no-store'
     });
     
     if (!res.ok) return [];
