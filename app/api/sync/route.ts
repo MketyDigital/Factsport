@@ -18,47 +18,42 @@ export async function GET(req: Request) {
         { auth: { persistSession: false } }
     );
 
+    // List of leagues to sync. The ID param is ignored by the new adapter, only name matters.
     const leagues = [
-      { id: 'eng.1', name: 'Premier League' },
-      { id: 'esp.1', name: 'La Liga' },
-      { id: 'ger.1', name: 'Bundesliga' },
-      { id: 'ita.1', name: 'Serie A' },
-      { id: 'fra.1', name: 'Ligue 1' },
-      { id: 'uefa.champions', name: 'Champions League' },
-      { id: 'uefa.europa', name: 'Europa League' },
-      { id: 'eng.fa.cup', name: 'FA Cup' },
-      { id: 'eng.league_cup', name: 'Carabao Cup' },
-      { id: 'esp.copa_del_rey', name: 'Copa del Rey' },
-      { id: 'ita.coppa_italia', name: 'Coppa Italia' },
-      { id: 'ger.dfb_pokal', name: 'DFB Pokal' },
-      { id: 'fifa.world', name: 'World Cup' },
-      { id: 'uefa.euro', name: 'Euros' }
+      { id: 'ignored', name: 'Premier League' },
+      { id: 'ignored', name: 'La Liga' },
+      { id: 'ignored', name: 'Bundesliga' },
+      { id: 'ignored', name: 'Serie A' },
+      { id: 'ignored', name: 'Ligue 1' },
+      { id: 'ignored', name: 'Champions League' },
     ];
 
-    const getFormattedDate = (daysOffset: number) => {
+    // Fetch yesterday, today, tomorrow to be safe
+    const dates = [0].map(offset => {
         const d = new Date();
-        d.setDate(d.getDate() + daysOffset);
-        return d.toISOString().split('T')[0].replace(/-/g, '');
-    };
+        d.setDate(d.getDate() + offset);
+        return d.toISOString().split('T')[0];
+    });
 
-    const datesToFetch = [getFormattedDate(-1), getFormattedDate(0), getFormattedDate(1)]; 
-    const requests = [];
+    let allMatches: any[] = [];
 
-    for (const league of leagues) {
-        for (const dateStr of datesToFetch) {
-            requests.push(getLeagueMatches(league.id, league.name, dateStr));
-        }
+    // Loop through dates and leagues
+    for (const date of dates) {
+        const requests = leagues.map(l => getLeagueMatches(l.id, l.name, date));
+        const results = await Promise.all(requests);
+        allMatches = [...allMatches, ...results.flat()];
     }
 
-    const results = await Promise.all(requests);
-    const matchesToSync = results.flat();
-
-    if (matchesToSync.length > 0) {
-      const { error } = await supabase.from('matches').upsert(matchesToSync, { onConflict: 'api_id' }); 
+    if (allMatches.length > 0) {
+      // Upsert using the new API_ID column
+      const { error } = await supabase.from('matches').upsert(allMatches, { 
+          onConflict: 'api_id',
+          ignoreDuplicates: false 
+      }); 
       if (error) throw error;
     }
 
-    return NextResponse.json({ success: true, count: matchesToSync.length });
+    return NextResponse.json({ success: true, synced: allMatches.length });
 
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
