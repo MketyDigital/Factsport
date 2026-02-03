@@ -26,19 +26,17 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const dbData = await getSupabaseData(resolvedParams.id);
   if (!dbData) return notFound();
 
-  // We still fetch external data for the Scoreboard (Live Goals)
   const data = await getExternalData(dbData);
-  
   const activeVideoUrl = dbData.livestream_url || dbData.video_url;
   const isLiveStream = !!dbData.livestream_url;
-  
-  // 🟢 LOGIC: If we have a Widget, we don't need the fallback stats.
+
+  // Logic: Only show Fallback Stats if Widget is MISSING
   const showFallbackStats = !dbData.widget_id; 
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       
-      {/* 1. HEADER (Natural Scroll) */}
+      {/* 1. HEADER */}
       <div className="relative bg-[#0a1428] text-white pb-6 rounded-b-[2rem] overflow-hidden shadow-2xl">
         <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
         <div className="relative z-10 p-4 flex items-center justify-between">
@@ -48,17 +46,14 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           <span className="text-xs font-bold tracking-widest opacity-70 uppercase">{dbData.league}</span>
           <div className="w-10"></div>
         </div>
-
-        {/* Realtime Scoreboard */}
         <MatchHeaderClient matchId={dbData.id} initialData={dbData} initialGoals={data.goals} />
       </div>
 
       <div className="mx-4 mt-4 relative z-20 space-y-4">
         
-        {/* 🟢 2. SCOREAXIS WIDGET (Premium Visuals) */}
-        {/* If this exists, it replaces the stats section below */}
+        {/* 🟢 2. SCOREAXIS WIDGET (With Integrated Bet Button) */}
         {dbData.widget_id && (
-             <ScoreAxisWidget matchId={dbData.widget_id} />
+             <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={dbData.affiliate_link} />
         )}
 
         {/* 3. VIDEO PLAYER */}
@@ -105,24 +100,10 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
            <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
         </div>
 
-        {/* 6. BETTING BANNER */}
-        <div className="bg-[#1A1A1A] rounded-xl p-3 shadow-lg border border-white/5 flex items-center justify-between relative overflow-hidden">
-            <div className="absolute top-0 right-0 bg-blue-600 w-16 h-full blur-[40px] opacity-20"></div>
-            <div className="flex items-center gap-3 relative z-10">
-                 <div className="bg-blue-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded">1X</div>
-                 <div>
-                     <div className="text-white font-bold text-xs">1xBet Official</div>
-                     <div className="text-[9px] text-slate-400">Code: <span className="text-white font-bold tracking-wider">{dbData.booking_code || "FACTSPORT"}</span></div>
-                 </div>
-            </div>
-            <a href={dbData.affiliate_link || "#"} target="_blank" className="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase px-4 py-2 rounded-lg shadow-lg text-[10px] flex items-center gap-1 active:scale-95 transition">
-                Bet <LinkIcon size={10} />
-            </a>
-        </div>
+        {/* 🔴 REMOVED: The old "1xBet Official" banner is gone from here. */}
       </div>
 
-      {/* 🟢 7. CONDITIONAL CONTENT SECTION */}
-      {/* Logic: Only show Football API Stats/Tabs if the Widget is MISSING */}
+      {/* 6. CONDITIONAL CONTENT SECTION */}
       {showFallbackStats && (
           <>
             {!data.hasExternalData ? (
@@ -131,7 +112,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                 </div>
             ) : (
                 <div className="px-4 mt-8 space-y-6">
-                    {/* Live Feed */}
                     {data.commentary.length > 0 && (
                         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
                             <div className="flex items-center gap-2 mb-4 text-slate-400">
@@ -148,15 +128,13 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                             </div>
                         </div>
                     )}
-                    
-                    {/* Lineups & Stats Tabs */}
                     <StatsLineupsTabs data={data} />
                 </div>
             )}
           </>
       )}
 
-      {/* 8. FREE TIPS */}
+      {/* 7. FREE TIPS (Kept at bottom) */}
       <div className="px-4 mt-6">
         <FreeTipsBanner />
       </div>

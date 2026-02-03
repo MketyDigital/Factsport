@@ -1,15 +1,13 @@
 'use client';
+import { ExternalLink, DollarSign } from 'lucide-react';
 
-export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
+export default function ScoreAxisWidget({ matchId, affiliateLink }: { matchId?: string, affiliateLink?: string }) {
   if (!matchId) return null;
 
   const isRawId = /^\d+$/.test(matchId.trim());
-
   let widgetContent = '';
 
   if (isRawId) {
-    // 🟢 RAW ID STRATEGY
-    // We MUST set data-links="1" to avoid the blank screen.
     widgetContent = `
       <div class="scoreaxis-widget" 
            data-widget-id="${matchId}" 
@@ -22,11 +20,9 @@ export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
       <script src="https://www.scoreaxis.com/widget/live-match-widget.js"></script>
     `;
   } else {
-    // 🟢 FULL EMBED CODE STRATEGY
     widgetContent = matchId;
   }
 
-  // ⚡ THE "FREEZE" CSS INJECTION ⚡
   const widgetHtml = `
     <!DOCTYPE html>
     <html>
@@ -34,30 +30,14 @@ export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            /* 1. Basic Reset */
             body { margin: 0; padding: 0; overflow-x: hidden; width: 100%; font-family: sans-serif; }
+            .scoreaxis-widget, iframe { width: 100% !important; max-width: 100vw !important; display: block; }
             
-            /* 2. Constrain the Widget */
-            .scoreaxis-widget, iframe { 
-                width: 100% !important; 
-                max-width: 100vw !important;
-                display: block; 
-            }
-
-            /* 3. 🔴 DISABLE CLICKS ON LOGO 🔴 */
-            /* We target all links (<a> tags) inside the widget */
-            a { 
-                pointer-events: none !important; /* Makes it unclickable */
-                cursor: default !important;      /* Keeps the mouse pointer normal (not a hand) */
-                text-decoration: none !important; 
-                color: inherit !important;
-            }
+            /* Disable clicks inside the widget to prevent leaving the site */
+            a { pointer-events: none !important; cursor: default !important; text-decoration: none !important; color: inherit !important; }
             
-            /* Optional: Make the footer smaller/greyer so it's less noticeable */
-            .sa-footer, .sa-copyright {
-                opacity: 0.5;
-                filter: grayscale(100%);
-            }
+            /* Make footer tiny so it's easier to cover */
+            .sa-footer, .sa-copyright { font-size: 10px !important; opacity: 1; }
         </style>
       </head>
       <body>
@@ -67,18 +47,34 @@ export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
   `;
 
   return (
-    <div className="w-full bg-white rounded-xl border border-slate-200 shadow-sm my-4 overflow-hidden relative">
+    <div className="w-full bg-white rounded-xl border border-slate-200 shadow-sm my-4 overflow-hidden relative group">
+      {/* 1. THE WIDGET */}
       <iframe
         srcDoc={widgetHtml}
-        style={{ 
-            width: '100%', 
-            height: '500px', 
-            border: 'none',
-            display: 'block'
-        }}
+        style={{ width: '100%', height: '450px', border: 'none', display: 'block' }}
         title="Match Widget"
         loading="lazy"
       />
+
+      {/* 🟢 2. MASKING BET BUTTON (Floats on top of the footer) */}
+      {/* Position 'absolute bottom-0' makes it stick to the bottom, covering the logo. */}
+      {affiliateLink && (
+        <div className="absolute bottom-0 left-0 w-full bg-white/95 backdrop-blur-sm border-t border-slate-100 p-2 flex justify-between items-center z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+            <div className="flex items-center gap-2 pl-2">
+                <div className="bg-green-500 text-white p-1 rounded-full animate-pulse">
+                    <DollarSign size={10} />
+                </div>
+                <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wide">Live Odds</span>
+            </div>
+            <a 
+                href={affiliateLink} 
+                target="_blank" 
+                className="bg-[#0a1428] text-white text-[10px] font-black uppercase px-6 py-2.5 rounded-lg flex items-center gap-2 shadow hover:bg-blue-900 transition active:scale-95"
+            >
+                Bet on 1xBet <ExternalLink size={10} />
+            </a>
+        </div>
+      )}
     </div>
   );
 }
