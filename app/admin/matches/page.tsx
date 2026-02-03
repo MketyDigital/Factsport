@@ -3,7 +3,7 @@ export const runtime = 'edge';
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
-import { Search, Plus, Save, Trash2, Calendar, Link as LinkIcon, Video, ExternalLink, Filter, CheckCircle } from 'lucide-react';
+import { Search, Plus, Save, Trash2, Calendar, Link as LinkIcon, Video, ExternalLink, Filter, CheckCircle, Hash } from 'lucide-react';
 
 export default function AdminMatchesPage() {
   const supabase = createClient();
@@ -15,12 +15,11 @@ export default function AdminMatchesPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   
-  // Filter defaults to 'future' to see upcoming games easily
   const [filterMode, setFilterMode] = useState<'week' | 'future' | 'finished'>('future');
 
-  // New Match Form State
+  // 🟢 NEW MATCH FORM (With API ID)
   const [newMatch, setNewMatch] = useState({
-    home_team: '', away_team: '', league: 'FA Cup', match_date: '', home_logo: '', away_logo: ''
+    home_team: '', away_team: '', league: 'FA Cup', match_date: '', home_logo: '', away_logo: '', api_id: ''
   });
 
   useEffect(() => { fetchMatches(); }, [filterMode]);
@@ -30,19 +29,13 @@ export default function AdminMatchesPage() {
     let query = supabase.from('matches').select('*');
 
     if (filterMode === 'future') {
-        query = query.gte('match_date', new Date().toISOString())
-                     .order('match_date', { ascending: true })
-                     .limit(50);
+        query = query.gte('match_date', new Date().toISOString()).order('match_date', { ascending: true }).limit(50);
     } else if (filterMode === 'finished') {
-        query = query.lte('match_date', new Date().toISOString())
-                     .order('match_date', { ascending: false })
-                     .limit(50);
+        query = query.lte('match_date', new Date().toISOString()).order('match_date', { ascending: false }).limit(50);
     } else {
         const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
         const nextWeek = new Date(); nextWeek.setDate(nextWeek.getDate() + 7);
-        query = query.gte('match_date', yesterday.toISOString())
-                     .lte('match_date', nextWeek.toISOString())
-                     .order('match_date', { ascending: true });
+        query = query.gte('match_date', yesterday.toISOString()).lte('match_date', nextWeek.toISOString()).order('match_date', { ascending: true });
     }
 
     if (search) query = query.or(`home_team.ilike.%${search}%,away_team.ilike.%${search}%`);
@@ -55,7 +48,6 @@ export default function AdminMatchesPage() {
   const handleCreate = async () => {
     if (!newMatch.home_team || !newMatch.match_date) return alert("Please fill required fields");
     setLoading(true);
-    // Status defaults to SCHEDULED
     const { error } = await supabase.from('matches').insert([{ ...newMatch, status: 'SCHEDULED' }]);
     if (error) alert("Error: " + error.message);
     else { setIsCreating(false); fetchMatches(); }
@@ -72,6 +64,7 @@ export default function AdminMatchesPage() {
         home_score: match.home_score,
         away_score: match.away_score,
         status: match.status,
+        api_id: match.api_id,        // 🟢 SAVES API ID
         widget_id: match.widget_id,  
         booking_code: match.booking_code,
         affiliate_link: match.affiliate_link,
@@ -91,44 +84,29 @@ export default function AdminMatchesPage() {
     fetchMatches();
   };
 
-  // 🟢 SETTLE POINTS FUNCTION (Restored)
   const settlePoints = async (matchId: string) => {
       if (!confirm("⚠️ Confirm Result? This distributes points to users.")) return;
-      
       const { data: match } = await supabase.from('matches').select('*').eq('id', matchId).single();
       if (!match) return;
 
-      // 1. Fetch predictions
       const { data: predictions } = await supabase.from('predictions').select('*').eq('match_id', matchId);
-      if (!predictions) return alert("No predictions found for this match.");
+      if (!predictions || predictions.length === 0) return alert("No predictions found for this match.");
 
       const updates = predictions.map(async (p) => {
           let points = 0;
           let isCorrect = false;
-
-          // Simple Logic: 1X2 Prediction
           const result = match.home_score > match.away_score ? '1' : match.home_score < match.away_score ? '2' : 'X';
           
-          if (p.prediction === result) {
-              points = 3; 
-              isCorrect = true;
-          }
-
-          // Update Prediction
+          if (p.prediction === result) { points = 3; isCorrect = true; }
           await supabase.from('predictions').update({ status: isCorrect ? 'won' : 'lost', points_earned: points }).eq('id', p.id);
           
-          // Update User Profile Points
           if (isCorrect) {
              const { data: profile } = await supabase.from('profiles').select('total_points').eq('id', p.user_id).single();
-             if (profile) {
-                 await supabase.from('profiles').update({ total_points: (profile.total_points || 0) + points }).eq('id', p.user_id);
-             }
+             if (profile) await supabase.from('profiles').update({ total_points: (profile.total_points || 0) + points }).eq('id', p.user_id);
           }
       });
 
       await Promise.all(updates);
-      
-      // Mark match as distributed
       await supabase.from('matches').update({ points_distributed: true }).eq('id', matchId);
       alert("✅ Points distributed successfully.");
       fetchMatches();
@@ -170,19 +148,12 @@ export default function AdminMatchesPage() {
                 <input type="text" placeholder="Home Team (e.g. Man City)" className="border p-3 rounded-xl font-bold" value={newMatch.home_team} onChange={e => setNewMatch({...newMatch, home_team: e.target.value})} />
                 <input type="text" placeholder="Away Team (e.g. Chelsea)" className="border p-3 rounded-xl font-bold" value={newMatch.away_team} onChange={e => setNewMatch({...newMatch, away_team: e.target.value})} />
                 <input type="datetime-local" className="border p-3 rounded-xl" value={newMatch.match_date} onChange={e => setNewMatch({...newMatch, match_date: e.target.value})} />
-                
-                {/* 🟢 CUSTOM LEAGUE INPUT */}
-                <div className="relative">
-                    <input list="leagues" type="text" placeholder="League Name (Type or Select)" className="border p-3 rounded-xl w-full" value={newMatch.league} onChange={e => setNewMatch({...newMatch, league: e.target.value})} />
-                    <datalist id="leagues">
-                        <option value="FA Cup"/>
-                        <option value="Carabao Cup"/>
-                        <option value="Champions League"/>
-                        <option value="Premier League"/>
-                        <option value="Europa League"/>
-                        <option value="Friendly"/>
-                    </datalist>
+                <div className="flex gap-2">
+                    <input list="leagues" type="text" placeholder="League" className="border p-3 rounded-xl w-full" value={newMatch.league} onChange={e => setNewMatch({...newMatch, league: e.target.value})} />
+                    <datalist id="leagues"><option value="FA Cup"/><option value="Carabao Cup"/><option value="Champions League"/><option value="Premier League"/><option value="Europa League"/></datalist>
                 </div>
+                {/* 🟢 NEW API ID FIELD IN CREATE */}
+                <input type="text" placeholder="API ID (Optional)" className="border p-3 rounded-xl font-mono text-sm" value={newMatch.api_id} onChange={e => setNewMatch({...newMatch, api_id: e.target.value})} />
             </div>
             <div className="flex justify-end">
                 <button onClick={handleCreate} disabled={loading} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold">
@@ -231,27 +202,28 @@ export default function AdminMatchesPage() {
                                 </div>
                             </div>
 
-                            {/* 2. WIDGET & LINKS */}
+                            {/* 2. WIDGET & API LINKS */}
                             <div className="p-4 lg:w-[35%] border-b lg:border-b-0 lg:border-r border-slate-100">
                                 <div className="flex flex-col gap-3 h-full justify-center">
+                                     {/* 🟢 API ID FIELD */}
+                                     <div className="flex items-center gap-2">
+                                        <Hash size={12} className="text-slate-400"/>
+                                        <input type="text" placeholder="API ID" className="w-full border rounded px-2 py-1 text-xs font-mono bg-slate-50" value={match.api_id || ''} onChange={(e) => handleUpdateChange(match.id, 'api_id', e.target.value)} />
+                                     </div>
+
                                      <div className={`p-2 rounded border ${match.widget_id ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                                          <div className="flex justify-between mb-1">
-                                            <label className="text-[9px] font-bold text-slate-600">Widget ID (For FA Cup/Other)</label>
+                                            <label className="text-[9px] font-bold text-slate-600">Widget ID (ScoreAxis)</label>
                                             <a href="https://www.scoreaxis.com/widget/live-match-widget" target="_blank" className="text-[9px] text-blue-600 underline font-bold">Get ID</a>
                                          </div>
-                                         <input type="text" placeholder="Paste ScoreAxis ID..." className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs font-mono" value={match.widget_id || ''} onChange={(e) => handleUpdateChange(match.id, 'widget_id', e.target.value)} />
-                                     </div>
-                                     <div className="grid grid-cols-2 gap-2">
-                                         <input type="text" placeholder="Booking Code" className="border rounded px-2 py-1 text-xs" value={match.booking_code || ''} onChange={(e) => handleUpdateChange(match.id, 'booking_code', e.target.value)} />
-                                         <input type="text" placeholder="Affiliate Link" className="border rounded px-2 py-1 text-xs" value={match.affiliate_link || ''} onChange={(e) => handleUpdateChange(match.id, 'affiliate_link', e.target.value)} />
+                                         <input type="text" placeholder="Paste ID (e.g. 123456)..." className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs font-mono" value={match.widget_id || ''} onChange={(e) => handleUpdateChange(match.id, 'widget_id', e.target.value)} />
                                      </div>
                                 </div>
                             </div>
 
-                            {/* 3. MEDIA & ACTIONS */}
+                            {/* 3. ACTIONS */}
                             <div className="p-4 lg:w-[30%] bg-slate-50/20 flex flex-col gap-2">
-                                <input type="text" placeholder="🔴 Live Stream URL" className="w-full border rounded px-2 py-1 text-xs" value={match.livestream_url || ''} onChange={(e) => handleUpdateChange(match.id, 'livestream_url', e.target.value)} />
-                                <input type="text" placeholder="🎧 Audio URL" className="w-full border rounded px-2 py-1 text-xs" value={match.audio_url || ''} onChange={(e) => handleUpdateChange(match.id, 'audio_url', e.target.value)} />
+                                <input type="text" placeholder="🔴 Stream URL" className="w-full border rounded px-2 py-1 text-xs" value={match.livestream_url || ''} onChange={(e) => handleUpdateChange(match.id, 'livestream_url', e.target.value)} />
                                 
                                 <div className="flex items-center justify-between mt-1">
                                     <label className="flex items-center gap-1 cursor-pointer">
@@ -261,12 +233,14 @@ export default function AdminMatchesPage() {
                                     <button onClick={() => deleteMatch(match.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
                                 </div>
 
-                                {/* 🟢 SETTLE POINTS BUTTON */}
-                                {match.status === 'FT' && !match.points_distributed && (
-                                    <button onClick={() => settlePoints(match.id)} className="w-full mt-2 bg-purple-600 hover:bg-purple-700 text-white py-1.5 rounded text-[10px] font-bold flex items-center justify-center gap-1">
-                                        <CheckCircle size={12}/> Distribute Points
-                                    </button>
-                                )}
+                                {/* 🟢 SETTLE POINTS BUTTON (ALWAYS VISIBLE BUT DISABLED IF NOT FT) */}
+                                <button 
+                                    onClick={() => settlePoints(match.id)} 
+                                    disabled={match.status !== 'FT' && match.status !== 'FINISHED'}
+                                    className={`w-full mt-2 py-1.5 rounded text-[10px] font-bold flex items-center justify-center gap-1 ${match.status === 'FT' || match.status === 'FINISHED' ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                                >
+                                    <CheckCircle size={12}/> {match.points_distributed ? 'Redistribute Points' : 'Settle Points'}
+                                </button>
                             </div>
 
                         </div>

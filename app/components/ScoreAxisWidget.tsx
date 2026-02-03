@@ -2,50 +2,46 @@
 import { useEffect, useRef } from 'react';
 
 export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
-  const widgetContainerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!matchId || !widgetContainerRef.current) return;
+    if (!matchId || !containerRef.current) return;
 
-    // 1. Clear any existing widget to prevent duplicates
-    widgetContainerRef.current.innerHTML = '';
+    // 1. Wipe container clean
+    containerRef.current.innerHTML = '';
 
-    // 2. Create the wrapper DIV that ScoreAxis looks for
+    // 2. Create the wrapper DIV
     const widgetDiv = document.createElement('div');
-    // This class and attribute are vital for their script to find the element
-    widgetDiv.className = "scoreaxis-widget"; 
+    widgetDiv.className = "scoreaxis-widget";
     widgetDiv.setAttribute('data-widget-id', matchId);
-    widgetDiv.setAttribute('data-auto-height', '1'); // Auto-resize height
-    widgetDiv.setAttribute('data-font', '0'); // System font
+    widgetDiv.setAttribute('data-auto-height', '1');
+    widgetDiv.setAttribute('data-font', '0');
     widgetDiv.setAttribute('data-body-background', 'FFFFFF');
     widgetDiv.setAttribute('data-text-color', '000000');
-    widgetDiv.setAttribute('data-links', '0'); // Disable external links if possible
+    widgetDiv.setAttribute('data-links', '0'); 
+    
+    // 3. Append DIV first
+    containerRef.current.appendChild(widgetDiv);
 
-    // 3. Append the wrapper to our container
-    widgetContainerRef.current.appendChild(widgetDiv);
-
-    // 4. Inject the Script
+    // 4. Inject Script (Force Reload)
     const script = document.createElement('script');
     script.src = "https://www.scoreaxis.com/widget/live-match-widget.js";
     script.async = true;
-    widgetContainerRef.current.appendChild(script);
+    containerRef.current.appendChild(script);
 
-    return () => {
-      // Cleanup on unmount
-      if (widgetContainerRef.current) {
-        widgetContainerRef.current.innerHTML = '';
-      }
-    };
   }, [matchId]);
 
   if (!matchId) return null;
 
   return (
-    <div 
-      ref={widgetContainerRef} 
-      className="w-full bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm my-4 min-h-[200px]"
-    >
-      {/* Widget loads here */}
+    <div className="w-full bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm my-4 min-h-[400px]">
+       {/* 🟢 Container for the widget */}
+       <div ref={containerRef} className="w-full"></div>
+       
+       {/* 🟢 Fallback Text (Shows only if widget is loading slowly) */}
+       <div className="text-center py-2 text-[10px] text-slate-300">
+          Loading Match Data...
+       </div>
     </div>
   );
 }
