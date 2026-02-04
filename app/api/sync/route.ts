@@ -1,66 +1,93 @@
 export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
 
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/app/lib/supabase/server';
 import { getLeagueMatches } from '@/app/lib/matchService';
+import { NextResponse } from 'next/server';
 
-export async function GET(req: Request) {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const key = searchParams.get('key');
+  const type = searchParams.get('type') || 'live'; // Default to 'live' if missing
+
+  // 1. Security Check
+  if (key !== process.env.CRON_KEY) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const supabase = createClient();
+
+  // 2. Define Leagues to Sync (Includes Major Leagues + Int'l Tournaments)
+  const leagues = [
+    { id: 'PL', name: 'Premier League' },
+    { id: 'PD', name: 'La Liga' },
+    { id: 'BL1', name: 'Bundesliga' },
+    { id: 'SA', name: 'Serie A' },
+    { id: 'FL1', name: 'Ligue 1' },
+    { id: 'CL', name: 'Champions League' },
+    { id: 'EC', name: 'European Championship' }, // Euros
+    { id: 'WC', name: 'World Cup' }              // World Cup
+  ];
+
+  // 3. Smart Date Logic (Live vs Full Mode)
+  // We explicitly type this as a string array to fix the TypeScript error.
+  const daysToSync: string[] = []; 
+  
+  if (type === 'full') {
+      // FULL MODE: Sync Yesterday + Next 14 Days (Heavy, run rarely - e.g., every 12h)
+      // This fills your schedule/calendar so the "Future" tab is never empty.
+      for (let i = -1; i <= 14; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() + i);
+        daysToSync.push(date.toISOString().split('T')[0]);
+      }
+  } else {
+      // LIVE MODE: Sync Yesterday + Today + Tomorrow (Light, run often - e.g., every 1m)
+      // This catches live scores, halftime, and fulltime results instantly.
+      for (let i = -1; i <= 1; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() + i);
+        daysToSync.push(date.toISOString().split('T')[0]);
+      }
+  }
+
   try {
-    const { searchParams } = new URL(req.url);
-    if (searchParams.get('key') !== process.env.CRON_KEY) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+      // 4. Run Sync in Parallel
+      const syncPromises = leagues.map(async (league) => {
+          let leagueMatchCount = 0;
+          
+          // Fetch all selected days for this league simultaneously
+          const dayPromises = daysToSync.map(async (dateStr) => {
+              const matches = await getLeagueMatches(league.id, league.name, dateStr);
+              
+              if (matches.length > 0) {
+                  // Upsert to Supabase
+                  const { error } = await supabase.from('matches').upsert(matches, { 
+                      onConflict: 'api_id',
+                      ignoreDuplicates: false // Always update if data changes (e.g. score update)
+                  });
+                  
+                  if (!error) leagueMatchCount += matches.length;
+                  else console.error(`Error upserting ${league.name} on ${dateStr}:`, error);
+              }
+          });
 
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { auth: { persistSession: false } }
-    );
+          await Promise.all(dayPromises);
+          return leagueMatchCount;
+      });
 
-    const leagues = [
-      { id: 'eng.1', name: 'Premier League' },
-      { id: 'esp.1', name: 'La Liga' },
-      { id: 'ger.1', name: 'Bundesliga' },
-      { id: 'ita.1', name: 'Serie A' },
-      { id: 'fra.1', name: 'Ligue 1' },
-      { id: 'uefa.champions', name: 'Champions League' },
-      { id: 'uefa.europa', name: 'Europa League' },
-      { id: 'eng.fa.cup', name: 'FA Cup' },
-      { id: 'eng.league_cup', name: 'Carabao Cup' },
-      { id: 'esp.copa_del_rey', name: 'Copa del Rey' },
-      { id: 'ita.coppa_italia', name: 'Coppa Italia' },
-      { id: 'ger.dfb_pokal', name: 'DFB Pokal' },
-      { id: 'fifa.world', name: 'World Cup' },
-      { id: 'uefa.euro', name: 'Euros' }
-    ];
+      const results = await Promise.all(syncPromises);
+      const totalUpserted = results.reduce((a, b) => a + b, 0);
 
-    const getFormattedDate = (daysOffset: number) => {
-        const d = new Date();
-        d.setDate(d.getDate() + daysOffset);
-        return d.toISOString().split('T')[0].replace(/-/g, '');
-    };
-
-    const datesToFetch = [getFormattedDate(-1), getFormattedDate(0), getFormattedDate(1)]; 
-    const requests = [];
-
-    for (const league of leagues) {
-        for (const dateStr of datesToFetch) {
-            requests.push(getLeagueMatches(league.id, league.name, dateStr));
-        }
-    }
-
-    const results = await Promise.all(requests);
-    const matchesToSync = results.flat();
-
-    if (matchesToSync.length > 0) {
-      const { error } = await supabase.from('matches').upsert(matchesToSync, { onConflict: 'api_id' }); 
-      if (error) throw error;
-    }
-
-    return NextResponse.json({ success: true, count: matchesToSync.length });
+      return NextResponse.json({ 
+          success: true, 
+          mode: type,
+          days_synced: daysToSync.length,
+          total_matches_updated: totalUpserted,
+          message: `Synced ${totalUpserted} matches across ${daysToSync.length} days (${type} mode).` 
+      });
 
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Sync Error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
