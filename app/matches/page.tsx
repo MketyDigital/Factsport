@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner'; 
 import LeagueMatchGroup from '@/app/components/LeagueMatchGroup'; 
+import LeagueNavigator from '@/app/components/LeagueNavigator'; // 🟢 New Import
 
 const PRIORITY_LEAGUES = [
     'Premier League', 'La Liga', 'Bundesliga', 
@@ -15,9 +16,8 @@ const PRIORITY_LEAGUES = [
 export default async function AllMatchesPage() {
   const supabase = createClient();
    
-  // 🟢 SMART FETCH WINDOW: (-7 Days to +14 Days)
-  // This guarantees we capture the FULL "Last Round" (Results) and "Next Round" (Fixtures)
-  // regardless of what day of the week it is.
+  // 🟢 FETCH WINDOW: (-7 Days to +14 Days)
+  // Ensures we have a good history and a solid future schedule
   const startDate = new Date(); startDate.setDate(startDate.getDate() - 7); 
   const endDate = new Date(); endDate.setDate(endDate.getDate() + 14); 
 
@@ -33,29 +33,28 @@ export default async function AllMatchesPage() {
   PRIORITY_LEAGUES.forEach(league => { leagues[league] = []; });
 
   matches?.forEach(match => {
-    // Automatically creates groups for other leagues (e.g. Carabao Cup)
     if (!leagues[match.league]) leagues[match.league] = [];
     leagues[match.league].push(match);
   });
 
-  // 3. GAP FILLING (Fallback logic if a Priority League is empty)
+  // 3. GAP FILLING
   const missingLeagues = PRIORITY_LEAGUES.filter(l => leagues[l].length === 0);
 
   if (missingLeagues.length > 0) {
       const gapFillPromises = missingLeagues.map(async (leagueName) => {
-          // A. Fetch Future (Next 5 games)
+          // A. Fetch Future (Limit 10)
           const { data: nextMatches } = await supabase
               .from('matches').select('*').eq('league', leagueName)
               .gt('match_date', new Date().toISOString()) 
-              .order('match_date', { ascending: true }).limit(5); 
+              .order('match_date', { ascending: true }).limit(10); 
 
           if (nextMatches && nextMatches.length > 0) return nextMatches;
 
-          // B. Fetch Past (Last 5 results)
+          // B. Fetch Past (Limit 10)
           const { data: lastMatches } = await supabase
               .from('matches').select('*').eq('league', leagueName)
               .lt('match_date', new Date().toISOString()) 
-              .order('match_date', { ascending: false }).limit(5);
+              .order('match_date', { ascending: false }).limit(10);
               
           return lastMatches || [];
       });
@@ -74,6 +73,13 @@ export default async function AllMatchesPage() {
       if (leagues[key].length === 0) delete leagues[key];
   });
 
+  // 🟢 PREPARE ACTIVE LEAGUE LIST FOR NAVIGATOR
+  // This combines priority leagues (that have data) with other leagues (like Cups)
+  const activeLeagues = [
+      ...PRIORITY_LEAGUES.filter(l => leagues[l]?.length > 0),
+      ...Object.keys(leagues).filter(k => !PRIORITY_LEAGUES.includes(k))
+  ];
+
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-20 font-sans">
       
@@ -86,22 +92,25 @@ export default async function AllMatchesPage() {
           </div>
       </div>
 
+      {/* 🟢 LEAGUE NAVIGATOR (Sticky Tabs) */}
+      <LeagueNavigator leagues={activeLeagues} />
+
       <div className="p-3 space-y-6">
         <FreeTipsBanner />
         
         {/* RENDER LEAGUE GROUPS */}
-        {[...PRIORITY_LEAGUES, ...Object.keys(leagues).filter(k => !PRIORITY_LEAGUES.includes(k))]
-            .filter(leagueName => leagues[leagueName]?.length > 0)
-            .map((leagueName) => (
+        {activeLeagues.map((leagueName) => (
+            // 🟢 ID ADDED: Allows the navigator to scroll here
+            <div key={leagueName} id={leagueName.replace(/\s+/g, '-')}>
                 <LeagueMatchGroup 
-                    key={leagueName} 
                     leagueName={leagueName} 
-                    matches={leagues[leagueName]} 
+                    // 🟢 LIMIT ENFORCED: .slice(0, 10) ensures max 10 items per list
+                    matches={leagues[leagueName].slice(0, 10)} 
                 />
-            ))
-        }
+            </div>
+        ))}
 
-        {Object.keys(leagues).length === 0 && (
+        {activeLeagues.length === 0 && (
             <div className="text-center py-20 opacity-50">
                 <p>No matches found.</p>
             </div>
