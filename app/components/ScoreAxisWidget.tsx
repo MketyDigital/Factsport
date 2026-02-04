@@ -23,7 +23,7 @@ export default function ScoreAxisWidget({ matchId, affiliateLink }: { matchId?: 
       <script src="https://www.scoreaxis.com/widget/live-match-widget.js"></script>
     `;
   } else {
-    // 🟢 FULL CODE STRATEGY
+    // 🟢 FULL CODE STRATEGY (Uses your specific minimum size embed)
     widgetContent = matchId;
   }
 
@@ -34,41 +34,46 @@ export default function ScoreAxisWidget({ matchId, affiliateLink }: { matchId?: 
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            /* 1. FLEXBOX LAYOUT (The Safer Fix) */
-            /* This forces the footer to the bottom naturally */
-            body { 
+            /* 1. ROBUST RESET */
+            body, html { 
                 margin: 0; 
                 padding: 0; 
+                height: 100%; /* Ensure full height */
                 background: white; 
                 font-family: sans-serif;
-                min-height: 100vh;
-                display: flex;
-                flex-direction: column;
-                /* Hide scrollbar but allow scrolling */
-                scrollbar-width: none; 
-                -ms-overflow-style: none;
+                overflow-x: hidden; /* No horizontal scroll */
             }
-            body::-webkit-scrollbar { display: none; }
 
-            /* 2. Widget Expands */
+            /* 2. PUSH CONTENT UP */
+            /* We add padding to the bottom so the last item isn't hidden behind the button */
+            body { 
+                padding-bottom: 70px !important; 
+                box-sizing: border-box;
+            }
+
+            /* 3. WIDGET SIZING */
             .scoreaxis-widget, iframe { 
                 width: 100% !important; 
                 display: block; 
-                flex: 1; /* Pushes footer down */
             }
 
-            /* 3. PUSH FOOTER DOWN & ADD PADDING */
-            /* We target the footer class you provided */
-            .widget-main-link, .sa-footer, .sa-copyright {
-                margin-top: auto !important; /* Flexbox trick to push to bottom */
-                padding-bottom: 80px !important; /* 🟢 Giant padding ensures it sits BEHIND our button */
-                text-align: center !important;
-                background: white;
-                width: 100%;
-                display: block;
+            /* 4. 🟢 THE "ANCHOR" FIX */
+            /* We force the footer to stick to the bottom of the SCREEN, not the content */
+            .widget-main-link, .sa-footer, .sa-copyright, div[style*="text-align: right"] {
+                position: fixed !important;
+                bottom: 0px !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 40px !important; /* Fixed height for the footer */
+                background: white !important;
+                z-index: 1 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                pointer-events: none !important; /* Disable clicks */
             }
 
-            /* 4. Disable Clicks */
+            /* 5. Disable Links */
             a { pointer-events: none !important; cursor: default !important; text-decoration: none !important; }
         </style>
       </head>
@@ -86,16 +91,17 @@ export default function ScoreAxisWidget({ matchId, affiliateLink }: { matchId?: 
         srcDoc={widgetHtml}
         style={{ 
             width: '100%', 
-            height: '600px', // Tall enough for your "Mini" layout
+            height: '550px', // Tall enough for your content
             border: 'none', 
             display: 'block' 
         }}
         title="Match Widget"
         loading="lazy"
-        scrolling="yes" // Allowed, but hidden via CSS
+        scrolling="yes" // Allow scrolling if list is long
       />
 
       {/* 🟢 2. MASKING BUTTON (Pins to Bottom) */}
+      {/* Z-Index 50 ensures it sits ON TOP of the fixed footer inside the iframe */}
       <div className="absolute bottom-0 left-0 w-full bg-white border-t border-slate-100 p-2 flex justify-between items-center z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.1)] h-[60px]">
           <div className="flex items-center gap-2 pl-2">
               <div className="bg-green-500 text-white p-1.5 rounded-full animate-pulse">
