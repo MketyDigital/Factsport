@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Video, ExternalLink, Youtube, Newspaper, Radio, TrendingUp, Calendar, BarChart2 } from "lucide-react";
+import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Video, ExternalLink, Youtube, Newspaper, Radio, TrendingUp, Calendar, BarChart2, Award } from "lucide-react";
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import NewsArtwork from '@/app/components/NewsArtwork';
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
@@ -376,7 +376,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </div>
 
-{/* 🚀 QUICK ACTION LINKS (Clean Buttons Only) */}
+      {/* 🚀 QUICK ACTION LINKS (Clean Buttons Only) */}
       <div className="grid grid-cols-4 gap-3 px-4 py-6">
           {/* Predict */}
           <Link href="/matches" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
