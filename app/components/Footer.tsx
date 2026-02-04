@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Facebook, Instagram, Twitter, Youtube, Send, Zap } from 'lucide-react'; // 🟢 Added Zap
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -9,12 +10,55 @@ export default function Footer() {
         
         {/* Brand Section */}
         <div className="col-span-1 md:col-span-2">
-            <h2 className="text-white font-black text-xl italic tracking-tighter mb-4">
-              FACT<span className="text-blue-600">SPORT</span>
-            </h2>
+            
+            {/* 🟢 REAL LOGO (Matches Home Page Header) */}
+            <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-lg flex items-center justify-center shadow-lg shrink-0">
+                    <Zap size={18} className="text-white fill-white" />
+                </div>
+                <span className="text-xl font-black tracking-tight text-white">FactSport</span>
+            </div>
+
             <p className="text-xs leading-relaxed max-w-xs text-slate-500">
                 The ultimate sports prediction platform. Watch highlights, get expert betting tips, and compete for monthly cash prizes.
             </p>
+
+            {/* Social Media Buttons */}
+            <div className="flex items-center gap-3 mt-6 flex-wrap">
+                {/* Facebook (General) */}
+                <a href="https://facebook.com/factsportlive" target="_blank" title="General Sport News" className="bg-white/5 hover:bg-blue-600 text-white p-2 rounded-lg transition active:scale-95">
+                    <Facebook size={16} />
+                </a>
+                
+                {/* Facebook (Football Only) */}
+                <a href="https://facebook.com/Factsportfootball" target="_blank" title="Football Updates Only" className="bg-white/5 hover:bg-blue-600 text-white p-2 rounded-lg transition active:scale-95 relative">
+                    <Facebook size={16} />
+                    <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                    </span>
+                </a>
+
+                {/* Instagram */}
+                <a href="https://instagram.com/factsportlive" target="_blank" className="bg-white/5 hover:bg-pink-600 text-white p-2 rounded-lg transition active:scale-95">
+                    <Instagram size={16} />
+                </a>
+
+                {/* X (Twitter) */}
+                <a href="https://x.com/factsportlive" target="_blank" className="bg-white/5 hover:bg-black text-white p-2 rounded-lg transition active:scale-95">
+                    <Twitter size={16} />
+                </a>
+
+                {/* Telegram */}
+                <a href="https://t.me/Factsportlive" target="_blank" className="bg-white/5 hover:bg-sky-500 text-white p-2 rounded-lg transition active:scale-95">
+                    <Send size={16} />
+                </a>
+
+                {/* YouTube */}
+                <a href="https://youtube.com/@factsportlive" target="_blank" className="bg-white/5 hover:bg-red-600 text-white p-2 rounded-lg transition active:scale-95">
+                    <Youtube size={16} />
+                </a>
+            </div>
         </div>
 
         {/* Platform Links */}
