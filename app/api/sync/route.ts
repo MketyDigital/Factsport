@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const key = searchParams.get('key');
-  const type = searchParams.get('type') || 'live'; // Default to 'live' if missing
+  const type = searchParams.get('type') || 'live'; // Default to 'live'
 
   // 1. Security Check
   if (key !== process.env.CRON_KEY) {
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
   const supabase = createClient();
 
-  // 2. Define Leagues to Sync (Includes Major Leagues + Int'l Tournaments)
+  // 2. Define Leagues to Sync
   const leagues = [
     { id: 'PL', name: 'Premier League' },
     { id: 'PD', name: 'La Liga' },
@@ -24,25 +24,24 @@ export async function GET(request: Request) {
     { id: 'SA', name: 'Serie A' },
     { id: 'FL1', name: 'Ligue 1' },
     { id: 'CL', name: 'Champions League' },
-    { id: 'EC', name: 'European Championship' }, // Euros
-    { id: 'WC', name: 'World Cup' }              // World Cup
+    { id: 'EC', name: 'European Championship' },
+    { id: 'WC', name: 'World Cup' }
   ];
 
-  // 3. Smart Date Logic (Live vs Full Mode)
-  // We explicitly type this as a string array to fix the TypeScript error.
+  // 3. Smart Date Logic
   const daysToSync: string[] = []; 
   
   if (type === 'full') {
-      // FULL MODE: Sync Yesterday + Next 14 Days (Heavy, run rarely - e.g., every 12h)
-      // This fills your schedule/calendar so the "Future" tab is never empty.
-      for (let i = -1; i <= 14; i++) {
+      // 🟢 FULL MODE: Sync Last 14 Days + Next 30 Days
+      // This ensures "Results" has 2 weeks of history and "Fixtures" has 1 month of games.
+      for (let i = -14; i <= 30; i++) {
         const date = new Date();
         date.setDate(date.getDate() + i);
         daysToSync.push(date.toISOString().split('T')[0]);
       }
   } else {
-      // LIVE MODE: Sync Yesterday + Today + Tomorrow (Light, run often - e.g., every 1m)
-      // This catches live scores, halftime, and fulltime results instantly.
+      // 🔴 LIVE MODE: Sync Yesterday + Today + Tomorrow
+      // Fast sync for live scores.
       for (let i = -1; i <= 1; i++) {
         const date = new Date();
         date.setDate(date.getDate() + i);
@@ -55,15 +54,13 @@ export async function GET(request: Request) {
       const syncPromises = leagues.map(async (league) => {
           let leagueMatchCount = 0;
           
-          // Fetch all selected days for this league simultaneously
           const dayPromises = daysToSync.map(async (dateStr) => {
               const matches = await getLeagueMatches(league.id, league.name, dateStr);
               
               if (matches.length > 0) {
-                  // Upsert to Supabase
                   const { error } = await supabase.from('matches').upsert(matches, { 
                       onConflict: 'api_id',
-                      ignoreDuplicates: false // Always update if data changes (e.g. score update)
+                      ignoreDuplicates: false 
                   });
                   
                   if (!error) leagueMatchCount += matches.length;
