@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner'; 
 import LeagueMatchGroup from '@/app/components/LeagueMatchGroup'; 
-import LeagueNavigator from '@/app/components/LeagueNavigator'; // 🟢 New Import
+import LeagueNavigator from '@/app/components/LeagueNavigator'; 
 
 const PRIORITY_LEAGUES = [
     'Premier League', 'La Liga', 'Bundesliga', 
@@ -16,8 +16,7 @@ const PRIORITY_LEAGUES = [
 export default async function AllMatchesPage() {
   const supabase = createClient();
    
-  // 🟢 FETCH WINDOW: (-7 Days to +14 Days)
-  // Ensures we have a good history and a solid future schedule
+  // 1. FETCH WINDOW: (-7 Days to +14 Days)
   const startDate = new Date(); startDate.setDate(startDate.getDate() - 7); 
   const endDate = new Date(); endDate.setDate(endDate.getDate() + 14); 
 
@@ -26,7 +25,7 @@ export default async function AllMatchesPage() {
     .select('*')
     .gte('match_date', startDate.toISOString())
     .lte('match_date', endDate.toISOString())
-    .order('match_date', { ascending: true });
+    .order('match_date', { ascending: true }); // Oldest first (Results -> Fixtures)
 
   // 2. GROUP BY LEAGUE
   const leagues: { [key: string]: any[] } = {};
@@ -73,8 +72,7 @@ export default async function AllMatchesPage() {
       if (leagues[key].length === 0) delete leagues[key];
   });
 
-  // 🟢 PREPARE ACTIVE LEAGUE LIST FOR NAVIGATOR
-  // This combines priority leagues (that have data) with other leagues (like Cups)
+  // PREPARE NAVIGATOR LIST
   const activeLeagues = [
       ...PRIORITY_LEAGUES.filter(l => leagues[l]?.length > 0),
       ...Object.keys(leagues).filter(k => !PRIORITY_LEAGUES.includes(k))
@@ -92,23 +90,43 @@ export default async function AllMatchesPage() {
           </div>
       </div>
 
-      {/* 🟢 LEAGUE NAVIGATOR (Sticky Tabs) */}
+      {/* STICKY NAVIGATOR */}
       <LeagueNavigator leagues={activeLeagues} />
 
       <div className="p-3 space-y-6">
         <FreeTipsBanner />
         
         {/* RENDER LEAGUE GROUPS */}
-        {activeLeagues.map((leagueName) => (
-            // 🟢 ID ADDED: Allows the navigator to scroll here
-            <div key={leagueName} id={leagueName.replace(/\s+/g, '-')}>
-                <LeagueMatchGroup 
-                    leagueName={leagueName} 
-                    // 🟢 LIMIT ENFORCED: .slice(0, 10) ensures max 10 items per list
-                    matches={leagues[leagueName].slice(0, 10)} 
-                />
-            </div>
-        ))}
+        {activeLeagues.map((leagueName) => {
+            const leagueMatches = leagues[leagueName];
+
+            // 🟢 SMART FILTER: Ensure we have both Results AND Fixtures
+            // 1. Get Scheduled (Live/Pre) -> Take Next 10
+            const fixtures = leagueMatches
+                .filter(m => !['FT', 'FINISHED', 'ABD'].includes(m.status))
+                // Sort Ascending (Nearest Future First)
+                .sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime())
+                .slice(0, 10);
+
+            // 2. Get Results (Finished) -> Take Last 10
+            const results = leagueMatches
+                .filter(m => ['FT', 'FINISHED', 'ABD'].includes(m.status))
+                // Sort Descending (Newest Result First)
+                .sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime())
+                .slice(0, 10);
+
+            // 3. Combine for the component
+            const smartDisplayList = [...fixtures, ...results];
+
+            return (
+                <div key={leagueName} id={leagueName.replace(/\s+/g, '-')}>
+                    <LeagueMatchGroup 
+                        leagueName={leagueName} 
+                        matches={smartDisplayList} 
+                    />
+                </div>
+            );
+        })}
 
         {activeLeagues.length === 0 && (
             <div className="text-center py-20 opacity-50">
