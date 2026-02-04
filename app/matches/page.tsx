@@ -15,10 +15,11 @@ const PRIORITY_LEAGUES = [
 export default async function AllMatchesPage() {
   const supabase = createClient();
    
-  // 🟢 1. EXTENDED FETCH WINDOW (Matches the new Sync Logic)
-  // We go back 14 days for Results and forward 30 days for Fixtures
-  const startDate = new Date(); startDate.setDate(startDate.getDate() - 14); 
-  const endDate = new Date(); endDate.setDate(endDate.getDate() + 30); 
+  // 🟢 SMART FETCH WINDOW: (-7 Days to +14 Days)
+  // This guarantees we capture the FULL "Last Round" (Results) and "Next Round" (Fixtures)
+  // regardless of what day of the week it is.
+  const startDate = new Date(); startDate.setDate(startDate.getDate() - 7); 
+  const endDate = new Date(); endDate.setDate(endDate.getDate() + 14); 
 
   const { data: matches } = await supabase
     .from('matches')
@@ -32,29 +33,29 @@ export default async function AllMatchesPage() {
   PRIORITY_LEAGUES.forEach(league => { leagues[league] = []; });
 
   matches?.forEach(match => {
-    // If it's a new league (e.g. Carabao Cup), create a group for it automatically
+    // Automatically creates groups for other leagues (e.g. Carabao Cup)
     if (!leagues[match.league]) leagues[match.league] = [];
     leagues[match.league].push(match);
   });
 
-  // 3. GAP FILLING (Fallback if Priority Leagues are empty)
+  // 3. GAP FILLING (Fallback logic if a Priority League is empty)
   const missingLeagues = PRIORITY_LEAGUES.filter(l => leagues[l].length === 0);
 
   if (missingLeagues.length > 0) {
       const gapFillPromises = missingLeagues.map(async (leagueName) => {
-          // A. Fetch Future (Limit 10)
+          // A. Fetch Future (Next 5 games)
           const { data: nextMatches } = await supabase
               .from('matches').select('*').eq('league', leagueName)
               .gt('match_date', new Date().toISOString()) 
-              .order('match_date', { ascending: true }).limit(10); 
+              .order('match_date', { ascending: true }).limit(5); 
 
           if (nextMatches && nextMatches.length > 0) return nextMatches;
 
-          // B. Fetch Past (Limit 10)
+          // B. Fetch Past (Last 5 results)
           const { data: lastMatches } = await supabase
               .from('matches').select('*').eq('league', leagueName)
               .lt('match_date', new Date().toISOString()) 
-              .order('match_date', { ascending: false }).limit(10);
+              .order('match_date', { ascending: false }).limit(5);
               
           return lastMatches || [];
       });
@@ -89,7 +90,6 @@ export default async function AllMatchesPage() {
         <FreeTipsBanner />
         
         {/* RENDER LEAGUE GROUPS */}
-        {/* 🟢 Priority Leagues First, then any other leagues found */}
         {[...PRIORITY_LEAGUES, ...Object.keys(leagues).filter(k => !PRIORITY_LEAGUES.includes(k))]
             .filter(leagueName => leagues[leagueName]?.length > 0)
             .map((leagueName) => (
