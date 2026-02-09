@@ -5,16 +5,31 @@ import AuthProvider from "@/app/components/AuthProvider";
 import Footer from '@/app/components/Footer'; 
 import SiteHeader from '@/app/components/SiteHeader'; 
 
+
+export const runtime = 'edge';
+
 const inter = Inter({ subsets: ["latin"] });
 
 // 1. UPDATE METADATA (Manifest & Apple Config)
 export const metadata: Metadata = {
-  title: "FactSport | Live Football, Sport News, Scores, Predict & Win",
-  description: "The #1 Platform for sports updates, predictions, live scores, analysis and breaking news. Join VIP to win monthly prizes.",
+  title: "FactSport | Live Football, Sport News, Predict & Win",
+  description: "The #1 Platform for sports updates,predictions, live scores, analysis and breaking news. Join VIP to win monthly prizes.",
   metadataBase: new URL('https://factsport.com'), 
   
   // 🟢 PWA LINKING
   manifest: '/manifest.json',
+  
+  // 🟢 FIXED ICONS: Pointing explicitly to public folder
+  icons: {
+    icon: '/icon.png',
+    shortcut: '/favicon.ico',
+    apple: '/apple-icon.png',
+    other: {
+      rel: 'apple-touch-icon-precomposed',
+      url: '/apple-icon.png',
+    },
+  },
+
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -23,10 +38,18 @@ export const metadata: Metadata = {
 
   openGraph: {
     title: "FactSport - Live Football, Sport News, Predict & Win",
-    description: "Watch highlights, get expert tips, and win monthly prizes.",
+    description: "Latest Sport Updates, Livescores, Watch Football highlights, Live Radio Commentary, Analysis , Predict and win monthly prizes.",
     siteName: 'FactSport',
     locale: 'en_US',
     type: 'website',
+    images: [
+      {
+        url: '/logo.png', // Uses your logo for social sharing
+        width: 1200,
+        height: 630,
+        alt: 'FactSport Logo',
+      },
+    ],
   },
   robots: "index, follow",
 };
