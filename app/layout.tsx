@@ -59,7 +59,7 @@ export const viewport: Viewport = {
   themeColor: '#0a1428',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1, // Prevents zooming on input focus (feels more like an app)
+  maximumScale: 1, 
   userScalable: false,
 };
 
