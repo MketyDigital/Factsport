@@ -9,8 +9,8 @@ const inter = Inter({ subsets: ["latin"] });
 
 // 1. UPDATE METADATA (Manifest & Apple Config)
 export const metadata: Metadata = {
-  title: "FactSport | Live Scores, News & Predict & Win",
-  description: "The #1 Platform for sports predictions, live scores, analysis and breaking news. Join VIP to win monthly prizes.",
+  title: "FactSport | Live Football, Sport News, Scores, Predict & Win",
+  description: "The #1 Platform for sports updates, predictions, live scores, analysis and breaking news. Join VIP to win monthly prizes.",
   metadataBase: new URL('https://factsport.com'), 
   
   // 🟢 PWA LINKING
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   },
 
   openGraph: {
-    title: "FactSport - Predict & Win",
+    title: "FactSport - Live Football, Sport News, Predict & Win",
     description: "Watch highlights, get expert tips, and win monthly prizes.",
     siteName: 'FactSport',
     locale: 'en_US',
@@ -36,7 +36,7 @@ export const viewport: Viewport = {
   themeColor: '#0a1428',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1, // Prevents zooming on input focus (feels more like an app)
+  maximumScale: 1, 
   userScalable: false,
 };
 
