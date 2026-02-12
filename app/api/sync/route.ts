@@ -11,6 +11,7 @@ export async function GET(request: Request) {
 
   // 1. Security Check
   if (key !== process.env.CRON_KEY) {
+    console.error("❌ Sync Attempt Failed: Invalid Key");
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -24,23 +25,19 @@ export async function GET(request: Request) {
     { id: 'SA', name: 'Serie A' },
     { id: 'FL1', name: 'Ligue 1' },
     { id: 'CL', name: 'Champions League' },
-    { id: 'EC', name: 'European Championship' }, // API uses 'EC' for Euros
+    { id: 'EC', name: 'European Championship' },
     { id: 'WC', name: 'World Cup' }
   ];
 
-  // 3. Smart Date Logic (Batch Mode)
+  // 3. Smart Date Logic
   const today = new Date();
   let fromDate = new Date();
   let toDate = new Date();
 
   if (type === 'full') {
-      // 🟢 FULL MODE: 14 days back + 30 days forward
-      // Only 8 API calls total (1 per league)
       fromDate.setDate(today.getDate() - 14);
       toDate.setDate(today.getDate() + 30);
   } else {
-      // 🔴 LIVE MODE: Yesterday + Today + Tomorrow
-      // Only 8 API calls total
       fromDate.setDate(today.getDate() - 1);
       toDate.setDate(today.getDate() + 1);
   }
@@ -48,13 +45,15 @@ export async function GET(request: Request) {
   const fromStr = fromDate.toISOString().split('T')[0];
   const toStr = toDate.toISOString().split('T')[0];
 
+  // 🔍 DEBUG: Log the date range to check for timezone issues
+  console.log(`📅 [Sync Start] Mode: ${type} | Date Range: ${fromStr} to ${toStr}`);
+
   try {
       let totalUpserted = 0;
       let leaguesUpdated = 0;
 
-      // 4. Run Sync (Loop through leagues, not days)
+      // 4. Run Sync
       for (const league of leagues) {
-          // Pass the full date range to the service
           const matches = await getLeagueMatches(league.id, league.name, fromStr, toStr);
           
           if (matches.length > 0) {
@@ -66,9 +65,12 @@ export async function GET(request: Request) {
               if (!error) {
                   totalUpserted += matches.length;
                   leaguesUpdated++;
+                  console.log(`💾 [DB Success] ${league.name}: Upserted ${matches.length} matches.`);
               } else {
-                  console.error(`DB Error (${league.name}):`, error);
+                  console.error(`❌ [DB Error] ${league.name}:`, error.message);
               }
+          } else {
+              console.log(`⚠️ [No Data] ${league.name}: 0 matches found in API.`);
           }
       }
 
@@ -82,7 +84,7 @@ export async function GET(request: Request) {
       });
 
   } catch (error: any) {
-      console.error("Sync Critical Error:", error);
+      console.error("🔥 Sync Critical Error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
