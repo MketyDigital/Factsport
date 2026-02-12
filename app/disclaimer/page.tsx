@@ -1,56 +1,72 @@
 export const runtime = 'edge';
 
 import Link from 'next/link';
-import { ChevronLeft, ShieldAlert } from 'lucide-react';
+import { ChevronLeft, ShieldAlert, AlertTriangle, Info } from 'lucide-react';
 
 export default function DisclaimerPage() {
   return (
     <div className="min-h-screen bg-[#F0F2F5] p-6 font-sans text-slate-800">
-      <div className="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-        <Link href="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-blue-600 mb-6 text-sm font-bold transition">
+      <div className="max-w-4xl mx-auto bg-white p-8 md:p-12 rounded-2xl shadow-sm border border-slate-200">
+        <Link href="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-blue-600 mb-8 text-sm font-bold transition">
             <ChevronLeft size={16} /> Back to Home
         </Link>
         
-        <h1 className="text-2xl font-black uppercase mb-6 flex items-center gap-2">
-            <ShieldAlert className="text-red-600" /> Disclaimer & Disclosure
-        </h1>
+        <header className="mb-10 border-b border-slate-100 pb-6">
+            <h1 className="text-3xl font-black uppercase mb-3 flex items-center gap-3 text-red-600">
+                <ShieldAlert size={32} /> Disclaimer & Risk Disclosure
+            </h1>
+            <p className="text-slate-500 text-sm">Please read this document carefully before using our platform.</p>
+        </header>
 
-        <div className="prose prose-slate prose-sm max-w-none space-y-6">
+        <div className="prose prose-slate prose-sm max-w-none space-y-8">
             
-            <section>
-                <h3 className="font-bold text-lg text-slate-900">1. Not a Gambling Site</h3>
-                <p>
-                    FactSport is strictly a <strong>sports information and prediction game platform</strong>. We do NOT accept real money deposits, we do NOT take bets, and we do NOT operate as a lottery or casino. 
+            {/* CRITICAL: NO GAMBLING SECTION */}
+            <section className="bg-red-50 border-l-4 border-red-500 p-6 rounded-r-lg">
+                <h3 className="font-bold text-xl text-red-800 mb-2 flex items-center gap-2">
+                    <AlertTriangle size={24} /> 1. NOT A GAMBLING SITE
+                </h3>
+                <p className="text-red-900 font-medium">
+                    FactSport is strictly a <strong>sports media and prediction game platform</strong>. 
                 </p>
+                <ul className="list-disc pl-5 mt-3 space-y-1 text-red-800">
+                    <li>We do <strong>NOT</strong> accept real money deposits.</li>
+                    <li>We do <strong>NOT</strong> facilitate real money betting or bookmaking.</li>
+                    <li>Points earned on FactSport are <strong>virtual</strong> and have no cash exchange value.</li>
+                </ul>
+            </section>
+
+            <section>
+                <h3 className="font-bold text-xl text-slate-900 mb-3">2. Affiliate Disclosure</h3>
                 <p>
-                    Any "points" earned on FactSport are virtual points used solely for ranking on our leaderboard. They have no cash value and cannot be withdrawn or exchanged for currency.
+                    FactSport acts as an affiliate marketer. We may display advertisements or links to third-party sports betting operators (e.g., 1xBet, Bet9ja, BetKing).
+                </p>
+                <p className="italic text-slate-600 border-l-2 border-slate-300 pl-4 mt-2">
+                    "If you click on these links and register or place a bet, FactSport may receive a commission. This comes at no extra cost to you and helps support our free content."
+                </p>
+                <p className="mt-2">
+                    We are not responsible for the actions, terms, or privacy practices of these third-party websites. You access them at your own risk.
                 </p>
             </section>
 
             <section>
-                <h3 className="font-bold text-lg text-slate-900">2. Affiliate Disclosure</h3>
+                <h3 className="font-bold text-xl text-slate-900 mb-3">3. Responsible Gaming Warning</h3>
                 <p>
-                    FactSport contains links to third-party websites, including sports betting operators (e.g., 1xBet, Bet9ja). We may receive a commission if you click these links and register or place a bet on their platforms.
+                    While FactSport itself is risk-free, the third-party betting sites we may link to involve financial risk. Gambling can be addictive.
                 </p>
-                <p>
-                    We are not responsible for the content, terms, or actions of these third-party websites. If you choose to visit them, you do so at your own risk and subject to their terms and conditions.
-                </p>
-            </section>
-
-            <section>
-                <h3 className="font-bold text-lg text-slate-900">3. Responsible Gaming</h3>
-                <p>
-                    While FactSport is free to play, the third-party sites we link to may involve real money gambling. Gambling carries financial risk and risk of addiction.
-                </p>
-                <p className="font-bold text-red-600">
-                    You must be 18+ to use this platform. If you or someone you know has a gambling problem, please seek help immediately.
+                <p className="font-bold text-slate-900 mt-2">
+                    You must be 18+ to use our platform. If you or someone you know has a gambling problem, please seek help from your local authorities.
                 </p>
             </section>
 
             <section>
-                <h3 className="font-bold text-lg text-slate-900">4. Accuracy of Information</h3>
+                <h3 className="font-bold text-xl text-slate-900 mb-3 flex items-center gap-2">
+                    <Info size={20} /> 4. Accuracy of Information
+                </h3>
                 <p>
-                    While we strive for accuracy, match scores, statistics, and news provided on FactSport are for entertainment purposes. We do not guarantee the accuracy of live scores or prediction outcomes.
+                    <strong>News & Scores:</strong> While we strive for accuracy, live scores, match statistics, and news reports are provided for information and entertainment purposes only. We do not guarantee zero latency or absolute accuracy (e.g., a score might display 1-0 while a VAR check is ongoing).
+                </p>
+                <p>
+                    <strong>Predictions:</strong> Our editorial predictions and analysis are opinions, not financial advice. Past performance is not indicative of future results.
                 </p>
             </section>
 
