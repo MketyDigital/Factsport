@@ -53,8 +53,8 @@ export async function getLeagueMatches(leagueId: string, leagueName: string, dat
 
   const url = `${BASE_URL}/competitions/${code}/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`;
   
-  // 🔍 DEBUG: Log the exact request we are making
-  console.log(`[Sync] Fetching ${leagueName}: ${url}`);
+  // 🔍 DEBUG: Log the request URL
+  console.log(`[Sync Request] ${leagueName}: ${url}`);
 
   try {
     const res = await fetch(url, {
@@ -62,28 +62,29 @@ export async function getLeagueMatches(leagueId: string, leagueName: string, dat
       cache: 'no-store'
     });
     
+    // 🔍 DEBUG: Log detailed API errors
     if (!res.ok) {
-        // 🔍 DEBUG: Log the ACTUAL error from the API (e.g., "Plan Restricted" or "Too Many Requests")
-        const errorText = await res.text(); 
-        console.error(`❌ API Error (${leagueName}) [${res.status}]: ${errorText}`);
+        const errorText = await res.text();
+        console.error(`❌ API Failed (${leagueName}): Status ${res.status} - ${errorText}`);
         return [];
     }
 
     const data = await res.json();
-    const matches = data.matches || [];
+    const count = data.matches?.length || 0;
     
-    // 🔍 DEBUG: Log success count
-    console.log(`✅ [Sync] ${leagueName}: Found ${matches.length} matches.`);
+    // 🔍 DEBUG: Log success
+    console.log(`✅ API Success (${leagueName}): Found ${count} matches`);
     
-    return matches.map((m: any) => transformMatch(m, leagueName));
+    return (data.matches || []).map((m: any) => transformMatch(m, leagueName));
 
   } catch (e) {
-    console.error(`🔥 Exception in getLeagueMatches (${leagueName}):`, e);
+    console.error(`🔥 Sync Exception (${leagueName}):`, e);
     return [];
   }
 }
 
 // --- MAIN FUNCTION 2: FRONTEND ADAPTER ---
+// (Unchanged)
 export interface UnifiedMatchData {
   status: string;
   displayClock: string;
