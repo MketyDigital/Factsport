@@ -31,7 +31,6 @@ const normalizeStatus = (status: string) => {
 };
 
 // --- HELPER 2: Standardize Match Data ---
-// (Kept exactly as you had it to preserve DB structure)
 const transformMatch = (m: any, leagueName: string) => ({
     api_id: m.id, 
     league: leagueName,
@@ -48,34 +47,43 @@ const transformMatch = (m: any, leagueName: string) => ({
 });
 
 // --- MAIN FUNCTION 1: SYNC ---
-// 🟢 UPDATED: Accepts Date Range to fix API Rate Limiting
 export async function getLeagueMatches(leagueId: string, leagueName: string, dateFrom: string, dateTo: string) {
-  const code = LEAGUE_MAP[leagueName] || leagueId; // Fallback to ID if name not found
+  const code = LEAGUE_MAP[leagueName] || leagueId; 
   if (!code) return [];
 
+  const url = `${BASE_URL}/competitions/${code}/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`;
+  
+  // 🔍 DEBUG: Log the exact request we are making
+  console.log(`[Sync] Fetching ${leagueName}: ${url}`);
+
   try {
-    // We use the dateFrom & dateTo parameters to fetch multiple days in 1 call
-    const res = await fetch(`${BASE_URL}/competitions/${code}/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`, {
+    const res = await fetch(url, {
       headers: { 'X-Auth-Token': API_KEY },
       cache: 'no-store'
     });
     
     if (!res.ok) {
-        console.error(`API Error (${leagueName}): ${res.status}`);
+        // 🔍 DEBUG: Log the ACTUAL error from the API (e.g., "Plan Restricted" or "Too Many Requests")
+        const errorText = await res.text(); 
+        console.error(`❌ API Error (${leagueName}) [${res.status}]: ${errorText}`);
         return [];
     }
 
     const data = await res.json();
-    return (data.matches || []).map((m: any) => transformMatch(m, leagueName));
+    const matches = data.matches || [];
+    
+    // 🔍 DEBUG: Log success count
+    console.log(`✅ [Sync] ${leagueName}: Found ${matches.length} matches.`);
+    
+    return matches.map((m: any) => transformMatch(m, leagueName));
 
   } catch (e) {
-    console.error(`Sync Error (${leagueName}):`, e);
+    console.error(`🔥 Exception in getLeagueMatches (${leagueName}):`, e);
     return [];
   }
 }
 
 // --- MAIN FUNCTION 2: FRONTEND ADAPTER ---
-// 🔒 UNTOUCHED: This ensures your frontend never breaks
 export interface UnifiedMatchData {
   status: string;
   displayClock: string;
