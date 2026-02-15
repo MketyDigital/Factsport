@@ -1,9 +1,10 @@
 import { createClient } from '@/app/lib/supabase/client';
 
+// 🟢 CONFIG: Football-Data.org API
 const API_KEY = process.env.FOOTBALL_DATA_KEY!;
 const BASE_URL = 'https://api.football-data.org/v4';
 
-// 🟢 CONFIG: Map your frontend league names to API codes
+// Map your frontend league names to API codes
 const LEAGUE_MAP: Record<string, string> = {
   'Premier League': 'PL',
   'La Liga': 'PD',
@@ -53,7 +54,7 @@ export async function getLeagueMatches(leagueId: string, leagueName: string, dat
 
   const url = `${BASE_URL}/competitions/${code}/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`;
   
-  // 🔍 DEBUG: Log the request URL
+  // 🔍 DEBUG: Print to server logs
   console.log(`[Sync Request] ${leagueName}: ${url}`);
 
   try {
@@ -62,29 +63,27 @@ export async function getLeagueMatches(leagueId: string, leagueName: string, dat
       cache: 'no-store'
     });
     
-    // 🔍 DEBUG: Log detailed API errors
+    // 🔍 DEBUG: Log detailed API errors if any
     if (!res.ok) {
         const errorText = await res.text();
-        console.error(`❌ API Failed (${leagueName}): Status ${res.status} - ${errorText}`);
-        return [];
+        // We throw an error so the Route can catch it and show it to you
+        throw new Error(`API Failed (${leagueName}): Status ${res.status} - ${errorText}`);
     }
 
     const data = await res.json();
     const count = data.matches?.length || 0;
     
-    // 🔍 DEBUG: Log success
     console.log(`✅ API Success (${leagueName}): Found ${count} matches`);
     
     return (data.matches || []).map((m: any) => transformMatch(m, leagueName));
 
-  } catch (e) {
-    console.error(`🔥 Sync Exception (${leagueName}):`, e);
-    return [];
+  } catch (e: any) {
+    console.error(`🔥 Sync Exception (${leagueName}):`, e.message);
+    throw e; // Re-throw to be caught by the route
   }
 }
 
 // --- MAIN FUNCTION 2: FRONTEND ADAPTER ---
-// (Unchanged)
 export interface UnifiedMatchData {
   status: string;
   displayClock: string;
