@@ -4,52 +4,47 @@ import { createClient } from '@/app/lib/supabase/server';
 import { getLeagueMatches } from '@/app/lib/matchService';
 import { NextResponse } from 'next/server';
 
-// 🟢 HELPER: Sleep to prevent 429 Errors
+// 🟢 HELPER: Sleep to isolate Rate Limits from Logic Errors
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const key = searchParams.get('key');
-  const type = searchParams.get('type') || 'live';
-  const batch = searchParams.get('batch') || '1'; 
+  const type = searchParams.get('type') || 'live'; 
 
+  // 1. Security Check
   if (key !== process.env.CRON_KEY) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Debug: Ensure API Key is loaded
+  if (!process.env.FOOTBALL_DATA_KEY) {
+     return NextResponse.json({ error: 'Config Error: FOOTBALL_DATA_KEY is missing' }, { status: 500 });
+  }
+
   const supabase = createClient();
 
-  // 1. Define Leagues (Split into Batches to prevent Timeout)
-  const allLeagues = [
-    // Batch 1: The "Big 4" (Priority)
-    { id: 'PL', name: 'Premier League', batch: '1' },
-    { id: 'PD', name: 'La Liga', batch: '1' },
-    { id: 'BL1', name: 'Bundesliga', batch: '1' },
-    { id: 'SA', name: 'Serie A', batch: '1' },
-    
-    // Batch 2: The Rest
-    { id: 'FL1', name: 'Ligue 1', batch: '2' },
-    { id: 'CL', name: 'Champions League', batch: '2' },
-    { id: 'EC', name: 'European Championship', batch: '2' },
-    { id: 'WC', name: 'World Cup', batch: '2' }
+  // 2. Define Leagues
+  const leagues = [
+    { id: 'PL', name: 'Premier League' },
+    { id: 'PD', name: 'La Liga' },
+    { id: 'BL1', name: 'Bundesliga' },
+    { id: 'SA', name: 'Serie A' },
+    { id: 'FL1', name: 'Ligue 1' },
+    { id: 'CL', name: 'Champions League' },
+    { id: 'EC', name: 'European Championship' }, 
+    { id: 'WC', name: 'World Cup' }
   ];
 
-  // Select leagues based on Batch
-  const targetLeagues = type === 'full' 
-      ? allLeagues.filter(l => l.batch === batch)
-      : allLeagues; // Live mode checks all
-
-  // 2. Date Logic (Restoring your -14 to +21 request)
+  // 3. Date Logic (Your requested -14 to +21)
   const today = new Date();
   let fromDate = new Date();
   let toDate = new Date();
 
   if (type === 'full') {
-      // 🟢 RESTORE DB: 2 Weeks Back, 3 Weeks Forward
-      fromDate.setDate(today.getDate() - 14);
-      toDate.setDate(today.getDate() + 21);
+      fromDate.setDate(today.getDate() - 14); // 2 Weeks Back
+      toDate.setDate(today.getDate() + 21);   // 3 Weeks Forward
   } else {
-      // 🔴 LIVE UPDATE: 3 Days
       fromDate.setDate(today.getDate() - 1);
       toDate.setDate(today.getDate() + 1);
   }
@@ -57,47 +52,56 @@ export async function GET(request: Request) {
   const fromStr = fromDate.toISOString().split('T')[0];
   const toStr = toDate.toISOString().split('T')[0];
 
-  console.log(`🚀 [Sync] Type: ${type} (Batch ${batch}) | Range: ${fromStr} to ${toStr}`);
+  // We will collect logs here to show you in the browser
+  let logs: string[] = [];
+  logs.push(`🚀 [Sync] Type: ${type} | Range: ${fromStr} to ${toStr}`);
 
   try {
       let totalUpserted = 0;
 
-      for (const league of targetLeagues) {
-          console.log(`.. Fetching ${league.name} (${league.id})`);
+      for (const league of leagues) {
+          const startMsg = `.. Fetching ${league.name} (${league.id})`;
+          console.log(startMsg);
+          logs.push(startMsg);
           
-          // Fetch data
-          const matches = await getLeagueMatches(league.id, league.name, fromStr, toStr);
-          
-          if (matches.length > 0) {
-              const { error } = await supabase.from('matches').upsert(matches, { 
-                  onConflict: 'api_id', ignoreDuplicates: false 
-              });
+          try {
+              // Fetch data
+              const matches = await getLeagueMatches(league.id, league.name, fromStr, toStr);
               
-              if (!error) {
-                  totalUpserted += matches.length;
-                  console.log(`   ✅ Saved ${matches.length} matches.`);
+              if (matches.length > 0) {
+                  const { error } = await supabase.from('matches').upsert(matches, { 
+                      onConflict: 'api_id', ignoreDuplicates: false 
+                  });
+                  
+                  if (!error) {
+                      totalUpserted += matches.length;
+                      logs.push(`   ✅ Saved ${matches.length} matches.`);
+                  } else {
+                      logs.push(`   ❌ DB Error: ${error.message}`);
+                  }
               } else {
-                  console.error(`   ❌ DB Error:`, error.message);
+                   logs.push(`   ⚠️ API returned 0 matches (Empty response).`);
               }
-          } else {
-               console.log(`   ⚠️ No matches found.`);
+
+          } catch (innerError: any) {
+              // Capture the specific API error here
+              logs.push(`   🔥 API FAIL: ${innerError.message}`);
           }
 
-          // 🛑 SAFETY DELAY: 5s pause between leagues
-          // This prevents the API from blocking us for "Too Many Requests"
-          if (targetLeagues.length > 1) await delay(5000); 
+          // 🛑 SAFETY DELAY: 6s pause
+          // Without this, the error will always be "429 Too Many Requests"
+          logs.push(`   ⏳ Waiting 6s to respect API limit...`);
+          await delay(6000); 
       }
 
       return NextResponse.json({ 
           success: true, 
-          batch: batch,
           range: `${fromStr} to ${toStr}`,
           matches_updated: totalUpserted,
-          leagues_processed: targetLeagues.length
+          logs: logs // 👈 CHECK THIS IN YOUR BROWSER
       });
 
   } catch (error: any) {
-      console.error("🔥 Sync Error:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: error.message, logs: logs }, { status: 500 });
   }
 }
