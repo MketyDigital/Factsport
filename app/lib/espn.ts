@@ -9,6 +9,7 @@ export const ESPN_LEAGUES: Record<string, string> = {
   'Champions League': 'uefa.champions',
   'Euros': 'uefa.euro',
   'World Cup': 'fifa.world',
+  // Cups
   'FA Cup': 'eng.fa_cup',
   'Carabao Cup': 'eng.league_cup',
   'Copa del Rey': 'esp.copa_del_rey'
@@ -21,27 +22,37 @@ export const normalizeName = (name: string) => {
     .trim();
 };
 
-// 1. Fetch Scoreboard (Fast, Basic Info for many matches)
+// 1. Fetch Scoreboard (Fast, Basic Info)
 export async function fetchEspnLive(leagueCode: string) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueCode}/scoreboard`;
   try {
     const res = await fetch(url, { next: { revalidate: 0 } });
     if (!res.ok) return [];
+    
     const data = await res.json();
-    return (data.events || []).map((e: any) => ({
+    return (data.events || []).map((e: any) => {
+      const comp = e.competitions[0];
+      const home = comp.competitors.find((c: any) => c.homeAway === 'home');
+      const away = comp.competitors.find((c: any) => c.homeAway === 'away');
+      
+      return {
         espn_id: e.id,
-        status: e.status.type.state,
+        status: e.status.type.state, // 'pre', 'in', 'post'
         clock: e.status.type.description === 'Halftime' ? 'HT' : e.status.displayClock,
-        home_team: e.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.displayName,
-        away_team: e.competitions[0].competitors.find((c:any)=>c.homeAway==='away').team.displayName,
-        home_score: parseInt(e.competitions[0].competitors.find((c:any)=>c.homeAway==='home').score),
-        away_score: parseInt(e.competitions[0].competitors.find((c:any)=>c.homeAway==='away').score),
+        home_team: home.team.displayName,
+        away_team: away.team.displayName,
+        home_score: parseInt(home.score),
+        away_score: parseInt(away.score),
         startTime: new Date(e.date).getTime()
-    }));
-  } catch (err) { return []; }
+      };
+    });
+  } catch (err) {
+    console.error(`ESPN Fetch Error (${leagueCode}):`, err);
+    return [];
+  }
 }
 
-// 2. Fetch Deep Details (Lineups, Stats, Events for ONE match)
+// 2. Fetch Deep Details (Lineups, Stats, Events)
 export async function fetchEspnDetails(gameId: string) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${gameId}`;
   try {
@@ -49,14 +60,19 @@ export async function fetchEspnDetails(gameId: string) {
     if (!res.ok) return null;
     const data = await res.json();
 
-    // A. Parse Events (Goals/Cards)
-    const events = (data.header?.competitions?.[0]?.details || []).map((e: any) => ({
+    const homeId = data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.id;
+
+    // A. Parse Events (Goals, Cards, Subs)
+    const rawEvents = data.header?.competitions?.[0]?.details || [];
+    const events = rawEvents.map((e: any) => ({
        id: Math.random().toString(36).substr(2, 9),
        time: e.clock?.displayValue || "0'",
-       type: e.type?.text?.toLowerCase() || 'goal', // 'goal', 'yellow card', 'substitution'
-       text: e.shortText || e.text, // "Goal! Salah"
+       type: e.type?.text?.toLowerCase() || 'event', // goal, yellow card, substitution
+       // This text usually contains "Goal - Scorer (Assist)"
+       text: e.shortText || e.text || 'Match Event', 
        team: e.team?.displayName || '',
-       player: e.participants?.[0]?.athlete?.displayName || 'Unknown'
+       // Primary actor (Scorer or Carded player)
+       player: e.participants?.[0]?.athlete?.displayName || '' 
     }));
 
     // B. Parse Stats (Possession, Shots)
@@ -65,9 +81,9 @@ export async function fetchEspnDetails(gameId: string) {
     
     if (boxscore?.teams) {
        boxscore.teams.forEach((t: any) => {
-          const side = t.team.id === data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.id ? 'home' : 'away';
+          const side = t.team.id === homeId ? 'home' : 'away';
           t.statistics.forEach((s: any) => {
-             // Map simplified keys
+             // We map specific keys to ensure the frontend finds them
              if(s.name === 'possessionPct') stats[side].possession = s.displayValue;
              if(s.name === 'shotsSummary') stats[side].shots = s.displayValue;
              if(s.name === 'foulsCommitted') stats[side].fouls = s.displayValue;
@@ -77,15 +93,26 @@ export async function fetchEspnDetails(gameId: string) {
        });
     }
 
-    // C. Parse Lineups
+    // C. Parse Lineups (Robust Method)
     const lineups: any = { home: [], away: [] };
-    if (boxscore?.rosters) {
-       boxscore.rosters.forEach((r: any) => {
-          const side = r.team.id === data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.id ? 'home' : 'away';
-          lineups[side] = (r.athletes || []).map((p: any) => ({
+    
+    // ESPN structure varies. We check 'rosters' first, then 'players'
+    let rosters = boxscore?.rosters;
+    if (!rosters && boxscore?.players) {
+        rosters = boxscore.players;
+    }
+
+    if (rosters) {
+       rosters.forEach((r: any) => {
+          const side = r.team.id === homeId ? 'home' : 'away';
+          
+          // Sometimes players are in 'athletes', sometimes inside 'statistics'
+          const athletes = r.athletes || r.statistics?.[0]?.athletes || [];
+
+          lineups[side] = athletes.map((p: any) => ({
              name: p.athlete.displayName,
              number: p.jersey,
-             position: p.position.abbreviation,
+             position: p.position?.abbreviation || 'P',
              is_starter: p.starter
           }));
        });
