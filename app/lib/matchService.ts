@@ -1,5 +1,6 @@
 import { createClient } from '@/app/lib/supabase/client';
 
+// 🟢 CONFIG: Football-Data.org API (Still used for basic sync)
 const API_KEY = process.env.FOOTBALL_DATA_KEY!;
 const BASE_URL = 'https://api.football-data.org/v4';
 
@@ -14,6 +15,7 @@ const LEAGUE_MAP: Record<string, string> = {
   'World Cup': 'WC',
 };
 
+// --- HELPER 1: Normalize Status Codes ---
 const normalizeStatus = (status: string) => {
   const map: Record<string, string> = {
     'IN_PLAY': 'LIVE',
@@ -28,6 +30,7 @@ const normalizeStatus = (status: string) => {
   return map[status] || status;
 };
 
+// --- HELPER 2: Standardize Match Data ---
 const transformMatch = (m: any, leagueName: string) => ({
     api_id: m.id, 
     league: leagueName,
@@ -43,6 +46,7 @@ const transformMatch = (m: any, leagueName: string) => ({
     match_events: [] 
 });
 
+// --- MAIN FUNCTION 1: SYNC ---
 export async function getLeagueMatches(leagueId: string, leagueName: string, dateFrom: string, dateTo: string) {
   const code = LEAGUE_MAP[leagueName] || leagueId; 
   if (!code) return { matches: [], error: 'Invalid League Code' };
@@ -57,7 +61,6 @@ export async function getLeagueMatches(leagueId: string, leagueName: string, dat
     
     if (!res.ok) {
         const errorText = await res.text();
-        // Return the error so the route can show it to us
         return { matches: [], error: `Status ${res.status}: ${errorText}` };
     }
 
@@ -72,18 +75,49 @@ export async function getLeagueMatches(leagueId: string, leagueName: string, dat
   }
 }
 
-// ... getExternalData stays the same ...
-export async function getExternalData(dbData: any): Promise<any> {
+// --- MAIN FUNCTION 2: FRONTEND ADAPTER (UPDATED) ---
+export interface UnifiedMatchData {
+  status: string;
+  displayClock: string;
+  home: { name: string; logo: string; score: number | string; id: string };
+  away: { name: string; logo: string; score: number | string; id: string };
+  goals: any[];
+  commentary: any[];
+  stats: any;
+  lineups: { home: any[]; away: any[]; };
+  hasExternalData: boolean;
+  widget_id?: string;
+}
+
+export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
+  // 🟢 LOGIC UPDATE: Check if Rich Data exists in the DB columns
+  const hasLineups = dbData.lineups && (dbData.lineups.home?.length > 0 || dbData.lineups.away?.length > 0);
+  const hasStats = dbData.stats && (Object.keys(dbData.stats.home || {}).length > 0);
+  
+  // "External Data" now means: Has Widget OR Has ESPN Data
+  const hasRichData = !!dbData.widget_id || hasLineups || hasStats;
+
   return {
     status: dbData.status === 'SCHEDULED' ? 'PRE' : dbData.status,
-    displayClock: dbData.status === 'LIVE' ? 'Live' : (dbData.status === 'HT' ? 'HT' : ''),
-    home: { name: dbData.home_team, logo: dbData.home_logo, score: dbData.home_score ?? 0, id: 'home' },
-    away: { name: dbData.away_team, logo: dbData.away_logo, score: dbData.away_score ?? 0, id: 'away' },
+    displayClock: dbData.displayClock || (dbData.status === 'LIVE' ? 'Live' : (dbData.status === 'HT' ? 'HT' : '')),
+    home: { 
+      name: dbData.home_team, 
+      logo: dbData.home_logo, 
+      score: dbData.home_score ?? 0, 
+      id: 'home' 
+    },
+    away: { 
+      name: dbData.away_team, 
+      logo: dbData.away_logo, 
+      score: dbData.away_score ?? 0, 
+      id: 'away' 
+    },
+    // 🟢 PASS DB DATA DIRECTLY
     goals: dbData.match_events || [], 
-    commentary: [], 
-    stats: { possession: { h:0, a:0 }, shots: { h:0, a:0 }, corners: { h:0, a:0 }, fouls: { h:0, a:0 } },
-    lineups: { home: [], away: [] },
-    hasExternalData: !!dbData.widget_id, 
+    commentary: [], // ESPN events can be mapped here later if needed
+    stats: dbData.stats || { home: {}, away: {} },
+    lineups: dbData.lineups || { home: [], away: [] },
+    hasExternalData: hasRichData, 
     widget_id: dbData.widget_id 
   };
 }
