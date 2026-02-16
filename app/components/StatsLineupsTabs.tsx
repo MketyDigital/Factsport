@@ -1,64 +1,116 @@
 'use client';
 import { useState } from 'react';
-import { BarChart2, Users } from 'lucide-react';
+import { BarChart2, Users, List, Flag } from 'lucide-react';
 
-function StatBar({ label, h, a, suffix = "" }: any) {
-    const total = (h + a) || 1;
-    const pct = (h / total) * 100;
-    return (
-      <div className="flex flex-col gap-1.5">
-        <div className="flex justify-between text-[10px] font-bold text-slate-500">
-            <span>{h}{suffix}</span><span className="uppercase text-slate-300 text-[9px] tracking-wider">{label}</span><span>{a}{suffix}</span>
-        </div>
-        <div className="h-1.5 w-full bg-slate-100 rounded-full flex overflow-hidden">
-            <div className="h-full bg-blue-600" style={{ width: `${pct}%` }}></div><div className="h-full bg-red-600 flex-1"></div>
-        </div>
+export default function StatsLineupsTabs({ data }: { data: any }) {
+  const [activeTab, setActiveTab] = useState('events');
+
+  const stats = data.stats || { home: {}, away: {} };
+  const lineups = data.lineups || { home: [], away: [] };
+  const events = data.match_events || [];
+
+  const hasStats = stats.home?.possession || stats.home?.shots;
+  const hasLineups = lineups.home?.length > 0;
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      
+      {/* TABS HEADER */}
+      <div className="flex border-b border-slate-200">
+        <button onClick={() => setActiveTab('events')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 ${activeTab === 'events' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-slate-400 hover:bg-slate-50'}`}>
+            <List size={14} /> Events
+        </button>
+        <button onClick={() => setActiveTab('stats')} disabled={!hasStats} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 ${activeTab === 'stats' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-slate-400 hover:bg-slate-50'} ${!hasStats && 'opacity-50 cursor-not-allowed'}`}>
+            <BarChart2 size={14} /> Stats
+        </button>
+        <button onClick={() => setActiveTab('lineups')} disabled={!hasLineups} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 ${activeTab === 'lineups' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-slate-400 hover:bg-slate-50'} ${!hasLineups && 'opacity-50 cursor-not-allowed'}`}>
+            <Users size={14} /> Lineups
+        </button>
       </div>
-    );
-}
 
-function RosterList({ title, players }: any) {
-    return (
-        <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100">
-            <div className="border-b border-slate-100 pb-2 mb-2 font-black text-[10px] text-slate-400 uppercase">{title}</div>
-            <ul className="space-y-1">
-                {players.length > 0 ? players.map((p:any) => (
-                    <li key={p.athlete?.id || Math.random()} className="text-[10px] font-bold text-slate-600 flex gap-2">
-                        <span className="text-slate-300 w-4">{p.jersey}</span> {p.athlete?.displayName || "Player"}
-                    </li>
-                )) : <li className="text-[10px] text-slate-300 italic">Not available</li>}
-            </ul>
-        </div>
-    )
-}
+      {/* CONTENT AREA */}
+      <div className="p-4 min-h-[200px]">
+        
+        {/* 1. EVENTS TAB */}
+        {activeTab === 'events' && (
+             <div className="space-y-4">
+                 {events.length === 0 ? (
+                     <p className="text-center text-xs text-slate-400 py-10">No key events yet.</p>
+                 ) : (
+                     events.map((e: any, i: number) => (
+                        <div key={i} className="flex gap-4 items-start">
+                            <div className="w-10 text-right font-mono text-xs font-bold text-slate-400 pt-0.5">{e.time}</div>
+                            <div className="flex-1 pb-4 border-b border-slate-50 last:border-0">
+                                <p className="text-xs font-bold text-slate-800">{e.text}</p>
+                                <p className="text-[10px] text-slate-500">{e.player}</p>
+                            </div>
+                        </div>
+                     ))
+                 )}
+             </div>
+        )}
 
-export default function StatsLineupsTabs({ data }: any) {
-    const [tab, setTab] = useState('stats');
-
-    return (
-        <div className="mt-6">
-            <div className="flex bg-white rounded-xl p-1 shadow-sm border border-slate-100 mb-4">
-                <button onClick={() => setTab('stats')} className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition flex items-center justify-center gap-1 ${tab === 'stats' ? 'bg-blue-50 text-blue-600' : 'text-slate-400'}`}>
-                    <BarChart2 size={12} /> Stats
-                </button>
-                <button onClick={() => setTab('lineups')} className={`flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition flex items-center justify-center gap-1 ${tab === 'lineups' ? 'bg-blue-50 text-blue-600' : 'text-slate-400'}`}>
-                    <Users size={12} /> Lineups
-                </button>
+        {/* 2. STATS TAB */}
+        {activeTab === 'stats' && (
+            <div className="space-y-4">
+                <StatRow label="Possession" home={stats.home?.possession || '50%'} away={stats.away?.possession || '50%'} />
+                <StatRow label="Shots" home={stats.home?.shots || '0'} away={stats.away?.shots || '0'} />
+                <StatRow label="Corners" home={stats.home?.corners || '0'} away={stats.away?.corners || '0'} />
+                <StatRow label="Fouls" home={stats.home?.fouls || '0'} away={stats.away?.fouls || '0'} />
+                <StatRow label="Saves" home={stats.home?.saves || '0'} away={stats.away?.saves || '0'} />
             </div>
+        )}
 
-            {tab === 'stats' ? (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 space-y-5">
-                    <StatBar label="Possession" h={data.stats.possession.h} a={data.stats.possession.a} suffix="%" />
-                    <StatBar label="Shots" h={data.stats.shots.h} a={data.stats.shots.a} />
-                    <StatBar label="Corners" h={data.stats.corners.h} a={data.stats.corners.a} />
-                    <StatBar label="Fouls" h={data.stats.fouls.h} a={data.stats.fouls.a} />
+        {/* 3. LINEUPS TAB */}
+        {activeTab === 'lineups' && (
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3 text-center">Home</h4>
+                    <ul className="space-y-2">
+                        {lineups.home?.filter((p:any)=>p.is_starter).map((p:any, i:number) => (
+                            <li key={i} className="text-xs text-slate-700 flex gap-2">
+                                <span className="font-mono text-slate-400 w-4 text-right">{p.number}</span> {p.name}
+                            </li>
+                        ))}
+                    </ul>
                 </div>
-            ) : (
-                <div className="grid grid-cols-2 gap-3">
-                    <RosterList title="Home" players={data.lineups.home} />
-                    <RosterList title="Away" players={data.lineups.away} />
+                <div>
+                    <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3 text-center">Away</h4>
+                    <ul className="space-y-2">
+                        {lineups.away?.filter((p:any)=>p.is_starter).map((p:any, i:number) => (
+                            <li key={i} className="text-xs text-slate-700 flex gap-2">
+                                <span className="font-mono text-slate-400 w-4 text-right">{p.number}</span> {p.name}
+                            </li>
+                        ))}
+                    </ul>
                 </div>
-            )}
+            </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+// Simple Stat Bar Helper
+function StatRow({ label, home, away }: any) {
+    // Basic Parsing to remove '%' for width calculation
+    const hVal = parseInt(home.toString().replace(/\D/g,'')) || 0;
+    const aVal = parseInt(away.toString().replace(/\D/g,'')) || 0;
+    const total = hVal + aVal || 1;
+    const hWidth = (hVal / total) * 100;
+
+    return (
+        <div>
+            <div className="flex justify-between text-[10px] font-bold text-slate-600 mb-1">
+                <span>{home}</span>
+                <span className="text-slate-400 uppercase tracking-widest">{label}</span>
+                <span>{away}</span>
+            </div>
+            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                <div style={{ width: `${hWidth}%` }} className="bg-blue-600 h-full"></div>
+                <div className="flex-1 bg-red-500 h-full"></div>
+            </div>
         </div>
     );
 }
