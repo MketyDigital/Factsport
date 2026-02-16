@@ -1,15 +1,14 @@
 'use client';
 import { useState } from 'react';
-import { BarChart2, Users, List, Flag } from 'lucide-react';
+import { BarChart2, Users, List } from 'lucide-react';
 
 export default function StatsLineupsTabs({ data }: { data: any }) {
-  const [activeTab, setActiveTab] = useState('events');
+  const [activeTab, setActiveTab] = useState('lineups'); // 🟢 Default to Lineups to check immediately
 
   const stats = data.stats || { home: {}, away: {} };
   const lineups = data.lineups || { home: [], away: [] };
   const events = data.match_events || [];
 
-  const hasStats = stats.home?.possession || stats.home?.shots;
   const hasLineups = lineups.home?.length > 0;
 
   return (
@@ -20,10 +19,11 @@ export default function StatsLineupsTabs({ data }: { data: any }) {
         <button onClick={() => setActiveTab('events')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 ${activeTab === 'events' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-slate-400 hover:bg-slate-50'}`}>
             <List size={14} /> Events
         </button>
-        <button onClick={() => setActiveTab('stats')} disabled={!hasStats} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 ${activeTab === 'stats' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-slate-400 hover:bg-slate-50'} ${!hasStats && 'opacity-50 cursor-not-allowed'}`}>
+        <button onClick={() => setActiveTab('stats')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 ${activeTab === 'stats' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-slate-400 hover:bg-slate-50'}`}>
             <BarChart2 size={14} /> Stats
         </button>
-        <button onClick={() => setActiveTab('lineups')} disabled={!hasLineups} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 ${activeTab === 'lineups' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-slate-400 hover:bg-slate-50'} ${!hasLineups && 'opacity-50 cursor-not-allowed'}`}>
+        {/* 🟢 ALWAYS ENABLED: So you can click and see status */}
+        <button onClick={() => setActiveTab('lineups')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 ${activeTab === 'lineups' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' : 'text-slate-400 hover:bg-slate-50'}`}>
             <Users size={14} /> Lineups
         </button>
       </div>
@@ -35,7 +35,9 @@ export default function StatsLineupsTabs({ data }: { data: any }) {
         {activeTab === 'events' && (
              <div className="space-y-4">
                  {events.length === 0 ? (
-                     <p className="text-center text-xs text-slate-400 py-10">No key events yet.</p>
+                     <div className="text-center py-10 opacity-50">
+                        <p className="text-xs font-bold text-slate-500">Match hasn't started or no events yet.</p>
+                     </div>
                  ) : (
                      events.map((e: any, i: number) => (
                         <div key={i} className="flex gap-4 items-start">
@@ -63,28 +65,38 @@ export default function StatsLineupsTabs({ data }: { data: any }) {
 
         {/* 3. LINEUPS TAB */}
         {activeTab === 'lineups' && (
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3 text-center">Home</h4>
-                    <ul className="space-y-2">
-                        {lineups.home?.filter((p:any)=>p.is_starter).map((p:any, i:number) => (
-                            <li key={i} className="text-xs text-slate-700 flex gap-2">
-                                <span className="font-mono text-slate-400 w-4 text-right">{p.number}</span> {p.name}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-                <div>
-                    <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3 text-center">Away</h4>
-                    <ul className="space-y-2">
-                        {lineups.away?.filter((p:any)=>p.is_starter).map((p:any, i:number) => (
-                            <li key={i} className="text-xs text-slate-700 flex gap-2">
-                                <span className="font-mono text-slate-400 w-4 text-right">{p.number}</span> {p.name}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            </div>
+            <>
+                {!hasLineups ? (
+                    <div className="text-center py-10 opacity-50 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                        <Users className="mx-auto mb-2 text-slate-400" size={24} />
+                        <p className="text-xs font-bold text-slate-500">Lineups available 60m before kickoff.</p>
+                        <p className="text-[10px] text-slate-400">Waiting for official team sheet...</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3 text-center">Home</h4>
+                            <ul className="space-y-2">
+                                {lineups.home?.filter((p:any)=>p.is_starter).map((p:any, i:number) => (
+                                    <li key={i} className="text-xs text-slate-700 flex gap-2">
+                                        <span className="font-mono text-slate-400 w-4 text-right">{p.number}</span> {p.name}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3 text-center">Away</h4>
+                            <ul className="space-y-2">
+                                {lineups.away?.filter((p:any)=>p.is_starter).map((p:any, i:number) => (
+                                    <li key={i} className="text-xs text-slate-700 flex gap-2">
+                                        <span className="font-mono text-slate-400 w-4 text-right">{p.number}</span> {p.name}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                )}
+            </>
         )}
 
       </div>
@@ -92,9 +104,7 @@ export default function StatsLineupsTabs({ data }: { data: any }) {
   );
 }
 
-// Simple Stat Bar Helper
 function StatRow({ label, home, away }: any) {
-    // Basic Parsing to remove '%' for width calculation
     const hVal = parseInt(home.toString().replace(/\D/g,'')) || 0;
     const aVal = parseInt(away.toString().replace(/\D/g,'')) || 0;
     const total = hVal + aVal || 1;
