@@ -1,9 +1,9 @@
 import { createClient } from '@/app/lib/supabase/client';
 
+// 🟢 CONFIG: Football-Data.org API (Still used for basic sync)
 const API_KEY = process.env.FOOTBALL_DATA_KEY!;
 const BASE_URL = 'https://api.football-data.org/v4';
 
-// 🟢 CONFIG: Map your frontend league names to API codes
 const LEAGUE_MAP: Record<string, string> = {
   'Premier League': 'PL',
   'La Liga': 'PD',
@@ -49,42 +49,33 @@ const transformMatch = (m: any, leagueName: string) => ({
 // --- MAIN FUNCTION 1: SYNC ---
 export async function getLeagueMatches(leagueId: string, leagueName: string, dateFrom: string, dateTo: string) {
   const code = LEAGUE_MAP[leagueName] || leagueId; 
-  if (!code) return [];
+  if (!code) return { matches: [], error: 'Invalid League Code' };
 
   const url = `${BASE_URL}/competitions/${code}/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`;
   
-  // 🔍 DEBUG: Log the request URL
-  console.log(`[Sync Request] ${leagueName}: ${url}`);
-
   try {
     const res = await fetch(url, {
       headers: { 'X-Auth-Token': API_KEY },
       cache: 'no-store'
     });
     
-    // 🔍 DEBUG: Log detailed API errors
     if (!res.ok) {
         const errorText = await res.text();
-        console.error(`❌ API Failed (${leagueName}): Status ${res.status} - ${errorText}`);
-        return [];
+        return { matches: [], error: `Status ${res.status}: ${errorText}` };
     }
 
     const data = await res.json();
-    const count = data.matches?.length || 0;
-    
-    // 🔍 DEBUG: Log success
-    console.log(`✅ API Success (${leagueName}): Found ${count} matches`);
-    
-    return (data.matches || []).map((m: any) => transformMatch(m, leagueName));
+    return { 
+        matches: (data.matches || []).map((m: any) => transformMatch(m, leagueName)),
+        error: null 
+    };
 
-  } catch (e) {
-    console.error(`🔥 Sync Exception (${leagueName}):`, e);
-    return [];
+  } catch (e: any) {
+    return { matches: [], error: e.message };
   }
 }
 
-// --- MAIN FUNCTION 2: FRONTEND ADAPTER ---
-// (Unchanged)
+// --- MAIN FUNCTION 2: FRONTEND ADAPTER (UPDATED) ---
 export interface UnifiedMatchData {
   status: string;
   displayClock: string;
@@ -99,9 +90,16 @@ export interface UnifiedMatchData {
 }
 
 export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
+  // 🟢 LOGIC UPDATE: Check if Rich Data exists in the DB columns
+  const hasLineups = dbData.lineups && (dbData.lineups.home?.length > 0 || dbData.lineups.away?.length > 0);
+  const hasStats = dbData.stats && (Object.keys(dbData.stats.home || {}).length > 0);
+  
+  // "External Data" now means: Has Widget OR Has ESPN Data
+  const hasRichData = !!dbData.widget_id || hasLineups || hasStats;
+
   return {
     status: dbData.status === 'SCHEDULED' ? 'PRE' : dbData.status,
-    displayClock: dbData.status === 'LIVE' ? 'Live' : (dbData.status === 'HT' ? 'HT' : ''),
+    displayClock: dbData.displayClock || (dbData.status === 'LIVE' ? 'Live' : (dbData.status === 'HT' ? 'HT' : '')),
     home: { 
       name: dbData.home_team, 
       logo: dbData.home_logo, 
@@ -114,11 +112,12 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
       score: dbData.away_score ?? 0, 
       id: 'away' 
     },
+    // 🟢 PASS DB DATA DIRECTLY
     goals: dbData.match_events || [], 
-    commentary: [], 
-    stats: { possession: { h:0, a:0 }, shots: { h:0, a:0 }, corners: { h:0, a:0 }, fouls: { h:0, a:0 } },
-    lineups: { home: [], away: [] },
-    hasExternalData: !!dbData.widget_id, 
+    commentary: [], // ESPN events can be mapped here later if needed
+    stats: dbData.stats || { home: {}, away: {} },
+    lineups: dbData.lineups || { home: [], away: [] },
+    hasExternalData: hasRichData, 
     widget_id: dbData.widget_id 
   };
 }
