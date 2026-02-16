@@ -52,8 +52,7 @@ export async function fetchEspnDetails(gameId: string) {
 
     const homeId = String(data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.id);
 
-    // 🟢 A. PARSE EVENTS (ROBUST)
-    // We look for 'details' which contains the timeline
+    // 🟢 A. PARSE EVENTS (FIXED TEXT LOGIC)
     const rawEvents = data.header?.competitions?.[0]?.details || [];
     const events = rawEvents.map((e: any) => {
         const rawType = (e.type?.text || 'event').toLowerCase();
@@ -64,17 +63,21 @@ export async function fetchEspnDetails(gameId: string) {
         else if (rawType.includes('card')) cleanType = 'card';
         else if (rawType.includes('substitution')) cleanType = 'sub';
 
+        // 🟢 FIX: If text is missing, use the type text (e.g. "Yellow Card")
+        const fallbackText = e.type?.text || 'Match Event';
+        const finalText = e.shortText || e.text || fallbackText;
+
         return {
             id: Math.random().toString(36).substr(2, 9),
             time: e.clock?.displayValue || "0'",
             type: cleanType,
-            text: e.shortText || e.text || 'Match Event',
+            text: finalText, // Now guarantees a real name like "Goal" or "Yellow Card"
             team: e.team?.displayName || '',
             player: e.participants?.[0]?.athlete?.displayName || '' 
         };
     });
 
-    // 🟢 B. PARSE STATS
+    // 🟢 B. PARSE STATS (Untouched)
     const boxscore = data.boxscore;
     const stats: any = { home: {}, away: {} };
     if (boxscore?.teams) {
@@ -90,10 +93,8 @@ export async function fetchEspnDetails(gameId: string) {
        });
     }
 
-    // 🟢 C. PARSE LINEUPS (CHECK EVERYWHERE)
+    // 🟢 C. PARSE LINEUPS (Untouched)
     const lineups: any = { home: [], away: [] };
-    
-    // Strategy: Rosters > Players > Teams
     let rosters = boxscore?.rosters;
     if (!rosters && boxscore?.players) rosters = boxscore.players;
     if (!rosters && data.rosters) rosters = data.rosters;
@@ -101,7 +102,6 @@ export async function fetchEspnDetails(gameId: string) {
     if (rosters) {
        rosters.forEach((r: any) => {
           const side = String(r.team.id) === homeId ? 'home' : 'away';
-          
           let athletes = r.athletes || r.roster || r.statistics?.[0]?.athletes || [];
 
           lineups[side] = athletes.map((p: any) => ({
@@ -112,7 +112,6 @@ export async function fetchEspnDetails(gameId: string) {
           }));
        });
     } 
-    // FALLBACK: Look inside 'teams' array
     else if (boxscore?.teams) {
         boxscore.teams.forEach((t: any) => {
             const side = String(t.team.id) === homeId ? 'home' : 'away';
