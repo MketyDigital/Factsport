@@ -23,10 +23,12 @@ export async function GET(request: Request) {
 
   if (!dbMatches || dbMatches.length === 0) return NextResponse.json({ message: "No active matches." });
 
-  const activeLeagues = [...new Set(dbMatches.map(m => m.league))];
+  // 🟢 FIX: Use Array.from() to avoid TypeScript ES5 iteration error
+  const activeLeagues = Array.from(new Set(dbMatches.map(m => m.league)));
 
   for (const leagueName of activeLeagues) {
-    const espnCode = ESPN_LEAGUES[leagueName];
+    // Type assertion to ensure leagueName is used as an index key
+    const espnCode = ESPN_LEAGUES[leagueName as string];
     if (!espnCode) continue;
 
     // A. Get Basic Scoreboard
@@ -35,8 +37,12 @@ export async function GET(request: Request) {
     for (const espnGame of espnMatches) {
       const matchInDb = dbMatches.find(db => {
         if (db.league !== leagueName) return false;
+        
+        // Strict Time Match (4 Hours) to prevent wrong matches
         const diff = Math.abs(new Date(db.match_date).getTime() - espnGame.startTime);
         if (diff > (4 * 60 * 60 * 1000)) return false; 
+        
+        // Name Match
         const dbHome = normalizeName(db.home_team);
         const espnHome = normalizeName(espnGame.home_team);
         return dbHome.includes(espnHome) || espnHome.includes(dbHome);
