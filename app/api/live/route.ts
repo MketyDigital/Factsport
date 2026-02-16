@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   let logs: string[] = [];
   let updates = 0;
 
-  // 1. Get Active Matches (Lookback 3 hours, Lookahead 3 hours)
+  // 1. Get Active Matches
   const now = Date.now();
   const timeWindow = 3 * 60 * 60 * 1000;
   
@@ -23,25 +23,20 @@ export async function GET(request: Request) {
 
   if (!dbMatches || dbMatches.length === 0) return NextResponse.json({ message: "No active matches." });
 
-  // 🟢 FIX: Use Array.from() to avoid TypeScript ES5 iteration error
   const activeLeagues = Array.from(new Set(dbMatches.map(m => m.league)));
 
   for (const leagueName of activeLeagues) {
-    // Type assertion to ensure leagueName is used as an index key
     const espnCode = ESPN_LEAGUES[leagueName as string];
     if (!espnCode) continue;
 
-    // A. Get Basic Scoreboard
     const espnMatches = await fetchEspnLive(espnCode);
 
     for (const espnGame of espnMatches) {
       const matchInDb = dbMatches.find(db => {
         if (db.league !== leagueName) return false;
-        
-        // Strict Time Match (4 Hours) to prevent wrong matches
+        // Strict Time Match (4 Hours)
         const diff = Math.abs(new Date(db.match_date).getTime() - espnGame.startTime);
         if (diff > (4 * 60 * 60 * 1000)) return false; 
-        
         // Name Match
         const dbHome = normalizeName(db.home_team);
         const espnHome = normalizeName(espnGame.home_team);
@@ -49,10 +44,9 @@ export async function GET(request: Request) {
       });
 
       if (matchInDb) {
-        // B. Fetch Rich Details (Lineups, Stats, Events)
+        // 🟢 FETCH RICH DATA
         const richData = await fetchEspnDetails(espnGame.espn_id);
         
-        // Prepare Update Object
         let updatePayload: any = {
            home_score: espnGame.home_score,
            away_score: espnGame.away_score,
@@ -60,20 +54,18 @@ export async function GET(request: Request) {
            updated_at: new Date().toISOString()
         };
 
-        // Status Logic
         if (espnGame.status === 'in') updatePayload.status = 'LIVE';
         else if (espnGame.status === 'post') updatePayload.status = 'FT';
         else if (espnGame.clock === 'HT') updatePayload.status = 'HT';
-        else updatePayload.status = matchInDb.status; // Keep existing if unsure
+        else updatePayload.status = matchInDb.status;
 
-        // Add Rich Data if available
+        // 🟢 SAVE RICH DATA
         if (richData) {
             updatePayload.match_events = richData.events;
             updatePayload.stats = richData.stats;
             updatePayload.lineups = richData.lineups;
         }
 
-        // C. Update Database
         await supabase.from('matches').update(updatePayload).eq('id', matchInDb.id);
         
         updates++;

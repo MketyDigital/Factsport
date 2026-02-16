@@ -5,12 +5,17 @@ import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
 
 export default function MatchHeaderClient({ matchId, initialData }: any) {
   const [data, setData] = useState(initialData);
-  const hasPremiumWidget = !!initialData.widget_id; // 🟢 CHECK FOR WIDGET
+  const hasPremiumWidget = !!initialData.widget_id;
 
   useEffect(() => {
     const supabase = createClient();
-    const channel = supabase.channel(`match-header-${matchId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'matches', filter: `id=eq.${matchId}` }, (payload) => {
+    const channel = supabase.channel(`header-${matchId}`)
+      .on('postgres_changes', { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'matches', 
+          filter: `id=eq.${matchId}` 
+      }, (payload) => {
           setData((prev:any) => ({ 
              ...prev, 
              status: payload.new.status, 
@@ -20,15 +25,14 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
              displayClock: payload.new.displayClock
           }));
       }).subscribe();
+
     return () => { supabase.removeChannel(channel); };
   }, [matchId]);
 
-  // 🅰️ SCENARIO A: PREMIUM WIDGET (Admin provided ID)
   if (hasPremiumWidget) {
       return <ScoreAxisWidget matchId={initialData.widget_id} />;
   }
 
-  // 🅱️ SCENARIO B: STATIC HEADER (ESPN Data)
   const isLive = ['LIVE', 'HT', 'IN_PLAY'].includes(data.status);
   const isFinished = ['FT', 'FINISHED'].includes(data.status);
 
