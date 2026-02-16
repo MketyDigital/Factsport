@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
 import { 
   Search, Plus, Save, Trash2, Calculator, 
-  Calendar, Star, Eye, Terminal
+  Calendar, Star, Eye, Terminal, CheckCircle 
 } from 'lucide-react';
 
 export default function AdminMatchesPage() {
