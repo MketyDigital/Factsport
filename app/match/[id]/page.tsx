@@ -30,29 +30,24 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const activeVideoUrl = dbData.livestream_url || dbData.video_url;
   const isLiveStream = !!dbData.livestream_url;
 
-  // 🟢 LOGIC: 
-  // 1. If Widget exists, we HIDE the fallback stats.
-  // 2. We ALSO hide the main Scoreboard Header to avoid duplicates.
+  // 🟢 LOGIC: Widget Presence Check
   const hasWidget = !!dbData.widget_id; 
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       
-      {/* 1. HEADER */}
-      {/* If Widget exists, we show a "Slim Header" (Just Back Button & League). */}
-      {/* If Widget missing, we show the "Full Scoreboard". */}
-      
+      {/* 1. HEADER LOGIC */}
       {hasWidget ? (
-          // 🟢 SLIM HEADER (Used when Widget is present)
+          // SLIM HEADER (Back Button Only)
           <div className="bg-[#0a1428] text-white p-4 shadow-md flex items-center justify-between sticky top-0 z-40">
               <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
                 <ChevronLeft size={20} />
               </Link>
               <span className="text-xs font-bold tracking-widest uppercase opacity-90">{dbData.league}</span>
-              <div className="w-9"></div> {/* Spacer for alignment */}
+              <div className="w-9"></div>
           </div>
       ) : (
-          // 🔴 FULL HEADER (Used when Widget is missing)
+          // FULL HEADER (Scoreboard)
           <div className="relative bg-[#0a1428] text-white pb-6 rounded-b-[2rem] overflow-hidden shadow-2xl">
             <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
             <div className="relative z-10 p-4 flex items-center justify-between">
@@ -62,16 +57,15 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
               <span className="text-xs font-bold tracking-widest opacity-70 uppercase">{dbData.league}</span>
               <div className="w-10"></div>
             </div>
-            {/* Realtime Scoreboard */}
-            <MatchHeaderClient matchId={dbData.id} initialData={dbData} initialGoals={data.goals} />
+            <MatchHeaderClient matchId={dbData.id} initialData={dbData} />
           </div>
       )}
 
       <div className="mx-4 mt-4 relative z-20 space-y-4">
         
-        {/* 🟢 2. SCOREAXIS WIDGET */}
+        {/* 2. WIDGET INJECTION */}
         {hasWidget && (
-             <div className="-mt-2"> {/* Pull it up slightly to sit under the slim header */}
+             <div className="-mt-2">
                  <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={dbData.affiliate_link} />
              </div>
         )}
@@ -120,7 +114,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
            <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
         </div>
 
-        {/* 6. BETTING BANNER (Only show if Widget is missing, because Widget has its own button now) */}
+        {/* 6. BETTING BANNER (Show if no widget) */}
         {!hasWidget && (
             <div className="bg-[#1A1A1A] rounded-xl p-3 shadow-lg border border-white/5 flex items-center justify-between relative overflow-hidden">
                 <div className="absolute top-0 right-0 bg-blue-600 w-16 h-full blur-[40px] opacity-20"></div>
@@ -138,8 +132,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         )}
       </div>
 
-      {/* 🟢 7. CONDITIONAL CONTENT SECTION */}
-      {/* Logic: Only show Football API Stats/Tabs if the Widget is MISSING */}
+      {/* 7. CONDITIONAL STATS (Only if no widget) */}
       {!hasWidget && (
           <>
             {!data.hasExternalData ? (
@@ -148,22 +141,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                 </div>
             ) : (
                 <div className="px-4 mt-8 space-y-6">
-                    {data.commentary.length > 0 && (
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
-                            <div className="flex items-center gap-2 mb-4 text-slate-400">
-                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
-                                <h3 className="text-xs font-black uppercase tracking-wider">Live Feed</h3>
-                            </div>
-                            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200">
-                                {data.commentary.map((c: any) => (
-                                    <div key={c.id || Math.random()} className="flex gap-3 text-xs">
-                                        <div className="font-mono font-bold text-slate-400 min-w-[24px] pt-0.5">{c.time}'</div>
-                                        <p className="text-slate-700 leading-relaxed font-medium">{c.text}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                     <StatsLineupsTabs data={data} />
                 </div>
             )}

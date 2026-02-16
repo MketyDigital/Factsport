@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Trophy, Activity, Ticket, ArrowRight, PlayCircle, Video, ExternalLink, Youtube, Newspaper, Radio, TrendingUp, Calendar, BarChart2, Award } from "lucide-react";
+import { Zap, Activity, ArrowRight, PlayCircle, Video, ExternalLink, Youtube, Newspaper, Radio, TrendingUp, Calendar, BarChart2, Award, Trophy } from "lucide-react";
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import NewsArtwork from '@/app/components/NewsArtwork';
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
@@ -52,7 +52,7 @@ const getDiverseMatches = (allMatches: any[], limit: number) => {
         leagues[m.league].push(m);
     });
 
-    // 3. Round Robin Pick (1 from EPL, 1 from La Liga, etc.)
+    // 3. Round Robin Pick
     const mixedScheduled: any[] = [];
     const leagueKeys = Object.keys(leagues);
     let hasMore = true;
@@ -61,13 +61,12 @@ const getDiverseMatches = (allMatches: any[], limit: number) => {
         hasMore = false;
         for (const league of leagueKeys) {
             if (leagues[league].length > 0) {
-                mixedScheduled.push(leagues[league].shift()); // Take top match
+                mixedScheduled.push(leagues[league].shift());
                 hasMore = true;
             }
         }
     }
 
-    // 4. Combine & Slice
     return [...live, ...mixedScheduled].slice(0, limit);
 };
 
@@ -76,7 +75,7 @@ async function getHomepageData(leagueFilter: string | undefined) {
   
   let matchQuery = supabase.from('matches').select('*');
 
-  // 🟢 LOGIC 1: LEAGUE FILTER (Strict Window)
+  // 🟢 LOGIC 1: LEAGUE FILTER
   if (leagueFilter) {
       const startDate = new Date(); startDate.setDate(startDate.getDate() - 1); 
       const endDate = new Date(); endDate.setDate(endDate.getDate() + 3); 
@@ -86,14 +85,13 @@ async function getHomepageData(leagueFilter: string | undefined) {
         .ilike('league', `%${leagueFilter}%`)
         .order('match_date', { ascending: true });
   } 
-  // 🟢 LOGIC 2: "FOR YOU" (SMART MIX)
+  // 🟢 LOGIC 2: "FOR YOU"
   else {
       const todayStart = new Date(); todayStart.setHours(0,0,0,0);
       const tomorrowEnd = new Date(); 
       tomorrowEnd.setDate(tomorrowEnd.getDate() + 1); 
       tomorrowEnd.setHours(23,59,59,999);
       
-      // Fetch a larger pool (50) so we have enough to mix
       matchQuery = matchQuery
         .or(`status.eq.LIVE,status.eq.IN_PLAY,status.eq.HT,match_date.gte.${todayStart.toISOString()}`)
         .lte('match_date', tomorrowEnd.toISOString()) 
@@ -101,36 +99,46 @@ async function getHomepageData(leagueFilter: string | undefined) {
         .limit(50); 
   }
 
-  const [matchesRes, newsRes, highlightsRes] = await Promise.all([
+  // ⚡ UPDATED: Fetch Featured Matches Separately
+  const [matchesRes, newsRes, highlightsRes, featuredRes] = await Promise.all([
     matchQuery,
     supabase.from('news').select('*').order('created_at', { ascending: false }).limit(20),
-    supabase.from('matches').select('*').not('video_url', 'is', null).order('match_date', { ascending: false }).limit(10)
+    supabase.from('matches').select('*').not('video_url', 'is', null).order('match_date', { ascending: false }).limit(10),
+    
+    // 🟢 NEW QUERY: Fetch matches manually marked as 'is_featured'
+    supabase.from('matches').select('*').eq('is_featured', true).order('match_date', { ascending: true }).limit(5)
   ]);
 
   let matches = matchesRes.data || [];
 
-  // 🟢 APPLY MIXER (Only for "For You" tab)
+  // Apply Mixer
   if (!leagueFilter && matches.length > 0) {
-      matches = getDiverseMatches(matches, 20); // Pick top 20 diverse matches
+      matches = getDiverseMatches(matches, 20);
   }
 
-  // 🟢 FALLBACK: If NO matches found (e.g. Break), show LAST FINISHED
+  // Fallback
   if (matches.length === 0 && !leagueFilter) {
       const { data: finishedMatches } = await supabase.from('matches').select('*')
         .in('status', ['FT', 'FINISHED', 'ABD']) 
-        .order('match_date', { ascending: false }) // Newest first
+        .order('match_date', { ascending: false })
         .limit(10);
-      
       if (finishedMatches) matches = finishedMatches;
   }
 
-  return { matches, news: newsRes.data || [], highlights: highlightsRes.data || [] };
+  return { 
+      matches, 
+      news: newsRes.data || [], 
+      highlights: highlightsRes.data || [], 
+      featuredMatches: featuredRes.data || [] // Return the specific featured list
+  };
 }
 
 export default async function Home({ searchParams }: { searchParams: { league?: string } }) {
   const resolvedParams = await searchParams;
   const selectedLeague = resolvedParams.league;
-  const { matches, news, highlights } = await getHomepageData(selectedLeague);
+  
+  // 🟢 Destructure the new featuredMatches
+  const { matches, news, highlights, featuredMatches } = await getHomepageData(selectedLeague);
 
   const breakingNews = news.filter(n => n.is_breaking); 
   const rawTicker = breakingNews.length > 0 ? breakingNews : news.slice(0, 5);
@@ -139,7 +147,11 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const finalHeadlines = headlines.length > 0 ? headlines : news.slice(0, 3);
   const latestNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id) && !n.is_breaking).slice(0, 5);
 
-  const heroMatches = matches.filter(m => m.widget_id && (m.audio_url || m.livestream_url)).slice(0, 2);
+  // 🟢 UPDATED: Use the DB list directly. 
+  // If no manually featured matches exist, fall back to the first 2 from the main list.
+  const heroMatches = featuredMatches.length > 0 ? featuredMatches : matches.slice(0, 2);
+
+  // Filter display matches to avoid duplicates (don't show hero match again in the list)
   const displayMatches = matches.filter(m => !heroMatches.some(h => h.id === m.id));
   const groupedMatches = groupByDate(displayMatches);
 
@@ -240,7 +252,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             </div>
         </div>
 
-        {/* HERO SECTION */}
+        {/* HERO SECTION (UPDATED) */}
         {!selectedLeague && heroMatches.length > 0 && (
          <div className="px-4 mb-4 flex gap-2 overflow-x-auto">
              {heroMatches.map((match) => (
@@ -251,10 +263,13 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                 <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE
                             </div>
                         )}
-                        <div className="absolute top-3 left-3 bg-black/40 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1">
-                             {match.livestream_url ? <Video size={8} /> : <Radio size={8} />}
-                             {match.livestream_url ? 'WATCH' : 'AUDIO'}
-                        </div>
+                        {/* Only show 'WATCH' badge if URL actually exists */}
+                        {(match.livestream_url || match.audio_url) && (
+                            <div className="absolute top-3 left-3 bg-black/40 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1">
+                                 {match.livestream_url ? <Video size={8} /> : <Radio size={8} />}
+                                 {match.livestream_url ? 'WATCH' : 'AUDIO'}
+                            </div>
+                        )}
                         <div className="flex justify-between items-center mt-6">
                             <div className="flex flex-col items-center w-[30%]">
                                 {match.home_logo ? <img src={match.home_logo} className="w-10 h-10 object-contain mb-2 drop-shadow-md"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px]">H</div>}
@@ -282,7 +297,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
          </div>
         )}
         
-        {/* MATCH LIST (Live + Today + Tomorrow) */}
+        {/* MATCH LIST */}
         <div className="px-4 py-0 space-y-3">
              <FreeTipsBanner />
 
@@ -327,7 +342,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                         </div>
                                     </Link>
 
-                                    {/* 🟢 BUTTON LOGIC */}
+                                    {/* BUTTON LOGIC */}
                                     <div className="px-3 py-2 border-t border-slate-100 bg-slate-50/50">
                                         {isScheduled && (
                                             <div className="grid grid-cols-2 gap-3">
@@ -377,27 +392,20 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </div>
 
-      {/* 🚀 QUICK ACTION LINKS (Your Original Buttons) */}
+      {/* 🚀 QUICK ACTION LINKS */}
       <div className="grid grid-cols-4 gap-3 px-4 py-6">
-          {/* Predict */}
           <Link href="/matches" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
               <Trophy className="text-yellow-500" size={20} />
               <span className="text-[10px] font-bold text-slate-700">Predict</span>
           </Link>
-
-          {/* Leaders */}
           <Link href="/leaderboard" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
               <Award className="text-yellow-500" size={20} />
               <span className="text-[10px] font-bold text-slate-700">Leaders</span>
           </Link>
-
-          {/* News */}
           <Link href="/news" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
               <Newspaper className="text-blue-500" size={20} />
               <span className="text-[10px] font-bold text-slate-700">News</span>
           </Link>
-
-          {/* YouTube */}
           <a href="https://youtube.com/@factsportlive" target="_blank" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
               <Youtube className="text-red-600" size={20} />
               <span className="text-[10px] font-bold text-slate-700">YouTube</span>
