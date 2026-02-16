@@ -29,16 +29,13 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const data = await getExternalData(dbData);
   const activeVideoUrl = dbData.livestream_url || dbData.video_url;
   const isLiveStream = !!dbData.livestream_url;
-
-  // 🟢 LOGIC: Widget Presence Check
   const hasWidget = !!dbData.widget_id; 
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       
-      {/* 1. HEADER LOGIC */}
+      {/* 1. HEADER */}
       {hasWidget ? (
-          // SLIM HEADER (Back Button Only)
           <div className="bg-[#0a1428] text-white p-4 shadow-md flex items-center justify-between sticky top-0 z-40">
               <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
                 <ChevronLeft size={20} />
@@ -47,7 +44,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
               <div className="w-9"></div>
           </div>
       ) : (
-          // FULL HEADER (Scoreboard)
           <div className="relative bg-[#0a1428] text-white pb-6 rounded-b-[2rem] overflow-hidden shadow-2xl">
             <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
             <div className="relative z-10 p-4 flex items-center justify-between">
@@ -57,20 +53,18 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
               <span className="text-xs font-bold tracking-widest opacity-70 uppercase">{dbData.league}</span>
               <div className="w-10"></div>
             </div>
+            {/* 🟢 HEADER CONNECTED TO REALTIME */}
             <MatchHeaderClient matchId={dbData.id} initialData={dbData} />
           </div>
       )}
 
       <div className="mx-4 mt-4 relative z-20 space-y-4">
-        
-        {/* 2. WIDGET INJECTION */}
         {hasWidget && (
              <div className="-mt-2">
                  <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={dbData.affiliate_link} />
              </div>
         )}
 
-        {/* 3. VIDEO PLAYER */}
         {activeVideoUrl && (
             <div className="rounded-xl overflow-hidden shadow-2xl border border-white/20 relative">
                 <div className="absolute top-3 left-3 z-30 pointer-events-none">
@@ -88,7 +82,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             </div>
         )}
 
-        {/* 4. AUDIO PLAYER */}
+        {/* Audio, Predictions, Betting... (Unchanged) */}
         <div className="bg-[#0f172a] rounded-xl p-3 border border-slate-800 shadow-xl flex items-center justify-between">
              <div className="flex items-center gap-3">
                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${dbData.audio_url ? 'bg-red-600 animate-pulse' : 'bg-slate-800'}`}>
@@ -99,22 +93,14 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                     <p className="text-slate-400 text-[10px]">{dbData.audio_url ? "Radio is currently LIVE" : "Tune in when match starts"}</p>
                  </div>
              </div>
-             {dbData.audio_url ? (
-                 <Link href={dbData.audio_url} target="_blank" className="bg-white text-black hover:bg-slate-200 text-[10px] font-black px-4 py-2 rounded-full shadow-lg transition transform active:scale-95 flex items-center gap-1">
-                    LISTEN NOW <ExternalLink size={10} />
-                 </Link>
-             ) : (
-                 <button disabled className="bg-slate-700 text-slate-400 text-[10px] font-bold px-3 py-1.5 rounded-full cursor-not-allowed border border-white/5">OFF AIR</button>
-             )}
+             {dbData.audio_url ? <Link href={dbData.audio_url} target="_blank" className="bg-white text-black hover:bg-slate-200 text-[10px] font-black px-4 py-2 rounded-full shadow-lg transition transform active:scale-95 flex items-center gap-1">LISTEN NOW <ExternalLink size={10} /></Link> : <button disabled className="bg-slate-700 text-slate-400 text-[10px] font-bold px-3 py-1.5 rounded-full cursor-not-allowed border border-white/5">OFF AIR</button>}
         </div>
 
-        {/* 5. PREDICTION */}
         <div className="bg-white rounded-xl shadow-lg p-5 border border-slate-100">
            <h3 className="text-xs font-black uppercase text-slate-800 flex items-center gap-1 mb-4"><Zap size={14} className="text-blue-600 fill-blue-600" /> Predict & Win Points</h3>
            <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
         </div>
 
-        {/* 6. BETTING BANNER (Show if no widget) */}
         {!hasWidget && (
             <div className="bg-[#1A1A1A] rounded-xl p-3 shadow-lg border border-white/5 flex items-center justify-between relative overflow-hidden">
                 <div className="absolute top-0 right-0 bg-blue-600 w-16 h-full blur-[40px] opacity-20"></div>
@@ -132,22 +118,13 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         )}
       </div>
 
-      {/* 7. CONDITIONAL STATS (Only if no widget) */}
+      {/* 🟢 TABS CONNECTED TO REALTIME */}
       {!hasWidget && (
-          <>
-            {!data.hasExternalData ? (
-                <div className="mx-4 mt-6 bg-white p-6 rounded-xl border border-slate-100 text-center shadow-sm">
-                    <p className="text-xs font-bold text-slate-500">Detailed stats unavailable.</p>
-                </div>
-            ) : (
-                <div className="px-4 mt-8 space-y-6">
-                    <StatsLineupsTabs data={data} />
-                </div>
-            )}
-          </>
+          <div className="px-4 mt-8 space-y-6">
+              <StatsLineupsTabs matchId={dbData.id} initialData={data} />
+          </div>
       )}
 
-      {/* 8. FREE TIPS */}
       <div className="px-4 mt-6">
         <FreeTipsBanner />
       </div>

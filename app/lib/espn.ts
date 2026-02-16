@@ -21,15 +21,17 @@ export const normalizeName = (name: string) => {
     .trim();
 };
 
+// 1. Fetch Scoreboard (Fast)
 export async function fetchEspnLive(leagueCode: string) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueCode}/scoreboard`;
   try {
     const res = await fetch(url, { next: { revalidate: 0 } });
     if (!res.ok) return [];
+    
     const data = await res.json();
     return (data.events || []).map((e: any) => ({
         espn_id: e.id,
-        status: e.status.type.state,
+        status: e.status.type.state, 
         clock: e.status.type.description === 'Halftime' ? 'HT' : e.status.displayClock,
         home_team: e.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.displayName,
         away_team: e.competitions[0].competitors.find((c:any)=>c.homeAway==='away').team.displayName,
@@ -40,6 +42,7 @@ export async function fetchEspnLive(leagueCode: string) {
   } catch (err) { return []; }
 }
 
+// 2. Fetch Deep Details (Lineups, Stats, Events)
 export async function fetchEspnDetails(gameId: string) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${gameId}`;
   try {
@@ -47,31 +50,35 @@ export async function fetchEspnDetails(gameId: string) {
     if (!res.ok) return null;
     const data = await res.json();
 
-    // 🟢 1. GET HOME ID SAFELY (String format)
-    const homeComp = data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home');
-    const homeId = String(homeComp.team.id);
+    const homeId = String(data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.id);
 
-    // 🟢 2. PARSE EVENTS (With Fallback)
-    let events = (data.header?.competitions?.[0]?.details || []).map((e: any) => ({
-       id: Math.random().toString(36).substr(2, 9),
-       time: e.clock?.displayValue || "0'",
-       type: e.type?.text?.toLowerCase() || 'event', 
-       text: e.shortText || e.text || 'Match Event', 
-       team: e.team?.displayName || '',
-       player: e.participants?.[0]?.athlete?.displayName || '' 
-    }));
+    // 🟢 A. PARSE EVENTS (ROBUST)
+    // We look for 'details' which contains the timeline
+    const rawEvents = data.header?.competitions?.[0]?.details || [];
+    const events = rawEvents.map((e: any) => {
+        const rawType = (e.type?.text || 'event').toLowerCase();
+        let cleanType = 'event';
+        
+        // Normalize types for frontend icons
+        if (rawType.includes('goal')) cleanType = 'goal';
+        else if (rawType.includes('card')) cleanType = 'card';
+        else if (rawType.includes('substitution')) cleanType = 'sub';
 
-    // If live but empty, show "Match Started"
-    if (events.length === 0 && data.header.competitions[0].status.type.state === 'in') {
-        events.push({ id: 'start', time: "0'", type: 'info', text: 'Match Started', team: '', player: '' });
-    }
+        return {
+            id: Math.random().toString(36).substr(2, 9),
+            time: e.clock?.displayValue || "0'",
+            type: cleanType,
+            text: e.shortText || e.text || 'Match Event',
+            team: e.team?.displayName || '',
+            player: e.participants?.[0]?.athlete?.displayName || '' 
+        };
+    });
 
-    // 🟢 3. PARSE STATS
+    // 🟢 B. PARSE STATS
     const boxscore = data.boxscore;
     const stats: any = { home: {}, away: {} };
     if (boxscore?.teams) {
        boxscore.teams.forEach((t: any) => {
-          // Compare IDs as Strings!
           const side = String(t.team.id) === homeId ? 'home' : 'away';
           t.statistics.forEach((s: any) => {
              if(s.name === 'possessionPct') stats[side].possession = s.displayValue;
@@ -83,17 +90,18 @@ export async function fetchEspnDetails(gameId: string) {
        });
     }
 
-    // 🟢 4. PARSE LINEUPS (Robust ID Matching)
+    // 🟢 C. PARSE LINEUPS (CHECK EVERYWHERE)
     const lineups: any = { home: [], away: [] };
     
-    // Strategy: Look in 'rosters', then 'players', then 'teams'
-    let rosterSource = boxscore?.rosters || boxscore?.players;
-    
-    if (rosterSource) {
-       rosterSource.forEach((r: any) => {
+    // Strategy: Rosters > Players > Teams
+    let rosters = boxscore?.rosters;
+    if (!rosters && boxscore?.players) rosters = boxscore.players;
+    if (!rosters && data.rosters) rosters = data.rosters;
+
+    if (rosters) {
+       rosters.forEach((r: any) => {
           const side = String(r.team.id) === homeId ? 'home' : 'away';
           
-          // Players might be in 'athletes', 'roster', or 'statistics'
           let athletes = r.athletes || r.roster || r.statistics?.[0]?.athletes || [];
 
           lineups[side] = athletes.map((p: any) => ({
@@ -104,12 +112,10 @@ export async function fetchEspnDetails(gameId: string) {
           }));
        });
     } 
-    // FALLBACK: Sometimes lineups are inside the 'teams' array directly
+    // FALLBACK: Look inside 'teams' array
     else if (boxscore?.teams) {
         boxscore.teams.forEach((t: any) => {
             const side = String(t.team.id) === homeId ? 'home' : 'away';
-            // Sometimes hidden in a 'roster' property inside the team object
-            // (This is rare but happens in some leagues)
             if (t.roster) {
                 lineups[side] = t.roster.map((p: any) => ({
                     name: p.athlete.displayName,
