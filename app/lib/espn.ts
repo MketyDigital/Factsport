@@ -42,7 +42,7 @@ export async function fetchEspnLive(leagueCode: string) {
   } catch (err) { return []; }
 }
 
-// 2. Fetch Deep Details (Lineups, Stats, Events)
+// 2. Fetch Deep Details (Now uses COMMENTARY for Events)
 export async function fetchEspnDetails(gameId: string) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${gameId}`;
   try {
@@ -52,57 +52,59 @@ export async function fetchEspnDetails(gameId: string) {
 
     const homeId = String(data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.id);
 
-    // 🟢 A. PARSE EVENTS (THE FINAL FIX)
-    const rawEvents = data.header?.competitions?.[0]?.details || [];
-    const events = rawEvents.map((e: any) => {
-        
-        // 1. Determine Type using FLAGS (Most Reliable)
-        let cleanType = 'event';
-        let finalText = 'Match Event';
+    // 🟢 A. PARSE EVENTS FROM COMMENTARY (Rich Text)
+    let events: any[] = [];
+    
+    // Check if commentary exists
+    if (data.commentary) {
+        // Filter commentary to find only IMPORTANT events
+        events = data.commentary.filter((c: any) => {
+            const text = (c.text || '').toLowerCase();
+            // Only keep these types of events
+            return text.includes('goal') || 
+                   text.includes('card') || 
+                   text.includes('substitution') || 
+                   text.includes('penalty') ||
+                   text.includes('var');
+        }).map((c: any) => {
+            const text = c.text || '';
+            const lowerText = text.toLowerCase();
+            let type = 'event';
 
-        // Check Flags
-        const isGoal = e.scoringPlay === true;
-        const isCard = e.type?.slug?.includes('card');
-        const isSub = e.type?.slug?.includes('substitution');
-        const isRed = e.type?.slug === 'red-card';
-        const isYellow = e.type?.slug === 'yellow-card';
+            // Assign Type for Icons
+            if (lowerText.includes('goal')) type = 'goal';
+            else if (lowerText.includes('red card')) type = 'red-card'; // Special icon for Red
+            else if (lowerText.includes('yellow card')) type = 'card';
+            else if (lowerText.includes('substitution')) type = 'sub';
+            
+            // Clean up text (Optional: Shorten it if too long, or keep full)
+            // For now, we keep full text because it's descriptive (e.g. "Goal! Scored by...")
+            
+            return {
+                id: Math.random().toString(36).substr(2, 9),
+                time: c.time?.displayValue || "0'",
+                type: type,
+                text: text, // FULL COMMENTARY TEXT
+                team: '', // Commentary often includes team name in text
+                player: '' // Commentary includes player name in text
+            };
+        });
+    }
 
-        // Assign Type & Text based on Flags
-        if (isGoal) {
-            cleanType = 'goal';
-            finalText = 'Goal';
-        } else if (isRed) {
-            cleanType = 'card';
-            finalText = 'Red Card';
-        } else if (isYellow) {
-            cleanType = 'card';
-            finalText = 'Yellow Card';
-        } else if (isSub) {
-            cleanType = 'sub';
-            finalText = 'Substitution';
-        } else {
-             // Fallback for weird events (VAR, Penalty Miss)
-             finalText = e.shortText || e.text || e.type?.text || 'Event';
-             if (finalText.toLowerCase().includes('goal')) cleanType = 'goal';
-        }
+    // FALLBACK: If commentary is empty, use the old method
+    if (events.length === 0) {
+        const rawEvents = data.header?.competitions?.[0]?.details || [];
+        events = rawEvents.map((e: any) => ({
+           id: Math.random().toString(36).substr(2, 9),
+           time: e.clock?.displayValue || "0'",
+           type: (e.type?.text || 'event').toLowerCase(),
+           text: e.shortText || e.text || 'Match Event',
+           team: e.team?.displayName || '',
+           player: e.participants?.[0]?.athlete?.displayName || '' 
+        }));
+    }
 
-        // Overwrite generic text if we know better
-        if (finalText === 'Match Event' || finalText === 'Event') {
-             if (cleanType === 'goal') finalText = 'Goal';
-             if (cleanType === 'card') finalText = 'Card';
-        }
-
-        return {
-            id: Math.random().toString(36).substr(2, 9),
-            time: e.clock?.displayValue || "0'",
-            type: cleanType,
-            text: finalText, 
-            team: e.team?.displayName || '',
-            player: e.participants?.[0]?.athlete?.displayName || '' 
-        };
-    });
-
-    // 🟢 B. PARSE STATS (Untouched)
+    // 🟢 B. PARSE STATS
     const boxscore = data.boxscore;
     const stats: any = { home: {}, away: {} };
     if (boxscore?.teams) {
@@ -118,7 +120,7 @@ export async function fetchEspnDetails(gameId: string) {
        });
     }
 
-    // 🟢 C. PARSE LINEUPS (Untouched)
+    // 🟢 C. PARSE LINEUPS
     const lineups: any = { home: [], away: [] };
     let rosters = boxscore?.rosters;
     if (!rosters && boxscore?.players) rosters = boxscore.players;
