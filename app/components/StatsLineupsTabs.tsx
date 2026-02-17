@@ -69,7 +69,6 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
                                         {e.type === 'red-card' && '🟥'} 
                                         {e.type === 'sub' && '🔄'}
                                     </span>
-                                    {/* Commentary Text */}
                                     <span>{e.text}</span>
                                 </p>
                             </div>
@@ -79,7 +78,6 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
              </div>
         )}
         
-        {/* STATS & LINEUPS UNCHANGED */}
         {activeTab === 'stats' && (
             <div className="space-y-4">
                 {!hasStats ? <div className="text-center py-10 opacity-50"><p className="text-xs">Stats updating...</p></div> : <>
