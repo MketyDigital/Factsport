@@ -39,20 +39,36 @@ const groupByDate = (matchList: any[]) => {
     return groups;
 };
 
-// 🟢 SMART MIXER: Ensures variety of leagues
+// 🟢 HELPER: Sort Matches (Live -> Upcoming by Time)
+const sortMatches = (matches: any[]) => {
+  return matches.sort((a, b) => {
+    // 1. STATUS PRIORITY: LIVE/HT is always first
+    const liveStatus = ['LIVE', 'HT', 'IN_PLAY'];
+    const isLiveA = liveStatus.includes(a.status);
+    const isLiveB = liveStatus.includes(b.status);
+
+    if (isLiveA && !isLiveB) return -1; // A comes first
+    if (!isLiveA && isLiveB) return 1;  // B comes first
+
+    // 2. IF BOTH LIVE: Sort by ID (Just to keep stable)
+    if (isLiveA && isLiveB) return a.id - b.id;
+
+    // 3. IF NEITHER LIVE: Sort by Date (Soonest first)
+    return new Date(a.match_date).getTime() - new Date(b.match_date).getTime();
+  });
+};
+
+// 🟢 SMART MIXER: Ensures variety of leagues (Preserved from your code)
 const getDiverseMatches = (allMatches: any[], limit: number) => {
-    // 1. Always show LIVE games first
     const live = allMatches.filter(m => ['LIVE', 'HT', 'IN_PLAY'].includes(m.status));
     const scheduled = allMatches.filter(m => !['LIVE', 'HT', 'IN_PLAY'].includes(m.status));
 
-    // 2. Group Scheduled by League
     const leagues: { [key: string]: any[] } = {};
     scheduled.forEach(m => {
         if (!leagues[m.league]) leagues[m.league] = [];
         leagues[m.league].push(m);
     });
 
-    // 3. Round Robin Pick
     const mixedScheduled: any[] = [];
     const leagueKeys = Object.keys(leagues);
     let hasMore = true;
@@ -66,13 +82,13 @@ const getDiverseMatches = (allMatches: any[], limit: number) => {
             }
         }
     }
-
-    return [...live, ...mixedScheduled].slice(0, limit);
+    // Apply final sort to the mixed result
+    return sortMatches([...live, ...mixedScheduled].slice(0, limit));
 };
 
 async function getHomepageData(leagueFilter: string | undefined) {
   const supabase = createClient();
-  
+   
   let matchQuery = supabase.from('matches').select('*');
 
   // 🟢 LOGIC 1: LEAGUE FILTER
@@ -99,21 +115,23 @@ async function getHomepageData(leagueFilter: string | undefined) {
         .limit(50); 
   }
 
-  // ⚡ UPDATED: Fetch Featured Matches Separately
+  // Fetch Data
   const [matchesRes, newsRes, highlightsRes, featuredRes] = await Promise.all([
     matchQuery,
     supabase.from('news').select('*').order('created_at', { ascending: false }).limit(20),
     supabase.from('matches').select('*').not('video_url', 'is', null).order('match_date', { ascending: false }).limit(10),
-    
-    // 🟢 NEW QUERY: Fetch matches manually marked as 'is_featured'
+    // Fetch manually featured matches
     supabase.from('matches').select('*').eq('is_featured', true).order('match_date', { ascending: true }).limit(5)
   ]);
 
   let matches = matchesRes.data || [];
 
-  // Apply Mixer
+  // Apply Mixer if no filter
   if (!leagueFilter && matches.length > 0) {
       matches = getDiverseMatches(matches, 20);
+  } else {
+      // Ensure sorted even if filtered
+      matches = sortMatches(matches);
   }
 
   // Fallback
@@ -129,15 +147,14 @@ async function getHomepageData(leagueFilter: string | undefined) {
       matches, 
       news: newsRes.data || [], 
       highlights: highlightsRes.data || [], 
-      featuredMatches: featuredRes.data || [] // Return the specific featured list
+      featuredMatches: featuredRes.data || [] 
   };
 }
 
 export default async function Home({ searchParams }: { searchParams: { league?: string } }) {
   const resolvedParams = await searchParams;
   const selectedLeague = resolvedParams.league;
-  
-  // 🟢 Destructure the new featuredMatches
+   
   const { matches, news, highlights, featuredMatches } = await getHomepageData(selectedLeague);
 
   const breakingNews = news.filter(n => n.is_breaking); 
@@ -147,11 +164,30 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const finalHeadlines = headlines.length > 0 ? headlines : news.slice(0, 3);
   const latestNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id) && !n.is_breaking).slice(0, 5);
 
-  // 🟢 UPDATED: Use the DB list directly. 
-  // If no manually featured matches exist, fall back to the first 2 from the main list.
-  const heroMatches = featuredMatches.length > 0 ? featuredMatches : matches.slice(0, 2);
+  // 🟢 SMART HERO LOGIC: Admin Pick -> Big Match Today -> First Upcoming
+  let heroMatches: any[] = [];
 
-  // Filter display matches to avoid duplicates (don't show hero match again in the list)
+  // 1. Admin Override
+  if (featuredMatches.length > 0) {
+      heroMatches = featuredMatches;
+  } 
+  // 2. Big Match Today (if no admin pick)
+  else {
+      const today = new Date().toISOString().split('T')[0];
+      const bigLeagues = ['Premier League', 'Champions League', 'World Cup', 'La Liga', 'Serie A'];
+      const bigMatch = matches.find(m => 
+        m.match_date.startsWith(today) && bigLeagues.includes(m.league)
+      );
+      
+      if (bigMatch) {
+          heroMatches = [bigMatch];
+      } else if (matches.length > 0) {
+          // 3. Fallback: Next available match
+          heroMatches = [matches[0]];
+      }
+  }
+
+  // Filter display matches (remove duplicates if hero is shown)
   const displayMatches = matches.filter(m => !heroMatches.some(h => h.id === m.id));
   const groupedMatches = groupByDate(displayMatches);
 
@@ -263,7 +299,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                 <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE
                             </div>
                         )}
-                        {/* Only show 'WATCH' badge if URL actually exists */}
                         {(match.livestream_url || match.audio_url) && (
                             <div className="absolute top-3 left-3 bg-black/40 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1">
                                  {match.livestream_url ? <Video size={8} /> : <Radio size={8} />}
