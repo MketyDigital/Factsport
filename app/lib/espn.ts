@@ -52,7 +52,7 @@ export async function fetchEspnDetails(gameId: string) {
 
     const homeId = String(data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.id);
 
-    // 🟢 A. PARSE EVENTS (FIXED TEXT LOGIC)
+    // 🟢 A. PARSE EVENTS (FIXED: REJECT "MATCH EVENT")
     const rawEvents = data.header?.competitions?.[0]?.details || [];
     const events = rawEvents.map((e: any) => {
         const rawType = (e.type?.text || 'event').toLowerCase();
@@ -63,15 +63,26 @@ export async function fetchEspnDetails(gameId: string) {
         else if (rawType.includes('card')) cleanType = 'card';
         else if (rawType.includes('substitution')) cleanType = 'sub';
 
-        // 🟢 FIX: If text is missing, use the type text (e.g. "Yellow Card")
-        const fallbackText = e.type?.text || 'Match Event';
-        const finalText = e.shortText || e.text || fallbackText;
+        // 🟢 CLEAN TEXT LOGIC
+        // 1. Get the raw text from API
+        let finalText = e.shortText || e.text || '';
+        
+        // 2. Get the official Type text (e.g. "Goal", "Yellow Card")
+        const typeText = e.type?.text || 'Event';
+
+        // 3. THE FIX: If text is missing OR is the generic "Match Event", FORCE use of typeText
+        if (!finalText || finalText === 'Match Event') {
+            finalText = typeText;
+        }
+
+        // 4. Capitalize first letter (just in case)
+        finalText = finalText.charAt(0).toUpperCase() + finalText.slice(1);
 
         return {
             id: Math.random().toString(36).substr(2, 9),
             time: e.clock?.displayValue || "0'",
             type: cleanType,
-            text: finalText, // Now guarantees a real name like "Goal" or "Yellow Card"
+            text: finalText, // Now guarantees "Goal", "Substitution", etc.
             team: e.team?.displayName || '',
             player: e.participants?.[0]?.athlete?.displayName || '' 
         };
