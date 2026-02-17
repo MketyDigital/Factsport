@@ -42,7 +42,7 @@ export async function fetchEspnLive(leagueCode: string) {
   } catch (err) { return []; }
 }
 
-// 2. Fetch Deep Details (Now uses COMMENTARY for Events)
+// 2. Fetch Deep Details (Uses Commentary)
 export async function fetchEspnDetails(gameId: string) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${gameId}`;
   try {
@@ -52,15 +52,12 @@ export async function fetchEspnDetails(gameId: string) {
 
     const homeId = String(data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.id);
 
-    // 🟢 A. PARSE EVENTS FROM COMMENTARY (Rich Text)
+    // 🟢 A. PARSE EVENTS FROM COMMENTARY
     let events: any[] = [];
     
-    // Check if commentary exists
     if (data.commentary) {
-        // Filter commentary to find only IMPORTANT events
         events = data.commentary.filter((c: any) => {
             const text = (c.text || '').toLowerCase();
-            // Only keep these types of events
             return text.includes('goal') || 
                    text.includes('card') || 
                    text.includes('substitution') || 
@@ -71,27 +68,26 @@ export async function fetchEspnDetails(gameId: string) {
             const lowerText = text.toLowerCase();
             let type = 'event';
 
-            // Assign Type for Icons
             if (lowerText.includes('goal')) type = 'goal';
-            else if (lowerText.includes('red card')) type = 'red-card'; // Special icon for Red
+            else if (lowerText.includes('red card')) type = 'red-card';
             else if (lowerText.includes('yellow card')) type = 'card';
             else if (lowerText.includes('substitution')) type = 'sub';
-            
-            // Clean up text (Optional: Shorten it if too long, or keep full)
-            // For now, we keep full text because it's descriptive (e.g. "Goal! Scored by...")
             
             return {
                 id: Math.random().toString(36).substr(2, 9),
                 time: c.time?.displayValue || "0'",
                 type: type,
-                text: text, // FULL COMMENTARY TEXT
-                team: '', // Commentary often includes team name in text
-                player: '' // Commentary includes player name in text
+                text: text, 
+                team: '', 
+                player: '' 
             };
         });
+        
+        // 🟢 NEWEST FIRST
+        events.reverse();
     }
 
-    // FALLBACK: If commentary is empty, use the old method
+    // Fallback if commentary is empty
     if (events.length === 0) {
         const rawEvents = data.header?.competitions?.[0]?.details || [];
         events = rawEvents.map((e: any) => ({
@@ -102,6 +98,8 @@ export async function fetchEspnDetails(gameId: string) {
            team: e.team?.displayName || '',
            player: e.participants?.[0]?.athlete?.displayName || '' 
         }));
+        // Reverse fallback too
+        events.reverse();
     }
 
     // 🟢 B. PARSE STATS
