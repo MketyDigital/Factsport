@@ -32,7 +32,6 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
   }, [matchId]);
 
   const { stats, lineups, events } = liveData;
-
   const hasLineups = lineups.home?.length > 0 || lineups.away?.length > 0;
   const hasStats = stats.home?.possession || stats.home?.shots;
 
@@ -63,14 +62,16 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
                         <div key={i} className="flex gap-4 items-start animate-in fade-in slide-in-from-left-2">
                             <div className="w-10 text-right font-mono text-xs font-bold text-slate-400 pt-0.5">{e.time}</div>
                             <div className="flex-1 pb-4 border-b border-slate-50 last:border-0">
-                                <p className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                                    {/* 🟢 Render Icon based on cleaned Type */}
-                                    {e.type.includes('goal') && '⚽'} 
-                                    {e.type.includes('card') && '🟨'} 
-                                    {e.type.includes('sub') && '🔄'} 
-                                    {e.text}
+                                <p className="text-xs font-bold text-slate-800 flex items-start gap-2 leading-relaxed">
+                                    <span className="shrink-0 mt-0.5">
+                                        {e.type === 'goal' && '⚽'} 
+                                        {e.type === 'card' && '🟨'} 
+                                        {e.type === 'red-card' && '🟥'} 
+                                        {e.type === 'sub' && '🔄'}
+                                    </span>
+                                    {/* Commentary Text */}
+                                    <span>{e.text}</span>
                                 </p>
-                                {e.player && <p className="text-[10px] text-slate-500 mt-0.5">{e.player}</p>}
                             </div>
                         </div>
                      ))
@@ -78,7 +79,7 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
              </div>
         )}
         
-        {/* STATS & LINEUPS (Untouched) */}
+        {/* STATS & LINEUPS UNCHANGED */}
         {activeTab === 'stats' && (
             <div className="space-y-4">
                 {!hasStats ? <div className="text-center py-10 opacity-50"><p className="text-xs">Stats updating...</p></div> : <>
