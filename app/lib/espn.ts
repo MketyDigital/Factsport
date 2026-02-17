@@ -21,25 +21,6 @@ export const normalizeName = (name: string) => {
     .trim();
 };
 
-// 🟢 NEW: Hardcoded Dictionary for specific ESPN Event IDs
-const KNOWN_EVENT_IDS: Record<string, { type: string, text: string }> = {
-    // GOALS
-    '66': { type: 'goal', text: 'Goal' },
-    '67': { type: 'goal', text: 'Goal' },
-    '68': { type: 'goal', text: 'Goal' },
-    '69': { type: 'goal', text: 'Goal' },
-    '70': { type: 'goal', text: 'Goal' },
-    '81': { type: 'goal', text: 'Goal' },
-    // CARDS
-    '8':  { type: 'card', text: 'Yellow Card' },
-    '11': { type: 'card', text: 'Red Card' },
-    '17': { type: 'card', text: 'Red Card' },
-    '18': { type: 'card', text: 'Yellow Card' },
-    '33': { type: 'card', text: 'Red Card' },
-    // SUBS
-    '23': { type: 'sub',  text: 'Substitution' }
-};
-
 // 1. Fetch Scoreboard (Fast)
 export async function fetchEspnLive(leagueCode: string) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueCode}/scoreboard`;
@@ -71,37 +52,44 @@ export async function fetchEspnDetails(gameId: string) {
 
     const homeId = String(data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.id);
 
-    // 🟢 A. PARSE EVENTS (DEEP ID CHECK)
+    // 🟢 A. PARSE EVENTS (THE FINAL FIX)
     const rawEvents = data.header?.competitions?.[0]?.details || [];
     const events = rawEvents.map((e: any) => {
         
+        // 1. Determine Type using FLAGS (Most Reliable)
         let cleanType = 'event';
-        let finalText = e.shortText || e.text || 'Match Event';
-        
-        // 1. CHECK ID FIRST (Most Reliable)
-        const typeId = String(e.type?.id);
-        if (KNOWN_EVENT_IDS[typeId]) {
-            cleanType = KNOWN_EVENT_IDS[typeId].type;
-            // Only overwrite text if the API text is generic
-            if (finalText === 'Event' || finalText === 'Match Event') {
-                finalText = KNOWN_EVENT_IDS[typeId].text;
-            }
-        } 
-        // 2. FALLBACK: String Matching
-        else {
-            const rawType = (e.type?.text || 'event').toLowerCase();
-            const rawDesc = finalText.toLowerCase();
+        let finalText = 'Match Event';
 
-            if (rawType.includes('goal') || rawDesc.includes('goal')) cleanType = 'goal';
-            else if (rawType.includes('card') || rawDesc.includes('card') || rawDesc.includes('yellow') || rawDesc.includes('red')) cleanType = 'card';
-            else if (rawType.includes('substitution') || rawDesc.includes('sub')) cleanType = 'sub';
-            
-            // Fix generic text if we identified the type
-            if ((finalText === 'Event' || finalText === 'Match Event')) {
-                if (cleanType === 'goal') finalText = 'Goal';
-                if (cleanType === 'card') finalText = 'Card';
-                if (cleanType === 'sub') finalText = 'Substitution';
-            }
+        // Check Flags
+        const isGoal = e.scoringPlay === true;
+        const isCard = e.type?.slug?.includes('card');
+        const isSub = e.type?.slug?.includes('substitution');
+        const isRed = e.type?.slug === 'red-card';
+        const isYellow = e.type?.slug === 'yellow-card';
+
+        // Assign Type & Text based on Flags
+        if (isGoal) {
+            cleanType = 'goal';
+            finalText = 'Goal';
+        } else if (isRed) {
+            cleanType = 'card';
+            finalText = 'Red Card';
+        } else if (isYellow) {
+            cleanType = 'card';
+            finalText = 'Yellow Card';
+        } else if (isSub) {
+            cleanType = 'sub';
+            finalText = 'Substitution';
+        } else {
+             // Fallback for weird events (VAR, Penalty Miss)
+             finalText = e.shortText || e.text || e.type?.text || 'Event';
+             if (finalText.toLowerCase().includes('goal')) cleanType = 'goal';
+        }
+
+        // Overwrite generic text if we know better
+        if (finalText === 'Match Event' || finalText === 'Event') {
+             if (cleanType === 'goal') finalText = 'Goal';
+             if (cleanType === 'card') finalText = 'Card';
         }
 
         return {
