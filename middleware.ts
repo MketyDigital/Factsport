@@ -2,13 +2,19 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  // -----------------------------------------------------------------
-  // 🔒 PART 1: STAGING ENVIRONMENT LOCK (Vercel Only)
-  // -----------------------------------------------------------------
   const hostname = request.headers.get('host') || '';
+  const pathname = request.nextUrl.pathname;
 
-  // Only lock the site if the domain contains "vercel.app"
-  if (hostname.includes('vercel.app')) {
+  // -----------------------------------------------------------------
+  // 🔒 PART 1: ENVIRONMENT LOCK (Staging & Dev)
+  // -----------------------------------------------------------------
+  // We lock the site ONLY if:
+  // 1. It is a Vercel OR Cloudflare Pages dev URL
+  // 2. AND it is NOT an API route (Cron Jobs need access to /api)
+  const isDevDomain = hostname.includes('vercel.app') || hostname.includes('factsport.pages.dev');
+  const isApiRoute = pathname.startsWith('/api');
+
+  if (isDevDomain && !isApiRoute) {
     const basicAuth = request.headers.get('authorization');
 
     if (basicAuth) {
@@ -16,10 +22,9 @@ export async function middleware(request: NextRequest) {
       // Decodes "username:password"
       const [user, pwd] = atob(authValue).split(':');
 
-      // 👇 CREDENTIALS FOR YOUR DEV SITE
-      // Username is 'admin', Password is '<Do Not Access>'
+      // 👇 CREDENTIALS
       if (user === 'admin' && pwd === '<Do Not Access>') {
-        // Password correct? Allow code to proceed to Part 2
+        // Password correct? Allow proceed
       } else {
         return new NextResponse('Auth Required.', {
           status: 401,
@@ -27,7 +32,6 @@ export async function middleware(request: NextRequest) {
         });
       }
     } else {
-      // No password provided? Show login prompt
       return new NextResponse('Auth Required.', {
         status: 401,
         headers: { 'WWW-Authenticate': 'Basic realm="Secure Area"' },
@@ -93,7 +97,7 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   // 🛡️ SECURITY CHECK FOR ADMIN ROUTES
-  if (request.nextUrl.pathname.startsWith('/admin')) {
+  if (pathname.startsWith('/admin')) {
     
     // 1. If not logged in -> Send to Login
     if (!user) {
