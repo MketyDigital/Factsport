@@ -21,6 +21,25 @@ export const normalizeName = (name: string) => {
     .trim();
 };
 
+// 🟢 NEW: Hardcoded Dictionary for specific ESPN Event IDs
+const KNOWN_EVENT_IDS: Record<string, { type: string, text: string }> = {
+    // GOALS
+    '66': { type: 'goal', text: 'Goal' },
+    '67': { type: 'goal', text: 'Goal' },
+    '68': { type: 'goal', text: 'Goal' },
+    '69': { type: 'goal', text: 'Goal' },
+    '70': { type: 'goal', text: 'Goal' },
+    '81': { type: 'goal', text: 'Goal' },
+    // CARDS
+    '8':  { type: 'card', text: 'Yellow Card' },
+    '11': { type: 'card', text: 'Red Card' },
+    '17': { type: 'card', text: 'Red Card' },
+    '18': { type: 'card', text: 'Yellow Card' },
+    '33': { type: 'card', text: 'Red Card' },
+    // SUBS
+    '23': { type: 'sub',  text: 'Substitution' }
+};
+
 // 1. Fetch Scoreboard (Fast)
 export async function fetchEspnLive(leagueCode: string) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueCode}/scoreboard`;
@@ -52,37 +71,44 @@ export async function fetchEspnDetails(gameId: string) {
 
     const homeId = String(data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.id);
 
-    // 🟢 A. PARSE EVENTS (FIXED: REJECT "MATCH EVENT")
+    // 🟢 A. PARSE EVENTS (DEEP ID CHECK)
     const rawEvents = data.header?.competitions?.[0]?.details || [];
     const events = rawEvents.map((e: any) => {
-        const rawType = (e.type?.text || 'event').toLowerCase();
+        
         let cleanType = 'event';
+        let finalText = e.shortText || e.text || 'Match Event';
         
-        // Normalize types for frontend icons
-        if (rawType.includes('goal')) cleanType = 'goal';
-        else if (rawType.includes('card')) cleanType = 'card';
-        else if (rawType.includes('substitution')) cleanType = 'sub';
+        // 1. CHECK ID FIRST (Most Reliable)
+        const typeId = String(e.type?.id);
+        if (KNOWN_EVENT_IDS[typeId]) {
+            cleanType = KNOWN_EVENT_IDS[typeId].type;
+            // Only overwrite text if the API text is generic
+            if (finalText === 'Event' || finalText === 'Match Event') {
+                finalText = KNOWN_EVENT_IDS[typeId].text;
+            }
+        } 
+        // 2. FALLBACK: String Matching
+        else {
+            const rawType = (e.type?.text || 'event').toLowerCase();
+            const rawDesc = finalText.toLowerCase();
 
-        // 🟢 CLEAN TEXT LOGIC
-        // 1. Get the raw text from API
-        let finalText = e.shortText || e.text || '';
-        
-        // 2. Get the official Type text (e.g. "Goal", "Yellow Card")
-        const typeText = e.type?.text || 'Event';
-
-        // 3. THE FIX: If text is missing OR is the generic "Match Event", FORCE use of typeText
-        if (!finalText || finalText === 'Match Event') {
-            finalText = typeText;
+            if (rawType.includes('goal') || rawDesc.includes('goal')) cleanType = 'goal';
+            else if (rawType.includes('card') || rawDesc.includes('card') || rawDesc.includes('yellow') || rawDesc.includes('red')) cleanType = 'card';
+            else if (rawType.includes('substitution') || rawDesc.includes('sub')) cleanType = 'sub';
+            
+            // Fix generic text if we identified the type
+            if ((finalText === 'Event' || finalText === 'Match Event')) {
+                if (cleanType === 'goal') finalText = 'Goal';
+                if (cleanType === 'card') finalText = 'Card';
+                if (cleanType === 'sub') finalText = 'Substitution';
+            }
         }
-
-        // 4. Capitalize first letter (just in case)
-        finalText = finalText.charAt(0).toUpperCase() + finalText.slice(1);
 
         return {
             id: Math.random().toString(36).substr(2, 9),
             time: e.clock?.displayValue || "0'",
             type: cleanType,
-            text: finalText, // Now guarantees "Goal", "Substitution", etc.
+            text: finalText, 
             team: e.team?.displayName || '',
             player: e.participants?.[0]?.athlete?.displayName || '' 
         };
