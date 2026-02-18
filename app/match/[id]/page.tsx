@@ -3,7 +3,7 @@ export const runtime = 'edge';
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon } from 'lucide-react';
+import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon, Shirt } from 'lucide-react';
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
 import MatchHeaderClient from '@/app/components/MatchHeaderClient'; 
@@ -44,16 +44,38 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
               <div className="w-9"></div>
           </div>
       ) : (
+          // 🟢 RICH HEADER WITH STADIUM BACKGROUND
           <div className="relative bg-[#0a1428] text-white pb-6 rounded-b-[2rem] overflow-hidden shadow-2xl">
-            <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+            
+            {/* 🟢 STADIUM BACKGROUND LAYER */}
+            {dbData.home_stadium ? (
+                 <>
+                    <div className="absolute top-0 left-0 w-full h-full">
+                        <img src={dbData.home_stadium} className="w-full h-full object-cover opacity-30 blur-sm scale-110" />
+                    </div>
+                    {/* Gradient Overlay to ensure text readability */}
+                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-[#0a1428]/90 via-[#0a1428]/70 to-[#0a1428]"></div>
+                 </>
+            ) : (
+                 <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+            )}
+
             <div className="relative z-10 p-4 flex items-center justify-between">
-              <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
+              <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md border border-white/10">
                 <ChevronLeft size={24} />
               </Link>
-              <span className="text-xs font-bold tracking-widest opacity-70 uppercase">{dbData.league}</span>
+              
+              {/* League Banner or Text */}
+              {dbData.league_banner ? (
+                  <img src={dbData.league_banner} className="h-6 object-contain opacity-80" alt={dbData.league} />
+              ) : (
+                  <span className="text-xs font-bold tracking-widest opacity-70 uppercase">{dbData.league}</span>
+              )}
+              
               <div className="w-10"></div>
             </div>
-            {/* 🟢 HEADER CONNECTED TO REALTIME */}
+            
+            {/* HEADER CLIENT */}
             <MatchHeaderClient matchId={dbData.id} initialData={dbData} />
           </div>
       )}
@@ -63,6 +85,17 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
              <div className="-mt-2">
                  <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={dbData.affiliate_link} />
              </div>
+        )}
+
+        {/* 🟢 JERSEY SHOWCASE (If Available) */}
+        {dbData.home_jersey && (
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 flex items-center justify-center gap-6">
+                 <div className="text-center">
+                     <p className="text-[9px] font-bold text-slate-400 uppercase mb-2">Home Kit</p>
+                     <img src={dbData.home_jersey} className="h-16 object-contain drop-shadow-md" />
+                 </div>
+                 {/* Place for Away Jersey if you had it, for now just Home */}
+            </div>
         )}
 
         {activeVideoUrl && (
@@ -118,7 +151,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         )}
       </div>
 
-      {/* 🟢 TABS CONNECTED TO REALTIME */}
       {!hasWidget && (
           <div className="px-4 mt-8 space-y-6">
               <StatsLineupsTabs matchId={dbData.id} initialData={data} />
