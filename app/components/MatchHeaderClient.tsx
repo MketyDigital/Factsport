@@ -37,48 +37,53 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
   const isFinished = ['FT', 'FINISHED'].includes(data.status);
 
   return (
-    <div className="relative z-10 px-4 mt-1 bg-[#0a1428] pb-6 pt-2 rounded-b-3xl">
-        <div className="flex justify-center mb-5">
+    <div className="relative z-10 px-4 mt-1 pb-6 pt-2 rounded-b-3xl">
+        {/* Status Indicator */}
+        <div className="flex justify-center mb-6">
             {isLive ? (
                 <div className="flex flex-col items-center">
-                    <span className="bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-full animate-pulse flex items-center gap-1 shadow-lg shadow-red-900/20">
-                        <span className="w-1.5 h-1.5 bg-white rounded-full"></span> 
+                    <span className="bg-red-600/90 backdrop-blur-sm text-white text-[10px] font-black px-4 py-1.5 rounded-full animate-pulse flex items-center gap-2 shadow-lg shadow-red-900/40 border border-white/10">
+                        <span className="w-2 h-2 bg-white rounded-full"></span> 
                         {data.status === 'HT' ? 'HALF TIME' : 'LIVE'}
                     </span>
-                    {data.displayClock && <span className="text-red-400 text-[10px] font-mono mt-1">{data.displayClock}</span>}
+                    {data.displayClock && <span className="text-red-300 text-[10px] font-mono mt-1 font-bold">{data.displayClock}</span>}
                 </div>
             ) : (
-                <span className={`text-[10px] font-bold px-3 py-1 rounded-full border ${isFinished ? 'bg-slate-700 text-slate-300 border-slate-600' : 'bg-white/10 text-slate-300 border-white/5'}`}>
+                <span className={`text-[10px] font-bold px-4 py-1.5 rounded-full border backdrop-blur-md shadow-lg ${isFinished ? 'bg-slate-900/80 text-slate-300 border-slate-700' : 'bg-white/10 text-white border-white/20'}`}>
                     {isFinished ? 'FULL TIME' : new Date(data.match_date).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
                 </span>
             )}
         </div>
 
+        {/* Teams & Score */}
         <div className="flex justify-between items-start">
-            <div className="flex flex-col items-center w-[35%]">
-                <div className="w-16 h-16 bg-white/5 p-3 rounded-2xl mb-3 flex items-center justify-center border border-white/10 shadow-inner">
-                    {initialData.home_logo ? <img src={initialData.home_logo} className="w-full h-full object-contain" /> : <div className="font-black text-slate-500">H</div>}
+            {/* Home Team */}
+            <div className="flex flex-col items-center w-[35%] group">
+                <div className="w-20 h-20 bg-white/10 p-4 rounded-2xl mb-3 flex items-center justify-center border border-white/10 shadow-2xl backdrop-blur-md transition-transform group-hover:scale-105">
+                    {initialData.home_logo ? <img src={initialData.home_logo} className="w-full h-full object-contain drop-shadow-md" /> : <div className="font-black text-slate-500">H</div>}
                 </div>
-                <h2 className="font-bold text-center text-xs text-white leading-tight w-full line-clamp-2">{initialData.home_team}</h2>
+                <h2 className="font-bold text-center text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md">{initialData.home_team}</h2>
             </div>
             
-            <div className="flex flex-col items-center justify-center w-[30%] pt-2">
+            {/* Score */}
+            <div className="flex flex-col items-center justify-center w-[30%] pt-4">
                 {data.status === 'SCHEDULED' || data.status === 'PRE' ? (
-                     <div className="text-3xl font-black text-slate-600 opacity-50">VS</div>
+                     <div className="text-4xl font-black text-white/20">VS</div>
                 ) : (
-                    <div className="text-5xl font-black tracking-tighter text-white flex gap-1 drop-shadow-2xl">
+                    <div className="text-6xl font-black tracking-tighter text-white flex gap-1 drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]">
                         <span>{data.home_score}</span>
-                        <span className="text-slate-600 opacity-50">:</span>
+                        <span className="text-white/40">:</span>
                         <span>{data.away_score}</span>
                     </div>
                 )}
             </div>
 
-            <div className="flex flex-col items-center w-[35%]">
-                <div className="w-16 h-16 bg-white/5 p-3 rounded-2xl mb-3 flex items-center justify-center border border-white/10 shadow-inner">
-                    {initialData.away_logo ? <img src={initialData.away_logo} className="w-full h-full object-contain" /> : <div className="font-black text-slate-500">A</div>}
+            {/* Away Team */}
+            <div className="flex flex-col items-center w-[35%] group">
+                <div className="w-20 h-20 bg-white/10 p-4 rounded-2xl mb-3 flex items-center justify-center border border-white/10 shadow-2xl backdrop-blur-md transition-transform group-hover:scale-105">
+                    {initialData.away_logo ? <img src={initialData.away_logo} className="w-full h-full object-contain drop-shadow-md" /> : <div className="font-black text-slate-500">A</div>}
                 </div>
-                <h2 className="font-bold text-center text-xs text-white leading-tight w-full line-clamp-2">{initialData.away_team}</h2>
+                <h2 className="font-bold text-center text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md">{initialData.away_team}</h2>
             </div>
         </div>
     </div>

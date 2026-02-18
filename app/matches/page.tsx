@@ -20,12 +20,13 @@ export default async function AllMatchesPage() {
   const startDate = new Date(); startDate.setDate(startDate.getDate() - 7); 
   const endDate = new Date(); endDate.setDate(endDate.getDate() + 14); 
 
+  // 🟢 FETCH RICH DATA (league_banner)
   const { data: matches } = await supabase
     .from('matches')
     .select('*')
     .gte('match_date', startDate.toISOString())
     .lte('match_date', endDate.toISOString())
-    .order('match_date', { ascending: true }); // Oldest first (Results -> Fixtures)
+    .order('match_date', { ascending: true });
 
   // 2. GROUP BY LEAGUE
   const leagues: { [key: string]: any[] } = {};
@@ -36,12 +37,11 @@ export default async function AllMatchesPage() {
     leagues[match.league].push(match);
   });
 
-  // 3. GAP FILLING
+  // 3. GAP FILLING (Existing Logic Preserved)
   const missingLeagues = PRIORITY_LEAGUES.filter(l => leagues[l].length === 0);
 
   if (missingLeagues.length > 0) {
       const gapFillPromises = missingLeagues.map(async (leagueName) => {
-          // A. Fetch Future (Limit 10)
           const { data: nextMatches } = await supabase
               .from('matches').select('*').eq('league', leagueName)
               .gt('match_date', new Date().toISOString()) 
@@ -49,7 +49,6 @@ export default async function AllMatchesPage() {
 
           if (nextMatches && nextMatches.length > 0) return nextMatches;
 
-          // B. Fetch Past (Limit 10)
           const { data: lastMatches } = await supabase
               .from('matches').select('*').eq('league', leagueName)
               .lt('match_date', new Date().toISOString()) 
@@ -99,27 +98,37 @@ export default async function AllMatchesPage() {
         {/* RENDER LEAGUE GROUPS */}
         {activeLeagues.map((leagueName) => {
             const leagueMatches = leagues[leagueName];
+            
+            // 🟢 EXTRACT BANNER FROM FIRST MATCH
+            // Since we synced the banner to all matches in the league, any match has it.
+            const leagueBanner = leagueMatches[0]?.league_banner;
 
-            // 🟢 SMART FILTER: Ensure we have both Results AND Fixtures
-            // 1. Get Scheduled (Live/Pre) -> Take Next 10
             const fixtures = leagueMatches
                 .filter(m => !['FT', 'FINISHED', 'ABD'].includes(m.status))
-                // Sort Ascending (Nearest Future First)
                 .sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime())
                 .slice(0, 10);
 
-            // 2. Get Results (Finished) -> Take Last 10
             const results = leagueMatches
                 .filter(m => ['FT', 'FINISHED', 'ABD'].includes(m.status))
-                // Sort Descending (Newest Result First)
                 .sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime())
                 .slice(0, 10);
 
-            // 3. Combine for the component
             const smartDisplayList = [...fixtures, ...results];
 
             return (
                 <div key={leagueName} id={leagueName.replace(/\s+/g, '-')}>
+                    {/* 🟢 RICH LEAGUE HEADER */}
+                    {leagueBanner ? (
+                        <div className="mb-3 rounded-lg overflow-hidden shadow-sm border border-slate-200 bg-white">
+                            <img src={leagueBanner} alt={leagueName} className="w-full h-16 object-cover object-center" />
+                        </div>
+                    ) : (
+                        // Fallback Text Header if no banner
+                         <div className="mb-2 px-2 border-l-4 border-blue-600 pl-2">
+                             <h2 className="font-bold text-slate-800 uppercase text-sm tracking-wider">{leagueName}</h2>
+                         </div>
+                    )}
+
                     <LeagueMatchGroup 
                         leagueName={leagueName} 
                         matches={smartDisplayList} 
