@@ -31,7 +31,7 @@ async function run() {
   const fromStr = fromDate.toISOString().split('T')[0];
   const toStr = toDate.toISOString().split('T')[0];
 
-  console.log(`🚀 Starting Schedule Sync: ${fromStr} to ${toStr}`);
+  console.log(`🚀 Starting Safe Schedule Sync: ${fromStr} to ${toStr}`);
 
   for (const league of LEAGUES) {
     console.log(`\n.. Processing ${league.name}`);
@@ -41,35 +41,52 @@ async function run() {
       
       if (!res.ok) {
         console.error(`   ❌ Error ${res.status}: ${res.statusText}`);
-        if (res.status === 429) await delay(60000); // Wait 1 min if blocked
+        if (res.status === 429) await delay(60000); 
       } else {
         const data = await res.json();
-        const matches = (data.matches || []).map(m => ({
-          api_id: m.id, // 🛑 CRITICAL: This ID prevents duplicates!
-          league: league.name,
-          home_team: m.homeTeam.shortName || m.homeTeam.name,
-          away_team: m.awayTeam.shortName || m.awayTeam.name,
-          home_score: m.score.fullTime.home ?? 0,
-          away_score: m.score.fullTime.away ?? 0,
-          match_date: m.utcDate,
-          // We rely on ESPN for 'LIVE' status, so here we reset to SCHEDULED or FT
-          status: m.status === 'FINISHED' ? 'FT' : 'SCHEDULED', 
-          home_logo: m.homeTeam.crest,
-          away_logo: m.awayTeam.crest,
-          updated_at: new Date().toISOString()
-        }));
+        const now = Date.now();
+
+        // 🟢 FILTER: Prepare matches but SKIP live ones
+        const matches = (data.matches || []).reduce((acc, m) => {
+          
+          const matchTime = new Date(m.utcDate).getTime();
+          const diffHours = (now - matchTime) / (1000 * 60 * 60);
+
+          // 🛡️ SAFETY LOCK: 
+          // If match starts in < 30 mins (-0.5) OR started < 4 hours ago (4.0)
+          // We SKIP it. We trust ESPN Live Route to handle this window.
+          // This prevents overwriting "1-0 LIVE" with "0-0 SCHEDULED".
+          if (diffHours > -0.5 && diffHours < 4.0 && m.status !== 'FINISHED') {
+             console.log(`   ⏩ Skipping Active Match: ${m.homeTeam.shortName} vs ${m.awayTeam.shortName}`);
+             return acc; // Skip this iteration
+          }
+
+          acc.push({
+            api_id: m.id,
+            league: league.name,
+            home_team: m.homeTeam.shortName || m.homeTeam.name,
+            away_team: m.awayTeam.shortName || m.awayTeam.name,
+            home_score: m.score.fullTime.home ?? 0,
+            away_score: m.score.fullTime.away ?? 0,
+            match_date: m.utcDate,
+            status: (m.status === 'FINISHED' || m.status === 'AWARDED') ? 'FT' : 'SCHEDULED', 
+            home_logo: m.homeTeam.crest,
+            away_logo: m.awayTeam.crest,
+            updated_at: new Date().toISOString()
+          });
+          return acc;
+        }, []);
 
         if (matches.length > 0) {
-          // 🛑 CRITICAL: onConflict: 'api_id' ensures we update, not duplicate
           const { error } = await supabase.from('matches').upsert(matches, { onConflict: 'api_id' });
           if (error) console.error(`   ❌ DB Error: ${error.message}`);
-          else console.log(`   ✅ Synced ${matches.length} matches.`);
+          else console.log(`   ✅ Synced ${matches.length} matches (Safe Mode).`);
         }
       }
     } catch (e) {
       console.error(`   🔥 Exception: ${e.message}`);
     }
-    await delay(10000); // 10s wait between leagues (Safe Mode)
+    await delay(10000); 
   }
 }
 
