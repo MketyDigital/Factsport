@@ -1,0 +1,27 @@
+name: Daily Matchday Round-Up
+
+on:
+  schedule:
+    # Runs at 23:45 UTC (Approx 12:45 AM Nigeria Time)
+    - cron: '45 23 * * *'
+  workflow_dispatch: # Allows manual button click
+
+jobs:
+  generate-summary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      
+      # 🟢 This installs the AI libraries on the cloud server
+      - name: Install Dependencies
+        run: npm install @supabase/supabase-js @google/generative-ai
+
+      - name: Run Summary Script
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: node scripts/daily-summary-gemini.js
