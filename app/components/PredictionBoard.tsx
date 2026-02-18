@@ -15,7 +15,7 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
   const supabase = createClient();
   const router = useRouter();
 
-  // 🔒 Lock if match started
+  // 🔒 VISUAL LOCK: Updates when component renders
   const isLocked = new Date() > new Date(matchDate);
 
   useEffect(() => { fetchPrediction(); }, []);
@@ -28,7 +28,7 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
     const { data } = await supabase
         .from('user_predictions')
         .select('*')
-        .eq('match_id', matchId) // Note: Ensure matchId passed here is the TEXT ID from the page
+        .eq('match_id', matchId) 
         .eq('user_id', session.user.id)
         .single();
         
@@ -36,7 +36,23 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
   };
 
   const handleSubmit = async () => {
-    if (!outcome || scoreHome === '' || scoreAway === '') { alert("Select Winner & Score"); return; }
+    // 1. Basic Validation
+    if (!outcome || scoreHome === '' || scoreAway === '') { 
+        alert("Select Winner & Score"); 
+        return; 
+    }
+
+    // 🛡️ SECURITY LAYER 2: TIME CHECK
+    // We check the time RIGHT NOW, inside the function.
+    // This prevents users from betting if they kept the tab open past kickoff.
+    const now = new Date();
+    const kickoff = new Date(matchDate);
+    if (now >= kickoff) {
+        alert("⛔ Betting Closed! The match has already started.");
+        window.location.reload(); // Refresh to show the locked UI
+        return;
+    }
+
     setLoading(true);
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -48,11 +64,14 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
         predicted_outcome: outcome, 
         predicted_home_score: parseInt(scoreHome), 
         predicted_away_score: parseInt(scoreAway),
-        status: 'PENDING' // Explicitly set initial status
+        status: 'PENDING' 
     });
 
     if (error) {
-        if (error.code === '23505') { alert("Already predicted!"); fetchPrediction(); }
+        if (error.code === '23505') { 
+            alert("Already predicted!"); 
+            fetchPrediction(); 
+        }
         else alert("Error: " + error.message);
     } else {
         fetchPrediction();
@@ -88,7 +107,6 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
                          </div>
                     </div>
 
-                    {/* ✅ FIXED: Changed .points to .points_awarded to match DB */}
                     {isFinalized ? (
                         <div className={`text-xs font-black px-3 py-2 rounded-lg inline-flex items-center gap-2 ${existingPred.points_awarded > 0 ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-100'}`}>
                            {existingPred.points_awarded > 0 ? (
