@@ -5,7 +5,10 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SPORTSDB_KEY = '3'; 
 
-if (!SUPABASE_URL || !SUPABASE_KEY) { console.error("❌ Missing Keys"); process.exit(1); }
+if (!SUPABASE_URL || !SUPABASE_KEY) { 
+    console.error("❌ Missing Keys"); 
+    process.exit(1); 
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -18,50 +21,76 @@ const LEAGUE_IDS = {
     'Champions League': '4480'
 };
 
-// 🟢 1. MATH LOGIC (Same as Live Route)
-const normalize = (name) => {
-    if (!name) return "";
-    return name.toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9 ]/g, '') 
-        .replace(/ fc| cf| fk| sc| united| city| real| inter| ac| milan| athletic| hotspur| albion| & hove| wanderers| town| county| palace/g, '') 
-        .trim();
+// 🟢 SMART DICTIONARY: Maps your DB's short names to Official Search Names
+const SEARCH_ALIASES = {
+    'c palace': 'Crystal Palace',
+    'nottm forest': 'Nottingham Forest',
+    'nottingham': 'Nottingham Forest',
+    'man united': 'Manchester United',
+    'man city': 'Manchester City',
+    'spurs': 'Tottenham',
+    'wolves': 'Wolverhampton',
+    'brighton hove': 'Brighton',
+    'sheff utd': 'Sheffield United',
+    'barça': 'Barcelona',
+    'atleti': 'Atletico Madrid',
+    'atlético': 'Atletico Madrid',
+    'm\'gladbach': 'Monchengladbach',
+    'gladbach': 'Monchengladbach',
+    'hsv': 'Hamburg',
+    'roma': 'AS Roma',
+    'milan': 'AC Milan',
+    'inter': 'Inter Milan',
+    'inter milan': 'Inter Milan',
+    'psg': 'Paris SG',
+    'bayern': 'Bayern Munich',
+    'dortmund': 'Borussia Dortmund',
+    'leverkusen': 'Bayer Leverkusen',
+    'leipzig': 'RB Leipzig',
+    'frankfurt': 'Eintracht Frankfurt',
+    'köln': 'FC Koln',
+    '1. fc köln': 'FC Koln',
+    'cologne': 'FC Koln',
+    'bremen': 'Werder Bremen',
+    'stuttgart': 'VfB Stuttgart',
+    'freiburg': 'SC Freiburg',
+    'augsburg': 'FC Augsburg',
+    'mainz': 'Mainz 05',
+    'union berlin': 'Union Berlin',
+    'heidenheim': 'Heidenheim',
+    'st. pauli': 'St Pauli',
+    'bodo/glimt': 'Bodo Glimt',
+    'bodø/glimt': 'Bodo Glimt',
+    'qarabağ ağdam': 'Qarabag',
+    'slavia praha': 'Slavia Prague',
+    'paphos fc': 'Pafos',
+    'como 1907': 'Como',
+    'ac pisa': 'Pisa',
+    'angers sco': 'Angers',
+    'olympique lyon': 'Lyon',
+    'stade rennais': 'Rennes',
+    'fc metz': 'Metz',
+    'rc lens': 'Lens'
 };
 
-const similarity = (s1, s2) => {
-    let longer = s1;
-    let shorter = s2;
-    if (s1.length < s2.length) { longer = s2; shorter = s1; }
-    const longerLength = longer.length;
-    if (longerLength === 0) return 1.0;
-    
-    const costs = new Array();
-    for (let i = 0; i <= shorter.length; i++) {
-        let lastValue = i;
-        for (let j = 0; j <= longer.length; j++) {
-            if (i == 0) costs[j] = j;
-            else {
-                if (j > 0) {
-                    let newValue = costs[j - 1];
-                    if (s1.charAt(i - 1) != s2.charAt(j - 1)) newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
-                    costs[j - 1] = lastValue;
-                    lastValue = newValue;
-                }
-            }
-        }
-        if (i > 0) costs[longer.length] = lastValue;
+// 🟢 Prepare the name for TheSportsDB Search API
+const normalizeForSearch = (name) => {
+    let cleanName = name.toLowerCase().trim();
+    // Check if we have an exact alias for it
+    if (SEARCH_ALIASES[cleanName]) {
+        cleanName = SEARCH_ALIASES[cleanName];
     }
-    return (longerLength - costs[longer.length]) / longerLength;
+    // Remove accents (é -> e) to ensure search works
+    return cleanName.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 };
 
 async function syncBranding() {
-    console.log("🎨 Starting Smart Visual Branding Sync...");
+    console.log("🎨 Starting Direct-Search Branding Sync...");
 
-    // 🟢 1. GET ALL TEAMS FROM YOUR DB (Active Matches)
-    // We only care about teams that actually have matches coming up or recently finished
     const startDate = new Date(); 
-    startDate.setDate(startDate.getDate() - 30); // Look back 30 days
+    startDate.setDate(startDate.getDate() - 30); // Look back 30 days to catch recent matches
 
+    // 1. Fetch matches from DB
     const { data: dbMatches, error } = await supabase
         .from('matches')
         .select('home_team, league')
@@ -72,54 +101,66 @@ async function syncBranding() {
         return;
     }
 
-    // Create a unique list of teams per league from your DB
-    // Format: { 'Premier League': ['Man City', 'Liverpool'], 'La Liga': [...] }
+    // 2. Group teams by league
     const dbTeamsByLeague = {};
     dbMatches.forEach(m => {
         if (!dbTeamsByLeague[m.league]) dbTeamsByLeague[m.league] = new Set();
         dbTeamsByLeague[m.league].add(m.home_team);
     });
 
-    // 🟢 2. PROCESS LEAGUES
-    for (const [leagueName, leagueId] of Object.entries(LEAGUE_IDS)) {
+    // 3. Process each league
+    for (const [leagueName, expectedLeagueId] of Object.entries(LEAGUE_IDS)) {
         console.log(`\nProcessing ${leagueName}...`);
         
         try {
             const dbTeamList = Array.from(dbTeamsByLeague[leagueName] || []);
             if (dbTeamList.length === 0) {
-                console.log("   ⚠️ No teams found in your DB for this league.");
+                console.log("   ⚠️ No teams found in DB.");
                 continue;
             }
 
-            // A. Fetch League Banner
-            const leagueUrl = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}/lookupleague.php?id=${leagueId}`;
+            // A. Fetch League Banner (With Fallback Logic)
+            const leagueUrl = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}/lookupleague.php?id=${expectedLeagueId}`;
             const leagueRes = await fetch(leagueUrl);
             const leagueData = await leagueRes.json();
-            const leagueBanner = leagueData.leagues ? leagueData.leagues[0].strBanner : null; 
+            
+            let leagueBanner = null;
+            if (leagueData.leagues && leagueData.leagues[0]) {
+                const l = leagueData.leagues[0];
+                // Grabs the banner, or falls back to the logo, or falls back to the square badge
+                leagueBanner = l.strBanner || l.strLogo || l.strBadge || null;
+            }
 
-            // B. Fetch All Teams from TheSportsDB
-            const teamsUrl = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}/lookup_all_teams.php?id=${leagueId}`;
-            const teamsRes = await fetch(teamsUrl);
-            const teamsData = await teamsRes.json();
-
-            if (!teamsData.teams) continue;
-
-            // 🟢 3. MATCH & UPDATE
+            // B. Direct Search for each Team
             for (const dbTeamName of dbTeamList) {
-                const normDbName = normalize(dbTeamName);
+                const searchName = normalizeForSearch(dbTeamName);
+                const teamsUrl = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}/searchteams.php?t=${encodeURIComponent(searchName)}`;
+                
+                const teamsRes = await fetch(teamsUrl);
+                const teamsData = await teamsRes.json();
 
-                // Find best match in TSDB
-                const bestMatch = teamsData.teams.find(tsdbTeam => {
-                    const normTsdb = normalize(tsdbTeam.strTeam);
+                let bestMatch = null;
+
+                if (teamsData.teams) {
+                    // Lock 1: Try to match the exact league first (TSDB teams can have up to 7 leagues)
+                    bestMatch = teamsData.teams.find(t => 
+                        t.idLeague === expectedLeagueId || 
+                        t.idLeague2 === expectedLeagueId || 
+                        t.idLeague3 === expectedLeagueId || 
+                        t.idLeague4 === expectedLeagueId || 
+                        t.idLeague5 === expectedLeagueId || 
+                        t.idLeague6 === expectedLeagueId || 
+                        t.idLeague7 === expectedLeagueId
+                    );
                     
-                    // Direct Includes
-                    if (normDbName.includes(normTsdb) || normTsdb.includes(normDbName)) return true;
-                    // Fuzzy Match
-                    return similarity(normDbName, normTsdb) > 0.6;
-                });
+                    // Lock 2: If no exact league match (e.g., Champions League teams playing domestically), take the top result
+                    if (!bestMatch) {
+                        bestMatch = teamsData.teams[0];
+                    }
+                }
 
                 if (bestMatch) {
-                    // We found a match! Update ALL matches for this home team.
+                    // Overwrite the DB row (this fixes any previous bad data!)
                     const { error } = await supabase
                         .from('matches')
                         .update({
@@ -129,14 +170,20 @@ async function syncBranding() {
                             home_logo: bestMatch.strTeamBadge, 
                             league_banner: leagueBanner 
                         })
-                        .eq('home_team', dbTeamName) // Exact match on DB Name
+                        .eq('home_team', dbTeamName) 
                         .gte('match_date', startDate.toISOString());
 
-                    if (error) console.error(`   ❌ Failed to update ${dbTeamName}`);
-                    else console.log(`   ✅ Synced: ${dbTeamName} -> ${bestMatch.strTeam}`);
+                    if (error) {
+                        console.error(`   ❌ Failed to update ${dbTeamName}:`, error.message);
+                    } else {
+                        console.log(`   ✅ Synced: ${dbTeamName} -> ${bestMatch.strTeam}`);
+                    }
                 } else {
-                    console.log(`   ⚠️ Could not find image for: ${dbTeamName}`);
+                    console.log(`   ⚠️ Could not find image for: ${dbTeamName} (Searched: "${searchName}")`);
                 }
+                
+                // Be polite to the free API (Avoid Rate Limits)
+                await new Promise(r => setTimeout(r, 200));
             }
             
         } catch (e) {
