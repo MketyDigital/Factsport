@@ -6,7 +6,7 @@ import { createClient } from '@/app/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { ESPN_LEAGUES, fetchEspnLive, fetchEspnDetails, normalizeName } from '@/app/lib/espn';
 
-// 🟢 SHARED LOGIC (Used by both GET and POST)
+// 🟢 SHARED LOGIC
 async function runLiveUpdate() {
   const supabase = createClient();
   let logs: string[] = [];
@@ -14,20 +14,23 @@ async function runLiveUpdate() {
 
   try {
       const now = Date.now();
-      // Look back 24 hours (catch missed games) & forward 4 hours (catch starting soon)
+      
+      // 🟢 WIDENED WINDOW
+      // Look back 24 Hours (Catch stuck games from yesterday)
+      // Look forward 24 Hours (Catch ALL of today's games, even if 12 hours away)
       const twentyFourHoursAgo = new Date(now - (24 * 60 * 60 * 1000)).toISOString();
-      const fourHoursFuture = new Date(now + (4 * 60 * 60 * 1000)).toISOString();
+      const twentyFourHoursFuture = new Date(now + (24 * 60 * 60 * 1000)).toISOString();
 
-      // 1. FETCH MATCHES (LIVE, HT, or Missed SCHEDULED)
+      // 1. FETCH MATCHES
       const { data: dbMatches } = await supabase
         .from('matches')
         .select('*')
         .or('status.eq.LIVE,status.eq.HT,status.eq.IN_PLAY,status.eq.SCHEDULED,status.eq.TIMED,status.eq.PRE')
         .gt('match_date', twentyFourHoursAgo) 
-        .lt('match_date', fourHoursFuture);
+        .lt('match_date', twentyFourHoursFuture); // ✅ Checks next 24 hours now
 
       if (!dbMatches || dbMatches.length === 0) {
-          return NextResponse.json({ message: "No active/pending matches in window." });
+          return NextResponse.json({ message: "No matches found in the next/past 24h." });
       }
 
       const activeLeagues = Array.from(new Set(dbMatches.map(m => m.league)));
@@ -42,7 +45,6 @@ async function runLiveUpdate() {
 
         for (const dbMatch of leagueDbMatches) {
              // Find matching ESPN game
-             // 🟢 FIX: Added (e: any) type definition here
              const espnGame = espnMatches.find((e: any) => {
                  const dbHome = normalizeName(dbMatch.home_team);
                  const espnHome = normalizeName(e.home_team);
@@ -53,7 +55,7 @@ async function runLiveUpdate() {
                  const richData = await fetchEspnDetails(espnGame.espn_id);
                  
                  let newStatus = dbMatch.status;
-                 // ESPN Mapping: 'in'=Live, 'post'=FT, 'pre'=Scheduled
+                 // ESPN Mapping
                  if (espnGame.status === 'in') newStatus = 'LIVE';
                  else if (espnGame.status === 'post') newStatus = 'FT'; 
                  else if (espnGame.clock === 'HT') newStatus = 'HT';
@@ -78,6 +80,12 @@ async function runLiveUpdate() {
              }
         }
       }
+      
+      // If no updates, list what we checked so you know it's working
+      if (updates === 0) {
+          logs.push(`checked ${dbMatches.length} matches, but ESPN had no status changes.`);
+      }
+
       return NextResponse.json({ success: true, updates, logs });
 
   } catch (error: any) {
@@ -86,7 +94,7 @@ async function runLiveUpdate() {
   }
 }
 
-// 🟢 EXPORT BOTH METHODS
+// 🟢 EXPORT BOTH
 export async function GET(request: Request) {
     return runLiveUpdate();
 }
