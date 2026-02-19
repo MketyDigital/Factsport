@@ -41,7 +41,9 @@ async function runLiveUpdate() {
         const leagueDbMatches = dbMatches.filter(m => m.league === leagueName);
 
         for (const dbMatch of leagueDbMatches) {
-             const espnGame = espnMatches.find(e => {
+             // Find matching ESPN game
+             // 🟢 FIX: Added (e: any) type definition here
+             const espnGame = espnMatches.find((e: any) => {
                  const dbHome = normalizeName(dbMatch.home_team);
                  const espnHome = normalizeName(e.home_team);
                  return dbHome.includes(espnHome) || espnHome.includes(dbHome);
@@ -85,12 +87,10 @@ async function runLiveUpdate() {
 }
 
 // 🟢 EXPORT BOTH METHODS
-// GET: For you to check manually in browser
 export async function GET(request: Request) {
     return runLiveUpdate();
 }
 
-// POST: For cron-job.org (Bypasses Cache 100%)
 export async function POST(request: Request) {
     return runLiveUpdate();
 }
