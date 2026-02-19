@@ -6,12 +6,42 @@ import { createClient } from '@/app/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { ESPN_LEAGUES, fetchEspnLive, fetchEspnDetails } from '@/app/lib/espn';
 
-// 🟢 HELPER: Normalize Names (Remove common words)
+// 🟢 1. ROBUST NORMALIZER
+// Removes accents, special chars, and common "noise" words
 const normalize = (name: string) => {
     return name.toLowerCase()
-        .replace(/ fc| cf| united| city| real| inter| ac| milan| athletic| hotspur| albion| & hove| wanderers| town| county| palace/g, '') 
-        .replace(/[^a-z0-9]/g, '') 
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents (ø->o, é->e)
+        .replace(/[^a-z0-9 ]/g, '') // Remove everything except letters/numbers
+        .replace(/ fc| cf| fk| sc| united| city| real| inter| ac| milan| athletic| hotspur| albion| & hove| wanderers| town| county| palace/g, '') 
         .trim();
+};
+
+// 🟢 2. FUZZY MATCHER (Levenshtein Similarity)
+// Returns a score from 0 (0%) to 1 (100%)
+const similarity = (s1: string, s2: string) => {
+    let longer = s1;
+    let shorter = s2;
+    if (s1.length < s2.length) { longer = s2; shorter = s1; }
+    const longerLength = longer.length;
+    if (longerLength === 0) return 1.0;
+    
+    const costs = new Array();
+    for (let i = 0; i <= shorter.length; i++) {
+        let lastValue = i;
+        for (let j = 0; j <= longer.length; j++) {
+            if (i == 0) costs[j] = j;
+            else {
+                if (j > 0) {
+                    let newValue = costs[j - 1];
+                    if (s1.charAt(i - 1) != s2.charAt(j - 1)) newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                    costs[j - 1] = lastValue;
+                    lastValue = newValue;
+                }
+            }
+        }
+        if (i > 0) costs[longer.length] = lastValue;
+    }
+    return (longerLength - costs[longer.length]) / parseFloat(longerLength);
 };
 
 async function runLiveUpdate() {
@@ -21,12 +51,9 @@ async function runLiveUpdate() {
 
   try {
       const now = Date.now();
-      // Look back 48 hours (Catch yesterday's missed games)
-      // Look forward 24 hours (Catch today's upcoming games)
       const lookBack = new Date(now - (48 * 60 * 60 * 1000)).toISOString();
       const lookForward = new Date(now + (24 * 60 * 60 * 1000)).toISOString();
 
-      // 1. FETCH MATCHES FROM DB
       const { data: dbMatches } = await supabase
         .from('matches')
         .select('*')
@@ -37,14 +64,10 @@ async function runLiveUpdate() {
           return NextResponse.json({ message: "No matches found in 48h window." });
       }
 
-      // 2. FILTER: Active OR Finished-but-Empty
       const targetMatches = dbMatches.filter(m => {
           const isActive = ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE'].includes(m.status);
           const isFinished = ['FT', 'FINISHED', 'ABD', 'POST'].includes(m.status);
-          
-          // Check for missing data (Events, Stats, Lineups)
           const missingData = !m.match_events || !m.stats || !m.lineups || (Array.isArray(m.match_events) && m.match_events.length === 0);
-
           return isActive || (isFinished && missingData);
       });
 
@@ -55,8 +78,6 @@ async function runLiveUpdate() {
       const activeLeagues = Array.from(new Set(targetMatches.map(m => m.league)));
 
       for (const leagueName of activeLeagues) {
-        // 🔒 LOCK 1: LEAGUE MATCHING
-        // We only fetch ESPN data for this specific league
         const espnCode = ESPN_LEAGUES[leagueName as string];
         if (!espnCode) continue;
 
@@ -68,22 +89,21 @@ async function runLiveUpdate() {
              const dbName = normalize(dbMatch.home_team);
              
              const espnGame = espnMatches.find((e: any) => {
-                 // 🔒 LOCK 2: TIME MATCHING
-                 // Match must start within 4 hours of DB time (Allows for delays/timezone weirdness)
-                 const espnTime = e.startTime; // We added startTime in lib/espn.ts
-                 const timeDiff = Math.abs(dbTime - espnTime);
-                 const isSameDay = timeDiff < (4 * 60 * 60 * 1000); // 4 Hours tolerance
+                 // 🔒 LOCK 1: TIME (4 Hours Tolerance)
+                 const espnTime = e.startTime;
+                 if (Math.abs(dbTime - espnTime) > (4 * 60 * 60 * 1000)) return false;
 
-                 if (!isSameDay) return false;
-
-                 // 🔒 LOCK 3: NAME MATCHING
+                 // 🔒 LOCK 2: FUZZY NAME MATCH
                  const espnName = normalize(e.home_team);
                  
-                 // A. Direct Includes (e.g. "Man City" inside "Manchester City")
+                 // A. Exact Match (Fast)
                  if (dbName.includes(espnName) || espnName.includes(dbName)) return true;
                  
-                 // B. First 4 Letters (e.g. "Wolv" matches "Wolverhampton")
-                 if (dbName.substring(0,4) === espnName.substring(0,4)) return true;
+                 // B. Fuzzy Match (Smart)
+                 // If names are > 60% similar, it's a match.
+                 // We can be generous (60%) because we already matched LEAGUE and TIME.
+                 const score = similarity(dbName, espnName);
+                 if (score > 0.6) return true;
 
                  return false;
              });
@@ -112,9 +132,9 @@ async function runLiveUpdate() {
 
                  await supabase.from('matches').update(payload).eq('id', dbMatch.id);
                  updates++;
-                 logs.push(`✅ Synced: ${dbMatch.home_team}`);
+                 logs.push(`✅ Synced: ${dbMatch.home_team} (${Math.round(similarity(normalize(dbMatch.home_team), normalize(espnGame.home_team)) * 100)}% Match)`);
              } else {
-                 logs.push(`⚠️ Missed: ${dbMatch.home_team} (Time/Name mismatch)`);
+                 logs.push(`⚠️ Missed: ${dbMatch.home_team}`);
              }
         }
       }
