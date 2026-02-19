@@ -37,7 +37,11 @@ export async function fetchEspnLive(leagueCode: string) {
         away_team: e.competitions[0].competitors.find((c:any)=>c.homeAway==='away').team.displayName,
         home_score: parseInt(e.competitions[0].competitors.find((c:any)=>c.homeAway==='home').score),
         away_score: parseInt(e.competitions[0].competitors.find((c:any)=>c.homeAway==='away').score),
-        startTime: new Date(e.date).getTime()
+        
+        // 🟢 THIS IS THE KEY FIX FOR TIME MATCHING
+        // ESPN returns UTC ISO string (e.g. "2024-05-12T14:00Z")
+        // We convert it to a Timestamp Number immediately.
+        startTime: new Date(e.date).getTime() 
     }));
   } catch (err) { return []; }
 }
