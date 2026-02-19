@@ -3,7 +3,7 @@ export const runtime = 'edge';
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon, Shirt } from 'lucide-react';
+import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon } from 'lucide-react';
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
 import MatchHeaderClient from '@/app/components/MatchHeaderClient'; 
@@ -11,6 +11,7 @@ import StatsLineupsTabs from '@/app/components/StatsLineupsTabs';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 import { getExternalData } from '@/app/lib/matchService';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
+import { unstable_noStore as noStore } from 'next/cache'; // 🛑 Kills Cache
 
 async function getSupabaseData(id: string) {
     const supabase = createClient();
@@ -20,6 +21,7 @@ async function getSupabaseData(id: string) {
 }
 
 export default async function MatchDetailsPage({ params }: { params: { id: string } }) {
+  noStore(); // 🛑 Forces fresh data on load
   const resolvedParams = await params;
   if (!resolvedParams?.id) return notFound();
 
@@ -44,16 +46,13 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
               <div className="w-9"></div>
           </div>
       ) : (
-          // 🟢 RICH HEADER WITH STADIUM BACKGROUND
           <div className="relative bg-[#0a1428] text-white pb-6 rounded-b-[2rem] overflow-hidden shadow-2xl">
-            
-            {/* 🟢 STADIUM BACKGROUND LAYER */}
+            {/* 🟢 STADIUM BACKGROUND */}
             {dbData.home_stadium ? (
                  <>
                     <div className="absolute top-0 left-0 w-full h-full">
                         <img src={dbData.home_stadium} className="w-full h-full object-cover opacity-30 blur-sm scale-110" />
                     </div>
-                    {/* Gradient Overlay to ensure text readability */}
                     <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-[#0a1428]/90 via-[#0a1428]/70 to-[#0a1428]"></div>
                  </>
             ) : (
@@ -65,7 +64,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                 <ChevronLeft size={24} />
               </Link>
               
-              {/* League Banner or Text */}
+              {/* League Banner */}
               {dbData.league_banner ? (
                   <img src={dbData.league_banner} className="h-6 object-contain opacity-80" alt={dbData.league} />
               ) : (
@@ -75,7 +74,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
               <div className="w-10"></div>
             </div>
             
-            {/* HEADER CLIENT */}
             <MatchHeaderClient matchId={dbData.id} initialData={dbData} />
           </div>
       )}
@@ -87,14 +85,13 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
              </div>
         )}
 
-        {/* 🟢 JERSEY SHOWCASE (If Available) */}
+        {/* 🟢 TEAM JERSEY DISPLAY */}
         {dbData.home_jersey && (
             <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 flex items-center justify-center gap-6">
                  <div className="text-center">
                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-2">Home Kit</p>
                      <img src={dbData.home_jersey} className="h-16 object-contain drop-shadow-md" />
                  </div>
-                 {/* Place for Away Jersey if you had it, for now just Home */}
             </div>
         )}
 
@@ -115,7 +112,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             </div>
         )}
 
-        {/* Audio, Predictions, Betting... (Unchanged) */}
+        {/* Audio Commentary */}
         <div className="bg-[#0f172a] rounded-xl p-3 border border-slate-800 shadow-xl flex items-center justify-between">
              <div className="flex items-center gap-3">
                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${dbData.audio_url ? 'bg-red-600 animate-pulse' : 'bg-slate-800'}`}>
@@ -129,11 +126,13 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
              {dbData.audio_url ? <Link href={dbData.audio_url} target="_blank" className="bg-white text-black hover:bg-slate-200 text-[10px] font-black px-4 py-2 rounded-full shadow-lg transition transform active:scale-95 flex items-center gap-1">LISTEN NOW <ExternalLink size={10} /></Link> : <button disabled className="bg-slate-700 text-slate-400 text-[10px] font-bold px-3 py-1.5 rounded-full cursor-not-allowed border border-white/5">OFF AIR</button>}
         </div>
 
+        {/* Prediction Board */}
         <div className="bg-white rounded-xl shadow-lg p-5 border border-slate-100">
            <h3 className="text-xs font-black uppercase text-slate-800 flex items-center gap-1 mb-4"><Zap size={14} className="text-blue-600 fill-blue-600" /> Predict & Win Points</h3>
            <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
         </div>
 
+        {/* Betting Banner */}
         {!hasWidget && (
             <div className="bg-[#1A1A1A] rounded-xl p-3 shadow-lg border border-white/5 flex items-center justify-between relative overflow-hidden">
                 <div className="absolute top-0 right-0 bg-blue-600 w-16 h-full blur-[40px] opacity-20"></div>
@@ -151,6 +150,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         )}
       </div>
 
+      {/* Tabs */}
       {!hasWidget && (
           <div className="px-4 mt-8 space-y-6">
               <StatsLineupsTabs matchId={dbData.id} initialData={data} />
