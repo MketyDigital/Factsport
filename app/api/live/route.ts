@@ -4,7 +4,15 @@ export const revalidate = 0;
 
 import { createClient } from '@/app/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { ESPN_LEAGUES, fetchEspnLive, fetchEspnDetails, normalizeName } from '@/app/lib/espn';
+import { ESPN_LEAGUES, fetchEspnLive, fetchEspnDetails } from '@/app/lib/espn';
+
+// 🟢 HELPER: Normalize Names (Remove common words)
+const normalize = (name: string) => {
+    return name.toLowerCase()
+        .replace(/ fc| cf| united| city| real| inter| ac| milan| athletic| hotspur| albion| & hove| wanderers| town| county| palace/g, '') 
+        .replace(/[^a-z0-9]/g, '') 
+        .trim();
+};
 
 async function runLiveUpdate() {
   const supabase = createClient();
@@ -13,62 +21,74 @@ async function runLiveUpdate() {
 
   try {
       const now = Date.now();
-      // Look back 24h for missed games, forward 24h for today's games
-      const twentyFourHoursAgo = new Date(now - (24 * 60 * 60 * 1000)).toISOString();
-      const twentyFourHoursFuture = new Date(now + (24 * 60 * 60 * 1000)).toISOString();
+      // Look back 48 hours (Catch yesterday's missed games)
+      // Look forward 24 hours (Catch today's upcoming games)
+      const lookBack = new Date(now - (48 * 60 * 60 * 1000)).toISOString();
+      const lookForward = new Date(now + (24 * 60 * 60 * 1000)).toISOString();
 
-      // 🟢 1. FETCH EVERYTHING IN WINDOW (Simplified Query)
-      // We grab ALL matches from the last 24h. We will decide which ones need help in JS.
+      // 1. FETCH MATCHES FROM DB
       const { data: dbMatches } = await supabase
         .from('matches')
         .select('*')
-        .gt('match_date', twentyFourHoursAgo) 
-        .lt('match_date', twentyFourHoursFuture);
+        .gt('match_date', lookBack) 
+        .lt('match_date', lookForward);
 
       if (!dbMatches || dbMatches.length === 0) {
-          return NextResponse.json({ message: "No matches found in window." });
+          return NextResponse.json({ message: "No matches found in 48h window." });
       }
 
-      // 🟢 2. SMART FILTERING IN JS
-      // We keep matches that are:
-      // A) Currently Active (LIVE, HT, etc.)
-      // B) Scheduled (PRE, TIMED)
-      // C) FINISHED but MISSING DATA (The fix for your problem)
+      // 2. FILTER: Active OR Finished-but-Empty
       const targetMatches = dbMatches.filter(m => {
           const isActive = ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE'].includes(m.status);
           const isFinished = ['FT', 'FINISHED', 'ABD', 'POST'].includes(m.status);
           
-          // Check if events are missing (Null OR Empty Array)
-          const isMissingData = !m.match_events || (Array.isArray(m.match_events) && m.match_events.length === 0);
+          // Check for missing data (Events, Stats, Lineups)
+          const missingData = !m.match_events || !m.stats || !m.lineups || (Array.isArray(m.match_events) && m.match_events.length === 0);
 
-          return isActive || (isFinished && isMissingData);
+          return isActive || (isFinished && missingData);
       });
 
       if (targetMatches.length === 0) {
           return NextResponse.json({ message: "All matches are up to date." });
       }
 
-      logs.push(`Found ${targetMatches.length} matches needing updates...`);
-
       const activeLeagues = Array.from(new Set(targetMatches.map(m => m.league)));
 
       for (const leagueName of activeLeagues) {
+        // 🔒 LOCK 1: LEAGUE MATCHING
+        // We only fetch ESPN data for this specific league
         const espnCode = ESPN_LEAGUES[leagueName as string];
         if (!espnCode) continue;
 
-        // Fetch Live Scoreboard
         const espnMatches = await fetchEspnLive(espnCode);
         const leagueDbMatches = targetMatches.filter(m => m.league === leagueName);
 
         for (const dbMatch of leagueDbMatches) {
+             const dbTime = new Date(dbMatch.match_date).getTime();
+             const dbName = normalize(dbMatch.home_team);
+             
              const espnGame = espnMatches.find((e: any) => {
-                 const dbHome = normalizeName(dbMatch.home_team);
-                 const espnHome = normalizeName(e.home_team);
-                 return dbHome.includes(espnHome) || espnHome.includes(dbHome);
+                 // 🔒 LOCK 2: TIME MATCHING
+                 // Match must start within 4 hours of DB time (Allows for delays/timezone weirdness)
+                 const espnTime = e.startTime; // We added startTime in lib/espn.ts
+                 const timeDiff = Math.abs(dbTime - espnTime);
+                 const isSameDay = timeDiff < (4 * 60 * 60 * 1000); // 4 Hours tolerance
+
+                 if (!isSameDay) return false;
+
+                 // 🔒 LOCK 3: NAME MATCHING
+                 const espnName = normalize(e.home_team);
+                 
+                 // A. Direct Includes (e.g. "Man City" inside "Manchester City")
+                 if (dbName.includes(espnName) || espnName.includes(dbName)) return true;
+                 
+                 // B. First 4 Letters (e.g. "Wolv" matches "Wolverhampton")
+                 if (dbName.substring(0,4) === espnName.substring(0,4)) return true;
+
+                 return false;
              });
 
              if (espnGame) {
-                 // Always fetch details if we are targeting this match
                  const richData = await fetchEspnDetails(espnGame.espn_id);
                  
                  let newStatus = dbMatch.status;
@@ -91,13 +111,10 @@ async function runLiveUpdate() {
                  }
 
                  await supabase.from('matches').update(payload).eq('id', dbMatch.id);
-                 
                  updates++;
-                 if (['FT', 'FINISHED'].includes(newStatus)) {
-                     logs.push(`✨ Enriched: ${dbMatch.home_team}`);
-                 } else {
-                     logs.push(`✅ Synced: ${dbMatch.home_team} (${newStatus})`);
-                 }
+                 logs.push(`✅ Synced: ${dbMatch.home_team}`);
+             } else {
+                 logs.push(`⚠️ Missed: ${dbMatch.home_team} (Time/Name mismatch)`);
              }
         }
       }
@@ -105,7 +122,6 @@ async function runLiveUpdate() {
       return NextResponse.json({ success: true, updates, logs });
 
   } catch (error: any) {
-      console.error("Live Route Error:", error);
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
