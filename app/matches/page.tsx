@@ -7,6 +7,7 @@ import { ChevronLeft } from 'lucide-react';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner'; 
 import LeagueMatchGroup from '@/app/components/LeagueMatchGroup'; 
 import LeagueNavigator from '@/app/components/LeagueNavigator'; 
+import { unstable_noStore as noStore } from 'next/cache'; // 🛑 Kills Cache
 
 const PRIORITY_LEAGUES = [
     'Premier League', 'La Liga', 'Bundesliga', 
@@ -14,13 +15,13 @@ const PRIORITY_LEAGUES = [
 ];
 
 export default async function AllMatchesPage() {
+  noStore(); // 🛑 Forces the page to fetch fresh data every refresh
   const supabase = createClient();
    
   // 1. FETCH WINDOW: (-7 Days to +14 Days)
   const startDate = new Date(); startDate.setDate(startDate.getDate() - 7); 
   const endDate = new Date(); endDate.setDate(endDate.getDate() + 14); 
 
-  // 🟢 FETCH RICH DATA (league_banner)
   const { data: matches } = await supabase
     .from('matches')
     .select('*')
@@ -37,7 +38,7 @@ export default async function AllMatchesPage() {
     leagues[match.league].push(match);
   });
 
-  // 3. GAP FILLING (Existing Logic Preserved)
+  // 3. GAP FILLING
   const missingLeagues = PRIORITY_LEAGUES.filter(l => leagues[l].length === 0);
 
   if (missingLeagues.length > 0) {
@@ -66,12 +67,11 @@ export default async function AllMatchesPage() {
       });
   }
 
-  // Cleanup Empty Leagues
+  // Cleanup
   Object.keys(leagues).forEach(key => {
       if (leagues[key].length === 0) delete leagues[key];
   });
 
-  // PREPARE NAVIGATOR LIST
   const activeLeagues = [
       ...PRIORITY_LEAGUES.filter(l => leagues[l]?.length > 0),
       ...Object.keys(leagues).filter(k => !PRIORITY_LEAGUES.includes(k))
@@ -89,18 +89,14 @@ export default async function AllMatchesPage() {
           </div>
       </div>
 
-      {/* STICKY NAVIGATOR */}
       <LeagueNavigator leagues={activeLeagues} />
 
       <div className="p-3 space-y-6">
         <FreeTipsBanner />
         
-        {/* RENDER LEAGUE GROUPS */}
         {activeLeagues.map((leagueName) => {
             const leagueMatches = leagues[leagueName];
-            
-            // 🟢 EXTRACT BANNER FROM FIRST MATCH
-            // Since we synced the banner to all matches in the league, any match has it.
+            // 🟢 DISPLAY RICH LEAGUE BANNER
             const leagueBanner = leagueMatches[0]?.league_banner;
 
             const fixtures = leagueMatches
@@ -117,13 +113,12 @@ export default async function AllMatchesPage() {
 
             return (
                 <div key={leagueName} id={leagueName.replace(/\s+/g, '-')}>
-                    {/* 🟢 RICH LEAGUE HEADER */}
+                    {/* Banner Header */}
                     {leagueBanner ? (
                         <div className="mb-3 rounded-lg overflow-hidden shadow-sm border border-slate-200 bg-white">
                             <img src={leagueBanner} alt={leagueName} className="w-full h-16 object-cover object-center" />
                         </div>
                     ) : (
-                        // Fallback Text Header if no banner
                          <div className="mb-2 px-2 border-l-4 border-blue-600 pl-2">
                              <h2 className="font-bold text-slate-800 uppercase text-sm tracking-wider">{leagueName}</h2>
                          </div>

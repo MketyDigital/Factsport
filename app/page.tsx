@@ -8,6 +8,7 @@ import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import NewsArtwork from '@/app/components/NewsArtwork';
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
+import { unstable_noStore as noStore } from 'next/cache'; // 🛑 FORCE FRESH DATA
 
 // 🟢 CONFIG: Your Default 1xBet Link
 const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599"; 
@@ -152,6 +153,7 @@ async function getHomepageData(leagueFilter: string | undefined) {
 }
 
 export default async function Home({ searchParams }: { searchParams: { league?: string } }) {
+  noStore(); // 🛑 Kills cache for instant updates
   const resolvedParams = await searchParams;
   const selectedLeague = resolvedParams.league;
    
@@ -288,42 +290,65 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             </div>
         </div>
 
-        {/* HERO SECTION (UPDATED) */}
+        {/* 🟢 LEAGUE BANNER DISPLAY (If League Selected) */}
+        {selectedLeague && matches.length > 0 && matches[0].league_banner && (
+            <div className="px-4 mb-4">
+                <div className="rounded-xl overflow-hidden shadow-sm border border-slate-200 bg-white">
+                    <img src={matches[0].league_banner} alt={selectedLeague} className="w-full h-16 object-cover object-center" />
+                </div>
+            </div>
+        )}
+
+        {/* 🟢 RICH HERO SECTION (Background Image Upgrade) */}
         {!selectedLeague && heroMatches.length > 0 && (
          <div className="px-4 mb-4 flex gap-2 overflow-x-auto">
              {heroMatches.map((match) => (
                 <Link key={match.id} href={`/match/${match.id}`} className={`block relative z-10 ${heroMatches.length > 1 ? 'w-[85%] shrink-0' : 'w-full'}`}>
-                    <div className="bg-gradient-to-br from-blue-600 to-blue-900 rounded-2xl p-4 shadow-xl border border-white/10 relative overflow-hidden group hover:scale-[1.01] transition-transform">
-                        {['LIVE','HT','IN_PLAY'].includes(match.status) && (
-                            <div className="absolute top-3 right-3 bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1 shadow-lg">
-                                <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE
-                            </div>
+                    <div className="bg-[#0a1428] rounded-2xl p-4 shadow-xl border border-white/10 relative overflow-hidden group hover:scale-[1.01] transition-transform">
+                        
+                        {/* 🟢 RICH BACKGROUND LAYER */}
+                        {match.home_fanart || match.home_stadium ? (
+                            <>
+                                <img src={match.home_fanart || match.home_stadium} className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-overlay" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-[#0a1428] via-[#0a1428]/50 to-transparent"></div>
+                            </>
+                        ) : (
+                            <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-blue-900 opacity-80"></div>
                         )}
-                        {(match.livestream_url || match.audio_url) && (
-                            <div className="absolute top-3 left-3 bg-black/40 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1">
-                                 {match.livestream_url ? <Video size={8} /> : <Radio size={8} />}
-                                 {match.livestream_url ? 'WATCH' : 'AUDIO'}
-                            </div>
-                        )}
-                        <div className="flex justify-between items-center mt-6">
-                            <div className="flex flex-col items-center w-[30%]">
-                                {match.home_logo ? <img src={match.home_logo} className="w-10 h-10 object-contain mb-2 drop-shadow-md"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px]">H</div>}
-                                <span className="text-[10px] font-bold text-center leading-tight text-white line-clamp-1">{match.home_team}</span>
-                            </div>
-                            <div className="flex flex-col items-center w-[40%]">
-                                <div className="text-xl font-black tabular-nums tracking-widest bg-black/30 px-2 py-1 rounded-lg backdrop-blur-md border border-white/5 shadow-inner text-white whitespace-nowrap">
-                                    {match.status === 'SCHEDULED' || match.status === 'PRE' ? <span className="text-sm">VS</span> : `${match.home_score}-${match.away_score}`}
+
+                        <div className="relative z-10">
+                            {['LIVE','HT','IN_PLAY'].includes(match.status) && (
+                                <div className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1 shadow-lg">
+                                    <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE
                                 </div>
-                                <span className="text-[8px] font-medium text-blue-200 mt-1 uppercase tracking-wider text-center">
-                                    {match.status === 'SCHEDULED' || match.status === 'PRE' 
-                                        ? new Date(match.match_date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
-                                        : (match.status === 'HT' ? 'HT' : match.status)
-                                    }
-                                </span>
-                            </div>
-                            <div className="flex flex-col items-center w-[30%]">
-                                {match.away_logo ? <img src={match.away_logo} className="w-10 h-10 object-contain mb-2 drop-shadow-md"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px]">A</div>}
-                                <span className="text-[10px] font-bold text-center leading-tight text-white line-clamp-1">{match.away_team}</span>
+                            )}
+                            {(match.livestream_url || match.audio_url) && (
+                                <div className="absolute top-0 left-0 bg-black/40 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1">
+                                     {match.livestream_url ? <Video size={8} /> : <Radio size={8} />}
+                                     {match.livestream_url ? 'WATCH' : 'AUDIO'}
+                                </div>
+                            )}
+                            
+                            <div className="flex justify-between items-center mt-8">
+                                <div className="flex flex-col items-center w-[30%]">
+                                    {match.home_logo ? <img src={match.home_logo} className="w-12 h-12 object-contain mb-2 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px]">H</div>}
+                                    <span className="text-[10px] font-bold text-center leading-tight text-white line-clamp-1 drop-shadow-md">{match.home_team}</span>
+                                </div>
+                                <div className="flex flex-col items-center w-[40%]">
+                                    <div className="text-2xl font-black tabular-nums tracking-widest bg-black/40 px-3 py-1 rounded-xl backdrop-blur-md border border-white/10 shadow-inner text-white whitespace-nowrap">
+                                        {match.status === 'SCHEDULED' || match.status === 'PRE' ? <span className="text-sm">VS</span> : `${match.home_score}-${match.away_score}`}
+                                    </div>
+                                    <span className="text-[8px] font-medium text-blue-200 mt-1 uppercase tracking-wider text-center drop-shadow-md">
+                                        {match.status === 'SCHEDULED' || match.status === 'PRE' 
+                                            ? new Date(match.match_date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+                                            : (match.status === 'HT' ? 'HT' : match.status)
+                                        }
+                                    </span>
+                                </div>
+                                <div className="flex flex-col items-center w-[30%]">
+                                    {match.away_logo ? <img src={match.away_logo} className="w-12 h-12 object-contain mb-2 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px]">A</div>}
+                                    <span className="text-[10px] font-bold text-center leading-tight text-white line-clamp-1 drop-shadow-md">{match.away_team}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
