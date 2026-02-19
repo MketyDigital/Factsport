@@ -13,25 +13,44 @@ async function runLiveUpdate() {
 
   try {
       const now = Date.now();
+      // Look back 24h for missed games, forward 24h for today's games
       const twentyFourHoursAgo = new Date(now - (24 * 60 * 60 * 1000)).toISOString();
       const twentyFourHoursFuture = new Date(now + (24 * 60 * 60 * 1000)).toISOString();
 
-      // 🟢 THE SMART QUERY
-      // 1. Active Games: LIVE, HT, SCHEDULED (Standard)
-      // 2. 🧟 Zombie Games: LIVE/HT stuck from yesterday
-      // 3. 🧹 Enrichment: FT matches from last 24h that have NO events (Fixes your issue!)
+      // 🟢 1. FETCH EVERYTHING IN WINDOW (Simplified Query)
+      // We grab ALL matches from the last 24h. We will decide which ones need help in JS.
       const { data: dbMatches } = await supabase
         .from('matches')
         .select('*')
-        .or('status.eq.LIVE,status.eq.HT,status.eq.IN_PLAY,status.eq.SCHEDULED,status.eq.TIMED,status.eq.PRE,and(status.eq.FT,match_events.is.null)')
         .gt('match_date', twentyFourHoursAgo) 
         .lt('match_date', twentyFourHoursFuture);
 
       if (!dbMatches || dbMatches.length === 0) {
-          return NextResponse.json({ message: "No matches needing updates." });
+          return NextResponse.json({ message: "No matches found in window." });
       }
 
-      const activeLeagues = Array.from(new Set(dbMatches.map(m => m.league)));
+      // 🟢 2. SMART FILTERING IN JS
+      // We keep matches that are:
+      // A) Currently Active (LIVE, HT, etc.)
+      // B) Scheduled (PRE, TIMED)
+      // C) FINISHED but MISSING DATA (The fix for your problem)
+      const targetMatches = dbMatches.filter(m => {
+          const isActive = ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE'].includes(m.status);
+          const isFinished = ['FT', 'FINISHED', 'ABD', 'POST'].includes(m.status);
+          
+          // Check if events are missing (Null OR Empty Array)
+          const isMissingData = !m.match_events || (Array.isArray(m.match_events) && m.match_events.length === 0);
+
+          return isActive || (isFinished && isMissingData);
+      });
+
+      if (targetMatches.length === 0) {
+          return NextResponse.json({ message: "All matches are up to date." });
+      }
+
+      logs.push(`Found ${targetMatches.length} matches needing updates...`);
+
+      const activeLeagues = Array.from(new Set(targetMatches.map(m => m.league)));
 
       for (const leagueName of activeLeagues) {
         const espnCode = ESPN_LEAGUES[leagueName as string];
@@ -39,7 +58,7 @@ async function runLiveUpdate() {
 
         // Fetch Live Scoreboard
         const espnMatches = await fetchEspnLive(espnCode);
-        const leagueDbMatches = dbMatches.filter(m => m.league === leagueName);
+        const leagueDbMatches = targetMatches.filter(m => m.league === leagueName);
 
         for (const dbMatch of leagueDbMatches) {
              const espnGame = espnMatches.find((e: any) => {
@@ -49,7 +68,7 @@ async function runLiveUpdate() {
              });
 
              if (espnGame) {
-                 // Fetch Deep Details (Events, Stats, Lineups)
+                 // Always fetch details if we are targeting this match
                  const richData = await fetchEspnDetails(espnGame.espn_id);
                  
                  let newStatus = dbMatch.status;
@@ -57,7 +76,6 @@ async function runLiveUpdate() {
                  else if (espnGame.status === 'post') newStatus = 'FT'; 
                  else if (espnGame.clock === 'HT') newStatus = 'HT';
                  
-                 // 🟢 PREPARE UPDATE
                  const payload: any = {
                      status: newStatus,
                      home_score: espnGame.home_score,
@@ -66,7 +84,6 @@ async function runLiveUpdate() {
                      updated_at: new Date().toISOString()
                  };
 
-                 // Only update rich data if we found it
                  if (richData) {
                      payload.match_events = richData.events;
                      payload.stats = richData.stats;
@@ -76,9 +93,8 @@ async function runLiveUpdate() {
                  await supabase.from('matches').update(payload).eq('id', dbMatch.id);
                  
                  updates++;
-                 // Log nicely so you see what happened
-                 if (dbMatch.status === 'FT' && !dbMatch.match_events && richData) {
-                     logs.push(`✨ Enriched: ${dbMatch.home_team} (Added Stats/Events)`);
+                 if (['FT', 'FINISHED'].includes(newStatus)) {
+                     logs.push(`✨ Enriched: ${dbMatch.home_team}`);
                  } else {
                      logs.push(`✅ Synced: ${dbMatch.home_team} (${newStatus})`);
                  }
