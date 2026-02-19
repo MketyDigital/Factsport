@@ -7,17 +7,15 @@ import { NextResponse } from 'next/server';
 import { ESPN_LEAGUES, fetchEspnLive, fetchEspnDetails } from '@/app/lib/espn';
 
 // 🟢 1. ROBUST NORMALIZER
-// Removes accents, special chars, and common "noise" words
 const normalize = (name: string) => {
     return name.toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents (ø->o, é->e)
-        .replace(/[^a-z0-9 ]/g, '') // Remove everything except letters/numbers
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
+        .replace(/[^a-z0-9 ]/g, '') // Remove special chars
         .replace(/ fc| cf| fk| sc| united| city| real| inter| ac| milan| athletic| hotspur| albion| & hove| wanderers| town| county| palace/g, '') 
         .trim();
 };
 
 // 🟢 2. FUZZY MATCHER (Levenshtein Similarity)
-// Returns a score from 0 (0%) to 1 (100%)
 const similarity = (s1: string, s2: string) => {
     let longer = s1;
     let shorter = s2;
@@ -41,7 +39,8 @@ const similarity = (s1: string, s2: string) => {
         }
         if (i > 0) costs[longer.length] = lastValue;
     }
-    return (longerLength - costs[longer.length]) / parseFloat(longerLength);
+    // 🟢 FIX: Removed parseFloat() because longerLength is already a number
+    return (longerLength - costs[longer.length]) / longerLength;
 };
 
 async function runLiveUpdate() {
@@ -100,8 +99,6 @@ async function runLiveUpdate() {
                  if (dbName.includes(espnName) || espnName.includes(dbName)) return true;
                  
                  // B. Fuzzy Match (Smart)
-                 // If names are > 60% similar, it's a match.
-                 // We can be generous (60%) because we already matched LEAGUE and TIME.
                  const score = similarity(dbName, espnName);
                  if (score > 0.6) return true;
 
