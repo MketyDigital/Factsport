@@ -6,16 +6,18 @@ import { createClient } from '@/app/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { ESPN_LEAGUES, fetchEspnLive, fetchEspnDetails } from '@/app/lib/espn';
 
-// 🟢 1. ROBUST NORMALIZER
+// 🟢 1. ROBUST NORMALIZER (Improved Regex)
 const normalize = (name: string) => {
     return name.toLowerCase()
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
         .replace(/[^a-z0-9 ]/g, '') // Remove special chars
-        .replace(/ fc| cf| fk| sc| united| city| real| inter| ac| milan| athletic| hotspur| albion| & hove| wanderers| town| county| palace/g, '') 
+        // Remove common words (now handles start-of-string too)
+        .replace(/\b(fc|cf|fk|sc|united|city|real|inter|ac|milan|athletic|hotspur|albion|hove|wanderers|town|county|palace)\b/g, '') 
+        .replace(/\s+/g, ' ') // Collapse multiple spaces
         .trim();
 };
 
-// 🟢 2. FUZZY MATCHER (Levenshtein Similarity)
+// 🟢 2. FUZZY MATCHER (Levenshtein)
 const similarity = (s1: string, s2: string) => {
     let longer = s1;
     let shorter = s2;
@@ -39,7 +41,6 @@ const similarity = (s1: string, s2: string) => {
         }
         if (i > 0) costs[longer.length] = lastValue;
     }
-    // 🟢 FIX: Removed parseFloat() because longerLength is already a number
     return (longerLength - costs[longer.length]) / longerLength;
 };
 
@@ -92,13 +93,17 @@ async function runLiveUpdate() {
                  const espnTime = e.startTime;
                  if (Math.abs(dbTime - espnTime) > (4 * 60 * 60 * 1000)) return false;
 
-                 // 🔒 LOCK 2: FUZZY NAME MATCH
+                 // 🔒 LOCK 2: SMART NAME MATCH
                  const espnName = normalize(e.home_team);
                  
-                 // A. Exact Match (Fast)
+                 // A. Direct Includes (The "Milan" Fix)
                  if (dbName.includes(espnName) || espnName.includes(dbName)) return true;
                  
-                 // B. Fuzzy Match (Smart)
+                 // B. Starts With (The "Qarabag" Fix)
+                 // If "Qarabag" is the first word of "Qarabag Agdam", it matches.
+                 if (dbName.startsWith(espnName) || espnName.startsWith(dbName)) return true;
+                 
+                 // C. Fuzzy Match (The Final Net)
                  const score = similarity(dbName, espnName);
                  if (score > 0.6) return true;
 
@@ -129,9 +134,9 @@ async function runLiveUpdate() {
 
                  await supabase.from('matches').update(payload).eq('id', dbMatch.id);
                  updates++;
-                 logs.push(`✅ Synced: ${dbMatch.home_team} (${Math.round(similarity(normalize(dbMatch.home_team), normalize(espnGame.home_team)) * 100)}% Match)`);
+                 logs.push(`✅ Synced: ${dbMatch.home_team}`);
              } else {
-                 logs.push(`⚠️ Missed: ${dbMatch.home_team}`);
+                 logs.push(`⚠️ Missed: ${dbMatch.home_team} (DB Normalized: "${dbName}")`);
              }
         }
       }
