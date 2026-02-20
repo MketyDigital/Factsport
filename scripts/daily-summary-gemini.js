@@ -1,4 +1,3 @@
-// scripts/daily-summary-gemini.js
 const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -6,9 +5,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const GEMINI_KEY = process.env.GEMINI_API_KEY; 
-const SPORTSDB_KEY = '3'; // Public test key
 
-// Fail gracefully if keys are missing
 if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) { 
     console.error("❌ Missing Keys. Check GitHub Secrets."); 
     process.exit(1); 
@@ -17,35 +14,16 @@ if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) {
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
-// You can also use "gemini-2.0-flash" if you prefer
-
-// 🖼️ Helper: Fetch a High-Res "Fanart" Image
-async function getHeroImage(teamName) {
-    try {
-        console.log(`   🖼️ Fetching hero image for: ${teamName}`);
-        const url = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}/searchteams.php?t=${encodeURIComponent(teamName)}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        
-        if (data.teams && data.teams[0]) {
-            return data.teams[0].strTeamFanart1 || data.teams[0].strStadiumThumb || data.teams[0].strTeamBadge;
-        }
-    } catch (e) {
-        console.error("Image Fetch Error:", e.message);
-    }
-    return null; 
-}
 
 async function generateDailySummaries() {
     console.log("🌙 Starting Daily Matchday Analysis...");
 
     const today = new Date();
-    // Set strictly to today's range
     const startOfDay = new Date(today.setHours(0,0,0,0)).toISOString();
     const endOfDay = new Date(today.setHours(23,59,59,999)).toISOString();
     const dateSlug = today.toISOString().split('T')[0];
 
-    // 1. Fetch Finished Matches
+    // 1. Fetch Finished Matches from YOUR reliable DB
     const { data: matches } = await supabase
         .from('matches')
         .select('*')
@@ -70,7 +48,6 @@ async function generateDailySummaries() {
 
         const reportSlug = `${leagueName.toLowerCase().replace(/\s+/g, '-')}-roundup-${dateSlug}`;
         
-        // Prevent Duplicates
         const { data: existing } = await supabase.from('news').select('id').eq('slug', reportSlug).single();
         if (existing) {
             console.log(`   ⏩ Already reported: ${leagueName}`);
@@ -79,10 +56,8 @@ async function generateDailySummaries() {
 
         console.log(`   ✍️ Writing Summary for ${leagueName}...`);
 
-        // 3. Find "Main Event" for Image
+        // 3. Find "Main Event" to use their logos
         const mainMatch = leagueMatches.sort((a, b) => (b.home_score + b.away_score) - (a.home_score + a.away_score))[0];
-        let heroImage = await getHeroImage(mainMatch.home_team);
-        if (!heroImage) heroImage = mainMatch.home_logo;
 
         // 4. Prepare AI Prompt
         const matchSummaries = leagueMatches.map(m => {
@@ -104,7 +79,7 @@ async function generateDailySummaries() {
             - Headline: Catchy (e.g., "Arsenal Stun City").
             - Content: Summary of the action, key games, and table implications.
             - Length: 300 words.
-            - Output: Plain text only.
+            - Output: Plain text only. Do not use asterisks for bolding.
         `;
 
         try {
@@ -113,30 +88,29 @@ async function generateDailySummaries() {
             const text = response.text();
 
             const lines = text.split('\n').filter(line => line.trim() !== '');
-            const headline = lines[0].replace(/^#+\s*/, '').replace(/"/g, ''); 
+            const headline = lines[0].replace(/^#+\s*/, '').replace(/[\*"]/g, ''); 
             const body = lines.slice(1).join('\n').trim();
 
-            // 🟢 LOGIC: Premier League or Champions League = Headline Slider
             const isBigLeague = ['Premier League', 'Champions League', 'La Liga'].includes(leagueName);
 
-            const { error } = await supabase.from('news').insert({
+            // 🟢 EXACT MATCH TO ADMIN PAGE - Using YOUR reliable logos
+            const { error } = await supabase.from('news').insert([{
                 title: headline,
                 slug: reportSlug,
-                body: body, // Matches your Admin Panel
-                image_url: heroImage, 
-                source_name: 'FactSport Analysis',
-                published_at: new Date().toISOString(),
-                
-                // 🟢 AUTO TICKER & HEADLINE SETTINGS
-                is_breaking: true,         // ALL summaries go to Ticker
-                is_headline: isBigLeague,  // Only Big Leagues go to Slider
-                
+                body: body,
+                image_url: null, // Let the frontend use the VS background!
                 team_1_logo: mainMatch.home_logo,
-                team_2_logo: mainMatch.away_logo
-            });
+                team_2_logo: mainMatch.away_logo,
+                is_breaking: true,         
+                is_headline: isBigLeague   
+            }]);
 
-            if (error) console.error("DB Error:", error.message);
-            else console.log(`   ✅ Published: ${headline}`);
+            if (error) {
+                console.error(`   ❌ Supabase DB Error:`, error.message);
+                console.error(`   Details:`, error.details || error.hint);
+            } else {
+                console.log(`   ✅ Published: ${headline}`);
+            }
 
         } catch (e) {
             console.error(`   🔥 Gemini Error: ${e.message}`);
