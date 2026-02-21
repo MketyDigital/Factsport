@@ -22,7 +22,7 @@ export default function Footer() {
             </div>
 
             <p className="text-xs leading-relaxed max-w-xs text-slate-500">
-                The ultimate sports prediction platform. Watch highlights, get expert betting tips, and compete for monthly cash prizes.
+                The Ultimate Platform for Live Football, Sport News, live scores, analysis and breaking news. Join VIP to win monthly prizes in Our Predict & Win Game.
             </p>
 
             {/* Social Media Buttons */}
