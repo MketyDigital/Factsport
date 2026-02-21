@@ -49,7 +49,7 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
             <img 
                 src={leagueData.bg} 
                 alt="Stadium Atmosphere" 
-                className="absolute inset-0 w-full h-full object-cover opacity-65" 
+                className="absolute inset-0 w-full h-full object-cover opacity-80" 
             />
         </div>
 
