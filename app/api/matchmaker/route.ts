@@ -148,12 +148,19 @@ export async function GET(request: Request) {
              });
 
              if (espnGame) {
-                 syncTasks.push(
-    supabase.from('matches')
-      .update({ espn_id: String(espnGame.espn_id) })
-      .eq('id', dbMatch.id)
-      .select() // This forces the query to execute and return a Promise
-);
+                 // We wrap the update in an async arrow function to guarantee it returns a Promise
+                 const updateTask = (async () => {
+                    const { error } = await supabase
+                        .from('matches')
+                        .update({ espn_id: String(espnGame.espn_id) })
+                        .eq('id', dbMatch.id);
+                    
+                    if (error) throw error;
+                    return true;
+                 })();
+
+                 syncTasks.push(updateTask);
+                 
                  mappedCount++;
                  logs.push(`🔗 MAPPED: ${dbMatch.home_team} vs ${dbMatch.away_team}`);
              }
