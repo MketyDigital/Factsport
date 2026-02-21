@@ -23,7 +23,7 @@ async function generateDailyPreview() {
     const endOfDay = new Date(today.setHours(23,59,59,999)).toISOString();
     const dateSlug = today.toISOString().split('T')[0];
 
-    // 1. Fetch Scheduled Matches for TODAY from YOUR reliable DB
+    // 1. Fetch Scheduled Matches
     const { data: matches } = await supabase
         .from('matches')
         .select('*')
@@ -48,17 +48,12 @@ async function generateDailyPreview() {
     });
 
     let briefingData = "";
-    let mainEvent = matches[0]; 
 
     for (const [league, games] of Object.entries(leagues)) {
         briefingData += `\n${league}:\n`;
         games.forEach(g => {
             const time = new Date(g.match_date).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
             briefingData += `- ${g.home_team} vs ${g.away_team} at ${time}\n`;
-            // Find the biggest game to use as the cover image
-            if (['Arsenal','Chelsea','Liverpool','Man City','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG'].some(t => g.home_team.includes(t) || g.away_team.includes(t))) {
-                mainEvent = g;
-            }
         });
     }
 
@@ -70,7 +65,7 @@ async function generateDailyPreview() {
         ${briefingData}
 
         Guidelines:
-        - Headline: Hype up the biggest game.
+        - Headline: Hype up the biggest games. Keep it under 10 words.
         - Intro: "Welcome to today's matchday..."
         - Must Watch: Pick 1-2 key games and preview them.
         - Tone: Exciting, anticipatory.
@@ -83,17 +78,36 @@ async function generateDailyPreview() {
         const text = (await result.response).text();
 
         const lines = text.split('\n').filter(line => line.trim() !== '');
-        const headline = lines[0].replace(/^#+\s*/, '').replace(/[\*"]/g, ''); // Removes ##, **, and ""
+        const headline = lines[0].replace(/^#+\s*/, '').replace(/[\*"]/g, ''); 
         const body = lines.slice(1).join('\n').trim();
 
-        // 🟢 EXACT MATCH TO ADMIN PAGE - Using YOUR reliable logos
+        // 🟢 FIND THE TOP 4 TEAMS OF THE DAY FOR THE COLLAGE
+        let topLogos = [];
+        matches.forEach(g => {
+            // Prioritize giant teams first
+            if (['Arsenal','Chelsea','Liverpool','Man City','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG'].some(t => g.home_team.includes(t) || g.away_team.includes(t))) {
+                if (topLogos.length < 4 && !topLogos.includes(g.home_logo)) topLogos.push(g.home_logo);
+                if (topLogos.length < 4 && !topLogos.includes(g.away_logo)) topLogos.push(g.away_logo);
+            }
+        });
+        
+        // Fill the rest of the slots if we didn't find 4 giants
+        matches.forEach(g => {
+            if (topLogos.length < 4 && !topLogos.includes(g.home_logo)) topLogos.push(g.home_logo);
+            if (topLogos.length < 4 && !topLogos.includes(g.away_logo)) topLogos.push(g.away_logo);
+        });
+
+        // 🟢 GENERATE THE DYNAMIC COVER IMAGE URL
+        const logosParam = encodeURIComponent(topLogos.join(','));
+        const dynamicCoverImage = `/api/og/daily?title=Matchday+Preview&logos=${logosParam}&type=preview`;
+
         const { error } = await supabase.from('news').insert([{
             title: headline,
             slug: reportSlug,
             body: body,
-            image_url: null, // Let the frontend use the VS background we built!
-            team_1_logo: mainEvent.home_logo,
-            team_2_logo: mainEvent.away_logo,
+            image_url: dynamicCoverImage, 
+            team_1_logo: null, 
+            team_2_logo: null,
             is_breaking: false, 
             is_headline: true 
         }]);
