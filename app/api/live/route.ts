@@ -28,6 +28,12 @@ const getCanonicalName = (rawName: string) => {
         'wolverhampton': 'wolverhampton wanderers',
         'nottm forest': 'nottingham forest',
         'sheff utd': 'sheffield united',
+        'brighton hove albion': 'brighton',
+        'brighton hove': 'brighton',
+        'west ham united': 'west ham',
+        'newcastle united': 'newcastle',
+        'leicester city': 'leicester',
+        
         // La Liga
         'atleti': 'atletico madrid',
         'sociedad': 'real sociedad',
@@ -37,6 +43,10 @@ const getCanonicalName = (rawName: string) => {
         'osasuna': 'ca osasuna',
         'vallecano': 'rayo vallecano',
         'celta': 'celta vigo',
+        'espanyol barcelona': 'espanyol',
+        'real valladolid': 'valladolid',
+        'deportivo alaves': 'alaves',
+        
         // Bundesliga
         '1 koln': 'fc cologne',
         'koln': 'fc cologne',
@@ -55,6 +65,11 @@ const getCanonicalName = (rawName: string) => {
         'hoff': 'tsg hoffenheim',
         'hoffenheim': 'tsg hoffenheim',
         'union berlin': 'fc union berlin',
+        'werder bremen': 'sv werder bremen',
+        'freiburg': 'sc freiburg',
+        'wolfsburg': 'vfl wolfsburg',
+        'bochum': 'vfl bochum',
+        
         // Serie A
         'juve': 'juventus',
         'inter': 'inter milan',
@@ -64,10 +79,16 @@ const getCanonicalName = (rawName: string) => {
         'lazio': 'ss lazio',
         'napoli': 'ssc napoli',
         'hellas verona': 'verona',
-        'genoa': 'genoa cfc'
+        'genoa': 'genoa cfc',    // 🟢 FIXED COMMA
         'lecce': 'us lecce',
-        'torino': 'torino fc'
+        'torino': 'torino fc',   // 🟢 FIXED COMMA
         'cagliari': 'cagliari calcio',
+        'empoli fc': 'empoli',
+        'bologna fc': 'bologna',
+        'udinese calcio': 'udinese',
+        'parma calcio': 'parma',
+        'venezia fc': 'venezia',
+        
         // Ligue 1
         'psg': 'paris saint germain',
         'paris sg': 'paris saint germain',
@@ -75,6 +96,11 @@ const getCanonicalName = (rawName: string) => {
         'olympique de marseille': 'marseille',
         'ol': 'lyon',
         'olympique lyonnais': 'lyon',
+        'as monaco': 'monaco',
+        'stade rennais': 'rennes',
+        'rc lens': 'lens',
+        'stade brestois': 'brest',
+        
         // Internationals / Europe
         'sporting': 'sporting cp',
         'sporting lisbon': 'sporting cp',
