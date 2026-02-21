@@ -81,33 +81,18 @@ async function generateDailyPreview() {
         const headline = lines[0].replace(/^#+\s*/, '').replace(/[\*"]/g, ''); 
         const body = lines.slice(1).join('\n').trim();
 
-        // 🟢 FIND THE TOP 4 TEAMS OF THE DAY FOR THE COLLAGE
-        let topLogos = [];
-        matches.forEach(g => {
-            // Prioritize giant teams first
-            if (['Arsenal','Chelsea','Liverpool','Man City','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG'].some(t => g.home_team.includes(t) || g.away_team.includes(t))) {
-                if (topLogos.length < 4 && !topLogos.includes(g.home_logo)) topLogos.push(g.home_logo);
-                if (topLogos.length < 4 && !topLogos.includes(g.away_logo)) topLogos.push(g.away_logo);
-            }
-        });
-        
-        // Fill the rest of the slots if we didn't find 4 giants
-        matches.forEach(g => {
-            if (topLogos.length < 4 && !topLogos.includes(g.home_logo)) topLogos.push(g.home_logo);
-            if (topLogos.length < 4 && !topLogos.includes(g.away_logo)) topLogos.push(g.away_logo);
-        });
+        // 🟢 FIND THE BIGGEST MATCH TO FEATURE ON THE COVER
+        const giants = ['Arsenal','Chelsea','Liverpool','Man City','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG'];
+        let featureMatch = matches.find(g => giants.some(t => g.home_team.includes(t) || g.away_team.includes(t))) || matches[0];
 
-        // 🟢 GENERATE THE DYNAMIC COVER IMAGE URL
-        const logosParam = encodeURIComponent(topLogos.join(','));
-        const dynamicCoverImage = `/api/og/daily?title=Matchday+Preview&logos=${logosParam}&type=preview`;
-
+        // 🟢 INSERT NATIVE LOGOS (Pass null for image_url to trigger NewsArtwork VS Mode)
         const { error } = await supabase.from('news').insert([{
             title: headline,
             slug: reportSlug,
             body: body,
-            image_url: dynamicCoverImage, 
-            team_1_logo: null, 
-            team_2_logo: null,
+            image_url: null, 
+            team_1_logo: featureMatch ? featureMatch.home_logo : null, 
+            team_2_logo: featureMatch ? featureMatch.away_logo : null,
             is_breaking: false, 
             is_headline: true 
         }]);
