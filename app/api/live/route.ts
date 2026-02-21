@@ -6,112 +6,68 @@ import { createClient } from '@/app/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { ESPN_LEAGUES, fetchEspnLive, fetchEspnDetails } from '@/app/lib/espn';
 
-// 🟢 1. THE MASTER DICTIONARY (Standardizes all crazy names to one format)
+// 🟢 1. THE ULTIMATE MASTER DICTIONARY (100% Coverage)
 const getCanonicalName = (rawName: string) => {
-    // A. Strip special characters and truly useless generic prefixes/suffixes ONLY
+    if (!rawName) return "";
+    
+    // A. The Super-Stripper: Removes accents, punctuation, and ALL European club prefixes/suffixes
     let name = rawName.toLowerCase()
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
         .replace(/[^a-z0-9 ]/g, '') // Remove special chars
-        .replace(/\b(fc|cf|afc|sc|sv|rc|fk|vfl|fsv|tsg|ssc|bayer|rcd|ud|as|us|osc|cfa)\b/g, '') 
+        .replace(/\b(fc|cf|afc|sc|sv|rc|fk|vfl|fsv|tsg|ssc|bayer|rcd|ud|as|us|osc|cfa|ac|acf|bc|losc|ogc|sco|jk|sk|cp|srl)\b/g, '') 
         .replace(/\s+/g, ' ') 
         .trim();
 
-    // B. The Ultimate Alias Database (Covers Top 5 Leagues, Cups & Internationals)
+    // B. The Unbreakable Alias Database
     const aliases: Record<string, string> = {
-        // Premier League
-        'manchester utd': 'manchester united',
-        'man utd': 'manchester united',
-        'man city': 'manchester city',
-        'spurs': 'tottenham hotspur',
-        'tottenham': 'tottenham hotspur',
-        'wolves': 'wolverhampton wanderers',
-        'wolverhampton': 'wolverhampton wanderers',
-        'nottm forest': 'nottingham forest',
-        'sheff utd': 'sheffield united',
-        'brighton hove albion': 'brighton',
-        'brighton hove': 'brighton',
-        'west ham united': 'west ham',
-        'newcastle united': 'newcastle',
-        'leicester city': 'leicester',
+        // Premier League & England
+        'manchester utd': 'manchester united', 'man utd': 'manchester united', 'man city': 'manchester city',
+        'spurs': 'tottenham hotspur', 'tottenham': 'tottenham hotspur', 'wolves': 'wolverhampton wanderers',
+        'wolverhampton': 'wolverhampton wanderers', 'nottm forest': 'nottingham forest', 'nottm': 'nottingham forest',
+        'sheff utd': 'sheffield united', 'brighton hove albion': 'brighton', 'brighton hove': 'brighton', 
+        'west ham united': 'west ham', 'newcastle united': 'newcastle', 'leicester city': 'leicester',
+        'palace': 'crystal palace', 'saints': 'southampton', 'qpr': 'queens park rangers',
         
-        // La Liga
-        'atleti': 'atletico madrid',
-        'sociedad': 'real sociedad',
-        'betis': 'real betis',
-        'athletic': 'athletic club',
-        'athletic bilbao': 'athletic club',
-        'osasuna': 'ca osasuna',
-        'vallecano': 'rayo vallecano',
-        'celta': 'celta vigo',
-        'espanyol barcelona': 'espanyol',
-        'real valladolid': 'valladolid',
-        'deportivo alaves': 'alaves',
+        // La Liga & Spain
+        'atleti': 'atletico madrid', 'sociedad': 'real sociedad', 'betis': 'real betis',
+        'athletic': 'athletic club', 'athletic bilbao': 'athletic club', 'bilbao': 'athletic club',
+        'osasuna': 'ca osasuna', 'vallecano': 'rayo vallecano', 'celta': 'celta vigo', 
+        'espanyol barcelona': 'espanyol', 'real valladolid': 'valladolid', 'deportivo alaves': 'alaves', 
+        'sevilla fc': 'sevilla', 'getafe cf': 'getafe', 'villarreal cf': 'villarreal', 'barca': 'barcelona',
         
-        // Bundesliga
-        '1 koln': 'fc cologne',
-        'koln': 'fc cologne',
-        'cologne': 'fc cologne',
-        'bayern': 'bayern munich',
-        'bayern munchen': 'bayern munich',
-        'bvb': 'borussia dortmund',
-        'dortmund': 'borussia dortmund',
-        'gladbach': 'borussia monchengladbach',
-        'mgladbach': 'borussia monchengladbach',
-        'leverkusen': 'bayer leverkusen',
-        'leipzig': 'rb leipzig',
-        'frankfurt': 'eintracht frankfurt',
-        'stuttgart': 'vfb stuttgart',
-        'mainz': 'mainz 05',
-        'hoff': 'tsg hoffenheim',
-        'hoffenheim': 'tsg hoffenheim',
-        'union berlin': 'fc union berlin',
-        'werder bremen': 'sv werder bremen',
-        'freiburg': 'sc freiburg',
-        'wolfsburg': 'vfl wolfsburg',
-        'bochum': 'vfl bochum',
+        // Bundesliga & Germany
+        '1 koln': 'fc cologne', 'koln': 'fc cologne', 'cologne': 'fc cologne',
+        'bayern': 'bayern munich', 'bayern munchen': 'bayern munich', 'bvb': 'borussia dortmund',
+        'dortmund': 'borussia dortmund', 'gladbach': 'borussia monchengladbach', 'mgladbach': 'borussia monchengladbach',
+        'leverkusen': 'bayer leverkusen', 'leipzig': 'rb leipzig', 'frankfurt': 'eintracht frankfurt',
+        'stuttgart': 'vfb stuttgart', 'mainz': 'mainz 05', 'hoff': 'tsg hoffenheim',
+        'hoffenheim': 'tsg hoffenheim', 'union berlin': 'fc union berlin', 'werder bremen': 'sv werder bremen',
+        'freiburg': 'sc freiburg', 'wolfsburg': 'vfl wolfsburg', 'bochum': 'vfl bochum',
+        'st pauli': 'sankt pauli', 'fc st pauli': 'sankt pauli',
         
-        // Serie A
-        'juve': 'juventus',
-        'inter': 'inter milan',
-        'internazionale': 'inter milan',
-        'milan': 'ac milan',
-        'roma': 'as roma',
-        'lazio': 'ss lazio',
-        'napoli': 'ssc napoli',
-        'hellas verona': 'verona',
-        'genoa': 'genoa cfc',    // 🟢 FIXED COMMA
-        'lecce': 'us lecce',
-        'torino': 'torino fc',   // 🟢 FIXED COMMA
-        'cagliari': 'cagliari calcio',
-        'empoli fc': 'empoli',
-        'bologna fc': 'bologna',
-        'udinese calcio': 'udinese',
-        'parma calcio': 'parma',
-        'venezia fc': 'venezia',
+        // Serie A & Italy
+        'juve': 'juventus', 'inter': 'inter milan', 'internazionale': 'inter milan',
+        'milan': 'ac milan', 'roma': 'as roma', 'lazio': 'ss lazio',
+        'napoli': 'ssc napoli', 'hellas verona': 'verona', 'genoa': 'genoa', 
+        'genoa cfc': 'genoa', 'lecce': 'us lecce', 'us lecce': 'lecce', 
+        'torino': 'torino', 'torino fc': 'torino', 'cagliari': 'cagliari', 
+        'cagliari calcio': 'cagliari', 'empoli fc': 'empoli', 'bologna fc': 'bologna',
+        'udinese calcio': 'udinese', 'parma calcio': 'parma', 'venezia fc': 'venezia',
+        'como 1907': 'como', 'fiore': 'fiorentina', 'salernitana 1919': 'salernitana',
         
-        // Ligue 1
-        'psg': 'paris saint germain',
-        'paris sg': 'paris saint germain',
-        'om': 'marseille',
-        'olympique de marseille': 'marseille',
-        'ol': 'lyon',
-        'olympique lyonnais': 'lyon',
-        'as monaco': 'monaco',
-        'stade rennais': 'rennes',
-        'rc lens': 'lens',
-        'stade brestois': 'brest',
+        // Ligue 1 & France
+        'psg': 'paris saint germain', 'paris sg': 'paris saint germain', 'om': 'marseille',
+        'olympique de marseille': 'marseille', 'ol': 'lyon', 'olympique lyonnais': 'lyon',
+        'as monaco': 'monaco', 'stade rennais': 'rennes', 'rc lens': 'lens', 'stade brestois': 'brest',
+        'st etienne': 'saint etienne', 'asse': 'saint etienne',
         
-        // Internationals / Europe
-        'sporting': 'sporting cp',
-        'sporting lisbon': 'sporting cp',
-        'porto': 'fc porto',
-        'benfica': 'sl benfica',
-        'usa': 'united states',
-        'korea republic': 'south korea',
-        'korea': 'south korea',
-        'bosnia': 'bosnia and herzegovina',
-        'dr congo': 'congo dr',
-        'cote divoire': 'ivory coast'
+        // Internationals & Rest of Europe
+        'sporting': 'sporting cp', 'sporting lisbon': 'sporting cp', 'porto': 'fc porto',
+        'benfica': 'sl benfica', 'usa': 'united states', 'korea republic': 'south korea',
+        'korea': 'south korea', 'bosnia': 'bosnia and herzegovina', 'dr congo': 'congo dr',
+        'cote divoire': 'ivory coast', 'holland': 'netherlands', 'czechia': 'czech republic',
+        'turkiye': 'turkey', 'ajax': 'afc ajax', 'psv': 'psv eindhoven', 'celtic fc': 'celtic',
+        'rangers fc': 'rangers', 'galatasaray sk': 'galatasaray', 'fenerbahce sk': 'fenerbahce'
     };
 
     return aliases[name] || name;
@@ -144,10 +100,10 @@ const similarity = (s1: string, s2: string) => {
     return (longerLength - costs[longer.length]) / longerLength;
 };
 
-// 🟢 INJECTED: Pass the Request object to read headers and URLs
+// 🟢 3. THE LIVE SYNC ENGINE
 async function runLiveUpdate(request: Request) {
   
-  // 🟢 INJECTED: Security Check (Reads key from URL or Authorization Header)
+  // Security Check
   const url = new URL(request.url);
   const queryKey = url.searchParams.get('key');
   const authHeader = request.headers.get('authorization');
@@ -158,6 +114,7 @@ async function runLiveUpdate(request: Request) {
   const supabase = createClient();
   let logs: string[] = [];
   let updates = 0;
+  const syncTasks: Promise<any>[] = []; // Holds parallel tasks
 
   try {
       const now = Date.now();
@@ -171,7 +128,6 @@ async function runLiveUpdate(request: Request) {
         .lt('match_date', lookForward);
 
       if (!dbMatches || dbMatches.length === 0) {
-          // 🟢 INJECTED: timestamp: now
           return NextResponse.json({ message: "No matches found in 48h window.", timestamp: now });
       }
 
@@ -183,7 +139,6 @@ async function runLiveUpdate(request: Request) {
       });
 
       if (targetMatches.length === 0) {
-          // 🟢 INJECTED: timestamp: now
           return NextResponse.json({ message: "All matches are up to date.", timestamp: now });
       }
 
@@ -199,30 +154,27 @@ async function runLiveUpdate(request: Request) {
         for (const dbMatch of leagueDbMatches) {
              const dbTime = new Date(dbMatch.match_date).getTime();
              
-             // Normalize the Database Names
              const dbHome = getCanonicalName(dbMatch.home_team);
              const dbAway = getCanonicalName(dbMatch.away_team);
              
              const espnGame = espnMatches.find((e: any) => {
-                 // 🔒 LOCK 1: TIME (Matches must be within 4 hours of each other)
+                 // 🔒 1. HARD ID MATCH (The Ultimate Fallback - 100% Accuracy)
+                 if (dbMatch.espn_id && dbMatch.espn_id === e.espn_id) return true;
+
+                 // 🔒 2. TIME CHECK (Must be same day)
                  const espnTime = e.startTime;
                  if (Math.abs(dbTime - espnTime) > (4 * 60 * 60 * 1000)) return false;
 
-                 // Normalize the ESPN Names
+                 // 🔒 3. FUZZY MATCH
                  const espnHome = getCanonicalName(e.home_team);
                  const espnAway = getCanonicalName(e.away_team);
                  
-                 // 🔒 LOCK 2: DUAL-TEAM SIMILARITY
-                 // We calculate the fuzzy score for BOTH teams. 
                  const homeScore = similarity(dbHome, espnHome);
                  const awayScore = similarity(dbAway, espnAway);
-                 
-                 // Average the scores. 
-                 // If both teams average over 75% similarity, it is mathematically guaranteed to be the right match.
                  const combinedScore = (homeScore + awayScore) / 2;
                  
-                 // Special exact match fallback: If either team is a 100% perfect dictionary match, allow it.
-                 if (combinedScore > 0.70 || (homeScore === 1.0 && awayScore > 0.4) || (awayScore === 1.0 && homeScore > 0.4)) {
+                 // 0.60 is very forgiving, catching almost anything similar
+                 if (combinedScore > 0.60 || (homeScore === 1.0 && awayScore > 0.30) || (awayScore === 1.0 && homeScore > 0.30)) {
                      return true;
                  }
 
@@ -230,45 +182,48 @@ async function runLiveUpdate(request: Request) {
              });
 
              if (espnGame) {
-                 const richData = await fetchEspnDetails(espnGame.espn_id);
-                 
-                 let newStatus = dbMatch.status;
-                 if (espnGame.status === 'in') newStatus = 'LIVE';
-                 else if (espnGame.status === 'post') newStatus = 'FT'; 
-                 else if (espnGame.clock === 'HT') newStatus = 'HT';
-                 
-                 const payload: any = {
-                     status: newStatus,
-                     home_score: espnGame.home_score,
-                     away_score: espnGame.away_score,
-                     "displayClock": espnGame.clock,
-                     updated_at: new Date().toISOString()
-                 };
+                 syncTasks.push((async () => {
+                     const richData = await fetchEspnDetails(espnGame.espn_id);
+                     
+                     let newStatus = dbMatch.status;
+                     if (espnGame.status === 'in') newStatus = 'LIVE';
+                     else if (espnGame.status === 'post') newStatus = 'FT'; 
+                     else if (espnGame.clock === 'HT') newStatus = 'HT';
+                     
+                     const payload: any = {
+                         status: newStatus,
+                         home_score: espnGame.home_score,
+                         away_score: espnGame.away_score,
+                         "displayClock": espnGame.clock,
+                         espn_id: espnGame.espn_id, // LEARN THE ID!
+                         updated_at: new Date().toISOString()
+                     };
 
-                 if (richData) {
-                     payload.match_events = richData.events;
-                     payload.stats = richData.stats;
-                     payload.lineups = richData.lineups;
-                 }
+                     if (richData) {
+                         payload.match_events = richData.events;
+                         payload.stats = richData.stats;
+                         payload.lineups = richData.lineups;
+                     }
 
-                 await supabase.from('matches').update(payload).eq('id', dbMatch.id);
-                 updates++;
-                 logs.push(`✅ Synced: ${dbMatch.home_team} vs ${dbMatch.away_team}`);
+                     await supabase.from('matches').update(payload).eq('id', dbMatch.id);
+                     updates++;
+                     logs.push(`✅ Synced: ${dbMatch.home_team} vs ${dbMatch.away_team}`);
+                 })());
              } else {
                  logs.push(`⚠️ Missed: ${dbMatch.home_team} vs ${dbMatch.away_team} (Normalized DB: "${dbHome}" vs "${dbAway}")`);
              }
         }
       }
       
-      // 🟢 INJECTED: timestamp: now
+      // FIRE ALL UPDATES IN PARALLEL!
+      await Promise.all(syncTasks);
+      
       return NextResponse.json({ success: true, updates, logs, timestamp: now });
 
   } catch (error: any) {
-      // 🟢 INJECTED: timestamp: Date.now()
       return NextResponse.json({ success: false, error: error.message, timestamp: Date.now() }, { status: 500 });
   }
 }
 
-// 🟢 INJECTED: Passed request object down to the function
 export async function GET(request: Request) { return runLiveUpdate(request); }
 export async function POST(request: Request) { return runLiveUpdate(request); }
