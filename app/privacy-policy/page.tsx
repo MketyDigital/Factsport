@@ -26,7 +26,7 @@ export default function PrivacyPage() {
             <section>
                 <h3 className="font-bold text-xl text-slate-900 mb-3 flex items-center gap-2"><Eye size={20} /> 1. Information We Collect</h3>
                 <ul className="list-disc pl-5 space-y-2">
-                    <li><strong>Account Information:</strong> When you register via Google, we collect your email address, full name, and profile picture.</li>
+                    <li><strong>Account Information:</strong> When you register by providing your details or via Google, we collect your email address, full name, and profile picture.</li>
                     <li><strong>Game Data:</strong> We record your predictions, points earned, and win/loss history to maintain the global leaderboard.</li>
                     <li><strong>Technical Data:</strong> We may collect IP addresses and browser types for security purposes (e.g., to prevent duplicate voting).</li>
                 </ul>
@@ -46,7 +46,7 @@ export default function PrivacyPage() {
                 <h3 className="font-bold text-xl text-slate-900 mb-3">3. Third-Party Services</h3>
                 <p>We rely on trusted third-party providers:</p>
                 <ul className="list-disc pl-5 space-y-2">
-                    <li><strong>Supabase:</strong> Used for secure database storage.</li>
+                    <li><strong>Third-Party Database:</strong> Used for secure database storage.</li>
                     <li><strong>Google Auth:</strong> Used for secure sign-in.</li>
                     <li><strong>YouTube API:</strong> Used to display video content. We do not store your YouTube viewing history.</li>
                 </ul>
