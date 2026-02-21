@@ -64,7 +64,9 @@ const getCanonicalName = (rawName: string) => {
         'lazio': 'ss lazio',
         'napoli': 'ssc napoli',
         'hellas verona': 'verona',
+        'genoa': 'genoa cfc'
         'lecce': 'us lecce',
+        'torino': 'torino fc'
         'cagliari': 'cagliari calcio',
         // Ligue 1
         'psg': 'paris saint germain',
