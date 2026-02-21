@@ -44,18 +44,20 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
     <div className="relative z-10 px-4 mt-1 pb-6 pt-2 rounded-b-3xl overflow-hidden bg-slate-900 shadow-2xl">
         
         {/* 🟢 1. UNIFIED STADIUM BACKGROUND (Bottom Layer) */}
+        {/* TWEAKED: Removed mix-blend, increased opacity to 65% for vibrancy */}
         <div className="absolute inset-0 z-0 pointer-events-none">
             <img 
                 src={leagueData.bg} 
                 alt="Stadium Atmosphere" 
-                className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-luminosity" 
+                className="absolute inset-0 w-full h-full object-cover opacity-65" 
             />
         </div>
 
         {/* 🟢 2. COLOR GRADIENTS FOR READABILITY */}
+        {/* TWEAKED: Reduced top wash to 40%, adjusted bottom gradient to 50% for crisp text */}
         <div className="absolute inset-0 z-0 pointer-events-none">
-            <div className="absolute inset-0 bg-slate-900/60" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/30 to-transparent" />
+            <div className="absolute inset-0 bg-slate-900/40" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />
         </div>
 
         {/* 🟢 3. ORIGINAL CONTENT LAYER (Top Layer) */}

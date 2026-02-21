@@ -90,27 +90,19 @@ async function generateDailySummaries() {
 
             const isBigLeague = ['Premier League', 'Champions League', 'La Liga'].includes(leagueName);
 
-            // 🟢 FIND TOP 4 TEAMS FOR THIS LEAGUE'S COLLAGE
-            let topLogos = [];
-            leagueMatches.forEach(g => {
-                if (topLogos.length < 4 && !topLogos.includes(g.home_logo)) topLogos.push(g.home_logo);
-                if (topLogos.length < 4 && !topLogos.includes(g.away_logo)) topLogos.push(g.away_logo);
-            });
+            // 🟢 USE THE TOP MATCH OF THE LEAGUE FOR THE COVER
+            let featureMatch = leagueMatches[0];
 
-            // 🟢 GENERATE THE DYNAMIC COVER IMAGE URL
-            const titleParam = encodeURIComponent(`${leagueName} Roundup`);
-            const logosParam = encodeURIComponent(topLogos.join(','));
-            const dynamicCoverImage = `/api/og/daily?title=${titleParam}&logos=${logosParam}&type=summary`;
-
+            // 🟢 INSERT NATIVE LOGOS (Pass null for image_url to trigger NewsArtwork VS Mode)
             const { error } = await supabase.from('news').insert([{
                 title: headline,
                 slug: reportSlug,
                 body: body,
-                image_url: dynamicCoverImage, 
-                team_1_logo: null, 
-                team_2_logo: null,
+                image_url: null, 
+                team_1_logo: featureMatch ? featureMatch.home_logo : null, 
+                team_2_logo: featureMatch ? featureMatch.away_logo : null,
                 is_breaking: true,         
-                is_headline: isBigLeague   
+                is_headline: isBigLeague  
             }]);
 
             if (error) {
