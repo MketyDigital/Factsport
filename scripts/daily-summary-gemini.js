@@ -7,7 +7,7 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const GEMINI_KEY = process.env.GEMINI_API_KEY; 
 
 if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) { 
-    console.error("❌ Missing Keys. Check GitHub Secrets."); 
+    console.error("❌ Missing Keys."); 
     process.exit(1); 
 }
 
@@ -23,7 +23,7 @@ async function generateDailySummaries() {
     const endOfDay = new Date(today.setHours(23,59,59,999)).toISOString();
     const dateSlug = today.toISOString().split('T')[0];
 
-    // 1. Fetch Finished Matches from YOUR reliable DB
+    // 1. Fetch Finished Matches
     const { data: matches } = await supabase
         .from('matches')
         .select('*')
@@ -56,10 +56,7 @@ async function generateDailySummaries() {
 
         console.log(`   ✍️ Writing Summary for ${leagueName}...`);
 
-        // 3. Find "Main Event" to use their logos
-        const mainMatch = leagueMatches.sort((a, b) => (b.home_score + b.away_score) - (a.home_score + a.away_score))[0];
-
-        // 4. Prepare AI Prompt
+        // 3. Prepare AI Prompt
         const matchSummaries = leagueMatches.map(m => {
             const scorers = (m.match_events || [])
                 .filter(e => e.type === 'goal')
@@ -76,7 +73,7 @@ async function generateDailySummaries() {
             ${matchSummaries}
 
             Guidelines:
-            - Headline: Catchy (e.g., "Arsenal Stun City").
+            - Headline: Catchy (e.g., "Arsenal Stun City"). Keep it under 10 words.
             - Content: Summary of the action, key games, and table implications.
             - Length: 300 words.
             - Output: Plain text only. Do not use asterisks for bolding.
@@ -93,14 +90,25 @@ async function generateDailySummaries() {
 
             const isBigLeague = ['Premier League', 'Champions League', 'La Liga'].includes(leagueName);
 
-            // 🟢 EXACT MATCH TO ADMIN PAGE - Using YOUR reliable logos
+            // 🟢 FIND TOP 4 TEAMS FOR THIS LEAGUE'S COLLAGE
+            let topLogos = [];
+            leagueMatches.forEach(g => {
+                if (topLogos.length < 4 && !topLogos.includes(g.home_logo)) topLogos.push(g.home_logo);
+                if (topLogos.length < 4 && !topLogos.includes(g.away_logo)) topLogos.push(g.away_logo);
+            });
+
+            // 🟢 GENERATE THE DYNAMIC COVER IMAGE URL
+            const titleParam = encodeURIComponent(`${leagueName} Roundup`);
+            const logosParam = encodeURIComponent(topLogos.join(','));
+            const dynamicCoverImage = `/api/og/daily?title=${titleParam}&logos=${logosParam}&type=summary`;
+
             const { error } = await supabase.from('news').insert([{
                 title: headline,
                 slug: reportSlug,
                 body: body,
-                image_url: null, // Let the frontend use the VS background!
-                team_1_logo: mainMatch.home_logo,
-                team_2_logo: mainMatch.away_logo,
+                image_url: dynamicCoverImage, 
+                team_1_logo: null, 
+                team_2_logo: null,
                 is_breaking: true,         
                 is_headline: isBigLeague   
             }]);
