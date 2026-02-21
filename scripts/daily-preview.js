@@ -1,4 +1,3 @@
-// scripts/daily-preview.js
 const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -6,7 +5,6 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const GEMINI_KEY = process.env.GEMINI_API_KEY; 
-const SPORTSDB_KEY = '3'; 
 
 if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) { 
     console.error("❌ Missing Keys"); 
@@ -15,20 +13,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-// 🖼️ Helper
-async function getHeroImage(teamName) {
-    try {
-        const url = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}/searchteams.php?t=${encodeURIComponent(teamName)}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        if (data.teams && data.teams[0]) {
-            return data.teams[0].strStadiumThumb || data.teams[0].strTeamFanart1 || data.teams[0].strTeamBadge;
-        }
-    } catch (e) { console.error(e); }
-    return null; 
-}
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
 async function generateDailyPreview() {
     console.log("☀️ Starting Daily Preview...");
@@ -38,7 +23,7 @@ async function generateDailyPreview() {
     const endOfDay = new Date(today.setHours(23,59,59,999)).toISOString();
     const dateSlug = today.toISOString().split('T')[0];
 
-    // 1. Fetch Scheduled Matches for TODAY
+    // 1. Fetch Scheduled Matches
     const { data: matches } = await supabase
         .from('matches')
         .select('*')
@@ -63,21 +48,14 @@ async function generateDailyPreview() {
     });
 
     let briefingData = "";
-    let mainEvent = matches[0]; 
 
     for (const [league, games] of Object.entries(leagues)) {
         briefingData += `\n${league}:\n`;
         games.forEach(g => {
             const time = new Date(g.match_date).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
             briefingData += `- ${g.home_team} vs ${g.away_team} at ${time}\n`;
-            if (['Arsenal','Chelsea','Liverpool','Man City','Real Madrid','Barcelona'].some(t => g.home_team.includes(t) || g.away_team.includes(t))) {
-                mainEvent = g;
-            }
         });
     }
-
-    let heroImage = await getHeroImage(mainEvent.home_team);
-    if (!heroImage) heroImage = mainEvent.home_logo;
 
     const prompt = `
         You are a football editor for 'FactSport'.
@@ -87,12 +65,12 @@ async function generateDailyPreview() {
         ${briefingData}
 
         Guidelines:
-        - Headline: Hype up the biggest game.
+        - Headline: Hype up the biggest games. Keep it under 10 words.
         - Intro: "Welcome to today's matchday..."
         - Must Watch: Pick 1-2 key games and preview them.
         - Tone: Exciting, anticipatory.
         - Length: 300 words.
-        - Output: Plain text.
+        - Output: Plain text. Do not use asterisks for bolding.
     `;
 
     try {
@@ -100,21 +78,46 @@ async function generateDailyPreview() {
         const text = (await result.response).text();
 
         const lines = text.split('\n').filter(line => line.trim() !== '');
-        const headline = lines[0].replace(/^#+\s*/, '').replace(/"/g, ''); 
+        const headline = lines[0].replace(/^#+\s*/, '').replace(/[\*"]/g, ''); 
         const body = lines.slice(1).join('\n').trim();
 
-        await supabase.from('news').insert({
+        // 🟢 FIND THE TOP 4 TEAMS OF THE DAY FOR THE COLLAGE
+        let topLogos = [];
+        matches.forEach(g => {
+            // Prioritize giant teams first
+            if (['Arsenal','Chelsea','Liverpool','Man City','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG'].some(t => g.home_team.includes(t) || g.away_team.includes(t))) {
+                if (topLogos.length < 4 && !topLogos.includes(g.home_logo)) topLogos.push(g.home_logo);
+                if (topLogos.length < 4 && !topLogos.includes(g.away_logo)) topLogos.push(g.away_logo);
+            }
+        });
+        
+        // Fill the rest of the slots if we didn't find 4 giants
+        matches.forEach(g => {
+            if (topLogos.length < 4 && !topLogos.includes(g.home_logo)) topLogos.push(g.home_logo);
+            if (topLogos.length < 4 && !topLogos.includes(g.away_logo)) topLogos.push(g.away_logo);
+        });
+
+        // 🟢 GENERATE THE DYNAMIC COVER IMAGE URL
+        const logosParam = encodeURIComponent(topLogos.join(','));
+        const dynamicCoverImage = `/api/og/daily?title=Matchday+Preview&logos=${logosParam}&type=preview`;
+
+        const { error } = await supabase.from('news').insert([{
             title: headline,
             slug: reportSlug,
             body: body,
-            image_url: heroImage, 
-            source_name: 'FactSport Morning Brief',
-            published_at: new Date().toISOString(),
-            is_breaking: false, // Normal news
-            is_headline: true // Put in slider
-        });
+            image_url: dynamicCoverImage, 
+            team_1_logo: null, 
+            team_2_logo: null,
+            is_breaking: false, 
+            is_headline: true 
+        }]);
 
-        console.log(`   ✅ Published Preview: ${headline}`);
+        if (error) {
+            console.error(`   ❌ Supabase DB Error:`, error.message);
+            console.error(`   Details:`, error.details || error.hint);
+        } else {
+            console.log(`   ✅ Published Preview: ${headline}`);
+        }
 
     } catch (e) {
         console.error(`   🔥 Gemini Error: ${e.message}`);
