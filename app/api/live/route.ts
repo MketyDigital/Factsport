@@ -7,6 +7,101 @@ import { NextResponse } from 'next/server';
 import { fetchEspnLive, fetchEspnDetails, ESPN_LEAGUES } from '@/app/lib/espn';
 
 export async function GET(request: Request) {
+// 🟢 1. THE EXPANDED MASTER DICTIONARY
+const getCanonicalName = (rawName: string) => {
+    if (!rawName) return "";
+    
+    // Standard stripper for basic prefixes
+    let name = rawName.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
+        .replace(/[^a-z0-9 ]/g, '') 
+        .replace(/\b(fc|cf|afc|sc|sv|rc|fk|vfl|fsv|tsg|ssc|bayer|rcd|ud|as|us|osc|cfa|aja|ca)\b/g, '') 
+        .replace(/\s+/g, ' ') 
+        .trim();
+
+    // The proven alias database (Now with Stubborn Teams)
+    const aliases: Record<string, string> = {
+        // Premier League
+        'manchester utd': 'manchester united', 'man utd': 'manchester united', 'man city': 'manchester city',
+        'spurs': 'tottenham hotspur', 'tottenham': 'tottenham hotspur', 'wolves': 'wolverhampton wanderers',
+        'wolverhampton': 'wolverhampton wanderers', 'nottm forest': 'nottingham forest', 'nottingham': 'nottingham forest',
+        'sheff utd': 'sheffield united', 'brighton hove albion': 'brighton', 'brighton hove': 'brighton', 
+        'west ham united': 'west ham', 'newcastle united': 'newcastle', 'leicester city': 'leicester',
+        'sunderland': 'sunderland', 'fulham': 'fulham', 'crystal palace': 'crystal palace', 'liverpool': 'liverpool',
+        'afc bournemouth': 'bournemouth', 'luton town': 'luton', 'aston villa fc': 'aston villa',
+        
+        // La Liga
+        'atleti': 'atletico madrid', 'sociedad': 'real sociedad', 'betis': 'real betis',
+        'athletic': 'athletic club', 'athletic bilbao': 'athletic club', 'osasuna': 'ca osasuna',
+        'vallecano': 'rayo vallecano', 'celta': 'celta vigo', 'espanyol barcelona': 'espanyol',
+        'getafe cf': 'getafe', 'sevilla fc': 'sevilla', 'barcelona': 'barcelona', 'barca': 'barcelona', 'levante': 'levante',
+        'rcd mallorca': 'mallorca', 'cadiz cf': 'cadiz', 'ud almeria': 'almeria', 'ud las palmas': 'las palmas', 'girona fc': 'girona',
+        
+        // Bundesliga
+        '1 koln': 'fc cologne', 'koln': 'fc cologne', 'cologne': 'fc cologne',
+        'bayern': 'bayern munich', 'bayern munchen': 'bayern munich', 'bvb': 'borussia dortmund',
+        'dortmund': 'borussia dortmund', 'gladbach': 'borussia monchengladbach', 'mgladbach': 'borussia monchengladbach',
+        'borussia mgladbach': 'borussia monchengladbach', 'leverkusen': 'bayer leverkusen', 'leipzig': 'rb leipzig',
+        'frankfurt': 'eintracht frankfurt', 'stuttgart': 'vfb stuttgart', 'mainz': 'mainz 05',
+        'hoff': 'tsg hoffenheim', 'hoffenheim': 'tsg hoffenheim', 'union berlin': 'fc union berlin',
+        'freiburg': 'sc freiburg', '1 fc heidenheim 1846': 'heidenheim', 'heidenheim 1846': 'heidenheim', 
+        'sv darmstadt 98': 'darmstadt', 'darmstadt 98': 'darmstadt', 'vfl bochum 1848': 'bochum', 'fc augsburg': 'augsburg',
+        
+        // Serie A
+        'juve': 'juventus', 'inter': 'inter milan', 'internazionale': 'inter milan',
+        'milan': 'ac milan', 'roma': 'as roma', 'lazio': 'ss lazio',
+        'napoli': 'ssc napoli', 'hellas verona': 'verona', 'cagliari': 'cagliari calcio',
+        'genoa': 'genoa', 'genoa cfc': 'genoa', 'torino': 'torino', 'torino fc': 'torino',
+        'lecce': 'us lecce', 'us lecce': 'lecce', 'como 1907': 'como', 'atalanta bc': 'atalanta',
+        'ac monza': 'monza', 'us sassuolo': 'sassuolo', 'frosinone calcio': 'frosinone', 'us salernitana 1919': 'salernitana',
+        
+        // Ligue 1
+        'psg': 'paris saint germain', 'paris sg': 'paris saint germain', 'om': 'marseille',
+        'olympique de marseille': 'marseille', 'ol': 'lyon', 'olympique lyonnais': 'lyon',
+        'auxerre': 'auxerre', 'stade rennais': 'rennes', 'clermont foot 63': 'clermont', 'clermont foot': 'clermont', 
+        'toulouse fc': 'toulouse', 'le havre ac': 'le havre', 'mhsc': 'montpellier', 'montpellier hsc': 'montpellier',
+        
+        // Internationals / Europe
+        'sporting': 'sporting cp', 'sporting lisbon': 'sporting cp', 'porto': 'fc porto',
+        'benfica': 'sl benfica', 'usa': 'united states', 'korea republic': 'south korea',
+        'korea': 'south korea', 'bosnia': 'bosnia and herzegovina', 'dr congo': 'congo dr',
+        'cote divoire': 'ivory coast', 'fc copenhagen': 'copenhagen', 'shakhtar donetsk': 'shakhtar', 
+        'galatasaray sk': 'galatasaray', 'fenerbahce sk': 'fenerbahce', 'red bull salzburg': 'fc salzburg', 'slavia praha': 'slavia prague'
+    };
+
+    return aliases[name] || name;
+};
+
+// 🟢 2. FUZZY MATCHER (Levenshtein algorithm)
+const similarity = (s1: string, s2: string) => {
+    let longer = s1;
+    let shorter = s2;
+    if (s1.length < s2.length) { longer = s2; shorter = s1; }
+    const longerLength = longer.length;
+    if (longerLength === 0) return 1.0;
+    
+    const costs = new Array();
+    for (let i = 0; i <= shorter.length; i++) {
+        let lastValue = i;
+        for (let j = 0; j <= longer.length; j++) {
+            if (i == 0) costs[j] = j;
+            else {
+                if (j > 0) {
+                    let newValue = costs[j - 1];
+                    if (s1.charAt(i - 1) != s2.charAt(j - 1)) newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                    costs[j - 1] = lastValue;
+                    lastValue = newValue;
+                }
+            }
+        }
+        if (i > 0) costs[longer.length] = lastValue;
+    }
+    return (longerLength - costs[longer.length]) / longerLength;
+};
+
+// 🟢 3. THE LIVE SYNC ENGINE
+async function runLiveUpdate(request: Request) {
+  
   const url = new URL(request.url);
   if (url.searchParams.get('key') !== process.env.CRON_KEY) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -55,6 +150,34 @@ export async function GET(request: Request) {
         for (const dbMatch of leagueDbMatches) {
              // 🎯 PURE ID MATCHING: Bypasses names completely
              const espnGame = espnMatches.find((e: any) => String(e.espn_id) === dbMatch.espn_id);
+             const dbTime = new Date(dbMatch.match_date).getTime();
+             const dbHome = getCanonicalName(dbMatch.home_team);
+             const dbAway = getCanonicalName(dbMatch.away_team);
+             
+             const espnGame = espnMatches.find((e: any) => {
+                 // 🔒 LOCK 1: HARD ID MATCH (If we saved the ID before, it's a 100% guarantee)
+                 if (dbMatch.espn_id && dbMatch.espn_id === String(e.espn_id)) return true;
+
+                 // 🔒 LOCK 2: TIME (Matches must be within 48 hours of each other to account for timezone drift)
+                 const espnTime = e.startTime;
+                 if (Math.abs(dbTime - espnTime) > (48 * 60 * 60 * 1000)) return false;
+
+                 const espnHome = getCanonicalName(e.home_team);
+                 const espnAway = getCanonicalName(e.away_team);
+                 
+                 // 🔒 LOCK 3: DUAL-TEAM SIMILARITY
+                 const homeScore = similarity(dbHome, espnHome);
+                 const awayScore = similarity(dbAway, espnAway);
+                 
+                 const combinedScore = (homeScore + awayScore) / 2;
+                 
+                 // The Safe 0.70 threshold
+                 if (combinedScore > 0.70 || (homeScore === 1.0 && awayScore > 0.4) || (awayScore === 1.0 && homeScore > 0.4)) {
+                     return true;
+                 }
+
+                 return false;
+             });
 
              if (espnGame) {
                  syncTasks.push((async () => {
@@ -71,6 +194,7 @@ export async function GET(request: Request) {
                          home_score: espnGame.home_score,
                          away_score: espnGame.away_score,
                          "displayClock": espnGame.clock,
+                         espn_id: String(espnGame.espn_id), // 🟢 SAVE THE ID FOR NEXT TIME
                          updated_at: new Date().toISOString()
                      };
 
