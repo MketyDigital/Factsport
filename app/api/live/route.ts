@@ -6,7 +6,7 @@ import { createClient } from '@/app/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { fetchEspnLive, fetchEspnDetails, ESPN_LEAGUES } from '@/app/lib/espn';
 
-export async function GET(request: Request) {
+async function runLiveUpdate(request: Request) {
   const url = new URL(request.url);
   if (url.searchParams.get('key') !== process.env.CRON_KEY) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -93,3 +93,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+// Safely export both methods using the master function
+export async function GET(request: Request) { return runLiveUpdate(request); }
+export async function POST(request: Request) { return runLiveUpdate(request); }
