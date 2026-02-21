@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { Facebook, Instagram, Twitter, Youtube, Send, Zap } from 'lucide-react'; // 🟢 Added Zap
+// 🟢 Removed Zap since we are using the real logo image now
+import { Facebook, Instagram, Twitter, Youtube, Send } from 'lucide-react'; 
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -11,12 +12,13 @@ export default function Footer() {
         {/* Brand Section */}
         <div className="col-span-1 md:col-span-2">
             
-            {/* 🟢 REAL LOGO (Matches Home Page Header) */}
-            <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-lg flex items-center justify-center shadow-lg shrink-0">
-                    <Zap size={18} className="text-white fill-white" />
-                </div>
-                <span className="text-xl font-black tracking-tight text-white">FactSport</span>
+            {/* 🟢 REAL LOGO (Using logo.png from public folder) */}
+            <div className="mb-4 inline-block">
+                <img 
+                    src="/logo.png" 
+                    alt="FactSport Logo" 
+                    className="h-8 md:h-10 w-auto object-contain drop-shadow-lg" 
+                />
             </div>
 
             <p className="text-xs leading-relaxed max-w-xs text-slate-500">
