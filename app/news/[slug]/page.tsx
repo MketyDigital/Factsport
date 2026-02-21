@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, Calendar, Clock, Share2, ArrowRight, Zap, Trophy, Youtube, Newspaper } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
+import ShareButton from '@/app/components/ShareButton'; // 🟢 Added the new Client Component
 
 export default async function ArticlePage({ params }: { params: { slug: string } }) {
   const resolvedParams = await params;
@@ -86,9 +87,8 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                 {/* Share Button */}
                 <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-400">Share this story</span>
-                    <button className="flex items-center gap-2 text-blue-600 font-bold text-xs hover:bg-blue-50 px-3 py-1.5 rounded-full transition">
-                        <Share2 size={14} /> Share Article
-                    </button>
+                    {/* 🟢 Replaced static button with the interactive Client Component */}
+                    <ShareButton title={article.title} slug={article.slug} />
                 </div>
             </div>
          </div>
