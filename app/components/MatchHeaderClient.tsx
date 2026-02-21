@@ -44,12 +44,12 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
     <div className="relative z-10 px-4 mt-1 pb-6 pt-2 rounded-b-3xl overflow-hidden bg-slate-900 shadow-2xl">
         
         {/* 🟢 1. UNIFIED STADIUM BACKGROUND (Bottom Layer) */}
-        {/* TWEAKED: Removed mix-blend, increased opacity to 65% for vibrancy */}
+        {/* TWEAKED: Removed mix-blend, increased opacity to 80% for vibrancy */}
         <div className="absolute inset-0 z-0 pointer-events-none">
             <img 
                 src={leagueData.bg} 
                 alt="Stadium Atmosphere" 
-                className="absolute inset-0 w-full h-full object-cover opacity-65" 
+                className="absolute inset-0 w-full h-full object-cover opacity-80" 
             />
         </div>
 
