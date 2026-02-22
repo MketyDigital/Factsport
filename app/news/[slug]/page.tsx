@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ChevronLeft, Calendar, Clock, Share2, ArrowRight, Zap, Trophy, Youtube, Newspaper } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
 import ShareButton from '@/app/components/ShareButton'; // 🟢 Added the new Client Component
+import ReactMarkdown from 'react-markdown'; // 🟢 IMPORTED MARKDOWN RENDERER
 
 export default async function ArticlePage({ params }: { params: { slug: string } }) {
   const resolvedParams = await params;
@@ -68,8 +69,13 @@ export default async function ArticlePage({ params }: { params: { slug: string }
          {/* MAIN CONTENT */}
          <div className="md:col-span-2">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-8">
-                <div className="prose prose-slate prose-sm max-w-none text-slate-700 leading-relaxed whitespace-pre-line">
-                    {article.body || article.content || "No content available."}
+                {/* 🟢 UPGRADED: Wrapped the content in ReactMarkdown */}
+                <div className="prose prose-slate prose-sm max-w-none text-slate-700 leading-relaxed">
+                    {article.body || article.content ? (
+                        <ReactMarkdown>{article.body || article.content}</ReactMarkdown>
+                    ) : (
+                        "No content available."
+                    )}
                 </div>
                 
                 {/* 🏆 PREDICT & WIN BANNER */}

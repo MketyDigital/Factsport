@@ -3,13 +3,14 @@ export const runtime = 'edge';
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
-import { Loader2, Plus, Trash2, Star, Activity, Shield, Bot, Pencil, X, Save, RefreshCw } from 'lucide-react';
+import { Loader2, Plus, Trash2, Star, Activity, Shield, Bot, Pencil, X, Save, Search } from 'lucide-react';
 
 export default function AdminNewsPage() {
   const [news, setNews] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [botLoading, setBotLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [search, setSearch] = useState(''); // 🟢 NEW: Search state
   
   // Form State
   const [formData, setFormData] = useState({ 
@@ -24,9 +25,15 @@ export default function AdminNewsPage() {
   
   const supabase = createClient();
 
-  useEffect(() => { fetchNews(); }, []);
+  // 🟢 NEW: Smart Search Effect
+  useEffect(() => { 
+      const timer = setTimeout(() => {
+          fetchNews(); 
+      }, 500);
+      return () => clearTimeout(timer);
+  }, [search]);
 
-  // 🪄 AUTO-SUGGEST LOGOS (Updated to Search 1000 Matches)
+  // 🪄 AUTO-SUGGEST LOGOS
   useEffect(() => {
     if (editingId) return;
 
@@ -34,7 +41,6 @@ export default function AdminNewsPage() {
         if (!formData.title || formData.title.length < 4) return;
         if (formData.team1Logo && formData.team2Logo) return;
 
-        // ✅ INCREASED LIMIT to 1000 to find older teams
         const { data } = await supabase
             .from('matches')
             .select('home_team, home_logo, away_team, away_logo')
@@ -66,8 +72,11 @@ export default function AdminNewsPage() {
     return () => clearTimeout(timeoutId);
   }, [formData.title, editingId]);
 
+  // 🟢 UPDATED: Fetch respects the search query
   const fetchNews = async () => {
-    const { data } = await supabase.from('news').select('*').order('created_at', { ascending: false });
+    let query = supabase.from('news').select('*').order('created_at', { ascending: false }).limit(50);
+    if (search) query = query.ilike('title', `%${search}%`);
+    const { data } = await query;
     setNews(data || []);
   };
 
@@ -145,14 +154,30 @@ export default function AdminNewsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-20">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-slate-200 pb-6">
+    <div className="space-y-6 max-w-5xl mx-auto pb-20 p-4 md:p-8">
+      
+      {/* 🟢 HEADER & SEARCH BAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-6">
           <h1 className="text-3xl font-black text-slate-800 tracking-tight">Newsroom</h1>
-          <button onClick={runAutoBot} disabled={botLoading} className="px-6 py-3 rounded-xl text-sm font-bold shadow-lg flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700">
-              {botLoading ? <Loader2 className="animate-spin" size={18} /> : <Bot size={18} />} {botLoading ? 'Scraping...' : 'Run Bot'}
-          </button>
+          
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+              <div className="relative w-full sm:w-64">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input 
+                      type="text" 
+                      placeholder="Search articles..." 
+                      className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:border-blue-500 outline-none shadow-sm"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                  />
+              </div>
+              <button onClick={runAutoBot} disabled={botLoading} className="w-full sm:w-auto px-6 py-3 rounded-xl text-sm font-bold shadow-lg flex justify-center items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 whitespace-nowrap">
+                  {botLoading ? <Loader2 className="animate-spin" size={18} /> : <Bot size={18} />} {botLoading ? 'Scraping...' : 'Run Bot'}
+              </button>
+          </div>
       </div>
       
+      {/* EDITOR SECTION */}
       <div className={`p-6 rounded-2xl shadow-sm border transition-all ${editingId ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-slate-100'}`}>
         <div className="flex justify-between items-center mb-4">
             <h2 className="font-bold text-lg flex items-center gap-2 text-slate-800">
@@ -181,7 +206,19 @@ export default function AdminNewsPage() {
                 <label className={`flex gap-2 items-center px-4 py-2 rounded-lg border cursor-pointer ${formData.isBreaking ? 'bg-red-50 text-red-700 font-bold' : 'bg-white'}`}><input type="checkbox" className="hidden" checked={formData.isBreaking} onChange={(e) => setFormData({...formData, isBreaking: e.target.checked})} /><Activity size={16}/> Ticker</label>
             </div>
 
-            <textarea placeholder="Article content..." className="w-full h-48 border rounded-lg p-4 text-sm outline-none resize-none" value={formData.body} onChange={(e) => setFormData({...formData, body: e.target.value})}></textarea>
+            {/* 🟢 UPGRADED TEXTAREA: Explains how to use Links and Images */}
+            <div className="flex flex-col gap-1">
+                <div className="flex justify-between items-center text-xs font-bold text-slate-500 mb-1">
+                    <span>Article Content</span>
+                    <span className="text-[10px] font-normal opacity-70">Supports Markdown for Links & Images</span>
+                </div>
+                <textarea 
+                    placeholder="Write your article here...&#10;&#10;To add a Link: [Click Here](/match/123)&#10;To add an Image: ![Image Description](https://example.com/image.jpg)&#10;&#10;Leave a blank line between paragraphs." 
+                    className="w-full h-64 border rounded-lg p-4 text-sm outline-none resize-none bg-slate-50 focus:bg-white transition" 
+                    value={formData.body} 
+                    onChange={(e) => setFormData({...formData, body: e.target.value})}>
+                </textarea>
+            </div>
             
             <button type="submit" disabled={loading} className={`w-full py-3 rounded-xl font-bold text-sm flex justify-center items-center gap-2 shadow-md text-white ${editingId ? 'bg-yellow-500 text-black' : 'bg-black'}`}>
                 {loading ? <Loader2 className="animate-spin" size={18}/> : (editingId ? <><Save size={18}/> Update</> : <><Plus size={18}/> Publish</>)}
@@ -189,6 +226,7 @@ export default function AdminNewsPage() {
         </form>
       </div>
 
+      {/* NEWS LIST */}
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-100">
         {news.map((item) => (
             <div key={item.id} className="p-4 flex justify-between items-center border-b hover:bg-slate-50 transition">
@@ -207,6 +245,11 @@ export default function AdminNewsPage() {
                 </div>
             </div>
         ))}
+        {news.length === 0 && !loading && (
+            <div className="text-center py-12 bg-slate-50">
+                <p className="text-slate-500 font-bold">No articles found.</p>
+            </div>
+        )}
       </div>
     </div>
   );
