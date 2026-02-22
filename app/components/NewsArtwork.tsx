@@ -27,7 +27,7 @@ export default function NewsArtwork({ image, team1Logo, team2Logo, title, classN
     return (
       <div className={`relative overflow-hidden bg-[#0a1428] flex items-center justify-center ${className}`}>
         {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+        <div className="absolute inset-0 opacity-10 bg-[url('/tournaments/default-bg.jpg')]"></div>
         
         {/* Logos */}
         <div className="relative z-10 flex items-center gap-4 md:gap-8">
