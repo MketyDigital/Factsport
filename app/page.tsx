@@ -159,11 +159,16 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
    
   const { matches, news, highlights, featuredMatches } = await getHomepageData(selectedLeague);
 
+  // 🟢 THE NEWS WATERFALL FIX
   const breakingNews = news.filter(n => n.is_breaking); 
   const rawTicker = breakingNews.length > 0 ? breakingNews : news.slice(0, 5);
   const tickerNews = [...rawTicker, ...rawTicker, ...rawTicker, ...rawTicker]; 
-  const headlines = news.filter(n => n.is_headline).slice(0, 5);
-  const finalHeadlines = headlines.length > 0 ? headlines : news.slice(0, 3);
+  
+  // 1. Grab headlines, strictly limit to 3 so excess flows downwards
+  const headlines = news.filter(n => n.is_headline);
+  const finalHeadlines = headlines.length > 0 ? headlines.slice(0, 3) : news.slice(0, 3);
+  
+  // 2. Latest News takes whatever is left over (excluding the 3 active slider items)
   const latestNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id) && !n.is_breaking).slice(0, 5);
 
   // 🟢 SMART HERO LOGIC: Admin Pick -> Big Match Today -> First Upcoming
@@ -446,7 +451,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                 <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-[0_0_15px_rgba(234,179,8,0.4)]">
                     <Trophy className="text-black fill-black" size={24} />
                 </div>
-                <h2 className="text-white font-black text-xl uppercase italic tracking-tighter mb-2">Monthly <span className="text-yellow-500">Jackpot</span></h2>
+                <h2 className="text-white font-black text-xl uppercase italic tracking-tighter mb-2">Predict & Win <span className="text-yellow-500">Fantastic Prices</span></h2>
                 <Link href="/vip/upgrade" className="inline-flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-sm uppercase px-8 py-3 rounded-xl transition shadow-lg active:scale-95">Join Winners Circle <ArrowRight size={16} /></Link>
             </div>
         </div>
