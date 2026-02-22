@@ -53,10 +53,12 @@ async function generateDailyPreview() {
         briefingData += `\n${league}:\n`;
         games.forEach(g => {
             const time = new Date(g.match_date).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
-            briefingData += `- ${g.home_team} vs ${g.away_team} at ${time}\n`;
+            // 🟢 AI UPGRADE: Feeding the Match ID to Gemini
+            briefingData += `- MATCH ID: ${g.id} | ${g.home_team} vs ${g.away_team} at ${time}\n`;
         });
     }
 
+    // 🟢 AI UPGRADE: Strict Markdown Linking Instructions
     const prompt = `
         You are a football editor for 'FactSport'.
         Write a "Daily Briefing" article previewing today's football action (${dateSlug}).
@@ -70,7 +72,9 @@ async function generateDailyPreview() {
         - Must Watch: Pick 1-2 key games and preview them.
         - Tone: Exciting, anticipatory.
         - Length: 300 words.
-        - Output: Plain text. Do not use asterisks for bolding.
+        - Output: Plain text only. Do not use asterisks for bolding.
+        - CRITICAL LINKING RULE: You MUST wrap EVERY match you mention in a Markdown link pointing to its Match ID. 
+          Format strictly as: [Predict Arsenal vs Chelsea](/match/INSERT_MATCH_ID_HERE). Do this for every game you discuss!
     `;
 
     try {
@@ -81,11 +85,9 @@ async function generateDailyPreview() {
         const headline = lines[0].replace(/^#+\s*/, '').replace(/[\*"]/g, ''); 
         const body = lines.slice(1).join('\n').trim();
 
-        // 🟢 FIND THE BIGGEST MATCH TO FEATURE ON THE COVER
         const giants = ['Arsenal','Chelsea','Liverpool','Man City','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG'];
         let featureMatch = matches.find(g => giants.some(t => g.home_team.includes(t) || g.away_team.includes(t))) || matches[0];
 
-        // 🟢 INSERT NATIVE LOGOS (Pass null for image_url to trigger NewsArtwork VS Mode)
         const { error } = await supabase.from('news').insert([{
             title: headline,
             slug: reportSlug,
@@ -99,7 +101,6 @@ async function generateDailyPreview() {
 
         if (error) {
             console.error(`   ❌ Supabase DB Error:`, error.message);
-            console.error(`   Details:`, error.details || error.hint);
         } else {
             console.log(`   ✅ Published Preview: ${headline}`);
         }
