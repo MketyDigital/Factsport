@@ -1,9 +1,10 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic'; 
 export const revalidate = 0;
-export const fetchCache = 'force-no-store';
+export const fetchCache = 'force-no-store'; // 🟢 NO CACHING ALLOWED
 
-import { createClient } from '@/app/lib/supabase/server';
+// 🟢 CHANGED: Using the official supabase-js client to bypass RLS
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { ESPN_LEAGUES, fetchEspnLive } from '@/app/lib/espn';
 
@@ -18,7 +19,6 @@ const getCanonicalName = (rawName: string) => {
         .trim();
 
     const aliases: Record<string, string> = {
-        // Premier League & England
         'manchester utd': 'manchester united', 'man utd': 'manchester united', 'man city': 'manchester city',
         'spurs': 'tottenham hotspur', 'tottenham': 'tottenham hotspur', 'wolves': 'wolverhampton wanderers',
         'wolverhampton': 'wolverhampton wanderers', 'nottm forest': 'nottingham forest', 'nottingham': 'nottingham forest',
@@ -27,16 +27,12 @@ const getCanonicalName = (rawName: string) => {
         'sunderland': 'sunderland', 'fulham': 'fulham', 'crystal palace': 'crystal palace', 'liverpool': 'liverpool',
         'afc bournemouth': 'bournemouth', 'luton town': 'luton', 'aston villa fc': 'aston villa', 'arsenal fc': 'arsenal',
         'chelsea fc': 'chelsea', 'everton fc': 'everton', 'brentford fc': 'brentford',
-        
-        // La Liga & Spain
         'atleti': 'atletico madrid', 'sociedad': 'real sociedad', 'betis': 'real betis',
         'athletic': 'athletic club', 'athletic bilbao': 'athletic club', 'osasuna': 'ca osasuna',
         'vallecano': 'rayo vallecano', 'celta': 'celta vigo', 'espanyol barcelona': 'espanyol',
         'getafe cf': 'getafe', 'sevilla fc': 'sevilla', 'barcelona': 'barcelona', 'barca': 'barcelona', 'levante': 'levante',
         'rcd mallorca': 'mallorca', 'cadiz cf': 'cadiz', 'ud almeria': 'almeria', 'ud las palmas': 'las palmas', 'girona fc': 'girona',
         'real madrid cf': 'real madrid', 'valencia cf': 'valencia',
-        
-        // Bundesliga & Germany
         '1 koln': 'fc cologne', 'koln': 'fc cologne', 'cologne': 'fc cologne',
         'bayern': 'bayern munich', 'bayern munchen': 'bayern munich', 'bvb': 'borussia dortmund',
         'dortmund': 'borussia dortmund', 'gladbach': 'borussia monchengladbach', 'mgladbach': 'borussia monchengladbach',
@@ -46,8 +42,6 @@ const getCanonicalName = (rawName: string) => {
         'freiburg': 'sc freiburg', '1 fc heidenheim 1846': 'heidenheim', 'heidenheim 1846': 'heidenheim', 
         'sv darmstadt 98': 'darmstadt', 'darmstadt 98': 'darmstadt', 'vfl bochum 1848': 'bochum', 'fc augsburg': 'augsburg',
         'st pauli': 'sankt pauli', 'fc st pauli': 'sankt pauli',
-        
-        // Serie A & Italy
         'juve': 'juventus', 'inter': 'inter milan', 'internazionale': 'inter milan',
         'milan': 'ac milan', 'roma': 'as roma', 'lazio': 'ss lazio',
         'napoli': 'ssc napoli', 'hellas verona': 'verona', 'cagliari': 'cagliari calcio',
@@ -55,15 +49,11 @@ const getCanonicalName = (rawName: string) => {
         'lecce': 'us lecce', 'us lecce': 'lecce', 'como 1907': 'como', 'atalanta bc': 'atalanta',
         'ac monza': 'monza', 'us sassuolo': 'sassuolo', 'frosinone calcio': 'frosinone', 'us salernitana 1919': 'salernitana',
         'fiorentina': 'acf fiorentina', 'empoli fc': 'empoli', 'bologna fc': 'bologna', 'udinese calcio': 'udinese',
-        
-        // Ligue 1 & France
         'psg': 'paris saint germain', 'paris sg': 'paris saint germain', 'om': 'marseille',
         'olympique de marseille': 'marseille', 'ol': 'lyon', 'olympique lyonnais': 'lyon',
         'auxerre': 'auxerre', 'stade rennais': 'rennes', 'clermont foot 63': 'clermont', 'clermont foot': 'clermont', 
         'toulouse fc': 'toulouse', 'le havre ac': 'le havre', 'mhsc': 'montpellier', 'montpellier hsc': 'montpellier',
         'st etienne': 'saint etienne', 'asse': 'saint etienne', 'lille osc': 'lille', 'ogc nice': 'nice',
-        
-        // Internationals / Europe
         'sporting': 'sporting cp', 'sporting lisbon': 'sporting cp', 'porto': 'fc porto',
         'benfica': 'sl benfica', 'usa': 'united states', 'korea republic': 'south korea',
         'korea': 'south korea', 'bosnia': 'bosnia and herzegovina', 'dr congo': 'congo dr',
@@ -96,20 +86,26 @@ const similarity = (s1: string, s2: string) => {
 };
 
 // 3. THE MASTER MATCHMAKER
-export async function GET(request: Request) {
+async function runMatchmaker(request: Request) {
   const url = new URL(request.url);
   if (url.searchParams.get('key') !== process.env.CRON_KEY) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const supabase = createClient();
+  // 🟢 CHANGED: Initialized with the Service Role (Master) Key
+  const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   let logs: string[] = [];
   let mappedCount = 0;
+  const syncTasks: Promise<any>[] = [];
 
   try {
       const now = Date.now();
-      const lookBack = new Date(now - (24 * 60 * 60 * 1000)).toISOString(); // 24 hours back
-      const todayEnd = new Date(now + (24 * 60 * 60 * 1000)).toISOString(); // 24 hours forward
+      // 🟢 EXPANDED WINDOW: 48 Hours back and forward to beat US Timezones
+      const lookBack = new Date(now - (48 * 60 * 60 * 1000)).toISOString(); 
+      const todayEnd = new Date(now + (48 * 60 * 60 * 1000)).toISOString(); 
 
-      // 🔍 Find matches that DO NOT have an ESPN ID yet
       const { data: dbMatches } = await supabase
         .from('matches')
         .select('id, home_team, away_team, match_date, league')
@@ -120,7 +116,6 @@ export async function GET(request: Request) {
       if (!dbMatches || dbMatches.length === 0) return NextResponse.json({ message: "No unmatched games." });
 
       const activeLeagues = Array.from(new Set(dbMatches.map(m => m.league)));
-      const syncTasks: Promise<any>[] = [];
 
       for (const leagueName of activeLeagues) {
         const espnCode = ESPN_LEAGUES[leagueName as string];
@@ -135,8 +130,11 @@ export async function GET(request: Request) {
              const dbAway = getCanonicalName(dbMatch.away_team);
              
              const espnGame = espnMatches.find((e: any) => {
-                 const espnTime = e.startTime;
-                 if (Math.abs(dbTime - espnTime) > (48 * 60 * 60 * 1000)) return false;
+                 // 🟢 BULLETPROOF TIME PARSING
+                 const espnTimeString = e.date || e.startTime;
+                 const espnTime = espnTimeString ? new Date(espnTimeString).getTime() : 0;
+                 
+                 if (espnTime && Math.abs(dbTime - espnTime) > (48 * 60 * 60 * 1000)) return false;
 
                  const espnHome = getCanonicalName(e.home_team);
                  const espnAway = getCanonicalName(e.away_team);
@@ -149,7 +147,6 @@ export async function GET(request: Request) {
              });
 
              if (espnGame) {
-                 // We wrap the update in an async arrow function to guarantee it returns a Promise
                  const updateTask = (async () => {
                     const { error } = await supabase
                         .from('matches')
@@ -161,7 +158,6 @@ export async function GET(request: Request) {
                  })();
 
                  syncTasks.push(updateTask);
-                 
                  mappedCount++;
                  logs.push(`🔗 MAPPED: ${dbMatch.home_team} vs ${dbMatch.away_team}`);
              }
@@ -175,3 +171,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function GET(request: Request) { return runMatchmaker(request); }
+export async function POST(request: Request) { return runMatchmaker(request); }

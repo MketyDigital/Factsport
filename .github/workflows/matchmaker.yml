@@ -2,14 +2,15 @@ name: Matchmaker (ESPN ID Sync)
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # Runs at 6:00 AM UTC
-    - cron: '0 12 * * *' # Runs at 12:00 PM UTC
+    - cron: '0 6 * * *'  # Runs at 6:00 AM UTC (Morning sync)
+    - cron: '0 12 * * *' # Runs at 12:00 PM UTC (Afternoon sync for late matches)
   workflow_dispatch:
 
 jobs:
   map-matches:
     runs-on: ubuntu-latest
     steps:
-      - name: Hit the Matchmaker API
+      - name: Hit the Matchmaker API on Production
         run: |
-          curl -X GET "https://factsport.vercel.app/api/matchmaker?key=${{ secrets.CRON_KEY }}"
+          # Hits your live Cloudflare domain to map IDs for today and tomorrow.
+          curl -L -f "https://factsport.com/api/matchmaker?key=${{ secrets.CRON_KEY }}&t=$(date +%s)"

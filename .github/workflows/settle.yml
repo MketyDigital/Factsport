@@ -2,16 +2,16 @@ name: Match Settlement Automator
 
 on:
   schedule:
-    # Runs every 10 minutes
-    - cron: '*/10 * * * *'
-  workflow_dispatch:
+    # Runs every 5 minutes to clear out busy match days instantly
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Allows you to click a button in GitHub to run it manually
 
 jobs:
   settle-bets:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Settlement API
+      - name: Trigger Settlement API on Production
         run: |
-          # Uses the Vercel URL to bypass Cloudflare bot protection
-          # Includes timestamp (?t=...) to force Vercel to run fresh (no caching)
-          curl -L -f "https://factsport.vercel.app/api/settle?key=${{ secrets.CRON_KEY }}&t=$(date +%s)"
+          # Hits your live Cloudflare domain. 
+          # Includes the timestamp (?t=...) to force a fresh run and prevent caching.
+          curl -L -f "https://factsport.com/api/settle?key=${{ secrets.CRON_KEY }}&t=$(date +%s)"
