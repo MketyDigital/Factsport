@@ -2,9 +2,8 @@ name: Match Settlement Automator
 
 on:
   schedule:
-    # Runs every 5 minutes to clear out busy match days instantly
     - cron: '*/5 * * * *'
-  workflow_dispatch: # Allows you to click a button in GitHub to run it manually
+  workflow_dispatch:
 
 jobs:
   settle-bets:
@@ -12,6 +11,4 @@ jobs:
     steps:
       - name: Trigger Settlement API on Production
         run: |
-          # Hits your live Cloudflare domain. 
-          # Includes the timestamp (?t=...) to force a fresh run and prevent caching.
-          curl -L -f "https://factsport.com/api/settle?key=${{ secrets.CRON_KEY }}&t=$(date +%s)"
+          curl -L -f -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36" "https://factsport.com/api/settle?key=${{ secrets.CRON_KEY }}&t=$(date +%s)"

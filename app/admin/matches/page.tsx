@@ -23,7 +23,13 @@ export default function AdminMatchesPage() {
     home_team: '', away_team: '', league: 'Premier League', match_date: '', home_logo: '', away_logo: ''
   });
 
-  useEffect(() => { fetchMatches(); }, []);
+  // 🟢 RESTORED & UPGRADED: Smart Search Effect
+  useEffect(() => { 
+      const timer = setTimeout(() => {
+          fetchMatches(); 
+      }, 500);
+      return () => clearTimeout(timer);
+  }, [search]);
 
   const fetchMatches = async () => {
     setLoading(true);
@@ -111,16 +117,30 @@ export default function AdminMatchesPage() {
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
             <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
                 <Terminal size={24} className="text-blue-600"/> Match Manager
             </h1>
             <p className="text-sm text-slate-500">Manage Schedule, Live Scores, and Settlement.</p>
         </div>
-        <button onClick={() => setIsCreating(!isCreating)} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition">
-            <Plus size={18} /> {isCreating ? 'Cancel' : 'Add New Match'}
-        </button>
+        
+        {/* 🟢 RESTORED: Search Bar and Actions */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+            <div className="relative w-full sm:w-64">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input 
+                    type="text" 
+                    placeholder="Search teams..." 
+                    className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:border-blue-500 outline-none shadow-sm"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                />
+            </div>
+            <button onClick={() => setIsCreating(!isCreating)} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg transition whitespace-nowrap">
+                <Plus size={18} /> {isCreating ? 'Cancel' : 'Add New Match'}
+            </button>
+        </div>
       </div>
 
       {/* CREATE FORM */}
@@ -267,6 +287,11 @@ export default function AdminMatchesPage() {
 
             </div>
         ))}
+        {matches.length === 0 && !loading && (
+            <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-300">
+                <p className="text-slate-500 font-bold">No matches found matching your search.</p>
+            </div>
+        )}
       </div>
     </div>
   );
