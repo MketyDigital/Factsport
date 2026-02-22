@@ -62,15 +62,29 @@ export default function NewsArtwork({ image, team1Logo, team2Logo, title, classN
     );
   }
 
-  // 4. FALLBACK: Generic Breaking News
+  // 4. FALLBACK: Blurred Default Background with Factsport Text
   return (
-    <div className={`relative overflow-hidden bg-slate-800 flex items-center justify-center ${className}`}>
-      <Activity size={48} className="text-slate-700 opacity-50" />
-      <div className="absolute bottom-4 left-4">
-        <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest border border-slate-600 px-2 py-1 rounded">
-            Breaking News
+    <div className={`relative overflow-hidden bg-slate-900 flex items-center justify-center ${className}`}>
+      
+      {/* Blurred Default Background */}
+      <div className="absolute inset-0 bg-[url('/tournaments/default-bg.jpg')] bg-cover bg-center opacity-50 blur-[3px] scale-105"></div>
+      
+      {/* Factsport Breaking News Overlay */}
+      <div className="relative z-10 flex flex-col items-center">
+        <span className="text-white text-xl md:text-3xl font-black uppercase tracking-widest drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)]">
+          Factsport
         </span>
+        
+        <div className="flex items-center gap-2 mt-2">
+          <Activity size={16} className="text-red-500 animate-pulse" />
+          <span className="text-white text-[10px] md:text-xs font-bold uppercase tracking-widest bg-red-600/80 border border-red-500 px-3 py-1 rounded shadow-lg backdrop-blur-sm">
+            Breaking News
+          </span>
+        </div>
       </div>
+
+      {/* Bottom Gradient for readability if text sits on top of this container elsewhere */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
     </div>
   );
 }
