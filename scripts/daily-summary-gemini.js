@@ -62,9 +62,11 @@ async function generateDailySummaries() {
                 .filter(e => e.type === 'goal')
                 .map(e => `${e.player} (${e.time})`)
                 .join(', ');
-            return `- ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} (Scorers: ${scorers || 'None'})`;
+            // 🟢 AI UPGRADE: Feeding the Match ID to Gemini
+            return `- MATCH ID: ${m.id} | ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} (Scorers: ${scorers || 'None'})`;
         }).join('\n');
 
+        // 🟢 AI UPGRADE: Strict Markdown Linking Instructions
         const prompt = `
             You are a senior football analyst for 'FactSport'.
             Write a "Matchday Round-Up" article for the ${leagueName} played on ${dateSlug}.
@@ -77,6 +79,8 @@ async function generateDailySummaries() {
             - Content: Summary of the action, key games, and table implications.
             - Length: 300 words.
             - Output: Plain text only. Do not use asterisks for bolding.
+            - CRITICAL LINKING RULE: You MUST wrap EVERY match you mention in a Markdown link pointing to its Match ID. 
+              Format strictly as: [View Match Stats](/match/INSERT_MATCH_ID_HERE). Do this for every single game you discuss!
         `;
 
         try {
@@ -90,10 +94,8 @@ async function generateDailySummaries() {
 
             const isBigLeague = ['Premier League', 'Champions League', 'La Liga'].includes(leagueName);
 
-            // 🟢 USE THE TOP MATCH OF THE LEAGUE FOR THE COVER
             let featureMatch = leagueMatches[0];
 
-            // 🟢 INSERT NATIVE LOGOS (Pass null for image_url to trigger NewsArtwork VS Mode)
             const { error } = await supabase.from('news').insert([{
                 title: headline,
                 slug: reportSlug,
@@ -107,7 +109,6 @@ async function generateDailySummaries() {
 
             if (error) {
                 console.error(`   ❌ Supabase DB Error:`, error.message);
-                console.error(`   Details:`, error.details || error.hint);
             } else {
                 console.log(`   ✅ Published: ${headline}`);
             }

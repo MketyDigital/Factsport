@@ -3,9 +3,11 @@ export const runtime = 'edge';
 import { createClient } from '@/app/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronLeft, Calendar, Clock, Share2, ArrowRight, Zap, Trophy, Youtube, Newspaper } from 'lucide-react';
+import { ChevronLeft, Calendar, Clock, ArrowRight, Zap, Trophy, Youtube, Newspaper } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
-import ShareButton from '@/app/components/ShareButton'; // 🟢 Added the new Client Component
+import ShareButton from '@/app/components/ShareButton';
+// 🟢 IMPORT YOUR NEW CLIENT COMPONENT WRAPPER
+import MarkdownRenderer from '@/app/components/MarkdownRenderer'; 
 
 export default async function ArticlePage({ params }: { params: { slug: string } }) {
   const resolvedParams = await params;
@@ -26,7 +28,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
   return (
     <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans text-slate-900">
       
-      {/* HERO SECTION (Increased Height for better spacing) */}
+      {/* HERO SECTION */}
       <div className="relative h-[26rem] md:h-[30rem] w-full bg-slate-900 overflow-hidden group">
          <NewsArtwork 
             image={article.image_url} 
@@ -35,17 +37,14 @@ export default async function ArticlePage({ params }: { params: { slug: string }
             title={article.title}
             className="w-full h-full transition duration-700 group-hover:scale-105"
          />
-         {/* Smoother Gradient Fade */}
          <div className="absolute inset-0 bg-gradient-to-t from-[#F0F2F5] via-[#F0F2F5]/40 to-black/30"></div>
          
-         {/* Back Button */}
          <div className="absolute top-6 left-4 z-20">
              <Link href="/" className="bg-white/20 backdrop-blur-md text-white p-2 rounded-full hover:bg-white/30 transition inline-flex shadow-lg">
                 <ChevronLeft size={20} />
              </Link>
          </div>
 
-         {/* Title Block (Pushed to bottom) */}
          <div className="absolute bottom-0 left-0 w-full p-6 z-20">
             <div className="flex gap-2 mb-3">
                 {article.is_breaking && <span className="bg-red-600 text-white text-[10px] font-black px-2 py-1 rounded uppercase shadow-sm animate-pulse">Breaking</span>}
@@ -68,11 +67,17 @@ export default async function ArticlePage({ params }: { params: { slug: string }
          {/* MAIN CONTENT */}
          <div className="md:col-span-2">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-8">
-                <div className="prose prose-slate prose-sm max-w-none text-slate-700 leading-relaxed whitespace-pre-line">
-                    {article.body || article.content || "No content available."}
+                
+                {/* 🟢 UPGRADED: Using the safe Client Component wrapper */}
+                <div className="prose prose-slate prose-sm max-w-none text-slate-700 leading-relaxed">
+                    {article.body || article.content ? (
+                        <MarkdownRenderer content={article.body || article.content} />
+                    ) : (
+                        "No content available."
+                    )}
                 </div>
                 
-                {/* 🏆 PREDICT & WIN BANNER */}
+                {/* PREDICT & WIN BANNER */}
                 <div className="mt-8 mb-4 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-xl p-6 text-black relative overflow-hidden group shadow-lg">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-20 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
                     <div className="relative z-10">
@@ -87,7 +92,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                 {/* Share Button */}
                 <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-400">Share this story</span>
-                    {/* 🟢 Replaced static button with the interactive Client Component */}
                     <ShareButton title={article.title} slug={article.slug} />
                 </div>
             </div>
