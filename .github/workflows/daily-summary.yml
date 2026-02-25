@@ -2,8 +2,8 @@ name: Daily Matchday Round-Up
 
 on:
   schedule:
-    # Runs at 23:45 UTC (Approx 12:45 AM Nigeria Time)
-    - cron: '45 23 * * *'
+    # Runs at 22:55 UTC (Approx 11:55 AM Nigeria Time)
+    - cron: '55 22 * * *'
   workflow_dispatch: # Allows manual button click
 
 jobs:
