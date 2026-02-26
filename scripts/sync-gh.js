@@ -11,10 +11,18 @@ const LEAGUES = [
   { id: 'PL', name: 'Premier League' }, { id: 'PD', name: 'La Liga' },
   { id: 'BL1', name: 'Bundesliga' }, { id: 'SA', name: 'Serie A' },
   { id: 'FL1', name: 'Ligue 1' }, { id: 'CL', name: 'Champions League' },
-  { id: 'EC', name: 'Euros' }, { id: 'WC', name: 'World Cup' }
+  { id: 'EC', name: 'Euros' }, { id: 'WC', name: 'World Cup' },
+  { id: 'EL', name: 'Europa League' } 
 ];
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Safe fetch for when we ACTUALLY need to hit the API
+async function fetchSafe(url, options) {
+  const res = await fetch(url, options);
+  await delay(8000); // 8-second delay ensures we stay under 10/min
+  return res;
+}
 
 async function run() {
   if (!API_KEY || !SUPABASE_URL || !SUPABASE_KEY) {
@@ -31,37 +39,75 @@ async function run() {
   const fromStr = fromDate.toISOString().split('T')[0];
   const toStr = toDate.toISOString().split('T')[0];
 
-  console.log(`🚀 Starting Safe Schedule Sync: ${fromStr} to ${toStr}`);
+  console.log(`🚀 Starting SMART Schedule Sync: ${fromStr} to ${toStr}`);
+
+  // 🟢 1. PRE-FETCH EXISTING DATA FROM DB
+  // We get what we already have to avoid redundant API calls
+  console.log(`🔍 Checking database for existing rich data...`);
+  const { data: dbMatches, error: dbErr } = await supabase
+    .from('matches')
+    .select('api_id, h2h, venue, referees, stage, match_group')
+    .gte('match_date', fromStr)
+    .lte('match_date', toStr);
+
+  if (dbErr) console.error(`⚠️ Could not fetch existing matches: ${dbErr.message}`);
+
+  // Create a quick lookup map: { 12345: { h2h: {...}, venue: '...' } }
+  const existingMatches = {};
+  (dbMatches || []).forEach(m => existingMatches[m.api_id] = m);
 
   for (const league of LEAGUES) {
     console.log(`\n.. Processing ${league.name}`);
     try {
       const url = `${BASE_URL}/competitions/${league.id}/matches?dateFrom=${fromStr}&dateTo=${toStr}`;
-      const res = await fetch(url, { headers: { 'X-Auth-Token': API_KEY } });
       
+      // We don't need fetchSafe here, regular fetch is fine for the 9 league calls
+      let res = await fetch(url, { headers: { 'X-Auth-Token': API_KEY } });
+      
+      if (res.status === 429) {
+        console.error(`   ⚠️ Rate limit hit on main schedule. Backing off 60s...`);
+        await delay(60000); 
+        res = await fetch(url, { headers: { 'X-Auth-Token': API_KEY } });
+      }
+
       if (!res.ok) {
         console.error(`   ❌ Error ${res.status}: ${res.statusText}`);
-        if (res.status === 429) await delay(60000); 
       } else {
         const data = await res.json();
         const now = Date.now();
-
-        // 🟢 FILTER: Prepare matches but SKIP live ones
-        const matches = (data.matches || []).reduce((acc, m) => {
-          
+        const matches = [];
+        let newH2hFetches = 0;
+        
+        for (const m of data.matches || []) {
           const matchTime = new Date(m.utcDate).getTime();
           const diffHours = (now - matchTime) / (1000 * 60 * 60);
 
-          // 🛡️ SAFETY LOCK: 
-          // If match starts in < 30 mins (-0.5) OR started < 4 hours ago (4.0)
-          // We SKIP it. We trust ESPN Live Route to handle this window.
-          // This prevents overwriting "1-0 LIVE" with "0-0 SCHEDULED".
+          // 🛡️ SAFETY LOCK: Skip active matches
           if (diffHours > -0.5 && diffHours < 4.0 && m.status !== 'FINISHED') {
-             console.log(`   ⏩ Skipping Active Match: ${m.homeTeam.shortName} vs ${m.awayTeam.shortName}`);
-             return acc; // Skip this iteration
+             continue; 
           }
 
-          acc.push({
+          // 🟢 2. CHECK IF WE ALREADY HAVE THIS DATA
+          const existing = existingMatches[m.id];
+          let h2hData = existing?.h2h || null;
+          
+          // If we don't have the H2H data yet, ONLY THEN do we fetch it safely
+          if (!h2hData) {
+              try {
+                 const h2hUrl = `${BASE_URL}/matches/${m.id}/head2head`;
+                 const h2hRes = await fetchSafe(h2hUrl, { headers: { 'X-Auth-Token': API_KEY } });
+                 
+                 if (h2hRes.ok) {
+                     const parsedH2h = await h2hRes.json();
+                     h2hData = parsedH2h.aggregates || parsedH2h; 
+                     newH2hFetches++;
+                 }
+              } catch (err) {
+                 console.error(`   ❌ Failed to fetch H2H for ${m.id}:`, err.message);
+              }
+          }
+
+          matches.push({
             api_id: m.id,
             league: league.name,
             home_team: m.homeTeam.shortName || m.homeTeam.name,
@@ -72,21 +118,31 @@ async function run() {
             status: (m.status === 'FINISHED' || m.status === 'AWARDED') ? 'FT' : 'SCHEDULED', 
             home_logo: m.homeTeam.crest,
             away_logo: m.awayTeam.crest,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            
+            // 🟢 Merge API data with what we might already have in the DB
+            venue: m.venue || existing?.venue || null,
+            referees: m.referees?.length ? m.referees : (existing?.referees || []),
+            stage: m.stage || existing?.stage || null,
+            match_group: m.group || existing?.match_group || null,
+            h2h: h2hData
           });
-          return acc;
-        }, []);
+        }
 
         if (matches.length > 0) {
           const { error } = await supabase.from('matches').upsert(matches, { onConflict: 'api_id' });
           if (error) console.error(`   ❌ DB Error: ${error.message}`);
-          else console.log(`   ✅ Synced ${matches.length} matches (Safe Mode).`);
+          else {
+              console.log(`   ✅ Synced ${matches.length} matches.`);
+              if (newH2hFetches > 0) console.log(`   📡 Fetched H2H data for ${newH2hFetches} NEW matches.`);
+          }
         }
       }
     } catch (e) {
       console.error(`   🔥 Exception: ${e.message}`);
     }
-    await delay(10000); 
+    // Minor pause between leagues just to be safe
+    await delay(2000);
   }
 }
 
