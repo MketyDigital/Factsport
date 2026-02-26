@@ -35,12 +35,13 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const dbData = await getSupabaseData(resolvedParams.id);
   if (!dbData) return notFound();
 
-  const data = await getExternalData(dbData);
+  // 🟢 SAFETY FIX: Ensure data is never null so it doesn't crash on finished matches
+  const rawData = await getExternalData(dbData);
+  const data = rawData || {};
   
-  // 🟢 SMART MEDIA LOGIC: 
-  // If match is finished -> Show Highlights (video_url)
-  // If match is scheduled/live -> Show Watchalong (livestream_url)
-  const isFinished = ['FT', 'FINISHED', 'AWARDED'].includes(dbData.status);
+  // 🟢 SMART MEDIA LOGIC
+  const currentStatus = dbData.status?.toUpperCase() || '';
+  const isFinished = ['FT', 'FINISHED', 'AWARDED', 'AET', 'PEN'].includes(currentStatus);
   const activeVideoUrl = sanitizeUrl(isFinished ? dbData.video_url : dbData.livestream_url);
   const isLiveStream = !isFinished && !!dbData.livestream_url;
   
@@ -93,13 +94,13 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
       <div className="mx-4 mt-4 relative z-20 space-y-4">
         
-        {/* 🟢 NEW: RICH DATA DISPLAY (Venue, Stage, Group, Referees) */}
-        {(data.venue || data.stage || data.group || (dbData.referees && dbData.referees.length > 0)) && (
+        {/* 🟢 RICH DATA DISPLAY - SAFETY FIX: Added ?. everywhere */}
+        {(data?.venue || data?.stage || data?.group || (dbData?.referees && dbData?.referees?.length > 0)) && (
             <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 flex flex-wrap gap-4 items-center justify-center text-[10px] font-bold text-slate-500">
-                {data.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded"><Trophy size={12} className="text-amber-500"/> {data.stage}</span>}
-                {data.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded"><Grid size={12} className="text-blue-500"/> {data.group}</span>}
-                {data.venue && <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded"><MapPin size={12} className="text-red-500"/> {data.venue}</span>}
-                {dbData.referees && dbData.referees.length > 0 && (
+                {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded"><Trophy size={12} className="text-amber-500"/> {data.stage}</span>}
+                {data?.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded"><Grid size={12} className="text-blue-500"/> {data.group}</span>}
+                {data?.venue && <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded"><MapPin size={12} className="text-red-500"/> {data.venue}</span>}
+                {dbData?.referees && dbData?.referees?.length > 0 && (
                     <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded">
                         <span className="w-3 h-3 bg-slate-800 rounded-sm inline-block border border-white shrink-0"></span> 
                         Ref: {dbData.referees[0]}
@@ -156,8 +157,8 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
              {dbData.audio_url ? <Link href={sanitizeUrl(dbData.audio_url) || '#'} target="_blank" rel="noopener noreferrer" className="bg-white text-black hover:bg-slate-200 text-[10px] font-black px-4 py-2 rounded-full shadow-lg transition transform active:scale-95 flex items-center gap-1">LISTEN NOW <ExternalLink size={10} /></Link> : <button disabled className="bg-slate-700 text-slate-400 text-[10px] font-bold px-3 py-1.5 rounded-full cursor-not-allowed border border-white/5">OFF AIR</button>}
         </div>
 
-        {/* 🟢 HEAD-TO-HEAD (H2H) SUMMARY */}
-        {dbData.h2h && dbData.h2h.numberOfMatches > 0 && (
+        {/* 🟢 HEAD-TO-HEAD (H2H) SUMMARY - SAFETY FIX */}
+        {dbData?.h2h && dbData?.h2h?.numberOfMatches > 0 && (
             <div className="bg-white rounded-xl shadow-lg p-4 border border-slate-100">
                 <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-wider text-center mb-3">
                     Head-to-Head Summary (Last {dbData.h2h.numberOfMatches} Matches)
@@ -165,7 +166,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                 <div className="flex justify-between items-center text-center">
                     {/* Home Team Wins */}
                     <div className="flex-1">
-                        <div className="text-2xl font-black text-slate-800">{dbData.h2h.homeTeam?.wins || 0}</div>
+                        <div className="text-2xl font-black text-slate-800">{dbData.h2h?.homeTeam?.wins || 0}</div>
                         <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1 line-clamp-1 px-1">
                             {dbData.home_team} Wins
                         </div>
@@ -173,7 +174,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                     
                     {/* Draws */}
                     <div className="flex-1 border-x border-slate-100">
-                        <div className="text-xl font-black text-slate-400">{dbData.h2h.homeTeam?.draws || 0}</div>
+                        <div className="text-xl font-black text-slate-400">{dbData.h2h?.homeTeam?.draws || 0}</div>
                         <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">
                             Draws
                         </div>
@@ -181,7 +182,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                     
                     {/* Away Team Wins */}
                     <div className="flex-1">
-                        <div className="text-2xl font-black text-slate-800">{dbData.h2h.awayTeam?.wins || 0}</div>
+                        <div className="text-2xl font-black text-slate-800">{dbData.h2h?.awayTeam?.wins || 0}</div>
                         <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1 line-clamp-1 px-1">
                             {dbData.away_team} Wins
                         </div>
