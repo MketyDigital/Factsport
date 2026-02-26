@@ -89,11 +89,11 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
       <div className="mx-4 mt-4 relative z-20 space-y-4">
         
-        {/* 🟢 THE FIX IS HERE: Safely handles both String and Object referee formats */}
+        {/* 🟢 FIXED: Replaced underscores with spaces and separated tags so they copy cleanly! */}
         {(data?.venue || data?.stage || data?.group || (dbData?.referees && dbData?.referees?.length > 0)) && (
             <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 flex flex-wrap gap-4 items-center justify-center text-[10px] font-bold text-slate-500">
-                {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded"><Trophy size={12} className="text-amber-500"/> {data.stage}</span>}
-                {data?.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded"><Grid size={12} className="text-blue-500"/> {data.group}</span>}
+                {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded"><Trophy size={12} className="text-amber-500"/> {data.stage.replace(/_/g, ' ')}</span>}
+                {data?.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded"><Grid size={12} className="text-blue-500"/> {data.group.replace(/_/g, ' ')}</span>}
                 {data?.venue && <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded"><MapPin size={12} className="text-red-500"/> {data.venue}</span>}
                 {dbData?.referees && dbData?.referees?.length > 0 && (
                     <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded">
@@ -149,6 +149,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
              {dbData.audio_url ? <Link href={sanitizeUrl(dbData.audio_url) || '#'} target="_blank" rel="noopener noreferrer" className="bg-white text-black hover:bg-slate-200 text-[10px] font-black px-4 py-2 rounded-full shadow-lg transition transform active:scale-95 flex items-center gap-1">LISTEN NOW <ExternalLink size={10} /></Link> : <button disabled className="bg-slate-700 text-slate-400 text-[10px] font-bold px-3 py-1.5 rounded-full cursor-not-allowed border border-white/5">OFF AIR</button>}
         </div>
 
+        {/* 🟢 FIXED: H2H mathematically grabs Away Wins by looking at Home Losses! */}
         {dbData?.h2h && dbData?.h2h?.numberOfMatches > 0 && (
             <div className="bg-white rounded-xl shadow-lg p-4 border border-slate-100">
                 <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-wider text-center mb-3">
@@ -164,7 +165,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                         <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">Draws</div>
                     </div>
                     <div className="flex-1">
-                        <div className="text-2xl font-black text-slate-800">{dbData.h2h?.awayTeam?.wins || 0}</div>
+                        <div className="text-2xl font-black text-slate-800">{dbData.h2h?.awayTeam?.wins || dbData.h2h?.homeTeam?.losses || 0}</div>
                         <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1 line-clamp-1 px-1">{dbData.away_team} Wins</div>
                     </div>
                 </div>
