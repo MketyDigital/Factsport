@@ -7,8 +7,8 @@ import Link from 'next/link';
 import { CreditCard, Eye, ShieldAlert, LayoutDashboard, ArrowRight, Newspaper } from 'lucide-react';
 import ApproveButton from '@/app/components/ApproveButton';
 import ResetMonthButton from './components/ResetMonthButton'; 
-// 👇 IMPORT THE NEW BUTTON HERE
 import CleanupButton from './components/CleanupButton'; 
+import PromoSettingsManager from '@/app/components/PromoSettingsManager'; // 🟢 Added this import
 
 export default async function AdminDashboard() {
   const supabase = createClient();
@@ -37,7 +37,6 @@ export default async function AdminDashboard() {
       </div>
 
       {/* --- SECTION 1: DANGER ZONE (Reset & Cleanup) --- */}
-      {/* 👇 I updated this section to be a GRID so the buttons sit side-by-side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           <ResetMonthButton />
           <CleanupButton /> 
@@ -88,7 +87,8 @@ export default async function AdminDashboard() {
                                         </td>
                                         <td className="p-4">
                                             {sub.proof_url ? (
-                                                <a href={sub.proof_url} target="_blank" className="text-blue-600 font-bold text-[10px] flex items-center gap-1 hover:underline bg-blue-50 px-2 py-1 rounded w-fit">
+                                                /* 🛡️ SECURITY ADDED: rel="noopener noreferrer" */
+                                                <a href={sub.proof_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold text-[10px] flex items-center gap-1 hover:underline bg-blue-50 px-2 py-1 rounded w-fit">
                                                     <Eye size={12}/> View
                                                 </a>
                                             ) : <span className="text-slate-300 text-[10px] italic">No file</span>}
@@ -103,6 +103,10 @@ export default async function AdminDashboard() {
                     </div>
                 )}
               </div>
+
+              {/* 🟢 NEW: PROMO SETTINGS PANEL */}
+              <PromoSettingsManager />
+
           </div>
 
           {/* --- SECTION 3: QUICK LINKS (Takes up 1/3 width) --- */}
