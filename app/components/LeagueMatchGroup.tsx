@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Calendar, Zap, Ticket, ExternalLink, BarChart2, ChevronRight, Clock, CheckCircle } from 'lucide-react';
+import MatchTime from '@/app/components/MatchTime';
 
 // Helper to Group Matches by Date
 const groupByDate = (matchList: any[]) => {
@@ -139,7 +140,7 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                             ) : (
                                                 <div className="flex flex-col items-center bg-slate-50 p-1.5 rounded">
                                                     <span className="text-slate-900 font-bold text-xs">
-                                                        {new Date(match.match_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                        <MatchTime date={match.match_date} />
                                                     </span>
                                                 </div>
                                             )}
@@ -163,7 +164,7 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                                     <Ticket size={10}/> {match.booking_code}
                                                 </button>
                                             ) : (
-                                                <a href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} target="_blank" className="flex-1 bg-green-100 text-green-700 border border-green-200 rounded-lg py-1.5 text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-green-200 transition">
+                                                <a href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} target="_blank" rel="noopener noreferrer" className="flex-1 bg-green-100 text-green-700 border border-green-200 rounded-lg py-1.5 text-[10px] font-bold flex items-center justify-center gap-1 hover:bg-green-200 transition">
                                                     <ExternalLink size={10}/> Bet Now
                                                 </a>
                                             )}

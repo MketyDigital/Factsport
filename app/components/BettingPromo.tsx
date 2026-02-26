@@ -1,20 +1,42 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Copy, ExternalLink, CheckCircle } from 'lucide-react';
+import { createClient } from '@/app/lib/supabase/client';
 
 export default function BettingPromo({ affiliateLink }: { affiliateLink: string | null }) {
   const [copied, setCopied] = useState(false);
   
-  // 🟢 CONFIGURATION
-  const DEFAULT_1XBET_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599";
-  const PROMO_CODE = "FACTSPORT";
+  // 🟢 DYNAMIC SETTINGS STATE
+  const [promo, setPromo] = useState({
+      code1x: "FACTSPORT",
+      link1x: "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599",
+      codeMel: "FACTSPORT",
+      linkMel: "https://refpa54566.com/L?tag=d_1181253m_45415c_&site=1181253&ad=45415"
+  });
+
+  useEffect(() => {
+      const fetchSettings = async () => {
+          const supabase = createClient();
+          const { data } = await supabase.from('site_settings').select('*').eq('id', 1).single();
+          if (data) {
+              setPromo({
+                  code1x: data.code_1xbet || promo.code1x,
+                  link1x: data.link_1xbet || promo.link1x,
+                  codeMel: data.code_melbet || promo.codeMel,
+                  linkMel: data.link_melbet || promo.linkMel
+              });
+          }
+      };
+      fetchSettings();
+  }, []);
 
   // LOGIC: If admin set a link, it's Melbet. If null, it's 1xBet.
   const isOverride = !!affiliateLink;
-  const targetLink = affiliateLink || DEFAULT_1XBET_LINK;
+  const targetLink = affiliateLink || promo.link1x;
+  const targetCode = isOverride ? promo.codeMel : promo.code1x; // Uses specific code
 
   const copyCode = () => {
-      navigator.clipboard.writeText(PROMO_CODE);
+      navigator.clipboard.writeText(targetCode);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
   };
@@ -37,11 +59,12 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
                 <button onClick={copyCode} className="flex-1 bg-black/10 hover:bg-black/20 border border-black/5 rounded-lg px-3 py-2 flex items-center justify-between transition active:scale-95">
                     <div className="text-left">
                         <span className="text-[8px] font-bold block opacity-60 uppercase">Code</span>
-                        <span className="text-xs font-mono font-black tracking-wider">{PROMO_CODE}</span>
+                        <span className="text-xs font-mono font-black tracking-wider">{targetCode}</span>
                     </div>
                     {copied ? <CheckCircle size={16} className="text-black"/> : <Copy size={16} className="text-black opacity-50"/>}
                 </button>
-                <a href={targetLink} target="_blank" className="bg-black text-white px-5 py-2 rounded-lg font-black text-xs flex items-center gap-2 hover:scale-105 transition shadow-lg">
+                {/* 🛡️ SECURITY ADDED */}
+                <a href={targetLink} target="_blank" rel="noopener noreferrer" className="bg-black text-white px-5 py-2 rounded-lg font-black text-xs flex items-center gap-2 hover:scale-105 transition shadow-lg">
                     BET <ExternalLink size={12}/>
                 </a>
             </div>
@@ -68,12 +91,13 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
              <button onClick={copyCode} className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-3 py-2 flex-1 flex items-center justify-between transition active:scale-95">
                 <div className="text-left">
                     <span className="text-[8px] text-slate-400 block uppercase font-bold">Promo Code</span>
-                    <span className="text-xs text-white font-mono font-black tracking-wider">{PROMO_CODE}</span>
+                    <span className="text-xs text-white font-mono font-black tracking-wider">{targetCode}</span>
                 </div>
                 {copied ? <CheckCircle size={16} className="text-green-500"/> : <Copy size={16} className="text-slate-500"/>}
              </button>
 
-             <a href={targetLink} target="_blank" className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-black px-6 py-2 rounded-lg shadow-lg flex items-center gap-1 transition">
+             {/* 🛡️ SECURITY ADDED */}
+             <a href={targetLink} target="_blank" rel="noopener noreferrer" className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-black px-6 py-2 rounded-lg shadow-lg flex items-center gap-1 transition">
                 BET <ExternalLink size={12} />
              </a>
         </div>

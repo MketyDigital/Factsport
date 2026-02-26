@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { Calendar, ChevronRight, Zap, Trophy, Youtube, Newspaper, ArrowRight } from 'lucide-react';
-import NewsArtwork from '@/app/components/NewsArtwork'; // ✅ Import the smart artwork component
+import NewsArtwork from '@/app/components/NewsArtwork'; 
 
 export default async function NewsListingPage() {
   const supabase = createClient();
@@ -53,7 +53,6 @@ export default async function NewsListingPage() {
             <Link href={`/news/${featured.slug}`} className="block group mb-8">
                 <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
                     <div className="aspect-video w-full relative overflow-hidden bg-slate-100">
-                        {/* 🟢 FIXED: Use NewsArtwork instead of <img> */}
                         <NewsArtwork 
                             image={featured.image_url} 
                             team1Logo={featured.team_1_logo} 
@@ -86,7 +85,6 @@ export default async function NewsListingPage() {
             {rest.map((item) => (
                 <Link key={item.id} href={`/news/${item.slug}`} className="group bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition">
                     <div className="aspect-[3/2] relative overflow-hidden bg-slate-100">
-                        {/* 🟢 FIXED: Use NewsArtwork instead of <img> */}
                         <NewsArtwork 
                             image={item.image_url} 
                             team1Logo={item.team_1_logo} 
@@ -123,7 +121,8 @@ export default async function NewsListingPage() {
                       <Newspaper className="text-blue-400" size={24} />
                       <span className="text-[10px] font-bold text-white">Home</span>
                   </Link>
-                  <a href="https://youtube.com/@factsportlive" target="_blank" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
+                  {/* 🛡️ SECURITY ADDED */}
+                  <a href="https://youtube.com/@factsportlive" target="_blank" rel="noopener noreferrer" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
                       <Youtube className="text-red-500" size={24} />
                       <span className="text-[10px] font-bold text-white">YouTube</span>
                   </a>

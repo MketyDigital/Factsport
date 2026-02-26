@@ -7,11 +7,10 @@ import { createClient } from '@/app/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { 
   Trophy, Check, Copy, CreditCard, Bitcoin, Loader2, ShieldCheck, 
-  UploadCloud, Image as ImageIcon, X, AlertCircle, 
-  Gift, MessageCircle, Ticket, TrendingUp, Tv 
+  UploadCloud, AlertCircle, Gift, MessageCircle, Ticket, 
+  TrendingUp, Tv, ExternalLink, Mail, Send
 } from 'lucide-react';
 import Link from 'next/link';
-import FreeTipsBanner from '@/app/components/FreeTipsBanner'; // ✅ IMPORTED
 
 export default function VipUpgradePage() {
   const [loading, setLoading] = useState(false);
@@ -24,7 +23,7 @@ export default function VipUpgradePage() {
 
   // Form States
   const [copied, setCopied] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'bank' | 'crypto'>('bank');
+  const [paymentMethod, setPaymentMethod] = useState<'gateway' | 'crypto'>('crypto');
   const [ref, setRef] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [success, setSuccess] = useState(false);
@@ -33,43 +32,48 @@ export default function VipUpgradePage() {
   const router = useRouter();
   const supabase = createClient();
 
-  // --- CONFIG ---
-  const BANK_DETAILS = {
-    bankName: "Opay / Paycom",
-    accountNumber: "9012345678",
-    accountName: "FactSport Enterprise",
-    price: "₦5,000"
-  };
-  const CRYPTO_DETAILS = {
-    network: "Bitcoin / USDT (TRC20)",
-    address: "TWe7....(Your Wallet)...",
-    price: "$5.00"
-  };
+  // --- 🟢 DYNAMIC SETTINGS STATE ---
+  const [gatewayDetails, setGatewayDetails] = useState({ link: "", price: "$5.00" });
+  const [cryptoDetails, setCryptoDetails] = useState({ network: "USDT/Bitcoin (TRC20)", address: "TRVBw6ZzVnnzfSMSPkyGrRjVpqH9C7wcr2", price: "$5.00" });
+  const [supportDetails, setSupportDetails] = useState({ telegram: "https://t.me/factsportlive", email: "support@factsport.com" });
 
   // 1. SMART CHECK ON LOAD
   useEffect(() => {
-    const checkStatus = async () => {
+    const initData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      
+      // Fetch dynamic payment & support settings
+      const { data: settings } = await supabase.from('site_settings').select('*').eq('id', 1).single();
+      if (settings) {
+          setGatewayDetails({
+              link: settings.gateway_link || "",
+              price: "$5.00" // Locked to dollar
+          });
+          setCryptoDetails({
+              network: settings.crypto_network || "USDT/Bitcoin (TRC20)",
+              address: settings.crypto_address || "TRVBw6ZzVnnzfSMSPkyGrRjVpqH9C7wcr2",
+              price: "$5.00"
+          });
+          if (settings.telegram_support) {
+              setSupportDetails(prev => ({ ...prev, telegram: settings.telegram_support }));
+          }
+          
+          // Force crypto if gateway link is empty
+          if (!settings.gateway_link) setPaymentMethod('crypto');
+      }
+
       if (!session) return;
 
       // Check Profile for VIP Status
       const { data: profile } = await supabase.from('profiles').select('is_vip, vip_expires_at').eq('id', session.user.id).single();
-      
-      // Check for Pending Requests
       const { data: pending } = await supabase.from('subscriptions').select('id').eq('user_id', session.user.id).eq('status', 'pending').single();
 
-      if (profile?.is_vip) {
-          setIsVip(true);
-          setVipExpiry(profile.vip_expires_at);
-      }
-      
-      if (pending) {
-          setHasPending(true);
-      }
+      if (profile?.is_vip) { setIsVip(true); setVipExpiry(profile.vip_expires_at); }
+      if (pending) { setHasPending(true); }
 
       setCheckingStatus(false);
     };
-    checkStatus();
+    initData();
   }, [supabase]);
 
   // Helper: Copy Text
@@ -83,12 +87,15 @@ export default function VipUpgradePage() {
     e.preventDefault();
     setUploadError(null);
 
+    // Security Check: Prevent submitting if gateway is selected but unavailable
+    if (paymentMethod === 'gateway' && !gatewayDetails.link) return;
+
     if (hasPending) {
         setUploadError("You already have a pending request. Please wait for approval.");
         return;
     }
 
-    if (!file && !ref) { setUploadError("Please provide Proof."); return; }
+    if (!file && !ref) { setUploadError("Please provide Proof of payment or Transaction ID."); return; }
     setLoading(true);
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -99,10 +106,13 @@ export default function VipUpgradePage() {
     let proofUrl = null;
 
     if (file) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+        // Security Check: Sanitize file name before upload
+        const fileExt = file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'img';
+        const fileName = `proof-${user.id}-${Date.now()}.${fileExt}`;
+        
         const { error: uploadErr } = await supabase.storage.from('payment_proofs').upload(fileName, file);
         if (uploadErr) { setUploadError(`Upload Failed: ${uploadErr.message}`); setLoading(false); return; }
+        
         const { data: publicUrlData } = supabase.storage.from('payment_proofs').getPublicUrl(fileName);
         proofUrl = publicUrlData.publicUrl;
     }
@@ -110,7 +120,7 @@ export default function VipUpgradePage() {
     const { error } = await supabase.from('subscriptions').insert({
         user_id: user.id,
         plan: 'monthly',
-        amount: paymentMethod === 'bank' ? 5000 : 5,
+        amount: 5, 
         payment_method: paymentMethod,
         transaction_ref: ref || 'Screenshot Uploaded',
         proof_url: proofUrl,
@@ -119,7 +129,7 @@ export default function VipUpgradePage() {
 
     if (!error) {
         setSuccess(true);
-        setHasPending(true); // Prevent double submit instantly
+        setHasPending(true); 
     } else {
         setUploadError(`Error: ${error.message}`);
     }
@@ -188,27 +198,33 @@ export default function VipUpgradePage() {
         <div className="grid grid-cols-2 gap-3">
              <div className="bg-[#1A1A1A] border border-white/5 p-4 rounded-xl flex flex-col items-center text-center">
                  <div className="w-8 h-8 bg-yellow-500/10 rounded-full flex items-center justify-center mb-2"><Trophy size={16} className="text-yellow-500"/></div>
-                 <h3 className="text-xs font-bold text-white">Monthly Cash Prizes</h3>
+                 <h3 className="text-xs font-bold text-white mb-1">Monthly Cash Prizes</h3>
+                 <p className="text-[9px] text-slate-400 leading-tight">Top the leaderboard to win real cash rewards.</p>
              </div>
              <div className="bg-[#1A1A1A] border border-white/5 p-4 rounded-xl flex flex-col items-center text-center">
                  <div className="w-8 h-8 bg-blue-500/10 rounded-full flex items-center justify-center mb-2"><Gift size={16} className="text-blue-500"/></div>
-                 <h3 className="text-xs font-bold text-white">Win Sport Items</h3>
+                 <h3 className="text-xs font-bold text-white mb-1">Win Sport Items</h3>
+                 <p className="text-[9px] text-slate-400 leading-tight">Exclusive jerseys and official merchandise.</p>
              </div>
              <div className="bg-[#1A1A1A] border border-white/5 p-4 rounded-xl flex flex-col items-center text-center">
                  <div className="w-8 h-8 bg-green-500/10 rounded-full flex items-center justify-center mb-2"><MessageCircle size={16} className="text-green-500"/></div>
-                 <h3 className="text-xs font-bold text-white">VIP Telegram Access</h3>
+                 <h3 className="text-xs font-bold text-white mb-1">VIP Telegram</h3>
+                 <p className="text-[9px] text-slate-400 leading-tight">Join our private community of winners.</p>
              </div>
              <div className="bg-[#1A1A1A] border border-white/5 p-4 rounded-xl flex flex-col items-center text-center">
                  <div className="w-8 h-8 bg-purple-500/10 rounded-full flex items-center justify-center mb-2"><Ticket size={16} className="text-purple-500"/></div>
-                 <h3 className="text-xs font-bold text-white">Accurate Betting Codes</h3>
+                 <h3 className="text-xs font-bold text-white mb-1">Accurate Codes</h3>
+                 <p className="text-[9px] text-slate-400 leading-tight">Daily high-odds slips sent to you directly.</p>
              </div>
              <div className="bg-[#1A1A1A] border border-white/5 p-4 rounded-xl flex flex-col items-center text-center">
                  <div className="w-8 h-8 bg-red-500/10 rounded-full flex items-center justify-center mb-2"><TrendingUp size={16} className="text-red-500"/></div>
-                 <h3 className="text-xs font-bold text-white">Premium Analysis</h3>
+                 <h3 className="text-xs font-bold text-white mb-1">Premium Analysis</h3>
+                 <p className="text-[9px] text-slate-400 leading-tight">Deep stats and insights on top matches.</p>
              </div>
              <div className="bg-[#1A1A1A] border border-white/5 p-4 rounded-xl flex flex-col items-center text-center">
                  <div className="w-8 h-8 bg-orange-500/10 rounded-full flex items-center justify-center mb-2"><Tv size={16} className="text-orange-500"/></div>
-                 <h3 className="text-xs font-bold text-white">Live Match Watch</h3>
+                 <h3 className="text-xs font-bold text-white mb-1">Live Match Watch</h3>
+                 <p className="text-[9px] text-slate-400 leading-tight">Stream premium matches inside the app.</p>
              </div>
         </div>
 
@@ -231,8 +247,8 @@ export default function VipUpgradePage() {
             <>
                 {/* --- PAYMENT METHOD TOGGLE --- */}
                 <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => setPaymentMethod('bank')} className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition active:scale-95 ${paymentMethod === 'bank' ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-[#111] border-white/10 text-slate-400'}`}>
-                        <CreditCard size={24} /><span className="text-[10px] font-black uppercase tracking-wide">Bank Transfer</span>
+                    <button onClick={() => setPaymentMethod('gateway')} className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition active:scale-95 ${paymentMethod === 'gateway' ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-[#111] border-white/10 text-slate-400'}`}>
+                        <CreditCard size={24} /><span className="text-[10px] font-black uppercase tracking-wide">Card / Bank</span>
                     </button>
                     <button onClick={() => setPaymentMethod('crypto')} className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition active:scale-95 ${paymentMethod === 'crypto' ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-[#111] border-white/10 text-slate-400'}`}>
                         <Bitcoin size={24} /><span className="text-[10px] font-black uppercase tracking-wide">Crypto</span>
@@ -241,58 +257,58 @@ export default function VipUpgradePage() {
 
                 {/* --- PAYMENT DETAILS CARD --- */}
                 <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-                      {/* Background Glow */}
                       <div className="absolute -right-10 -top-10 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none"></div>
                       
                       <div className="text-center mb-6">
                         <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Amount to Pay</span>
-                        <h2 className="text-3xl font-black text-white mt-1">{paymentMethod === 'bank' ? BANK_DETAILS.price : CRYPTO_DETAILS.price}</h2>
+                        <h2 className="text-3xl font-black text-white mt-1">{paymentMethod === 'gateway' ? gatewayDetails.price : cryptoDetails.price}</h2>
                       </div>
 
                       <div className="space-y-4">
-                        {paymentMethod === 'bank' ? (
-                            <>
-                                <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                    <span className="text-xs text-slate-400">Bank Name</span>
-                                    <span className="text-sm font-bold text-white">{BANK_DETAILS.bankName}</span>
+                        {paymentMethod === 'gateway' ? (
+                            gatewayDetails.link ? (
+                                <div className="text-center">
+                                    <p className="text-xs text-slate-300 mb-4">
+                                        Click the button below to pay securely via our global payment partner. 
+                                        <strong> Save your receipt after payment.</strong>
+                                    </p>
+                                    <a 
+                                        href={gatewayDetails.link} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-black px-6 py-3 rounded-xl shadow-lg transition active:scale-95"
+                                    >
+                                        Proceed to Payment <ExternalLink size={16} />
+                                    </a>
                                 </div>
-                                <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                    <span className="text-xs text-slate-400">Account Name</span>
-                                    <span className="text-sm font-bold text-white text-right">{BANK_DETAILS.accountName}</span>
+                            ) : (
+                                /* 🔴 NOT AVAILABLE MESSAGE */
+                                <div className="bg-red-500/10 border border-red-500/20 p-5 rounded-xl text-center">
+                                    <AlertCircle className="text-red-500 mx-auto mb-2" size={28} />
+                                    <h4 className="text-sm font-black text-red-400 uppercase tracking-wider mb-1">Gateway Unavailable</h4>
+                                    <p className="text-[10px] text-red-200/70 font-medium">
+                                        Card payments are currently offline. Please select the <strong>Crypto</strong> option above to complete your upgrade securely.
+                                    </p>
                                 </div>
-                                <div>
-                                    <span className="text-xs text-slate-400 mb-1 block">Account Number</span>
-                                    <div className="flex gap-2">
-                                        <div className="flex-1 bg-black border border-white/20 rounded-lg p-3 font-mono font-bold text-lg text-yellow-500 tracking-wider">
-                                            {BANK_DETAILS.accountNumber}
-                                        </div>
-                                        <button 
-                                            onClick={() => handleCopy(BANK_DETAILS.accountNumber)}
-                                            className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg transition"
-                                        >
-                                            {copied === BANK_DETAILS.accountNumber ? <Check size={20} className="text-green-500"/> : <Copy size={20}/>}
-                                        </button>
-                                    </div>
-                                </div>
-                            </>
+                            )
                         ) : (
                             <>
                                 <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-lg mb-4">
                                      <p className="text-[10px] text-yellow-200 text-center font-bold">
-                                       ⚠️ Please ensure you send ONLY <br/> {CRYPTO_DETAILS.network}
+                                        ⚠️ Please ensure you send ONLY <br/> <span className="text-yellow-500">{cryptoDetails.network}</span>
                                      </p>
                                 </div>
                                 <div>
-                                    <span className="text-xs text-slate-400 mb-1 block">Wallet Address ({CRYPTO_DETAILS.network})</span>
+                                    <span className="text-xs text-slate-400 mb-1 block">Wallet Address ({cryptoDetails.network})</span>
                                     <div className="flex gap-2">
                                         <div className="flex-1 bg-black border border-white/20 rounded-lg p-3 font-mono text-xs text-slate-300 break-all flex items-center">
-                                            {CRYPTO_DETAILS.address}
+                                            {cryptoDetails.address}
                                         </div>
                                         <button 
-                                            onClick={() => handleCopy(CRYPTO_DETAILS.address)}
+                                            onClick={() => handleCopy(cryptoDetails.address)}
                                             className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg transition h-full"
                                         >
-                                            {copied === CRYPTO_DETAILS.address ? <Check size={20} className="text-green-500"/> : <Copy size={20}/>}
+                                            {copied === cryptoDetails.address ? <Check size={20} className="text-green-500"/> : <Copy size={20}/>}
                                         </button>
                                     </div>
                                 </div>
@@ -306,21 +322,52 @@ export default function VipUpgradePage() {
                     {uploadError && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold rounded-lg text-center">{uploadError}</div>}
                     
                     <div className="space-y-5">
-                        <input type="text" placeholder={paymentMethod === 'bank' ? "Sender Name / Ref ID" : "Transaction Hash / ID"} className="w-full bg-black border border-white/20 rounded-xl py-3.5 px-4 text-white text-sm focus:border-yellow-500 outline-none transition" value={ref} onChange={(e) => setRef(e.target.value)} />
+                        <input 
+                            type="text" 
+                            disabled={paymentMethod === 'gateway' && !gatewayDetails.link}
+                            placeholder="Enter Transaction ID or Receipt Ref" 
+                            className="w-full bg-black border border-white/20 rounded-xl py-3.5 px-4 text-white text-sm focus:border-yellow-500 outline-none transition disabled:opacity-50" 
+                            value={ref} 
+                            onChange={(e) => setRef(e.target.value)} 
+                        />
                         
-                        <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-yellow-500/50 hover:bg-white/5 transition group">
-                            <UploadCloud className="text-slate-500 group-hover:text-yellow-500 transition" size={24} />
-                            <span className="text-[10px] text-slate-400 mt-2 font-medium">{file ? file.name : "Tap to Upload Screenshot"}</span>
-                            <input type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files && setFile(e.target.files[0])} />
+                        <label className={`flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-white/20 rounded-xl transition group ${paymentMethod === 'gateway' && !gatewayDetails.link ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-yellow-500/50 hover:bg-white/5'}`}>
+                            <UploadCloud className={`transition ${paymentMethod === 'gateway' && !gatewayDetails.link ? 'text-slate-600' : 'text-slate-500 group-hover:text-yellow-500'}`} size={24} />
+                            <span className="text-[10px] text-slate-400 mt-2 font-medium">{file ? file.name : "Tap to Upload Screenshot (Required)"}</span>
+                            <input 
+                                type="file" 
+                                className="hidden" 
+                                accept="image/*" 
+                                disabled={paymentMethod === 'gateway' && !gatewayDetails.link}
+                                onChange={(e) => e.target.files && setFile(e.target.files[0])} 
+                            />
                         </label>
 
-                        <button type="submit" disabled={loading} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black uppercase py-4 rounded-xl shadow-lg mt-2 transition active:scale-95">
-                            {loading ? <Loader2 className="animate-spin mx-auto" size={20} /> : "Submit Payment"}
+                        <button 
+                            type="submit" 
+                            disabled={loading || (paymentMethod === 'gateway' && !gatewayDetails.link)} 
+                            className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black uppercase py-4 rounded-xl shadow-lg mt-2 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {loading ? <Loader2 className="animate-spin mx-auto" size={20} /> : "Submit Proof"}
                         </button>
                     </div>
                 </form>
             </>
         )}
+
+        {/* --- CUSTOMER SUPPORT FOOTER --- */}
+        <div className="mt-8 border-t border-white/10 pt-8 pb-4 text-center">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Need Help With Payment?</h4>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <a href={`mailto:${supportDetails.email}`} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2.5 rounded-lg text-xs font-bold transition">
+                    <Mail size={14} className="text-blue-400" /> {supportDetails.email}
+                </a>
+                <a href={supportDetails.telegram} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 px-4 py-2.5 rounded-lg text-xs font-bold text-blue-400 transition">
+                    <Send size={14} /> Chat on Telegram
+                </a>
+            </div>
+        </div>
+
       </div>
     </div>
   );
