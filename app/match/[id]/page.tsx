@@ -3,7 +3,7 @@ export const runtime = 'edge';
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon } from 'lucide-react';
+import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon, MapPin, Trophy, Grid } from 'lucide-react';
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
 import MatchHeaderClient from '@/app/components/MatchHeaderClient'; 
@@ -11,7 +11,14 @@ import StatsLineupsTabs from '@/app/components/StatsLineupsTabs';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 import { getExternalData } from '@/app/lib/matchService';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
-import { unstable_noStore as noStore } from 'next/cache'; // 🛑 Kills Cache
+import { unstable_noStore as noStore } from 'next/cache'; 
+
+// 🛡️ SECURITY: Prevent XSS attacks via malicious javascript: URLs
+const sanitizeUrl = (url: string | null | undefined) => {
+    if (!url) return null;
+    if (url.trim().toLowerCase().startsWith('javascript:')) return '#';
+    return url;
+};
 
 async function getSupabaseData(id: string) {
     const supabase = createClient();
@@ -21,7 +28,7 @@ async function getSupabaseData(id: string) {
 }
 
 export default async function MatchDetailsPage({ params }: { params: { id: string } }) {
-  noStore(); // 🛑 Forces fresh data on load
+  noStore(); 
   const resolvedParams = await params;
   if (!resolvedParams?.id) return notFound();
 
@@ -29,8 +36,14 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   if (!dbData) return notFound();
 
   const data = await getExternalData(dbData);
-  const activeVideoUrl = dbData.livestream_url || dbData.video_url;
-  const isLiveStream = !!dbData.livestream_url;
+  
+  // 🟢 SMART MEDIA LOGIC: 
+  // If match is finished -> Show Highlights (video_url)
+  // If match is scheduled/live -> Show Watchalong (livestream_url)
+  const isFinished = ['FT', 'FINISHED', 'AWARDED'].includes(dbData.status);
+  const activeVideoUrl = sanitizeUrl(isFinished ? dbData.video_url : dbData.livestream_url);
+  const isLiveStream = !isFinished && !!dbData.livestream_url;
+  
   const hasWidget = !!dbData.widget_id; 
 
   return (
@@ -47,11 +60,11 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           </div>
       ) : (
           <div className="relative bg-[#0a1428] text-white pb-6 rounded-b-[2rem] overflow-hidden shadow-2xl">
-            {/* 🟢 STADIUM BACKGROUND */}
+            {/* STADIUM BACKGROUND */}
             {dbData.home_stadium ? (
                  <>
                     <div className="absolute top-0 left-0 w-full h-full">
-                        <img src={dbData.home_stadium} className="w-full h-full object-cover opacity-30 blur-sm scale-110" />
+                        <img src={sanitizeUrl(dbData.home_stadium)} className="w-full h-full object-cover opacity-30 blur-sm scale-110" />
                     </div>
                     <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-[#0a1428]/90 via-[#0a1428]/70 to-[#0a1428]"></div>
                  </>
@@ -66,7 +79,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
               
               {/* League Banner */}
               {dbData.league_banner ? (
-                  <img src={dbData.league_banner} className="h-6 object-contain opacity-80" alt={dbData.league} />
+                  <img src={sanitizeUrl(dbData.league_banner)} className="h-6 object-contain opacity-80" alt={dbData.league} />
               ) : (
                   <span className="text-xs font-bold tracking-widest opacity-70 uppercase">{dbData.league}</span>
               )}
@@ -79,22 +92,33 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       )}
 
       <div className="mx-4 mt-4 relative z-20 space-y-4">
+        
+        {/* 🟢 NEW: RICH DATA DISPLAY (Venue, Stage, Group) */}
+        {(data.venue || data.stage || data.group) && (
+            <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 flex flex-wrap gap-4 items-center justify-center text-[10px] font-bold text-slate-500">
+                {data.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded"><Trophy size={12} className="text-amber-500"/> {data.stage}</span>}
+                {data.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded"><Grid size={12} className="text-blue-500"/> {data.group}</span>}
+                {data.venue && <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded"><MapPin size={12} className="text-red-500"/> {data.venue}</span>}
+            </div>
+        )}
+
         {hasWidget && (
              <div className="-mt-2">
-                 <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={dbData.affiliate_link} />
+                 <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={sanitizeUrl(dbData.affiliate_link)} />
              </div>
         )}
 
-        {/* 🟢 TEAM JERSEY DISPLAY */}
+        {/* TEAM JERSEY DISPLAY */}
         {dbData.home_jersey && (
             <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 flex items-center justify-center gap-6">
                  <div className="text-center">
                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-2">Home Kit</p>
-                     <img src={dbData.home_jersey} className="h-16 object-contain drop-shadow-md" />
+                     <img src={sanitizeUrl(dbData.home_jersey)} className="h-16 object-contain drop-shadow-md" />
                  </div>
             </div>
         )}
 
+        {/* MEDIA PLAYER (Livestream OR Highlights based on Status) */}
         {activeVideoUrl && (
             <div className="rounded-xl overflow-hidden shadow-2xl border border-white/20 relative">
                 <div className="absolute top-3 left-3 z-30 pointer-events-none">
@@ -123,7 +147,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                     <p className="text-slate-400 text-[10px]">{dbData.audio_url ? "Radio is currently LIVE" : "Tune in when match starts"}</p>
                  </div>
              </div>
-             {dbData.audio_url ? <Link href={dbData.audio_url} target="_blank" className="bg-white text-black hover:bg-slate-200 text-[10px] font-black px-4 py-2 rounded-full shadow-lg transition transform active:scale-95 flex items-center gap-1">LISTEN NOW <ExternalLink size={10} /></Link> : <button disabled className="bg-slate-700 text-slate-400 text-[10px] font-bold px-3 py-1.5 rounded-full cursor-not-allowed border border-white/5">OFF AIR</button>}
+             {dbData.audio_url ? <Link href={sanitizeUrl(dbData.audio_url) || '#'} target="_blank" className="bg-white text-black hover:bg-slate-200 text-[10px] font-black px-4 py-2 rounded-full shadow-lg transition transform active:scale-95 flex items-center gap-1">LISTEN NOW <ExternalLink size={10} /></Link> : <button disabled className="bg-slate-700 text-slate-400 text-[10px] font-bold px-3 py-1.5 rounded-full cursor-not-allowed border border-white/5">OFF AIR</button>}
         </div>
 
         {/* Prediction Board */}
@@ -143,7 +167,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                         <div className="text-[9px] text-slate-400">Code: <span className="text-white font-bold tracking-wider">{dbData.booking_code || "FACTSPORT"}</span></div>
                     </div>
                 </div>
-                <a href={dbData.affiliate_link || "#"} target="_blank" className="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase px-4 py-2 rounded-lg shadow-lg text-[10px] flex items-center gap-1 active:scale-95 transition">
+                <a href={sanitizeUrl(dbData.affiliate_link) || "#"} target="_blank" className="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase px-4 py-2 rounded-lg shadow-lg text-[10px] flex items-center gap-1 active:scale-95 transition">
                     Bet <LinkIcon size={10} />
                 </a>
             </div>
