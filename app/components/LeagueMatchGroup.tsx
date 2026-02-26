@@ -92,12 +92,23 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                 const isLive = ['LIVE', 'HT', 'IN_PLAY'].includes(match.status);
                                 const isScheduled = match.status === 'SCHEDULED' || match.status === 'PRE';
                                 const isFinished = ['FT', 'FINISHED'].includes(match.status);
+                                
+                                // 🟢 NEW: EXTRACT STAGE OR GROUP DATA
+                                const stageText = match.match_group ? match.match_group.replace(/_/g, ' ') : (match.stage && match.stage !== 'REGULAR_SEASON' ? match.stage.replace(/_/g, ' ') : null);
 
                                 return (
                                 <div key={match.id} className="block hover:bg-slate-50 transition p-4">
                                     <Link href={`/match/${match.id}`} className="flex items-center justify-between mb-3">
-                                        {/* TEAMS */}
+                                        {/* TEAMS & RICH DATA */}
                                         <div className="flex-1 space-y-2">
+                                            
+                                            {/* 🟢 STAGE / GROUP INFO PILL */}
+                                            {stageText && (
+                                                <div className="text-[8px] font-black text-blue-500 uppercase tracking-wider mb-1 bg-blue-50 inline-block px-1.5 py-0.5 rounded">
+                                                    {stageText}
+                                                </div>
+                                            )}
+
                                             <div className="flex items-center gap-3">
                                                 <div className="w-6 h-6 flex items-center justify-center shrink-0">
                                                     {match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain" /> : <div className="w-5 h-5 bg-slate-200 rounded-full"/>}
@@ -135,8 +146,7 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                         </div>
                                     </Link>
 
-                                    {/* C. ACTION BUTTONS (The Logic You Requested) */}
-                                    {/* Only show buttons if NOT finished */}
+                                    {/* C. ACTION BUTTONS */}
                                     {!isFinished && (
                                         <div className="flex gap-2 mt-2 pt-2 border-t border-slate-50">
                                             
