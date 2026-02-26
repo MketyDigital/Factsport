@@ -182,7 +182,8 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       
       // Get dates that have upcoming/current matches (>= today)
       const validMatches = matches.filter(m => m.match_date.split('T')[0] >= todayStr);
-      const upcomingDates = [...new Set(validMatches.map(m => m.match_date.split('T')[0]))].sort();
+      // 🟢 FIX: Used Array.from instead of spread operator to satisfy TypeScript
+      const upcomingDates = Array.from(new Set(validMatches.map((m: any) => m.match_date.split('T')[0]))).sort();
       
       if (upcomingDates.length > 0) {
           const targetDate = upcomingDates[0]; // This locks onto today, or next available day
@@ -355,7 +356,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                     </span>
                                 </div>
                                 <div className="flex flex-col items-center w-[30%]">
-                                    {match.away_logo ? <img src={match.away_logo} className="w-12 h-12 object-contain mb-2 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px]">A</div>}
+                                    {match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain mb-2 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px]">A</div>}
                                     <span className="text-[10px] font-bold text-center leading-tight text-white line-clamp-1 drop-shadow-md">{match.away_team}</span>
                                 </div>
                             </div>
