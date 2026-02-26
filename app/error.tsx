@@ -49,8 +49,18 @@ export default function GlobalError({
          {blame}
       </p>
 
+      {/* 🚨 THE MAGIC DEBUG BOX 🚨 */}
+      <div className="w-full max-w-md bg-red-100 border border-red-300 p-4 rounded-xl mb-6 shadow-sm">
+          <h3 className="text-xs font-black text-red-800 uppercase tracking-widest mb-2 flex items-center justify-center gap-1">
+              <AlertTriangle size={14} /> Official Ref Report
+          </h3>
+          <p className="text-sm font-mono text-red-600 font-bold break-words">
+              {error.name}: {error.message}
+          </p>
+      </div>
+
       <button onClick={generateExcuse} className="text-xs text-blue-600 font-bold hover:underline mb-8">
-          (Click for new excuse)
+         (Click for new excuse)
       </button>
       
       <button
