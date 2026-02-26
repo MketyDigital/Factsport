@@ -3,7 +3,7 @@
 export const runtime = 'edge';
 
 import { useEffect, useState } from 'react';
-import { MonitorPlay, RefreshCw, AlertTriangle } from 'lucide-react';
+import { MonitorPlay, RefreshCw } from 'lucide-react';
  
 export default function GlobalError({
   error,
@@ -50,7 +50,7 @@ export default function GlobalError({
       </p>
 
       <button onClick={generateExcuse} className="text-xs text-blue-600 font-bold hover:underline mb-8">
-          (Click for new excuse)
+         (Click for new excuse)
       </button>
       
       <button

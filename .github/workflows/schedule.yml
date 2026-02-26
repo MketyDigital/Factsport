@@ -2,7 +2,7 @@ name: Hourly Match Schedule Sync
 
 on:
   schedule:
-    - cron: '0 */4 * * *' # Runs every 4 hours
+    - cron: '0 */12 * * *' # Runs every 12 hours
   workflow_dispatch: # Allows manual button click
 
 jobs:

@@ -6,10 +6,11 @@ import { BarChart2, Users, List, AlertCircle } from 'lucide-react';
 export default function StatsLineupsTabs({ matchId, initialData }: { matchId: string, initialData: any }) {
   const [activeTab, setActiveTab] = useState('events');
 
+  // 🟢 SAFETY FIX: Added optional chaining so it doesn't crash on null
   const [liveData, setLiveData] = useState({
-      stats: initialData.stats || { home: {}, away: {} },
-      lineups: initialData.lineups || { home: [], away: [] },
-      events: initialData.goals || [] 
+      stats: initialData?.stats || { home: {}, away: {} },
+      lineups: initialData?.lineups || { home: [], away: [] },
+      events: initialData?.goals || initialData?.match_events || [] 
   });
 
   useEffect(() => {
@@ -21,30 +22,34 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
           table: 'matches', 
           filter: `id=eq.${matchId}` 
       }, (payload) => {
-          setLiveData({
-              stats: payload.new.stats || { home: {}, away: {} },
-              lineups: payload.new.lineups || { home: [], away: [] },
-              events: payload.new.match_events || []
-          });
+          setLiveData(prev => ({
+              stats: payload.new?.stats || prev.stats,
+              lineups: payload.new?.lineups || prev.lineups,
+              events: payload.new?.match_events || prev.events
+          }));
       }).subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [matchId]);
 
   const { stats, lineups, events } = liveData;
-  const hasLineups = lineups.home?.length > 0 || lineups.away?.length > 0;
-  const hasStats = stats.home?.possession || stats.home?.shots;
+  
+  // 🟢 SAFETY FIX: Protect against undefined lengths
+  const hasLineups = lineups?.home?.length > 0 || lineups?.away?.length > 0;
+  const hasStats = stats?.home?.possession || stats?.home?.shots;
 
   const getSortedLineup = (players: any[]) => {
-      if (!players) return [];
+      if (!players || !Array.isArray(players)) return [];
       const hasStarterInfo = players.some((p: any) => p.is_starter);
       if (hasStarterInfo) {
-          return players.sort((a: any, b: any) => (a.is_starter === b.is_starter) ? 0 : a.is_starter ? -1 : 1);
+          // 🟢 SAFETY FIX: [...players] prevents mutating state directly
+          return [...players].sort((a: any, b: any) => (a.is_starter === b.is_starter) ? 0 : a.is_starter ? -1 : 1);
       }
       return players;
   };
-  const homePlayers = getSortedLineup(lineups.home);
-  const awayPlayers = getSortedLineup(lineups.away);
+  
+  const homePlayers = getSortedLineup(lineups?.home);
+  const awayPlayers = getSortedLineup(lineups?.away);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -57,7 +62,7 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
       <div className="p-4 min-h-[200px]">
         {activeTab === 'events' && (
              <div className="space-y-4">
-                 {events.length === 0 ? <div className="text-center py-8 opacity-50"><AlertCircle className="mx-auto mb-2 text-slate-300" size={24} /><p className="text-xs font-bold text-slate-500">No match events yet.</p></div> : 
+                 {(!events || events.length === 0) ? <div className="text-center py-8 opacity-50"><AlertCircle className="mx-auto mb-2 text-slate-300" size={24} /><p className="text-xs font-bold text-slate-500">No match events yet.</p></div> : 
                      events.map((e: any, i: number) => (
                         <div key={i} className="flex gap-4 items-start animate-in fade-in slide-in-from-left-2">
                             <div className="w-10 text-right font-mono text-xs font-bold text-slate-400 pt-0.5">{e.time}</div>
@@ -81,11 +86,11 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
         {activeTab === 'stats' && (
             <div className="space-y-4">
                 {!hasStats ? <div className="text-center py-10 opacity-50"><p className="text-xs">Stats updating...</p></div> : <>
-                    <StatRow label="Possession" home={stats.home?.possession || '50%'} away={stats.away?.possession || '50%'} />
-                    <StatRow label="Shots" home={stats.home?.shots || '0'} away={stats.away?.shots || '0'} />
-                    <StatRow label="Corners" home={stats.home?.corners || '0'} away={stats.away?.corners || '0'} />
-                    <StatRow label="Fouls" home={stats.home?.fouls || '0'} away={stats.away?.fouls || '0'} />
-                    <StatRow label="Saves" home={stats.home?.saves || '0'} away={stats.away?.saves || '0'} />
+                    <StatRow label="Possession" home={stats?.home?.possession || '50%'} away={stats?.away?.possession || '50%'} />
+                    <StatRow label="Shots" home={stats?.home?.shots || '0'} away={stats?.away?.shots || '0'} />
+                    <StatRow label="Corners" home={stats?.home?.corners || '0'} away={stats?.away?.corners || '0'} />
+                    <StatRow label="Fouls" home={stats?.home?.fouls || '0'} away={stats?.away?.fouls || '0'} />
+                    <StatRow label="Saves" home={stats?.home?.saves || '0'} away={stats?.away?.saves || '0'} />
                 </>}
             </div>
         )}
@@ -105,8 +110,9 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
 }
 
 function StatRow({ label, home, away }: any) {
-    const hVal = parseInt(home.toString().replace(/\D/g,'')) || 0;
-    const aVal = parseInt(away.toString().replace(/\D/g,'')) || 0;
+    // 🟢 SAFETY FIX: ?.toString() prevents crash if data is totally missing
+    const hVal = parseInt(home?.toString().replace(/\D/g,'')) || 0;
+    const aVal = parseInt(away?.toString().replace(/\D/g,'')) || 0;
     const total = hVal + aVal || 1;
     const hWidth = (hVal / total) * 100;
     return (
