@@ -13,6 +13,7 @@ const LEAGUE_MAP: Record<string, string> = {
   'Champions League': 'CL',
   'Euros': 'EC',
   'World Cup': 'WC',
+  'Europa League': 'EL', // 🟢 Added Europa League
 };
 
 // --- HELPER: Normalize Status ---
@@ -43,7 +44,14 @@ const transformMatch = (m: any, leagueName: string) => ({
     home_logo: m.homeTeam.crest,
     away_logo: m.awayTeam.crest,
     updated_at: new Date().toISOString(),
-    match_events: [] 
+    match_events: [],
+    
+    // 🟢 Pass through rich data fields 
+    venue: m.venue || null,
+    referees: m.referees || [],
+    stage: m.stage || null,
+    match_group: m.group || null,
+    h2h: m.h2h || null
 });
 
 // --- FUNCTION 1: SYNC SCHEDULE (Called by GitHub Action) ---
@@ -87,17 +95,24 @@ export interface UnifiedMatchData {
   lineups: { home: any[]; away: any[]; };
   hasExternalData: boolean;
   widget_id?: string;
+  
+  // 🟢 New Rich Data Interfaces
+  venue?: string;
+  referees?: any[];
+  stage?: string;
+  group?: string;
+  h2h?: any;
 }
 
 export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
   // 🟢 LOGIC: Check if Rich Data exists in the DB columns
-  // We check if lineups array is not empty OR if stats object has keys
   const hasLineups = dbData.lineups && (dbData.lineups.home?.length > 0 || dbData.lineups.away?.length > 0);
   const hasStats = dbData.stats && (Object.keys(dbData.stats.home || {}).length > 0);
   const hasEvents = dbData.match_events && dbData.match_events.length > 0;
+  const hasH2h = !!dbData.h2h;
   
-  // "External Data" now means: Has Widget OR Has ANY ESPN Data (Lineups, Stats, or Events)
-  const hasRichData = !!dbData.widget_id || hasLineups || hasStats || hasEvents;
+  // "External Data" now means: Has Widget OR Has ANY Rich Data (Lineups, Stats, Events, H2H)
+  const hasRichData = !!dbData.widget_id || hasLineups || hasStats || hasEvents || hasH2h;
 
   return {
     status: dbData.status === 'SCHEDULED' ? 'PRE' : dbData.status,
@@ -114,12 +129,18 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
       score: dbData.away_score ?? 0, 
       id: 'away' 
     },
-    // 🟢 PASS DB EVENTS DIRECTLY TO 'GOALS' PROP
     goals: dbData.match_events || [], 
-    commentary: [], // ESPN events can be mapped here later if needed
+    commentary: [], 
     stats: dbData.stats || { home: {}, away: {} },
     lineups: dbData.lineups || { home: [], away: [] },
     hasExternalData: hasRichData, 
-    widget_id: dbData.widget_id 
+    widget_id: dbData.widget_id,
+    
+    // 🟢 Safely attach the new fields
+    venue: dbData.venue || null,
+    referees: dbData.referees || [],
+    stage: dbData.stage || null,
+    group: dbData.match_group || null, // Map back from safe DB naming
+    h2h: dbData.h2h || null
   };
 }
