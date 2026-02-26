@@ -59,7 +59,7 @@ const sortMatches = (matches: any[]) => {
   });
 };
 
-// 🟢 SMART MIXER: Ensures variety of leagues (Preserved from your code)
+// 🟢 SMART MIXER: Ensures variety of leagues
 const getDiverseMatches = (allMatches: any[], limit: number) => {
     const live = allMatches.filter(m => ['LIVE', 'HT', 'IN_PLAY'].includes(m.status));
     const scheduled = allMatches.filter(m => !['LIVE', 'HT', 'IN_PLAY'].includes(m.status));
@@ -121,7 +121,6 @@ async function getHomepageData(leagueFilter: string | undefined) {
     matchQuery,
     supabase.from('news').select('*').order('created_at', { ascending: false }).limit(20),
     supabase.from('matches').select('*').not('video_url', 'is', null).order('match_date', { ascending: false }).limit(10),
-    // Fetch manually featured matches
     supabase.from('matches').select('*').eq('is_featured', true).order('match_date', { ascending: true }).limit(5)
   ]);
 
@@ -131,7 +130,6 @@ async function getHomepageData(leagueFilter: string | undefined) {
   if (!leagueFilter && matches.length > 0) {
       matches = getDiverseMatches(matches, 20);
   } else {
-      // Ensure sorted even if filtered
       matches = sortMatches(matches);
   }
 
@@ -164,33 +162,40 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const rawTicker = breakingNews.length > 0 ? breakingNews : news.slice(0, 5);
   const tickerNews = [...rawTicker, ...rawTicker, ...rawTicker, ...rawTicker]; 
   
-  // 1. Grab headlines, strictly limit to 3 so excess flows downwards
   const headlines = news.filter(n => n.is_headline);
   const finalHeadlines = headlines.length > 0 ? headlines.slice(0, 3) : news.slice(0, 3);
   
-  // 2. Latest News takes whatever is left over (excluding the 3 active slider items)
   const latestNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id) && !n.is_breaking).slice(0, 5);
 
-  // 🟢 SMART HERO LOGIC: Admin Pick -> Big Match Today -> First Upcoming
+  // 🟢 SMART HERO LOGIC: Max 2 Matches, Disappears After Match Day
   let heroMatches: any[] = [];
+  const todayStr = new Date().toISOString().split('T')[0];
 
-  // 1. Admin Override
+  // 1. Admin Override (Limit to 2, strictly today or future)
   if (featuredMatches.length > 0) {
-      heroMatches = featuredMatches;
+      heroMatches = featuredMatches.filter(m => m.match_date.split('T')[0] >= todayStr).slice(0, 2);
   } 
-  // 2. Big Match Today (if no admin pick)
-  else {
-      const today = new Date().toISOString().split('T')[0];
+  
+  // 2. Automated Targeting (If no admin match is available for today/future)
+  if (heroMatches.length === 0) {
       const bigLeagues = ['Premier League', 'Champions League', 'World Cup', 'La Liga', 'Serie A'];
-      const bigMatch = matches.find(m => 
-        m.match_date.startsWith(today) && bigLeagues.includes(m.league)
-      );
       
-      if (bigMatch) {
-          heroMatches = [bigMatch];
-      } else if (matches.length > 0) {
-          // 3. Fallback: Next available match
-          heroMatches = [matches[0]];
+      // Get dates that have upcoming/current matches (>= today)
+      const validMatches = matches.filter(m => m.match_date.split('T')[0] >= todayStr);
+      // 🟢 FIX: Used Array.from instead of spread operator to satisfy TypeScript
+      const upcomingDates = Array.from(new Set(validMatches.map((m: any) => m.match_date.split('T')[0]))).sort();
+      
+      if (upcomingDates.length > 0) {
+          const targetDate = upcomingDates[0]; // This locks onto today, or next available day
+          const targetMatches = validMatches.filter(m => m.match_date.startsWith(targetDate));
+          
+          const bigMatchCandidates = targetMatches.filter(m => bigLeagues.includes(m.league));
+          
+          if (bigMatchCandidates.length > 0) {
+              heroMatches = bigMatchCandidates.slice(0, 2);
+          } else {
+              heroMatches = targetMatches.slice(0, 2);
+          }
       }
   }
 
@@ -351,7 +356,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                     </span>
                                 </div>
                                 <div className="flex flex-col items-center w-[30%]">
-                                    {match.away_logo ? <img src={match.away_logo} className="w-12 h-12 object-contain mb-2 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px]">A</div>}
+                                    {match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain mb-2 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px]">A</div>}
                                     <span className="text-[10px] font-bold text-center leading-tight text-white line-clamp-1 drop-shadow-md">{match.away_team}</span>
                                 </div>
                             </div>
@@ -380,11 +385,23 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                             const isScheduled = match.status === 'SCHEDULED' || match.status === 'PRE';
                             const isFinished = ['FT', 'FINISHED', 'ABD'].includes(match.status);
 
+                            // 🟢 EXTRACT RICH DATA FOR DISPLAY (Ignores "Regular Season" to prevent UI clutter)
+                            const stageText = match.match_group ? match.match_group.replace(/_/g, ' ') : (match.stage && match.stage !== 'REGULAR_SEASON' ? match.stage.replace(/_/g, ' ') : null);
+
                             return (
                                 <div key={match.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-3 hover:shadow-md transition">
                                     <div className="bg-slate-50 px-3 py-1.5 flex justify-between items-center border-b border-slate-100">
                                          <div className="flex items-center gap-2">
                                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[100px] truncate">{match.league}</span>
+                                            
+                                            {/* 🟢 NEW: STAGE / MATCH GROUP DISPLAY */}
+                                            {stageText && (
+                                                <>
+                                                    <span className="text-[9px] font-bold text-slate-300">•</span>
+                                                    <span className="text-[9px] font-bold text-blue-500 uppercase tracking-wider">{stageText}</span>
+                                                </>
+                                            )}
+                                            
                                             <span className="text-[9px] font-bold text-slate-300">•</span>
                                             <span className="text-[9px] font-bold text-slate-500">{formatDateLabel(match.match_date)}</span>
                                          </div>
