@@ -1,0 +1,33 @@
+name: 4-Hour FT Fallback Sync
+
+on:
+  schedule:
+    # Runs at minute 30 past every 4th hour (e.g., 00:30, 04:30, 08:30, 12:30...)
+    # This ensures it never collides with top-of-the-hour scripts!
+    - cron: '30 */4 * * *'
+  
+  # Allows you to trigger this manually from the GitHub Actions tab if needed
+  workflow_dispatch:
+
+jobs:
+  sync-finished-matches:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Use your project's Node version
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run FT-Only Sync Script
+        env:
+          FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/sync-ft-only.js

@@ -33,7 +33,10 @@ async function run() {
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
   const today = new Date();
-  const fromDate = new Date(today); fromDate.setDate(today.getDate() - 14);
+  
+  // 🚀 OPTIMIZATION: Changed lookback from -14 to -3 days. 
+  // Saves massive API bandwidth and GitHub Action minutes.
+  const fromDate = new Date(today); fromDate.setDate(today.getDate() - 3);
   const toDate = new Date(today); toDate.setDate(today.getDate() + 21);
   const fromStr = fromDate.toISOString().split('T')[0];
   const toStr = toDate.toISOString().split('T')[0];
