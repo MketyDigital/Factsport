@@ -1,18 +1,36 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Copy, CheckCircle, ExternalLink, Lock, Zap } from 'lucide-react';
+import { createClient } from '@/app/lib/supabase/client'; // 🟢 Added DB client
 
 export default function FreeTipsBanner() {
   const [copied1x, setCopied1x] = useState(false);
   const [copiedMel, setCopiedMel] = useState(false);
 
-  // 🟢 CONFIGURATION
-  const CODE_1XBET = "A8J92"; 
-  const CODE_MELBET = "7X2MM";
-  
-  const LINK_1XBET = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599";
-  const LINK_MELBET = "https://refpa54566.com/L?tag=d_1181253m_45415c_&site=1181253&ad=45415"; 
+  // 🟢 DYNAMIC SETTINGS STATE (With safe fallbacks)
+  const [promo, setPromo] = useState({
+      code1x: "A8J92",
+      link1x: "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599",
+      codeMel: "7X2MM",
+      linkMel: "https://refpa54566.com/L?tag=d_1181253m_45415c_&site=1181253&ad=45415"
+  });
+
+  useEffect(() => {
+      const fetchSettings = async () => {
+          const supabase = createClient();
+          const { data } = await supabase.from('site_settings').select('*').eq('id', 1).single();
+          if (data) {
+              setPromo({
+                  code1x: data.code_1xbet || promo.code1x,
+                  link1x: data.link_1xbet || promo.link1x,
+                  codeMel: data.code_melbet || promo.codeMel,
+                  linkMel: data.link_melbet || promo.linkMel
+              });
+          }
+      };
+      fetchSettings();
+  }, []);
 
   const copyToClipboard = (code: string, type: '1x' | 'mel') => {
     navigator.clipboard.writeText(code);
@@ -49,11 +67,12 @@ export default function FreeTipsBanner() {
              </div>
              
              <div className="flex gap-1.5">
-                <button onClick={() => copyToClipboard(CODE_1XBET, '1x')} className="flex-1 bg-black/40 hover:bg-black/60 border border-white/10 roundedmd h-8 flex items-center justify-between px-2 transition active:scale-95">
-                    <span className="font-mono font-black text-white text-xs tracking-wider">{CODE_1XBET}</span>
+                <button onClick={() => copyToClipboard(promo.code1x, '1x')} className="flex-1 bg-black/40 hover:bg-black/60 border border-white/10 rounded-md h-8 flex items-center justify-between px-2 transition active:scale-95">
+                    <span className="font-mono font-black text-white text-xs tracking-wider">{promo.code1x}</span>
                     {copied1x ? <CheckCircle size={12} className="text-green-500"/> : <Copy size={12} className="text-slate-500"/>}
                 </button>
-                <a href={LINK_1XBET} target="_blank" className="bg-blue-600 hover:bg-blue-500 text-white h-8 w-8 rounded-md flex items-center justify-center transition shadow-lg">
+                {/* 🛡️ SECURITY ADDED */}
+                <a href={promo.link1x} target="_blank" rel="noopener noreferrer" className="bg-blue-600 hover:bg-blue-500 text-white h-8 w-8 rounded-md flex items-center justify-center transition shadow-lg">
                     <ExternalLink size={12}/>
                 </a>
              </div>
@@ -70,11 +89,12 @@ export default function FreeTipsBanner() {
              </div>
              
              <div className="flex gap-1.5">
-                <button onClick={() => copyToClipboard(CODE_MELBET, 'mel')} className="flex-1 bg-black/40 hover:bg-black/60 border border-white/10 rounded-md h-8 flex items-center justify-between px-2 transition active:scale-95">
-                    <span className="font-mono font-black text-white text-xs tracking-wider">{CODE_MELBET}</span>
+                <button onClick={() => copyToClipboard(promo.codeMel, 'mel')} className="flex-1 bg-black/40 hover:bg-black/60 border border-white/10 rounded-md h-8 flex items-center justify-between px-2 transition active:scale-95">
+                    <span className="font-mono font-black text-white text-xs tracking-wider">{promo.codeMel}</span>
                     {copiedMel ? <CheckCircle size={12} className="text-green-500"/> : <Copy size={12} className="text-slate-500"/>}
                 </button>
-                <a href={LINK_MELBET} target="_blank" className="bg-yellow-500 hover:bg-yellow-400 text-black h-8 w-8 rounded-md flex items-center justify-center transition shadow-lg">
+                {/* 🛡️ SECURITY ADDED */}
+                <a href={promo.linkMel} target="_blank" rel="noopener noreferrer" className="bg-yellow-500 hover:bg-yellow-400 text-black h-8 w-8 rounded-md flex items-center justify-center transition shadow-lg">
                     <ExternalLink size={12}/>
                 </a>
              </div>

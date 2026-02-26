@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { ChevronLeft, Calendar, Clock, ArrowRight, Zap, Trophy, Youtube, Newspaper } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
 import ShareButton from '@/app/components/ShareButton';
-// 🟢 IMPORT YOUR NEW CLIENT COMPONENT WRAPPER
 import MarkdownRenderer from '@/app/components/MarkdownRenderer'; 
 
 export default async function ArticlePage({ params }: { params: { slug: string } }) {
@@ -68,7 +67,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
          <div className="md:col-span-2">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-8">
                 
-                {/* 🟢 UPGRADED: Using the safe Client Component wrapper */}
                 <div className="prose prose-slate prose-sm max-w-none text-slate-700 leading-relaxed">
                     {article.body || article.content ? (
                         <MarkdownRenderer content={article.body || article.content} />
@@ -145,7 +143,8 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                       <Newspaper className="text-blue-400" size={24} />
                       <span className="text-[10px] font-bold text-white">Home</span>
                   </Link>
-                  <a href="https://youtube.com/@factsportlive" target="_blank" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
+                  {/* 🛡️ SECURITY ADDED */}
+                  <a href="https://youtube.com/@factsportlive" target="_blank" rel="noopener noreferrer" className="bg-white/10 hover:bg-white/20 p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition border border-white/5 active:scale-95">
                       <Youtube className="text-red-500" size={24} />
                       <span className="text-[10px] font-bold text-white">YouTube</span>
                   </a>
