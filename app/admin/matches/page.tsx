@@ -18,12 +18,12 @@ export default function AdminMatchesPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  // New Match Template
+  // 🟢 UPGRADED: New Match Template includes Rich Data
   const [newMatch, setNewMatch] = useState({
-    home_team: '', away_team: '', league: 'Premier League', match_date: '', home_logo: '', away_logo: ''
+    home_team: '', away_team: '', league: 'Premier League', match_date: '', home_logo: '', away_logo: '',
+    venue: '', stage: '', match_group: ''
   });
 
-  // 🟢 RESTORED & UPGRADED: Smart Search Effect
   useEffect(() => { 
       const timer = setTimeout(() => {
           fetchMatches(); 
@@ -44,12 +44,11 @@ export default function AdminMatchesPage() {
     if (!newMatch.home_team || !newMatch.away_team || !newMatch.match_date) return alert("Required fields missing");
     setLoading(true);
 
-    // 🟢 DATE FIX: Convert Local Input to ISO String (UTC) to match DB format
     const isoDate = new Date(newMatch.match_date).toISOString();
 
     const { error } = await supabase.from('matches').insert([{ 
         ...newMatch, 
-        match_date: isoDate, // Save as UTC
+        match_date: isoDate, 
         status: 'SCHEDULED', 
         is_featured: false,
         points_distributed: false
@@ -58,7 +57,7 @@ export default function AdminMatchesPage() {
     if (error) alert("Error: " + error.message);
     else { 
         setIsCreating(false); 
-        setNewMatch({ home_team: '', away_team: '', league: 'Premier League', match_date: '', home_logo: '', away_logo: '' }); 
+        setNewMatch({ home_team: '', away_team: '', league: 'Premier League', match_date: '', home_logo: '', away_logo: '', venue: '', stage: '', match_group: '' }); 
         fetchMatches(); 
     }
     setLoading(false);
@@ -69,6 +68,9 @@ export default function AdminMatchesPage() {
   };
 
   const saveMatch = async (match: any) => {
+    // 🛡️ SECURITY: Basic URL validation before saving to DB
+    const sanitize = (url: string) => url?.trim().toLowerCase().startsWith('javascript:') ? '' : url;
+
     setSavingId(match.id);
     const { error } = await supabase.from('matches').update({
         home_score: match.home_score,
@@ -77,14 +79,18 @@ export default function AdminMatchesPage() {
         api_id: match.api_id, 
         widget_id: match.widget_id,
         booking_code: match.booking_code,
-        affiliate_link: match.affiliate_link,
-        video_url: match.video_url,         
-        livestream_url: match.livestream_url, 
-        audio_url: match.audio_url,         
+        affiliate_link: sanitize(match.affiliate_link),
+        video_url: sanitize(match.video_url),        
+        livestream_url: sanitize(match.livestream_url), 
+        audio_url: sanitize(match.audio_url),        
         is_featured: match.is_featured,
         is_featured_video: match.is_featured_video,
         points_distributed: match.points_distributed,
-        displayClock: match.displayClock 
+        displayClock: match.displayClock,
+        // 🟢 SAVING RICH DATA
+        venue: match.venue,
+        stage: match.stage,
+        match_group: match.match_group 
     }).eq('id', match.id);
 
     if (error) alert("Save failed: " + error.message);
@@ -122,10 +128,9 @@ export default function AdminMatchesPage() {
             <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
                 <Terminal size={24} className="text-blue-600"/> Match Manager
             </h1>
-            <p className="text-sm text-slate-500">Manage Schedule, Live Scores, and Settlement.</p>
+            <p className="text-sm text-slate-500">Manage Schedule, Live Scores, Rich Data, and Settlement.</p>
         </div>
         
-        {/* 🟢 RESTORED: Search Bar and Actions */}
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
             <div className="relative w-full sm:w-64">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -147,11 +152,10 @@ export default function AdminMatchesPage() {
       {isCreating && (
         <div className="bg-white p-6 rounded-2xl shadow-xl border border-blue-100 mb-8 animate-in fade-in slide-in-from-top-4">
             <h2 className="text-sm font-black uppercase text-blue-600 mb-4 flex items-center gap-2"><Calendar size={16}/> New Match Details</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <input type="text" placeholder="Home Team" className="border p-3 rounded-xl font-bold" value={newMatch.home_team} onChange={e => setNewMatch({...newMatch, home_team: e.target.value})} />
                 <input type="text" placeholder="Away Team" className="border p-3 rounded-xl font-bold" value={newMatch.away_team} onChange={e => setNewMatch({...newMatch, away_team: e.target.value})} />
                 
-                {/* 🟢 Date Input */}
                 <div className="flex flex-col">
                     <label className="text-[10px] font-bold text-slate-400 mb-1">Date & Time (Local)</label>
                     <input type="datetime-local" className="border p-3 rounded-xl" value={newMatch.match_date} onChange={e => setNewMatch({...newMatch, match_date: e.target.value})} />
@@ -162,11 +166,28 @@ export default function AdminMatchesPage() {
                     <input list="leagues" type="text" placeholder="Select League" className="border p-3 rounded-xl w-full bg-white" value={newMatch.league} onChange={e => setNewMatch({...newMatch, league: e.target.value})} />
                     <datalist id="leagues">
                         <option value="Premier League"/><option value="La Liga"/><option value="Champions League"/><option value="Serie A"/>
-                        <option value="Bundesliga"/><option value="Ligue 1"/><option value="FA Cup"/><option value="Carabao Cup"/><option value="Copa del Rey"/>
+                        <option value="Bundesliga"/><option value="Ligue 1"/><option value="Europa League"/><option value="FA Cup"/>
                     </datalist>
                 </div>
+
+                {/* 🟢 NEW: Rich Data Inputs */}
+                <div className="flex flex-col">
+                    <label className="text-[10px] font-bold text-slate-400 mb-1">Venue / Stadium</label>
+                    <input type="text" placeholder="e.g. Anfield" className="border p-3 rounded-xl text-sm" value={newMatch.venue} onChange={e => setNewMatch({...newMatch, venue: e.target.value})} />
+                </div>
+                <div className="flex gap-2">
+                     <div className="flex flex-col w-1/2">
+                        <label className="text-[10px] font-bold text-slate-400 mb-1">Stage</label>
+                        <input type="text" placeholder="e.g. Final" className="border p-3 rounded-xl text-sm" value={newMatch.stage} onChange={e => setNewMatch({...newMatch, stage: e.target.value})} />
+                    </div>
+                    <div className="flex flex-col w-1/2">
+                        <label className="text-[10px] font-bold text-slate-400 mb-1">Group</label>
+                        <input type="text" placeholder="e.g. Group A" className="border p-3 rounded-xl text-sm" value={newMatch.match_group} onChange={e => setNewMatch({...newMatch, match_group: e.target.value})} />
+                    </div>
+                </div>
+
             </div>
-            <div className="flex justify-end">
+            <div className="flex justify-end mt-4">
                 <button onClick={handleCreate} disabled={loading} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold">
                     {loading ? 'Creating...' : 'Create Match'}
                 </button>
@@ -179,7 +200,7 @@ export default function AdminMatchesPage() {
         {matches.map((match) => (
             <div key={match.id} className={`bg-white rounded-2xl shadow-sm border overflow-hidden flex flex-col lg:flex-row ${match.is_featured ? 'border-blue-400 ring-1 ring-blue-100' : 'border-slate-200'}`}>
                 
-                {/* 1. LEFT: Match Info */}
+                {/* 1. LEFT: Match Info & Rich Data */}
                 <div className="p-5 lg:w-1/3 border-b lg:border-b-0 lg:border-r border-slate-100 bg-slate-50/50">
                     <div className="flex justify-between items-start mb-2">
                         <span className="text-[10px] font-bold uppercase text-slate-400 bg-white px-2 py-1 rounded border border-slate-200">{match.league}</span>
@@ -204,6 +225,20 @@ export default function AdminMatchesPage() {
                         </div>
                     </div>
 
+                    {/* 🟢 NEW: Editable Rich Data Fields */}
+                    <div className="space-y-2 mb-4 border-t pt-3">
+                         <div className="flex items-center gap-2">
+                             <label className="text-[10px] font-bold text-slate-400 w-12">Venue</label>
+                             <input type="text" className="flex-1 border rounded py-1 px-2 text-[10px]" placeholder="Stadium" value={match.venue || ''} onChange={(e) => handleUpdateChange(match.id, 'venue', e.target.value)} />
+                         </div>
+                         <div className="flex items-center gap-2">
+                             <label className="text-[10px] font-bold text-slate-400 w-12">Stage</label>
+                             <input type="text" className="flex-1 border rounded py-1 px-2 text-[10px]" placeholder="e.g. Final" value={match.stage || ''} onChange={(e) => handleUpdateChange(match.id, 'stage', e.target.value)} />
+                             <label className="text-[10px] font-bold text-slate-400">Grp</label>
+                             <input type="text" className="w-16 border rounded py-1 px-2 text-[10px]" placeholder="e.g. A" value={match.match_group || ''} onChange={(e) => handleUpdateChange(match.id, 'match_group', e.target.value)} />
+                         </div>
+                    </div>
+
                     <div className="flex gap-2">
                          <button onClick={() => saveMatch(match)} disabled={savingId === match.id} className={`flex-1 py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition ${savingId === match.id ? 'bg-green-600 text-white' : 'bg-slate-900 text-white hover:bg-black'}`}>
                             <Save size={14} /> {savingId === match.id ? 'Saved' : 'Save'}
@@ -215,7 +250,6 @@ export default function AdminMatchesPage() {
                 {/* 2. MIDDLE: AUTOMATION & VISIBILITY */}
                 <div className="p-5 lg:w-1/3 border-b lg:border-b-0 lg:border-r border-slate-100">
                     
-                    {/* 🟢 FEATURED TOGGLE */}
                     <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 mb-4">
                         <label className="flex items-center justify-between cursor-pointer">
                             <span className="text-xs font-bold text-slate-700 flex items-center gap-2">
@@ -230,13 +264,11 @@ export default function AdminMatchesPage() {
                     </div>
 
                     <div className="space-y-3">
-                        {/* WIDGET BOX */}
                         <div className="relative">
                             <label className="text-[10px] font-bold text-slate-500 mb-1 flex items-center gap-1 justify-between">
                                 <span>Fallback Widget Code</span>
                                 {match.widget_id && <span className="text-[9px] bg-amber-100 text-amber-700 px-1 rounded">Active Override</span>}
                             </label>
-                            
                             <textarea 
                                 placeholder="Paste <iframe> code to OVERRIDE ESPN visualizer..." 
                                 className={`w-full h-20 border rounded-lg p-2 text-[10px] font-mono focus:bg-white resize-none ${match.widget_id ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}
@@ -263,8 +295,10 @@ export default function AdminMatchesPage() {
                     <div>
                          <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3 flex items-center gap-1"><Eye size={12} className="text-red-500" /> Media</h4>
                          <div className="space-y-2 mb-3">
-                            <input type="text" placeholder="🔴 Live Stream URL" className="w-full border border-red-100 rounded-lg py-2 px-3 text-xs" value={match.livestream_url || ''} onChange={(e) => handleUpdateChange(match.id, 'livestream_url', e.target.value)}/>
-                            <input type="text" placeholder="🎙️ Audio URL" className="w-full border border-blue-100 rounded-lg py-2 px-3 text-xs" value={match.audio_url || ''} onChange={(e) => handleUpdateChange(match.id, 'audio_url', e.target.value)}/>
+                            {/* 🟢 RESTORED: Both Livestream and Highlights inputs */}
+                            <input type="text" placeholder="🔴 Pre/Live Stream URL" className="w-full border border-red-100 rounded-lg py-2 px-3 text-[10px]" value={match.livestream_url || ''} onChange={(e) => handleUpdateChange(match.id, 'livestream_url', e.target.value)}/>
+                            <input type="text" placeholder="📼 Post-Match Highlights URL" className="w-full border border-slate-200 rounded-lg py-2 px-3 text-[10px]" value={match.video_url || ''} onChange={(e) => handleUpdateChange(match.id, 'video_url', e.target.value)}/>
+                            <input type="text" placeholder="🎙️ Audio Commentary URL" className="w-full border border-blue-100 rounded-lg py-2 px-3 text-[10px]" value={match.audio_url || ''} onChange={(e) => handleUpdateChange(match.id, 'audio_url', e.target.value)}/>
                          </div>
                     </div>
 
