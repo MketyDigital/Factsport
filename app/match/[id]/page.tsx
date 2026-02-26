@@ -2,7 +2,7 @@ export const runtime = 'edge';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+// Removed notFound to stop silent failures
 import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon, MapPin, Trophy, Grid, AlertCircle } from 'lucide-react';
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
@@ -21,8 +21,15 @@ const sanitizeUrl = (url: string | null | undefined) => {
 
 async function getSupabaseData(id: string) {
     const supabase = createClient();
-    const { data, error } = await supabase.from('matches').select('*').eq('id', id).single();
-    if (error) return null;
+    // 🔍 Let's try to fetch by both 'id' and 'api_id' just in case the URL format changed
+    let { data, error } = await supabase.from('matches').select('*').eq('id', id).single();
+    
+    if (!data) {
+        // Fallback: Check if the ID passed in the URL is actually the api_id
+        const fallback = await supabase.from('matches').select('*').eq('api_id', id).single();
+        data = fallback.data;
+    }
+    
     return data;
 }
 
@@ -31,10 +38,34 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   
   try {
       const resolvedParams = await params;
-      if (!resolvedParams?.id) return notFound();
+      
+      // 🚨 MOBILE DEBUG: Check if URL ID is missing
+      if (!resolvedParams?.id) {
+          return (
+              <div className="min-h-screen flex items-center justify-center p-6 bg-red-50 text-red-600 font-bold text-xl text-center">
+                  ⚠️ URL ERROR: No Match ID provided in the link.
+              </div>
+          );
+      }
 
       const dbData = await getSupabaseData(resolvedParams.id);
-      if (!dbData) return notFound();
+      
+      // 🚨 MOBILE DEBUG: Check if Database lookup failed
+      if (!dbData) {
+           return (
+              <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-red-50 font-mono">
+                  <AlertCircle size={48} className="text-red-500 mb-4" />
+                  <h1 className="text-red-600 font-black text-2xl text-center mb-2">DB MATCH NOT FOUND</h1>
+                  <p className="text-slate-700 text-center text-sm">
+                      The database could not find any match matching this ID:<br/>
+                      <span className="font-bold text-black text-lg">{resolvedParams.id}</span>
+                  </p>
+                  <p className="text-slate-500 text-xs text-center mt-4">
+                      (This means the link from the Matches page is passing an ID that doesn't exist in Supabase).
+                  </p>
+              </div>
+          );
+      }
 
       const rawData = await getExternalData(dbData);
       const data = rawData || {};
@@ -205,8 +236,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         </div>
       );
   } catch (error: any) {
-      // 🚨 THIS IS THE DEBUG SCREEN 🚨
-      // It will print the exact crash log on your phone/computer
       return (
           <div className="min-h-screen bg-red-50 p-6 flex flex-col items-center justify-center font-mono">
               <div className="bg-white border-2 border-red-500 rounded-xl p-6 shadow-2xl w-full max-w-lg overflow-auto">
