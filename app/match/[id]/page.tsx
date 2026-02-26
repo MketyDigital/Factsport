@@ -64,7 +64,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             {dbData.home_stadium ? (
                  <>
                     <div className="absolute top-0 left-0 w-full h-full">
-                        <img src={sanitizeUrl(dbData.home_stadium)} className="w-full h-full object-cover opacity-30 blur-sm scale-110" />
+                        <img src={sanitizeUrl(dbData.home_stadium) || undefined} className="w-full h-full object-cover opacity-30 blur-sm scale-110" />
                     </div>
                     <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-[#0a1428]/90 via-[#0a1428]/70 to-[#0a1428]"></div>
                  </>
@@ -79,7 +79,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
               
               {/* League Banner */}
               {dbData.league_banner ? (
-                  <img src={sanitizeUrl(dbData.league_banner)} className="h-6 object-contain opacity-80" alt={dbData.league} />
+                  <img src={sanitizeUrl(dbData.league_banner) || undefined} className="h-6 object-contain opacity-80" alt={dbData.league} />
               ) : (
                   <span className="text-xs font-bold tracking-widest opacity-70 uppercase">{dbData.league}</span>
               )}
@@ -104,7 +104,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
         {hasWidget && (
              <div className="-mt-2">
-                 <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={sanitizeUrl(dbData.affiliate_link)} />
+                 <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={sanitizeUrl(dbData.affiliate_link) || undefined} />
              </div>
         )}
 
@@ -113,7 +113,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 flex items-center justify-center gap-6">
                  <div className="text-center">
                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-2">Home Kit</p>
-                     <img src={sanitizeUrl(dbData.home_jersey)} className="h-16 object-contain drop-shadow-md" />
+                     <img src={sanitizeUrl(dbData.home_jersey) || undefined} className="h-16 object-contain drop-shadow-md" />
                  </div>
             </div>
         )}
