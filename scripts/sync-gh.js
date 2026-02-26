@@ -17,10 +17,10 @@ const LEAGUES = [
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Safe fetch for when we ACTUALLY need to hit the API
+// Safe fetch: 6.2 seconds keeps us safely under the 10/min limit (60s / 10 = 6s)
 async function fetchSafe(url, options) {
   const res = await fetch(url, options);
-  await delay(8000); // 8-second delay ensures we stay under 10/min
+  await delay(6200); 
   return res;
 }
 
@@ -32,7 +32,6 @@ async function run() {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  // Sync Range: -14 days (History) to +21 days (Schedule)
   const today = new Date();
   const fromDate = new Date(today); fromDate.setDate(today.getDate() - 14);
   const toDate = new Date(today); toDate.setDate(today.getDate() + 21);
@@ -41,8 +40,7 @@ async function run() {
 
   console.log(`🚀 Starting SMART Schedule Sync: ${fromStr} to ${toStr}`);
 
-  // 🟢 1. PRE-FETCH EXISTING DATA FROM DB
-  // We get what we already have to avoid redundant API calls
+  // 1. PRE-FETCH EXISTING DATA
   console.log(`🔍 Checking database for existing rich data...`);
   const { data: dbMatches, error: dbErr } = await supabase
     .from('matches')
@@ -52,7 +50,6 @@ async function run() {
 
   if (dbErr) console.error(`⚠️ Could not fetch existing matches: ${dbErr.message}`);
 
-  // Create a quick lookup map: { 12345: { h2h: {...}, venue: '...' } }
   const existingMatches = {};
   (dbMatches || []).forEach(m => existingMatches[m.api_id] = m);
 
@@ -61,11 +58,10 @@ async function run() {
     try {
       const url = `${BASE_URL}/competitions/${league.id}/matches?dateFrom=${fromStr}&dateTo=${toStr}`;
       
-      // We don't need fetchSafe here, regular fetch is fine for the 9 league calls
       let res = await fetch(url, { headers: { 'X-Auth-Token': API_KEY } });
       
       if (res.status === 429) {
-        console.error(`   ⚠️ Rate limit hit on main schedule. Backing off 60s...`);
+        console.error(`   ⚠️ Rate limit hit. Backing off 60s...`);
         await delay(60000); 
         res = await fetch(url, { headers: { 'X-Auth-Token': API_KEY } });
       }
@@ -81,18 +77,16 @@ async function run() {
         for (const m of data.matches || []) {
           const matchTime = new Date(m.utcDate).getTime();
           const diffHours = (now - matchTime) / (1000 * 60 * 60);
+          const diffDays = (matchTime - now) / (1000 * 60 * 60 * 24);
 
-          // 🛡️ SAFETY LOCK: Skip active matches
-          if (diffHours > -0.5 && diffHours < 4.0 && m.status !== 'FINISHED') {
-             continue; 
-          }
+          // Skip active matches
+          if (diffHours > -0.5 && diffHours < 4.0 && m.status !== 'FINISHED') continue; 
 
-          // 🟢 2. CHECK IF WE ALREADY HAVE THIS DATA
           const existing = existingMatches[m.id];
           let h2hData = existing?.h2h || null;
           
-          // If we don't have the H2H data yet, ONLY THEN do we fetch it safely
-          if (!h2hData) {
+          // 🚀 MASSIVE OPTIMIZATION: Only fetch H2H if the match is within the NEXT 3 DAYS
+          if (!h2hData && diffDays >= -1 && diffDays <= 3) {
               try {
                  const h2hUrl = `${BASE_URL}/matches/${m.id}/head2head`;
                  const h2hRes = await fetchSafe(h2hUrl, { headers: { 'X-Auth-Token': API_KEY } });
@@ -107,6 +101,9 @@ async function run() {
               }
           }
 
+          // Format Referees cleanly
+          const formattedReferees = m.referees?.map(r => r.name) || existing?.referees || [];
+
           matches.push({
             api_id: m.id,
             league: league.name,
@@ -119,10 +116,8 @@ async function run() {
             home_logo: m.homeTeam.crest,
             away_logo: m.awayTeam.crest,
             updated_at: new Date().toISOString(),
-            
-            // 🟢 Merge API data with what we might already have in the DB
             venue: m.venue || existing?.venue || null,
-            referees: m.referees?.length ? m.referees : (existing?.referees || []),
+            referees: formattedReferees,
             stage: m.stage || existing?.stage || null,
             match_group: m.group || existing?.match_group || null,
             h2h: h2hData
@@ -134,14 +129,13 @@ async function run() {
           if (error) console.error(`   ❌ DB Error: ${error.message}`);
           else {
               console.log(`   ✅ Synced ${matches.length} matches.`);
-              if (newH2hFetches > 0) console.log(`   📡 Fetched H2H data for ${newH2hFetches} NEW matches.`);
+              if (newH2hFetches > 0) console.log(`   📡 Fetched H2H data for ${newH2hFetches} NEW matches (Within 3-day window).`);
           }
         }
       }
     } catch (e) {
       console.error(`   🔥 Exception: ${e.message}`);
     }
-    // Minor pause between leagues just to be safe
     await delay(2000);
   }
 }

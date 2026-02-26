@@ -3,6 +3,7 @@ import { createClient } from '@/app/lib/supabase/client';
 import { useEffect, useState } from 'react';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget'; 
 import { getLeagueAssets } from '@/app/lib/league-assets';
+import MatchTime from '@/app/components/MatchTime';
 
 export default function MatchHeaderClient({ matchId, initialData }: any) {
   const [data, setData] = useState(initialData);
@@ -44,7 +45,6 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
     <div className="relative z-10 px-4 mt-1 pb-6 pt-2 rounded-b-3xl overflow-hidden bg-slate-900 shadow-2xl">
         
         {/* 🟢 1. UNIFIED STADIUM BACKGROUND (Bottom Layer) */}
-        {/* TWEAKED: Removed mix-blend, increased opacity to 80% for vibrancy */}
         <div className="absolute inset-0 z-0 pointer-events-none">
             <img 
                 src={leagueData.bg} 
@@ -54,7 +54,6 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
         </div>
 
         {/* 🟢 2. COLOR GRADIENTS FOR READABILITY */}
-        {/* TWEAKED: Reduced top wash to 40%, adjusted bottom gradient to 50% for crisp text */}
         <div className="absolute inset-0 z-0 pointer-events-none">
             <div className="absolute inset-0 bg-slate-900/40" />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />
@@ -73,8 +72,8 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                         {data.displayClock && <span className="text-red-300 text-[10px] font-mono mt-1 font-bold">{data.displayClock}</span>}
                     </div>
                 ) : (
-                    <span className={`text-[10px] font-bold px-4 py-1.5 rounded-full border backdrop-blur-md shadow-lg ${isFinished ? 'bg-slate-900/80 text-slate-300 border-slate-700' : 'bg-white/10 text-white border-white/20'}`}>
-                        {isFinished ? 'FULL TIME' : new Date(data.match_date).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                    <span className={`text-[10px] font-bold px-4 py-1.5 rounded-full border backdrop-blur-md shadow-lg flex items-center ${isFinished ? 'bg-slate-900/80 text-slate-300 border-slate-700' : 'bg-white/10 text-white border-white/20'}`}>
+                        {isFinished ? 'FULL TIME' : <MatchTime date={data.match_date} />}
                     </span>
                 )}
             </div>
