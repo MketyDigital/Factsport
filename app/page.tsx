@@ -8,6 +8,7 @@ import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import NewsArtwork from '@/app/components/NewsArtwork';
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
+import MatchTime from '@/app/components/MatchTime';
 import { unstable_noStore as noStore } from 'next/cache'; // 🛑 FORCE FRESH DATA
 
 // 🟢 CONFIG: Your Default 1xBet Link
@@ -182,7 +183,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       
       // Get dates that have upcoming/current matches (>= today)
       const validMatches = matches.filter(m => m.match_date.split('T')[0] >= todayStr);
-      // 🟢 FIX: Used Array.from instead of spread operator to satisfy TypeScript
       const upcomingDates = Array.from(new Set(validMatches.map((m: any) => m.match_date.split('T')[0]))).sort();
       
       if (upcomingDates.length > 0) {
@@ -350,7 +350,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                     </div>
                                     <span className="text-[8px] font-medium text-blue-200 mt-1 uppercase tracking-wider text-center drop-shadow-md">
                                         {match.status === 'SCHEDULED' || match.status === 'PRE' 
-                                            ? new Date(match.match_date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+                                            ? <MatchTime date={match.match_date} />
                                             : (match.status === 'HT' ? 'HT' : match.status)
                                         }
                                     </span>
@@ -385,7 +385,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                             const isScheduled = match.status === 'SCHEDULED' || match.status === 'PRE';
                             const isFinished = ['FT', 'FINISHED', 'ABD'].includes(match.status);
 
-                            // 🟢 EXTRACT RICH DATA FOR DISPLAY (Ignores "Regular Season" to prevent UI clutter)
                             const stageText = match.match_group ? match.match_group.replace(/_/g, ' ') : (match.stage && match.stage !== 'REGULAR_SEASON' ? match.stage.replace(/_/g, ' ') : null);
 
                             return (
@@ -394,7 +393,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                          <div className="flex items-center gap-2">
                                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[100px] truncate">{match.league}</span>
                                             
-                                            {/* 🟢 NEW: STAGE / MATCH GROUP DISPLAY */}
                                             {stageText && (
                                                 <>
                                                     <span className="text-[9px] font-bold text-slate-300">•</span>
@@ -431,13 +429,13 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                                 <Link href={`/match/${match.id}`} className="flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:border-blue-200 rounded-lg py-2 shadow-sm text-[10px] font-bold text-slate-700 active:scale-95 transition hover:bg-blue-50">
                                                     <Zap size={12} className="text-blue-500" /> Predict
                                                 </Link>
-                                                <a href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} target="_blank" className="flex items-center justify-center gap-1.5 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition hover:bg-green-200">
+                                                <a href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition hover:bg-green-200">
                                                     <ExternalLink size={12} /> Bet Now
                                                 </a>
                                             </div>
                                         )}
                                         {isLive && (
-                                            <a href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} target="_blank" className="w-full flex items-center justify-center gap-1.5 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition hover:bg-green-200">
+                                            <a href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-1.5 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition hover:bg-green-200">
                                                 <ExternalLink size={12} /> Bet Now
                                             </a>
                                         )}
@@ -488,7 +486,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
               <Newspaper className="text-blue-500" size={20} />
               <span className="text-[10px] font-bold text-slate-700">News</span>
           </Link>
-          <a href="https://youtube.com/@factsportlive" target="_blank" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
+          <a href="https://youtube.com/@factsportlive" target="_blank" rel="noopener noreferrer" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
               <Youtube className="text-red-600" size={20} />
               <span className="text-[10px] font-bold text-slate-700">YouTube</span>
           </a>
