@@ -8,12 +8,13 @@ import { CreditCard, Eye, ShieldAlert, LayoutDashboard, ArrowRight, Newspaper } 
 import ApproveButton from '@/app/components/ApproveButton';
 import ResetMonthButton from './components/ResetMonthButton'; 
 import CleanupButton from './components/CleanupButton'; 
-import PromoSettingsManager from '@/app/components/PromoSettingsManager'; // 🟢 Added this import
+import PromoSettingsManager from '@/app/components/PromoSettingsManager';
+// 🟢 NEW: Import your fully functional rules manager!
+import GameRulesManager from '@/app/components/GameRulesManager';
 
 export default async function AdminDashboard() {
   const supabase = createClient();
     
-  // 1. Fetch VIP Requests (Pending)
   const { data: pendingSubs, error } = await supabase
     .from('subscriptions')
     .select(`*, user:profiles(full_name, email)`)
@@ -24,8 +25,6 @@ export default async function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 p-4 md:p-8 font-sans text-slate-900">
-      
-      {/* Header */}
       <div className="flex items-center gap-3 mb-8">
           <div className="bg-slate-900 p-3 rounded-xl text-white">
               <ShieldAlert size={24} />
@@ -36,15 +35,12 @@ export default async function AdminDashboard() {
           </div>
       </div>
 
-      {/* --- SECTION 1: DANGER ZONE (Reset & Cleanup) --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           <ResetMonthButton />
           <CleanupButton /> 
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* --- SECTION 2: VIP REQUESTS (Takes up 2/3 width) --- */}
           <div className="lg:col-span-2 space-y-6">
               {error && <div className="p-4 bg-red-100 text-red-700 rounded-xl text-sm font-bold">Error: {error.message}</div>}
 
@@ -87,7 +83,6 @@ export default async function AdminDashboard() {
                                         </td>
                                         <td className="p-4">
                                             {sub.proof_url ? (
-                                                /* 🛡️ SECURITY ADDED: rel="noopener noreferrer" */
                                                 <a href={sub.proof_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold text-[10px] flex items-center gap-1 hover:underline bg-blue-50 px-2 py-1 rounded w-fit">
                                                     <Eye size={12}/> View
                                                 </a>
@@ -104,14 +99,14 @@ export default async function AdminDashboard() {
                 )}
               </div>
 
-              {/* 🟢 NEW: PROMO SETTINGS PANEL */}
               <PromoSettingsManager />
+
+              {/* 🟢 REPLACED: Render your actual working Client Component here */}
+              <GameRulesManager />
 
           </div>
 
-          {/* --- SECTION 3: QUICK LINKS (Takes up 1/3 width) --- */}
           <div className="space-y-4">
-             {/* 1. MATCH MANAGER */}
              <Link href="/admin/matches" className="block group">
                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:border-blue-500 transition relative overflow-hidden">
                      <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-4 -mt-4 transition group-hover:bg-blue-100"></div>
@@ -128,7 +123,6 @@ export default async function AdminDashboard() {
                  </div>
              </Link>
 
-             {/* 2. NEWS MANAGER */}
              <Link href="/admin/news" className="block group">
                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:border-purple-500 transition relative overflow-hidden">
                      <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-bl-full -mr-4 -mt-4 transition group-hover:bg-purple-100"></div>
@@ -145,7 +139,6 @@ export default async function AdminDashboard() {
                  </div>
              </Link>
           </div>
-
       </div>
     </div>
   );
