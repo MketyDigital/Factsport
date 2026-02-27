@@ -121,8 +121,13 @@ async function getHomepageData(leagueFilter: string | undefined) {
   const [matchesRes, newsRes, highlightsRes, featuredRes] = await Promise.all([
     matchQuery,
     supabase.from('news').select('*').order('created_at', { ascending: false }).limit(20),
-    // 🟢 UPDATED: Strictly 5 latest matches by match_date for Highlights
-    supabase.from('matches').select('*').not('video_url', 'is', null).order('match_date', { ascending: false }).limit(5),
+    // 🟢 UPDATED: Excludes both TRUE nulls and empty strings to guarantee instant disappearance on removal
+    supabase.from('matches')
+      .select('*')
+      .not('video_url', 'is', null)
+      .neq('video_url', '') 
+      .order('match_date', { ascending: false })
+      .limit(5),
     supabase.from('matches').select('*').eq('is_featured', true).order('match_date', { ascending: true }).limit(5)
   ]);
 

@@ -64,18 +64,36 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   let h2hDraws = Number(homeData.draws ?? h2hObj.draws ?? 0);
   let h2hAwayWins = Number(awayData.wins ?? homeData.losses ?? h2hObj.awayWins ?? h2hObj.away_wins ?? 0);
 
-  // 🛡️ RECALCULATOR: If the API's aggregate is missing the wins, we calculate it mathematically from historical matches!
+  // 🛡️ RECALCULATOR: If the API's aggregate is missing or 0, calculate mathematically!
   if (matchesArray.length > 0) {
       let calcHomeWins = 0, calcDraws = 0, calcAwayWins = 0;
+      let validMatchesCount = 0;
+      
+      const currentHomeId = homeData?.id;
+      const currentAwayId = awayData?.id;
       
       matchesArray.forEach((m: any) => {
-          const hScore = m.score?.fullTime?.home ?? m.score?.regularTime?.home;
-          const aScore = m.score?.fullTime?.away ?? m.score?.regularTime?.away;
+          // Prevent counting future games as 0-0 draws
+          if (m.status !== 'FINISHED' && m.status !== 'AWARDED') return;
+
+          let hScore = m.score?.fullTime?.home ?? m.score?.regularTime?.home;
+          let aScore = m.score?.fullTime?.away ?? m.score?.regularTime?.away;
           
-          if (hScore !== null && aScore !== null && hScore !== undefined) {
-              // Align the historical match teams to today's teams
-              const isHome = (m.homeTeam?.name === dbData.home_team || m.homeTeam?.shortName === dbData.home_team || m.homeTeam?.id === homeData?.id);
+          if (typeof hScore === 'number' && typeof aScore === 'number') {
+              validMatchesCount++;
               
+              // Rely on IDs instead of names whenever possible
+              let isHome = false;
+              if (currentHomeId && m.homeTeam?.id) {
+                  isHome = (m.homeTeam.id === currentHomeId);
+              } else if (currentAwayId && m.homeTeam?.id) {
+                  isHome = (m.homeTeam.id !== currentAwayId);
+              } else {
+                  const matchHomeName = (m.homeTeam?.shortName || m.homeTeam?.name || '').toLowerCase();
+                  const dbHomeName = (dbData.home_team || '').toLowerCase();
+                  isHome = matchHomeName.includes(dbHomeName) || dbHomeName.includes(matchHomeName);
+              }
+
               if (hScore === aScore) {
                   calcDraws++;
               } else if (hScore > aScore) {
@@ -86,12 +104,12 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           }
       });
 
-      // Override with perfectly calculated stats if they exist
-      if (calcHomeWins + calcAwayWins + calcDraws > 0) {
+      // Override if the recalculator found valid finished matches
+      if (validMatchesCount > 0 && (h2hHomeWins + h2hAwayWins + h2hDraws === 0 || validMatchesCount === matchesArray.length)) {
           h2hHomeWins = calcHomeWins;
           h2hAwayWins = calcAwayWins;
           h2hDraws = calcDraws;
-          h2hTotal = matchesArray.length; 
+          h2hTotal = validMatchesCount; 
       }
   }
 
@@ -204,32 +222,58 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
              {dbData.audio_url ? <Link href={sanitizeUrl(dbData.audio_url) || '#'} target="_blank" rel="noopener noreferrer" className="bg-white text-black hover:bg-slate-200 text-[10px] font-black px-4 py-2 rounded-full shadow-lg transition transform active:scale-95 flex items-center gap-1">LISTEN NOW <ExternalLink size={10} /></Link> : <button disabled className="bg-slate-700 text-slate-400 text-[10px] font-bold px-3 py-1.5 rounded-full cursor-not-allowed border border-white/5">OFF AIR</button>}
         </div>
 
-        {/* 🟢 UPGRADED H2H UI (Global Standard Bar Chart) */}
+        {/* 🟢 UPGRADED H2H UI (Global Standard Premium Layout) */}
         {h2hTotal > 0 && (
-            <div className="bg-white rounded-xl shadow-lg p-5 border border-slate-100">
-                <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center justify-center gap-2 mb-4">
-                    <History size={14} className="text-slate-400" /> Head-to-Head (Last {h2hTotal} Matches)
-                </h3>
+            <div className="bg-white rounded-2xl shadow-xl p-5 border border-slate-100 overflow-hidden">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-[11px] font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
+                        <History size={14} className="text-blue-600" /> Head-to-Head
+                    </h3>
+                    <span className="text-[9px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-md tracking-widest">
+                        LAST {h2hTotal} MATCHES
+                    </span>
+                </div>
                 
-                {/* Visual Data Bar */}
-                <div className="flex w-full h-2.5 rounded-full overflow-hidden mb-3 shadow-inner bg-slate-100">
-                    <div style={{ width: `${homePct}%` }} className="bg-blue-600 transition-all duration-700 ease-out"></div>
-                    <div style={{ width: `${drawPct}%` }} className="bg-slate-300 transition-all duration-700 ease-out"></div>
-                    <div style={{ width: `${awayPct}%` }} className="bg-red-500 transition-all duration-700 ease-out"></div>
+                <div className="flex items-center justify-between mb-6">
+                     {/* Home Stat */}
+                     <div className="flex flex-col items-center flex-1">
+                         {dbData.home_logo && <img src={sanitizeUrl(dbData.home_logo) || undefined} className="w-9 h-9 object-contain mb-2 drop-shadow-sm" alt="Home" />}
+                         <span className="text-3xl font-black text-slate-800 leading-none">{h2hHomeWins}</span>
+                         <span className="text-[9px] font-bold text-slate-400 uppercase mt-1 text-center line-clamp-1 w-full px-1">{dbData.home_team}</span>
+                     </div>
+                     
+                     {/* Draw Stat */}
+                     <div className="flex flex-col items-center flex-1 border-x border-slate-100 px-2">
+                         <div className="w-9 h-9 flex items-center justify-center mb-2">
+                             <span className="text-slate-200 font-black text-xl italic">VS</span>
+                         </div>
+                         <span className="text-xl font-black text-slate-400 leading-none">{h2hDraws}</span>
+                         <span className="text-[9px] font-bold text-slate-400 uppercase mt-1">Draws</span>
+                     </div>
+
+                     {/* Away Stat */}
+                     <div className="flex flex-col items-center flex-1">
+                         {dbData.away_logo && <img src={sanitizeUrl(dbData.away_logo) || undefined} className="w-9 h-9 object-contain mb-2 drop-shadow-sm" alt="Away" />}
+                         <span className="text-3xl font-black text-slate-800 leading-none">{h2hAwayWins}</span>
+                         <span className="text-[9px] font-bold text-slate-400 uppercase mt-1 text-center line-clamp-1 w-full px-1">{dbData.away_team}</span>
+                     </div>
                 </div>
 
-                <div className="flex justify-between items-center text-center">
-                    <div className="flex flex-col items-start w-1/3">
-                        <span className="text-2xl font-black text-blue-600 leading-none">{h2hHomeWins}</span>
-                        <span className="text-[9px] font-bold text-slate-500 uppercase mt-1 line-clamp-1">{dbData.home_team} Wins</span>
+                {/* Visual Data Bar with Percentages */}
+                <div className="relative pt-2">
+                    <div className="flex mb-1.5 items-center justify-between text-[10px] font-black">
+                        <span className="text-blue-600">{homePct.toFixed(0)}%</span>
+                        <span className="text-slate-400">{drawPct.toFixed(0)}%</span>
+                        <span className="text-red-500">{awayPct.toFixed(0)}%</span>
                     </div>
-                    <div className="flex flex-col items-center w-1/3 border-x border-slate-100">
-                        <span className="text-lg font-black text-slate-400 leading-none">{h2hDraws}</span>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase mt-1">Draws</span>
-                    </div>
-                    <div className="flex flex-col items-end w-1/3">
-                        <span className="text-2xl font-black text-red-500 leading-none">{h2hAwayWins}</span>
-                        <span className="text-[9px] font-bold text-slate-500 uppercase mt-1 line-clamp-1 text-right">{dbData.away_team} Wins</span>
+                    <div className="flex w-full h-3 rounded-full overflow-hidden shadow-inner bg-slate-100">
+                        <div style={{ width: `${homePct}%` }} className="bg-blue-600 transition-all duration-1000 ease-out relative">
+                            <div className="absolute inset-0 bg-white/20 w-full h-full"></div>
+                        </div>
+                        <div style={{ width: `${drawPct}%` }} className="bg-slate-300 transition-all duration-1000 ease-out"></div>
+                        <div style={{ width: `${awayPct}%` }} className="bg-red-500 transition-all duration-1000 ease-out relative">
+                            <div className="absolute inset-0 bg-white/20 w-full h-full"></div>
+                        </div>
                     </div>
                 </div>
             </div>

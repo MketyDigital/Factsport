@@ -83,22 +83,31 @@ async function run() {
           const existing = existingMatches[m.id];
           let h2hData = existing?.h2h || null;
           
-          if (!h2hData && diffDays >= -1 && diffDays <= 3) {
+          // 🟢 BULLETPROOF CHECK: Force a re-fetch if the database only has partial/empty H2H data
+          const isH2hComplete = h2hData && 
+                                h2hData.aggregates && 
+                                typeof h2hData.aggregates === 'object' && 
+                                Object.keys(h2hData.aggregates).length > 0;
+          
+          if (!isH2hComplete && diffDays >= -1 && diffDays <= 3) {
               try {
-                 const h2hUrl = `${BASE_URL}/matches/${m.id}/head2head`;
-                 const h2hRes = await fetchSafe(h2hUrl, { headers: { 'X-Auth-Token': API_KEY } });
-                 
-                 if (h2hRes.ok) {
-                     const parsedH2h = await h2hRes.json();
-                     // 🟢 FIXED: We now save the ENTIRE object (aggregates + matches) to allow our frontend recalculator to work
-                     h2hData = {
-                         aggregates: parsedH2h.aggregates || null,
-                         matches: parsedH2h.matches || []
-                     }; 
-                     newH2hFetches++;
-                 }
+                  const h2hUrl = `${BASE_URL}/matches/${m.id}/head2head`;
+                  const h2hRes = await fetchSafe(h2hUrl, { headers: { 'X-Auth-Token': API_KEY } });
+                  
+                  if (h2hRes.ok) {
+                      const parsedH2h = await h2hRes.json();
+                      
+                      // 🟢 ONLY save if the API actually gave us the aggregates
+                      if (parsedH2h && parsedH2h.aggregates) {
+                          h2hData = {
+                              aggregates: parsedH2h.aggregates,
+                              matches: parsedH2h.matches || []
+                          }; 
+                          newH2hFetches++;
+                      }
+                  }
               } catch (err) {
-                 console.error(`   ❌ Failed to fetch H2H for ${m.id}:`, err.message);
+                  console.error(`   ❌ Failed to fetch H2H for ${m.id}:`, err.message);
               }
           }
 
