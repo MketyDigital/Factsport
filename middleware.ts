@@ -4,6 +4,16 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
   const pathname = request.nextUrl.pathname;
+  const searchParams = request.nextUrl.search;
+
+  // -----------------------------------------------------------------
+  // 🛡️ PART 0: MALICIOUS PAYLOAD & THREAT FILTER
+  // -----------------------------------------------------------------
+  // Instantly blocks automated bots trying common SQLi or Path Traversal attacks in the URL
+  const threatPatterns = /(\%27)|(\')|(\-\-)|(\%23)|(#)|(\%3B)|(;)|(\.\.\/)|(\%2e\%2e\%2f)/i;
+  if (threatPatterns.test(pathname) || threatPatterns.test(searchParams)) {
+    return new NextResponse('Forbidden Request: Malicious payload detected.', { status: 403 });
+  }
 
   // -----------------------------------------------------------------
   // 🔒 PART 1: ENVIRONMENT LOCK (Staging & Dev)
@@ -61,6 +71,8 @@ export async function middleware(request: NextRequest) {
             name,
             value,
             ...options,
+            secure: process.env.NODE_ENV === 'production', // 🛡️ Forces secure cookies in prod
+            sameSite: 'lax', // 🛡️ Protects against CSRF
           })
           response = NextResponse.next({
             request: {
@@ -71,6 +83,8 @@ export async function middleware(request: NextRequest) {
             name,
             value,
             ...options,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
           })
         },
         remove(name: string, options: CookieOptions) {

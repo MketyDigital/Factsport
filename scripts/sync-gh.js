@@ -11,8 +11,7 @@ const LEAGUES = [
   { id: 'PL', name: 'Premier League' }, { id: 'PD', name: 'La Liga' },
   { id: 'BL1', name: 'Bundesliga' }, { id: 'SA', name: 'Serie A' },
   { id: 'FL1', name: 'Ligue 1' }, { id: 'CL', name: 'Champions League' },
-  { id: 'EC', name: 'Euros' }, { id: 'WC', name: 'World Cup' },
-  { id: 'EL', name: 'Europa League' } 
+  { id: 'EC', name: 'Euros' }, { id: 'WC', name: 'World Cup' }
 ];
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -96,7 +95,12 @@ async function run() {
                  
                  if (h2hRes.ok) {
                      const parsedH2h = await h2hRes.json();
-                     h2hData = parsedH2h.aggregates || parsedH2h; 
+                     // 🟢 FIXED: Extremely safe JSON extraction
+                     h2hData = parsedH2h.aggregates || {
+                         numberOfMatches: parsedH2h.resultSet?.count || 0,
+                         homeTeam: { wins: 0, draws: 0, losses: 0 },
+                         awayTeam: { wins: 0, draws: 0, losses: 0 }
+                     }; 
                      newH2hFetches++;
                  }
               } catch (err) {

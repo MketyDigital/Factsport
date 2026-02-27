@@ -3,7 +3,7 @@ export const runtime = 'edge';
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon, MapPin, Trophy, Grid } from 'lucide-react';
+import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon, MapPin, Trophy, Grid, History } from 'lucide-react';
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
 import MatchHeaderClient from '@/app/components/MatchHeaderClient'; 
@@ -44,6 +44,13 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const isLiveStream = !isFinished && !!dbData.livestream_url;
   
   const hasWidget = !!dbData.widget_id; 
+
+  // 🟢 FIXED & ENHANCED H2H EXTRACTION
+  const h2hObj = dbData?.h2h?.aggregates || dbData?.h2h || {};
+  const h2hTotal = h2hObj.numberOfMatches || 0;
+  const h2hHomeWins = h2hObj.homeTeam?.wins ?? 0;
+  const h2hDraws = h2hObj.homeTeam?.draws ?? h2hObj.draws ?? 0;
+  const h2hAwayWins = h2hObj.awayTeam?.wins ?? h2hObj.homeTeam?.losses ?? 0;
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
@@ -89,7 +96,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
       <div className="mx-4 mt-4 relative z-20 space-y-4">
         
-        {/* 🟢 FIXED: Replaced underscores with spaces and separated tags so they copy cleanly! */}
         {(data?.venue || data?.stage || data?.group || (dbData?.referees && dbData?.referees?.length > 0)) && (
             <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 flex flex-wrap gap-4 items-center justify-center text-[10px] font-bold text-slate-500">
                 {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded"><Trophy size={12} className="text-amber-500"/> {data.stage.replace(/_/g, ' ')}</span>}
@@ -149,24 +155,32 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
              {dbData.audio_url ? <Link href={sanitizeUrl(dbData.audio_url) || '#'} target="_blank" rel="noopener noreferrer" className="bg-white text-black hover:bg-slate-200 text-[10px] font-black px-4 py-2 rounded-full shadow-lg transition transform active:scale-95 flex items-center gap-1">LISTEN NOW <ExternalLink size={10} /></Link> : <button disabled className="bg-slate-700 text-slate-400 text-[10px] font-bold px-3 py-1.5 rounded-full cursor-not-allowed border border-white/5">OFF AIR</button>}
         </div>
 
-        {/* 🟢 FIXED: H2H mathematically grabs Away Wins by looking at Home Losses! */}
-        {dbData?.h2h && dbData?.h2h?.numberOfMatches > 0 && (
-            <div className="bg-white rounded-xl shadow-lg p-4 border border-slate-100">
-                <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-wider text-center mb-3">
-                    Head-to-Head Summary (Last {dbData.h2h.numberOfMatches} Matches)
+        {/* 🟢 UPGRADED H2H UI (Global Standard Bar Chart) */}
+        {h2hTotal > 0 && (
+            <div className="bg-white rounded-xl shadow-lg p-5 border border-slate-100">
+                <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center justify-center gap-2 mb-4">
+                    <History size={14} className="text-slate-400" /> Head-to-Head (Last {h2hTotal} Matches)
                 </h3>
+                
+                {/* Visual Data Bar */}
+                <div className="flex w-full h-2.5 rounded-full overflow-hidden mb-3 shadow-inner">
+                    <div style={{ width: `${(h2hHomeWins / h2hTotal) * 100}%` }} className="bg-blue-600 transition-all duration-500"></div>
+                    <div style={{ width: `${(h2hDraws / h2hTotal) * 100}%` }} className="bg-slate-300 transition-all duration-500"></div>
+                    <div style={{ width: `${(h2hAwayWins / h2hTotal) * 100}%` }} className="bg-red-500 transition-all duration-500"></div>
+                </div>
+
                 <div className="flex justify-between items-center text-center">
-                    <div className="flex-1">
-                        <div className="text-2xl font-black text-slate-800">{dbData.h2h?.homeTeam?.wins || 0}</div>
-                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1 line-clamp-1 px-1">{dbData.home_team} Wins</div>
+                    <div className="flex flex-col items-start w-1/3">
+                        <span className="text-2xl font-black text-blue-600 leading-none">{h2hHomeWins}</span>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase mt-1 line-clamp-1">{dbData.home_team} Wins</span>
                     </div>
-                    <div className="flex-1 border-x border-slate-100">
-                        <div className="text-xl font-black text-slate-400">{dbData.h2h?.homeTeam?.draws || 0}</div>
-                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">Draws</div>
+                    <div className="flex flex-col items-center w-1/3 border-x border-slate-100">
+                        <span className="text-lg font-black text-slate-400 leading-none">{h2hDraws}</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase mt-1">Draws</span>
                     </div>
-                    <div className="flex-1">
-                        <div className="text-2xl font-black text-slate-800">{dbData.h2h?.awayTeam?.wins || dbData.h2h?.homeTeam?.losses || 0}</div>
-                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1 line-clamp-1 px-1">{dbData.away_team} Wins</div>
+                    <div className="flex flex-col items-end w-1/3">
+                        <span className="text-2xl font-black text-red-500 leading-none">{h2hAwayWins}</span>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase mt-1 line-clamp-1 text-right">{dbData.away_team} Wins</span>
                     </div>
                 </div>
             </div>
