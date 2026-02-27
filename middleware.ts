@@ -67,37 +67,43 @@ export async function middleware(request: NextRequest) {
           return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
+          // 1. Update request (name & value only)
           request.cookies.set({
+            name,
+            value,
+          })
+          
+          // 2. Re-initialize response
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          
+          // 3. Update response (apply security options here)
+          response.cookies.set({
             name,
             value,
             ...options,
             secure: process.env.NODE_ENV === 'production', // 🛡️ Forces secure cookies in prod
             sameSite: 'lax', // 🛡️ Protects against CSRF
           })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-          })
         },
         remove(name: string, options: CookieOptions) {
+          // 1. Update request (name & empty value only)
           request.cookies.set({
             name,
             value: '',
-            ...options,
           })
+          
+          // 2. Re-initialize response
           response = NextResponse.next({
             request: {
               headers: request.headers,
             },
           })
+          
+          // 3. Update response (apply removal options here)
           response.cookies.set({
             name,
             value: '',
