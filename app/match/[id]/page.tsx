@@ -45,12 +45,61 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   
   const hasWidget = !!dbData.widget_id; 
 
-  // 🟢 FIXED & ENHANCED H2H EXTRACTION
-  const h2hObj = dbData?.h2h?.aggregates || dbData?.h2h || {};
-  const h2hTotal = h2hObj.numberOfMatches || 0;
-  const h2hHomeWins = h2hObj.homeTeam?.wins ?? 0;
-  const h2hDraws = h2hObj.homeTeam?.draws ?? h2hObj.draws ?? 0;
-  const h2hAwayWins = h2hObj.awayTeam?.wins ?? h2hObj.homeTeam?.losses ?? 0;
+  // 🟢 BULLETPROOF H2H EXTRACTION & EMERGENCY RECALCULATOR
+  let parsedH2h = dbData?.h2h;
+  if (typeof parsedH2h === 'string') {
+      try { parsedH2h = JSON.parse(parsedH2h); } catch (e) { parsedH2h = {}; }
+  }
+
+  const h2hObj = parsedH2h?.aggregates || parsedH2h || {};
+  const matchesArray = parsedH2h?.matches || [];
+
+  let h2hTotal = h2hObj.numberOfMatches ?? h2hObj.played ?? h2hObj.count ?? 0;
+
+  const homeData = typeof h2hObj.homeTeam === 'object' ? h2hObj.homeTeam : {};
+  const awayData = typeof h2hObj.awayTeam === 'object' ? h2hObj.awayTeam : {};
+
+  // Hunts for the data no matter how corrupted the API structure is
+  let h2hHomeWins = Number(homeData.wins ?? h2hObj.homeWins ?? h2hObj.home_wins ?? 0);
+  let h2hDraws = Number(homeData.draws ?? h2hObj.draws ?? 0);
+  let h2hAwayWins = Number(awayData.wins ?? homeData.losses ?? h2hObj.awayWins ?? h2hObj.away_wins ?? 0);
+
+  // 🛡️ RECALCULATOR: If the API's aggregate is missing the wins, we calculate it mathematically from historical matches!
+  if (matchesArray.length > 0) {
+      let calcHomeWins = 0, calcDraws = 0, calcAwayWins = 0;
+      
+      matchesArray.forEach((m: any) => {
+          const hScore = m.score?.fullTime?.home ?? m.score?.regularTime?.home;
+          const aScore = m.score?.fullTime?.away ?? m.score?.regularTime?.away;
+          
+          if (hScore !== null && aScore !== null && hScore !== undefined) {
+              // Align the historical match teams to today's teams
+              const isHome = (m.homeTeam?.name === dbData.home_team || m.homeTeam?.shortName === dbData.home_team || m.homeTeam?.id === homeData?.id);
+              
+              if (hScore === aScore) {
+                  calcDraws++;
+              } else if (hScore > aScore) {
+                  isHome ? calcHomeWins++ : calcAwayWins++;
+              } else {
+                  isHome ? calcAwayWins++ : calcHomeWins++;
+              }
+          }
+      });
+
+      // Override with perfectly calculated stats if they exist
+      if (calcHomeWins + calcAwayWins + calcDraws > 0) {
+          h2hHomeWins = calcHomeWins;
+          h2hAwayWins = calcAwayWins;
+          h2hDraws = calcDraws;
+          h2hTotal = matchesArray.length; 
+      }
+  }
+
+  // Prevents division by zero for the visual bar
+  const barTotal = (h2hHomeWins + h2hDraws + h2hAwayWins) || 1;
+  const homePct = (h2hHomeWins / barTotal) * 100;
+  const drawPct = (h2hDraws / barTotal) * 100;
+  const awayPct = (h2hAwayWins / barTotal) * 100;
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
@@ -163,10 +212,10 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                 </h3>
                 
                 {/* Visual Data Bar */}
-                <div className="flex w-full h-2.5 rounded-full overflow-hidden mb-3 shadow-inner">
-                    <div style={{ width: `${(h2hHomeWins / h2hTotal) * 100}%` }} className="bg-blue-600 transition-all duration-500"></div>
-                    <div style={{ width: `${(h2hDraws / h2hTotal) * 100}%` }} className="bg-slate-300 transition-all duration-500"></div>
-                    <div style={{ width: `${(h2hAwayWins / h2hTotal) * 100}%` }} className="bg-red-500 transition-all duration-500"></div>
+                <div className="flex w-full h-2.5 rounded-full overflow-hidden mb-3 shadow-inner bg-slate-100">
+                    <div style={{ width: `${homePct}%` }} className="bg-blue-600 transition-all duration-700 ease-out"></div>
+                    <div style={{ width: `${drawPct}%` }} className="bg-slate-300 transition-all duration-700 ease-out"></div>
+                    <div style={{ width: `${awayPct}%` }} className="bg-red-500 transition-all duration-700 ease-out"></div>
                 </div>
 
                 <div className="flex justify-between items-center text-center">
