@@ -6,8 +6,8 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Trophy, Star, User as UserIcon, 
-  Crown, CheckCircle, AlertCircle, Lock,
-  MessageCircle, Settings, Clock, Zap
+  Crown, CheckCircle, Lock,
+  MessageCircle, Settings, Clock, Target
 } from 'lucide-react';
 import SignOutButton from '@/app/components/SignOutButton';
 import DashboardHistory from '@/app/components/DashboardHistory'; 
@@ -19,16 +19,22 @@ async function getUserData() {
 
   if (!user) return null;
 
-  // 1. Calculate Start of Month
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  // 2. Fetch Profile
+  // 1. Fetch Profile
   const { data: profile } = await supabase
     .from('profiles')
     .select('*, monthly_points, monthly_correct_scores')
     .eq('id', user.id)
+    .single();
+
+  // 2. 🟢 NEW: Fetch Dynamic Game Rules
+  const { data: settings } = await supabase
+    .from('site_settings')
+    .select('target_exact_scores, min_points_floor, daily_limit')
+    .limit(1)
     .single();
 
   // 3. Fetch Current Month Predictions
@@ -43,7 +49,7 @@ async function getUserData() {
     .order('created_at', { ascending: false })
     .limit(50);
 
-  // 4. FALLBACK: If no activity this month, fetch Last 5 Wins
+  // 4. FALLBACK: Last 5 Wins
   let pastWins: any[] = [];
   if (!currentPredictions || currentPredictions.length === 0) {
       const { data: wins } = await supabase
@@ -53,38 +59,41 @@ async function getUserData() {
             match:matches ( home_team, away_team, home_score, away_score, status ) 
         `)
         .eq('user_id', user.id)
-        .lt('created_at', startOfMonth.toISOString()) // Before this month
-        .or('status.eq.Won,points_awarded.gt.0') // Only Wins
+        .lt('created_at', startOfMonth.toISOString())
+        .or('status.eq.Won,points_awarded.gt.0')
         .order('created_at', { ascending: false })
         .limit(5);
       pastWins = wins || [];
   }
 
-  return { user, profile, predictions: currentPredictions, pastWins };
+  return { user, profile, settings, predictions: currentPredictions, pastWins };
 }
 
 export default async function Dashboard() {
   const data = await getUserData();
-
   if (!data) redirect('/login');
 
-  const { profile, predictions, pastWins } = data;
+  const { profile, settings, predictions, pastWins } = data;
     
-  // VIP & Stats Logic
+  // --- 🟢 DYNAMIC VIP & STATS LOGIC ---
   const expiryDate = profile?.vip_expires_at ? new Date(profile.vip_expires_at) : null;
   const isVipActive = profile?.is_vip && (!expiryDate || expiryDate > new Date());
 
   const csCount = profile?.monthly_correct_scores || 0;
-  const csTarget = 3;
+  const csTarget = settings?.target_exact_scores || 4; // Dynamic Target
   const csProgress = Math.min((csCount / csTarget) * 100, 100);
   const isCsQualified = csCount >= csTarget;
-  const isFullyQualified = isCsQualified && isVipActive;
+
+  const ptsCount = profile?.monthly_points || 0;
+  const ptsTarget = settings?.min_points_floor || 100; // Dynamic Floor
+  const isPtsQualified = ptsCount >= ptsTarget;
+
+  const isFullyQualified = isCsQualified && isVipActive && isPtsQualified;
 
   const today = new Date();
   const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
   const daysLeft = lastDay.getDate() - today.getDate();
 
-  // Form Guide (Use recent predictions if available, else empty)
   const formSource = (predictions && predictions.length > 0) ? predictions : pastWins;
   const formGuide = formSource?.slice(0, 5).map((p: any) => {
       const s = p.status?.toLowerCase();
@@ -95,7 +104,6 @@ export default async function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans text-slate-900">
-        
       {/* HEADER */}
       <div className="bg-[#0a1428] text-white pt-8 pb-24 px-6 rounded-b-[2.5rem] relative overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600 rounded-full blur-[100px] opacity-20"></div>
@@ -189,20 +197,24 @@ export default async function Dashboard() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 relative z-10">
-                <div className={`flex items-center gap-2 text-[10px] font-bold p-2 rounded-lg border ${isCsQualified ? (isFullyQualified ? 'bg-white/10 border-white/10 text-white' : 'bg-green-50 border-green-200 text-green-700') : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
-                    {isCsQualified ? <CheckCircle size={12} /> : <div className="w-3 h-3 rounded-full border-2 border-slate-300"></div>}
-                    <span>Hit 3 Exact Scores</span>
-                </div>
-                <div className={`flex items-center gap-2 text-[10px] font-bold p-2 rounded-lg border ${isVipActive ? (isFullyQualified ? 'bg-white/10 border-white/10 text-white' : 'bg-green-50 border-green-200 text-green-700') : 'bg-red-50 border-red-100 text-red-700 animate-pulse'}`}>
+            <div className="grid grid-cols-3 gap-2 relative z-10">
+                <div className={`flex flex-col items-center justify-center text-center gap-1 text-[9px] font-bold p-2 rounded-lg border ${isVipActive ? (isFullyQualified ? 'bg-white/10 border-white/10 text-white' : 'bg-green-50 border-green-200 text-green-700') : 'bg-red-50 border-red-100 text-red-700 animate-pulse'}`}>
                     {isVipActive ? <CheckCircle size={12} /> : <Lock size={12} />}
                     <span>{isVipActive ? 'VIP Active' : 'VIP Required'}</span>
+                </div>
+                <div className={`flex flex-col items-center justify-center text-center gap-1 text-[9px] font-bold p-2 rounded-lg border ${isCsQualified ? (isFullyQualified ? 'bg-white/10 border-white/10 text-white' : 'bg-green-50 border-green-200 text-green-700') : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                    {isCsQualified ? <CheckCircle size={12} /> : <Target size={12} />}
+                    <span>{csTarget} Exact Scores</span>
+                </div>
+                <div className={`flex flex-col items-center justify-center text-center gap-1 text-[9px] font-bold p-2 rounded-lg border ${isPtsQualified ? (isFullyQualified ? 'bg-white/10 border-white/10 text-white' : 'bg-green-50 border-green-200 text-green-700') : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                    {isPtsQualified ? <CheckCircle size={12} /> : <Trophy size={12} />}
+                    <span>{ptsTarget} Pts Floor</span>
                 </div>
             </div>
         </div>
       </div>
 
-      {/* REVENUE */}
+      {/* REVENUE & TOOLS */}
       <div className="px-4 mb-6">
         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 pl-1">Premium Tools</h3>
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
@@ -228,12 +240,7 @@ export default async function Dashboard() {
         </div>
       </div>
 
-      {/* HISTORY WITH FALLBACK LOGIC */}
-      <DashboardHistory 
-          predictions={predictions || []} 
-          pastWins={pastWins || []} 
-      />
-      
+      <DashboardHistory predictions={predictions || []} pastWins={pastWins || []} />
     </div>
   );
 }

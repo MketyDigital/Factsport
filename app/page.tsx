@@ -121,7 +121,13 @@ async function getHomepageData(leagueFilter: string | undefined) {
   const [matchesRes, newsRes, highlightsRes, featuredRes] = await Promise.all([
     matchQuery,
     supabase.from('news').select('*').order('created_at', { ascending: false }).limit(20),
-    supabase.from('matches').select('*').not('video_url', 'is', null).order('match_date', { ascending: false }).limit(10),
+    // 🟢 UPDATED: Excludes both TRUE nulls and empty strings to guarantee instant disappearance on removal
+    supabase.from('matches')
+      .select('*')
+      .not('video_url', 'is', null)
+      .neq('video_url', '') 
+      .order('match_date', { ascending: false })
+      .limit(5),
     supabase.from('matches').select('*').eq('is_featured', true).order('match_date', { ascending: true }).limit(5)
   ]);
 
@@ -168,13 +174,13 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   
   const latestNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id) && !n.is_breaking).slice(0, 5);
 
-  // 🟢 SMART HERO LOGIC: Max 2 Matches, Disappears After Match Day
+  // 🟢 SMART HERO LOGIC: Max 3 Matches, Disappears After Match Day
   let heroMatches: any[] = [];
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // 1. Admin Override (Limit to 2, strictly today or future)
+  // 1. Admin Override (Limit to 3, strictly today or future)
   if (featuredMatches.length > 0) {
-      heroMatches = featuredMatches.filter(m => m.match_date.split('T')[0] >= todayStr).slice(0, 2);
+      heroMatches = featuredMatches.filter(m => m.match_date.split('T')[0] >= todayStr).slice(0, 3);
   } 
   
   // 2. Automated Targeting (If no admin match is available for today/future)
@@ -192,9 +198,9 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
           const bigMatchCandidates = targetMatches.filter(m => bigLeagues.includes(m.league));
           
           if (bigMatchCandidates.length > 0) {
-              heroMatches = bigMatchCandidates.slice(0, 2);
+              heroMatches = bigMatchCandidates.slice(0, 3);
           } else {
-              heroMatches = targetMatches.slice(0, 2);
+              heroMatches = targetMatches.slice(0, 3);
           }
       }
   }
@@ -236,11 +242,13 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       {/* 2. AUTO-SLIDER */}
       {finalHeadlines.length > 0 && <div className="mt-4 px-4"><HeadlinesSlider headlines={finalHeadlines} /></div>}
 
-      {/* 3. HIGHLIGHTS */}
+      {/* 3. HIGHLIGHTS (Latest 5 Matches) */}
       {highlights.length > 0 && (
         <div className="mt-4 px-4">
              <div className="flex justify-between items-center mb-3">
                 <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2"><PlayCircle size={14} className="text-red-600" /> Highlights</h3>
+                {/* 🟢 NEW: View All Highlights Link */}
+                <Link href="/highlights" className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded hover:bg-blue-100 transition">View All</Link>
             </div>
             <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 scrollbar-hide">
                 {highlights.map((item: any) => (
@@ -309,14 +317,20 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             </div>
         )}
 
-        {/* 🟢 RICH HERO SECTION (Background Image Upgrade) */}
+        {/* 🟢 UPDATED: RICH HERO SECTION (Smaller & with Top Match Label) */}
         {!selectedLeague && heroMatches.length > 0 && (
          <div className="px-4 mb-4 flex gap-2 overflow-x-auto">
              {heroMatches.map((match) => (
                 <Link key={match.id} href={`/match/${match.id}`} className={`block relative z-10 ${heroMatches.length > 1 ? 'w-[85%] shrink-0' : 'w-full'}`}>
-                    <div className="bg-[#0a1428] rounded-2xl p-4 shadow-xl border border-white/10 relative overflow-hidden group hover:scale-[1.01] transition-transform">
+                    {/* Notice the reduced padding: p-3 instead of p-4, and rounded-xl */}
+                    <div className="bg-[#0a1428] rounded-xl p-3 shadow-xl border border-white/10 relative overflow-hidden group hover:scale-[1.01] transition-transform">
                         
-                        {/* 🟢 RICH BACKGROUND LAYER */}
+                        {/* 🟢 NEW: TOP MATCH OF THE DAY LABEL */}
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-yellow-500 text-black text-[8px] font-black px-3 py-0.5 rounded-b-md z-20 uppercase tracking-widest shadow-md whitespace-nowrap">
+                            Top Match of the Day
+                        </div>
+
+                        {/* RICH BACKGROUND LAYER */}
                         {match.home_fanart || match.home_stadium ? (
                             <>
                                 <img src={match.home_fanart || match.home_stadium} className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-overlay" />
@@ -328,24 +342,25 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
 
                         <div className="relative z-10">
                             {['LIVE','HT','IN_PLAY'].includes(match.status) && (
-                                <div className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1 shadow-lg">
+                                <div className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-bl-lg animate-pulse flex items-center gap-1 shadow-lg">
                                     <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE
                                 </div>
                             )}
                             {(match.livestream_url || match.audio_url) && (
-                                <div className="absolute top-0 left-0 bg-black/40 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1">
+                                <div className="absolute top-0 left-0 bg-black/40 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded-br-lg border border-white/10 flex items-center gap-1">
                                      {match.livestream_url ? <Video size={8} /> : <Radio size={8} />}
                                      {match.livestream_url ? 'WATCH' : 'AUDIO'}
                                 </div>
                             )}
                             
-                            <div className="flex justify-between items-center mt-8">
+                            {/* Reduced top margin mt-6, smaller logos w-10, smaller score text-xl */}
+                            <div className="flex justify-between items-center mt-6">
                                 <div className="flex flex-col items-center w-[30%]">
-                                    {match.home_logo ? <img src={match.home_logo} className="w-12 h-12 object-contain mb-2 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px]">H</div>}
+                                    {match.home_logo ? <img src={match.home_logo} className="w-10 h-10 object-contain mb-1.5 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-1.5 flex items-center justify-center text-[10px]">H</div>}
                                     <span className="text-[10px] font-bold text-center leading-tight text-white line-clamp-1 drop-shadow-md">{match.home_team}</span>
                                 </div>
                                 <div className="flex flex-col items-center w-[40%]">
-                                    <div className="text-2xl font-black tabular-nums tracking-widest bg-black/40 px-3 py-1 rounded-xl backdrop-blur-md border border-white/10 shadow-inner text-white whitespace-nowrap">
+                                    <div className="text-xl font-black tabular-nums tracking-widest bg-black/40 px-2 py-1 rounded-lg backdrop-blur-md border border-white/10 shadow-inner text-white whitespace-nowrap">
                                         {match.status === 'SCHEDULED' || match.status === 'PRE' ? <span className="text-sm">VS</span> : `${match.home_score}-${match.away_score}`}
                                     </div>
                                     <span className="text-[8px] font-medium text-blue-200 mt-1 uppercase tracking-wider text-center drop-shadow-md">
@@ -356,7 +371,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                     </span>
                                 </div>
                                 <div className="flex flex-col items-center w-[30%]">
-                                    {match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain mb-2 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px]">A</div>}
+                                    {match.away_logo ? <img src={match.away_logo} className="w-10 h-10 object-contain mb-1.5 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-1.5 flex items-center justify-center text-[10px]">A</div>}
                                     <span className="text-[10px] font-bold text-center leading-tight text-white line-clamp-1 drop-shadow-md">{match.away_team}</span>
                                 </div>
                             </div>
