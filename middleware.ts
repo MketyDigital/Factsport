@@ -4,6 +4,16 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
   const pathname = request.nextUrl.pathname;
+  const searchParams = request.nextUrl.search;
+
+  // -----------------------------------------------------------------
+  // 🛡️ PART 0: MALICIOUS PAYLOAD & THREAT FILTER
+  // -----------------------------------------------------------------
+  // Instantly blocks automated bots trying common SQLi or Path Traversal attacks in the URL
+  const threatPatterns = /(\%27)|(\')|(\-\-)|(\%23)|(#)|(\%3B)|(;)|(\.\.\/)|(\%2e\%2e\%2f)/i;
+  if (threatPatterns.test(pathname) || threatPatterns.test(searchParams)) {
+    return new NextResponse('Forbidden Request: Malicious payload detected.', { status: 403 });
+  }
 
   // -----------------------------------------------------------------
   // 🔒 PART 1: ENVIRONMENT LOCK (Staging & Dev)
@@ -57,33 +67,43 @@ export async function middleware(request: NextRequest) {
           return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
+          // 1. Update request (name & value only)
           request.cookies.set({
             name,
             value,
-            ...options,
           })
+          
+          // 2. Re-initialize response
           response = NextResponse.next({
             request: {
               headers: request.headers,
             },
           })
+          
+          // 3. Update response (apply security options here)
           response.cookies.set({
             name,
             value,
             ...options,
+            secure: process.env.NODE_ENV === 'production', // 🛡️ Forces secure cookies in prod
+            sameSite: 'lax', // 🛡️ Protects against CSRF
           })
         },
         remove(name: string, options: CookieOptions) {
+          // 1. Update request (name & empty value only)
           request.cookies.set({
             name,
             value: '',
-            ...options,
           })
+          
+          // 2. Re-initialize response
           response = NextResponse.next({
             request: {
               headers: request.headers,
             },
           })
+          
+          // 3. Update response (apply removal options here)
           response.cookies.set({
             name,
             value: '',

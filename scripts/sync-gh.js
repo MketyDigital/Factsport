@@ -17,7 +17,6 @@ const LEAGUES = [
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Safe fetch: 6.2 seconds keeps us safely under the 10/min limit (60s / 10 = 6s)
 async function fetchSafe(url, options) {
   const res = await fetch(url, options);
   await delay(6200); 
@@ -34,8 +33,6 @@ async function run() {
 
   const today = new Date();
   
-  // 🚀 OPTIMIZATION: Changed lookback from -14 to -3 days. 
-  // Saves massive API bandwidth and GitHub Action minutes.
   const fromDate = new Date(today); fromDate.setDate(today.getDate() - 3);
   const toDate = new Date(today); toDate.setDate(today.getDate() + 21);
   const fromStr = fromDate.toISOString().split('T')[0];
@@ -43,7 +40,6 @@ async function run() {
 
   console.log(`🚀 Starting SMART Schedule Sync: ${fromStr} to ${toStr}`);
 
-  // 1. PRE-FETCH EXISTING DATA
   console.log(`🔍 Checking database for existing rich data...`);
   const { data: dbMatches, error: dbErr } = await supabase
     .from('matches')
@@ -82,29 +78,39 @@ async function run() {
           const diffHours = (now - matchTime) / (1000 * 60 * 60);
           const diffDays = (matchTime - now) / (1000 * 60 * 60 * 24);
 
-          // Skip active matches
           if (diffHours > -0.5 && diffHours < 4.0 && m.status !== 'FINISHED') continue; 
 
           const existing = existingMatches[m.id];
           let h2hData = existing?.h2h || null;
           
-          // 🚀 MASSIVE OPTIMIZATION: Only fetch H2H if the match is within the NEXT 3 DAYS
-          if (!h2hData && diffDays >= -1 && diffDays <= 3) {
+          // 🟢 BULLETPROOF CHECK: Force a re-fetch if the database only has partial/empty H2H data
+          const isH2hComplete = h2hData && 
+                                h2hData.aggregates && 
+                                typeof h2hData.aggregates === 'object' && 
+                                Object.keys(h2hData.aggregates).length > 0;
+          
+          if (!isH2hComplete && diffDays >= -1 && diffDays <= 3) {
               try {
-                 const h2hUrl = `${BASE_URL}/matches/${m.id}/head2head`;
-                 const h2hRes = await fetchSafe(h2hUrl, { headers: { 'X-Auth-Token': API_KEY } });
-                 
-                 if (h2hRes.ok) {
-                     const parsedH2h = await h2hRes.json();
-                     h2hData = parsedH2h.aggregates || parsedH2h; 
-                     newH2hFetches++;
-                 }
+                  const h2hUrl = `${BASE_URL}/matches/${m.id}/head2head`;
+                  const h2hRes = await fetchSafe(h2hUrl, { headers: { 'X-Auth-Token': API_KEY } });
+                  
+                  if (h2hRes.ok) {
+                      const parsedH2h = await h2hRes.json();
+                      
+                      // 🟢 ONLY save if the API actually gave us the aggregates
+                      if (parsedH2h && parsedH2h.aggregates) {
+                          h2hData = {
+                              aggregates: parsedH2h.aggregates,
+                              matches: parsedH2h.matches || []
+                          }; 
+                          newH2hFetches++;
+                      }
+                  }
               } catch (err) {
-                 console.error(`   ❌ Failed to fetch H2H for ${m.id}:`, err.message);
+                  console.error(`   ❌ Failed to fetch H2H for ${m.id}:`, err.message);
               }
           }
 
-          // Format Referees cleanly
           const formattedReferees = m.referees?.map(r => r.name) || existing?.referees || [];
 
           matches.push({

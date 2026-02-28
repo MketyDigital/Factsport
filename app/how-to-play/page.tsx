@@ -19,9 +19,12 @@ export default function HowToPlay() {
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10"><Target size={64} /></div>
             <h3 className="text-xl font-bold text-blue-400 mb-2">1. Predict Matches</h3>
-            <p className="text-sm text-slate-300 leading-relaxed">
+            <p className="text-sm text-slate-300 leading-relaxed mb-4">
                 Before every match starts, submit your prediction. You must choose the <b>Winner</b> (Home/Draw/Away) AND the <b>Exact Score</b>.
             </p>
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-xs text-blue-300">
+                <span className="font-bold text-blue-400">DAILY LIMIT:</span> Only your first 5 predictions per day count towards the leaderboard. Choose wisely!
+            </div>
         </div>
 
         {/* Step 2 */}
@@ -48,17 +51,51 @@ export default function HowToPlay() {
                 The leaderboard resets every month. To win 1st, 2nd, or 3rd place, you must meet the <b>VIP Criteria</b>:
             </p>
             <div className="bg-black/30 p-4 rounded-xl text-xs space-y-2 border border-white/5">
-                <div className="flex justify-between"><span>🥇 1st Place</span> <span className="font-bold text-yellow-400">Highest Pts + 3 Correct Scores</span></div>
-                <div className="flex justify-between"><span>🥈 2nd Place</span> <span className="font-bold text-slate-300">2nd Highest + 3 Correct Scores</span></div>
-                <div className="flex justify-between"><span>🥉 3rd Place</span> <span className="font-bold text-orange-400">3rd Highest + 3 Correct Score</span></div>
+                <div className="flex justify-between"><span>🥇 1st Place</span> <span className="font-bold text-yellow-400">Highest Pts + 4 Exact Scores</span></div>
+                <div className="flex justify-between"><span>🥈 2nd Place</span> <span className="font-bold text-slate-300">2nd Highest + 4 Exact Scores</span></div>
+                <div className="flex justify-between"><span>🥉 3rd Place</span> <span className="font-bold text-orange-400">3rd Highest + 4 Exact Scores</span></div>
             </div>
             <p className="text-[10px] text-slate-500 mt-2 italic">*Only VIP Members are eligible for ranking prizes.</p>
+        </div>
+
+        {/* The Champion's Checklist */}
+        <div className="bg-gradient-to-br from-purple-900/30 to-[#0a1428] border border-purple-500/30 rounded-2xl p-6 relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-4 opacity-10"><ShieldAlert size={64} className="text-purple-400" /></div>
+            <h3 className="text-xl font-bold text-purple-400 mb-2 flex items-center gap-2">
+                🏆 Champion's Checklist
+            </h3>
+            <p className="text-xs text-slate-300 leading-relaxed mb-4 pr-8">
+                To claim your VIP cash prize at the end of the month, your predictions must pass the ultimate test. You must meet <b>ALL</b> of these conditions:
+            </p>
+            
+            <ul className="space-y-3 text-xs text-slate-300">
+                <li className="flex items-start gap-2">
+                    <span className="text-purple-400 mt-0.5">●</span>
+                    <span><b>100-Point Floor:</b> Score a minimum of 100 total points in the month.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                    <span className="text-purple-400 mt-0.5">●</span>
+                    <span><b>Active Player:</b> Place predictions in at least 3 different weeks.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                    <span className="text-purple-400 mt-0.5">●</span>
+                    <span><b>4-League Master:</b> Your 4 Exact Scores must come from 4 different leagues.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                    <span className="text-purple-400 mt-0.5">●</span>
+                    <span><b>The Perfect Mix:</b> Include at least 1 Home Win, 1 Away Win, and 1 Draw Exact Score.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                    <span className="text-purple-400 mt-0.5">●</span>
+                    <span><b>Scoreline Variety:</b> Exact scores cannot all be identical, and a max of one "0-0" counts.</span>
+                </li>
+            </ul>
         </div>
 
       </div>
 
       <div className="mt-10 text-center">
-        <Link href="/" className="bg-yellow-500 text-black font-black py-4 px-8 rounded-xl shadow-lg active:scale-95 transition inline-block w-full">
+        <Link href="/" className="bg-yellow-500 text-black font-black py-4 px-8 rounded-xl shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] active:scale-95 transition inline-block w-full">
             START PREDICTING
         </Link>
       </div>

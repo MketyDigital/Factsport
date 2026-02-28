@@ -11,8 +11,7 @@ const LEAGUES = [
   { id: 'PL', name: 'Premier League' }, { id: 'PD', name: 'La Liga' },
   { id: 'BL1', name: 'Bundesliga' }, { id: 'SA', name: 'Serie A' },
   { id: 'FL1', name: 'Ligue 1' }, { id: 'CL', name: 'Champions League' },
-  { id: 'EC', name: 'Euros' }, { id: 'WC', name: 'World Cup' },
-  { id: 'EL', name: 'Europa League' } 
+  { id: 'EC', name: 'Euros' }, { id: 'WC', name: 'World Cup' }
 ];
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
