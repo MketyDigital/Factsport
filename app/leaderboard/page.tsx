@@ -2,12 +2,22 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/app/lib/supabase/server';
-import { Trophy, Medal, Star, Crown, History, TrendingUp, Calendar, Send, ExternalLink } from 'lucide-react';
+import { Trophy, Star, Crown, History, TrendingUp, Calendar, Send, ExternalLink } from 'lucide-react';
 
 export default async function LeaderboardPage() {
   const supabase = createClient();
 
-  // 1. Fetch Top 50 Users (EVERYONE)
+  // 1. 🟢 FETCH DYNAMIC RULES
+  const { data: settings } = await supabase
+    .from('site_settings')
+    .select('target_exact_scores, min_points_floor')
+    .limit(1)
+    .single();
+
+  const targetCS = settings?.target_exact_scores || 4;
+  const floorPts = settings?.min_points_floor || 100;
+
+  // 2. FETCH USERS
   const { data: users } = await supabase
     .from('profiles')
     .select('full_name, monthly_points, points, monthly_correct_scores, is_vip')
@@ -15,21 +25,19 @@ export default async function LeaderboardPage() {
     .order('monthly_correct_scores', { ascending: false })
     .limit(50);
 
-  // 2. PODIUM LOGIC (VIP + 3 Correct Scores)
-  const podiumQualifiers = users?.filter(u => u.is_vip && u.monthly_correct_scores >= 3) || [];
+  // 3. 🟢 DYNAMIC PODIUM LOGIC
+  const podiumQualifiers = users?.filter(u => u.is_vip && u.monthly_correct_scores >= targetCS && u.monthly_points >= floorPts) || [];
   
   const first = podiumQualifiers[0];
   const second = podiumQualifiers[1];
   const third = podiumQualifiers[2];
 
-  // 3. Mock Data
   const pastWinners = [
     { month: 'December 2025', name: 'Sarah J.', points: 145, prize: '$500' },
     { month: 'November 2025', name: 'Mike T.', points: 132, prize: '$300' },
     { month: 'October 2025', name: 'David B.', points: 128, prize: '$200' },
   ];
 
-  // 🔗 LINKS CONFIGURATION
   const TELEGRAM_LINK = "https://t.me/factsportlive"; 
   const BETTING_LINK = "https://melbet.com";
 
@@ -46,10 +54,11 @@ export default async function LeaderboardPage() {
                 {!isUnclaimed && <div className={`absolute top-0 inset-x-0 h-24 bg-${rank === 1 ? 'yellow' : rank === 2 ? 'slate' : 'orange'}-500/20 blur-xl`}></div>}
                 <div className="mb-3 bg-slate-900 text-white text-[10px] font-black px-3 py-1 rounded-full border border-slate-700 z-10 shadow-lg">#{rank}</div>
                 {isUnclaimed ? (
-                    <div className="flex flex-col items-center justify-center h-full opacity-50 mt-4">
+                    <div className="flex flex-col items-center justify-center h-full opacity-50 mt-4 text-center">
                         <Trophy size={24} className="text-slate-500 mb-2" />
                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Unclaimed</span>
-                        <span className="text-[8px] text-slate-500 mt-1 text-center max-w-[100px]">Need VIP + 3 Correct Scores</span>
+                        {/* Dynamic requirement message */}
+                        <span className="text-[8px] text-slate-500 mt-1 max-w-[100px] leading-tight">Need VIP + {targetCS} CS + {floorPts} Pts</span>
                     </div>
                 ) : (
                     <div className="flex flex-col items-center w-full z-10">
@@ -74,8 +83,6 @@ export default async function LeaderboardPage() {
 
   return (
     <div className="min-h-screen bg-[#0a1428] pb-24 font-sans text-white p-4">
-        
-        {/* HEADER */}
         <div className="text-center mb-10 pt-4">
             <h1 className="text-3xl font-black italic flex items-center justify-center gap-2 mb-2">
                 <Trophy className="text-yellow-500 fill-yellow-500" /> Monthly Kings
@@ -85,21 +92,20 @@ export default async function LeaderboardPage() {
             </p>
         </div>
 
-        {/* --- 1. THE PODIUM --- */}
         <div className="flex items-end justify-center gap-2 mb-8 max-w-lg mx-auto h-[260px]">
             <div className="w-1/3 flex justify-center">{renderPodiumCard(second, 2, 'border-slate-400/30 shadow-[0_-5px_20px_rgba(148,163,184,0.1)]', 'h-[180px]')}</div>
             <div className="w-1/3 flex justify-center z-10">{renderPodiumCard(first, 1, 'border-yellow-500/50 shadow-[0_-5px_30px_rgba(234,179,8,0.2)]', 'h-[230px]')}</div>
             <div className="w-1/3 flex justify-center">{renderPodiumCard(third, 3, 'border-orange-600/30 shadow-[0_-5px_20px_rgba(234,88,12,0.1)]', 'h-[160px]')}</div>
         </div>
 
-        {/* Requirements Banner */}
         <div className="bg-gradient-to-r from-blue-900/40 to-slate-900/40 border border-blue-500/20 rounded-xl p-3 mb-6 text-center backdrop-blur-md">
             <p className="text-[10px] text-blue-200 font-medium">
-                🏆 <span className="font-bold text-white">To Win:</span> You must be <span className="text-yellow-400 font-bold">VIP</span> and have <span className="text-green-400 font-bold">3+ Correct Scores</span>.
+                {/* Dynamic banner text */}
+                🏆 <span className="font-bold text-white">To Win:</span> You must be <span className="text-yellow-400 font-bold">VIP</span>, score <span className="text-white font-bold">{floorPts}+ Pts</span>, and hit <span className="text-green-400 font-bold">{targetCS}+ Correct Scores</span>.
+                <br/><span className="text-[8px] text-blue-300 opacity-80 mt-1 block">*Winner is verified against Champion's Checklist Audit before payout.</span>
             </p>
         </div>
 
-        {/* --- 📢 2. COMMUNITY LINKS (New Section) --- */}
         <div className="grid grid-cols-2 gap-3 mb-8">
             <a href={TELEGRAM_LINK} target="_blank" className="bg-[#229ED9]/10 border border-[#229ED9]/30 hover:bg-[#229ED9]/20 text-[#229ED9] p-3 rounded-xl flex items-center justify-center gap-2 transition">
                 <Send size={16} /> <span className="text-xs font-bold">Join Community</span>
@@ -109,7 +115,6 @@ export default async function LeaderboardPage() {
             </a>
         </div>
 
-        {/* --- 3. THE LIST --- */}
         <div className="bg-white/5 rounded-3xl border border-white/10 overflow-hidden mb-12 shadow-2xl">
             <div className="p-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
                 <h3 className="font-bold text-sm flex items-center gap-2"><TrendingUp size={16} /> Live Standings</h3>
@@ -137,14 +142,14 @@ export default async function LeaderboardPage() {
                             </td>
                             <td className="p-3 text-center"><span className="bg-yellow-500/10 text-yellow-400 px-2 py-1 rounded font-mono font-bold text-xs border border-yellow-500/20">{u.monthly_points}</span></td>
                             <td className="p-3 text-center font-mono text-slate-400 text-xs">{u.points}</td>
-                            <td className="p-3 pr-4 text-right"><span className={`font-mono font-bold text-xs ${u.monthly_correct_scores >= 3 ? 'text-green-400' : 'text-slate-500'}`}>{u.monthly_correct_scores}</span></td>
+                            {/* Dynamic Table Highlight */}
+                            <td className="p-3 pr-4 text-right"><span className={`font-mono font-bold text-xs ${u.monthly_correct_scores >= targetCS ? 'text-green-400' : 'text-slate-500'}`}>{u.monthly_correct_scores}</span></td>
                         </tr>
                     ))}
                 </tbody>
             </table>
         </div>
 
-        {/* --- 4. HALL OF FAME --- */}
         <div>
              <h3 className="text-sm font-black uppercase text-slate-500 mb-4 flex items-center gap-2 pl-2"><History size={16} /> Hall of Fame</h3>
              <div className="grid gap-3">
