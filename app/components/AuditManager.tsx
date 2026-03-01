@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
 import { Trophy, CheckCircle, XCircle, AlertCircle, Loader2, Play } from 'lucide-react';
+// 🟢 IMPORT THE SECURE SERVER ACTION
+import { triggerAuditAction } from '@/app/admin/actions'; 
 
 export default function AuditManager() {
     const supabase = createClient();
@@ -41,14 +43,21 @@ export default function AuditManager() {
     const manuallyRunAudit = async () => {
         if (!confirm("Run the automated audit script now?")) return;
         setRunningAudit(true);
+        
         try {
-            const res = await fetch(`/api/admin/run-audit?key=${process.env.NEXT_PUBLIC_CRON_KEY || ''}`);
-            const data = await res.json();
-            alert(data.message || data.error);
-            fetchDrafts();
+            // 🔒 CALL THE SERVER ACTION (No keys exposed in the browser!)
+            const response = await triggerAuditAction();
+            
+            if (response.success) {
+                alert(response.message);
+                fetchDrafts();
+            } else {
+                alert("Error: " + response.error);
+            }
         } catch (err) {
-            alert("Audit failed.");
+            alert("Audit failed to execute.");
         }
+        
         setRunningAudit(false);
     };
 
