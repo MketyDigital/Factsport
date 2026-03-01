@@ -36,12 +36,31 @@ export default async function LeaderboardPage() {
   const second = podiumQualifiers[1];
   const third = podiumQualifiers[2];
 
-  // (Optional: You can fetch real approved past winners from the 'monthly_winners' table here later!)
-  const pastWinners = [
-    { month: 'December 2025', name: 'Sarah J.', points: 145, prize: '$500' },
-    { month: 'November 2025', name: 'Mike T.', points: 132, prize: '$300' },
-    { month: 'October 2025', name: 'David B.', points: 128, prize: '$200' },
-  ];
+  // 🟢 LIVE DATABASE FETCH FOR PAST WINNERS
+  const { data: approvedWinners } = await supabase
+    .from('monthly_winners')
+    .select('month_year, points, prize_amount, rank, user:profiles(full_name)')
+    .eq('is_approved', true)
+    .order('created_at', { ascending: false })
+    .limit(15);
+
+  // 🟢 TS FIX: Safely map the winners and handle the full_name whether it's an array or object
+  const pastWinners = approvedWinners?.map(w => {
+    let winnerName = 'Champion';
+    if (w.user) {
+        winnerName = Array.isArray(w.user) 
+            ? w.user[0]?.full_name 
+            : (w.user as any).full_name;
+    }
+    
+    return {
+        month: w.month_year,
+        name: winnerName,
+        points: w.points,
+        prize: w.prize_amount || 'Mystery Prize',
+        rank: w.rank
+    };
+  }) || [];
 
   const TELEGRAM_LINK = "https://t.me/factsportlive"; 
   const BETTING_LINK = "https://melbet.com";
@@ -160,22 +179,26 @@ export default async function LeaderboardPage() {
         <div>
              <h3 className="text-sm font-black uppercase text-slate-500 mb-4 flex items-center gap-2 pl-2"><History size={16} /> Hall of Fame</h3>
              <div className="grid gap-3">
-                {pastWinners.map((winner, i) => (
-                    <div key={i} className="bg-gradient-to-r from-slate-800 to-slate-900 p-4 rounded-xl border border-slate-700 flex items-center justify-between relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-full bg-white/5 -skew-x-12 translate-x-12 group-hover:translate-x-0 transition duration-700"></div>
-                        <div className="flex items-center gap-4 relative z-10">
-                            <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center border border-yellow-500/30 text-yellow-500"><Trophy size={18} /></div>
-                            <div>
-                                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-0.5 flex items-center gap-1"><Calendar size={10} /> {winner.month}</p>
-                                <p className="font-bold text-white text-sm">{winner.name}</p>
+                {pastWinners.length === 0 ? (
+                    <div className="text-center text-slate-500 text-xs py-8">No winners approved yet. Be the first!</div>
+                ) : (
+                    pastWinners.map((winner, i) => (
+                        <div key={i} className="bg-gradient-to-r from-slate-800 to-slate-900 p-4 rounded-xl border border-slate-700 flex items-center justify-between relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 w-24 h-full bg-white/5 -skew-x-12 translate-x-12 group-hover:translate-x-0 transition duration-700"></div>
+                            <div className="flex items-center gap-4 relative z-10">
+                                <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center border border-yellow-500/30 text-yellow-500"><Trophy size={18} /></div>
+                                <div>
+                                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-0.5 flex items-center gap-1"><Calendar size={10} /> {winner.month}</p>
+                                    <p className="font-bold text-white text-sm">{winner.name}</p>
+                                </div>
+                            </div>
+                            <div className="text-right relative z-10">
+                                <div className="text-xl font-black text-yellow-400 italic">{winner.points} pts</div>
+                                <div className="text-[9px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full inline-block mt-1 border border-green-500/20">Won {winner.prize}</div>
                             </div>
                         </div>
-                        <div className="text-right relative z-10">
-                            <div className="text-xl font-black text-yellow-400 italic">{winner.points} pts</div>
-                            <div className="text-[9px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full inline-block mt-1 border border-green-500/20">Won {winner.prize}</div>
-                        </div>
-                    </div>
-                ))}
+                    ))
+                )}
              </div>
         </div>
     </div>
