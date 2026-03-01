@@ -62,14 +62,24 @@ async function getUserData() {
       pastWins = wins || [];
   }
 
-  return { user, profile, settings, predictions: currentPredictions, pastWins };
+  // 🟢 Fetch latest Rank #1 winner for the VIP Upsell banner
+  const { data: latestWinner } = await supabase
+    .from('monthly_winners')
+    .select('prize_amount, user:profiles(full_name)')
+    .eq('is_approved', true)
+    .eq('rank', 1)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  return { user, profile, settings, predictions: currentPredictions, pastWins, latestWinner };
 }
 
 export default async function Dashboard() {
   const data = await getUserData();
   if (!data) redirect('/login');
 
-  const { profile, settings, predictions, pastWins } = data;
+  const { profile, settings, predictions, pastWins, latestWinner } = data;
     
   const expiryDate = profile?.vip_expires_at ? new Date(profile.vip_expires_at) : null;
   const isVipActive = profile?.is_vip && (!expiryDate || expiryDate > new Date());
@@ -96,6 +106,14 @@ export default async function Dashboard() {
       if(s === 'lost') return 'L';
       return 'P';
   }).reverse() || [];
+
+  // 🟢 TS FIX: Safely extract the name whether Supabase returns an object or an array
+  let winnerName = 'A Champion';
+  if (latestWinner?.user) {
+      winnerName = Array.isArray(latestWinner.user) 
+          ? latestWinner.user[0]?.full_name 
+          : (latestWinner.user as any).full_name;
+  }
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans text-slate-900">
@@ -211,7 +229,6 @@ export default async function Dashboard() {
                 </div>
             </div>
             
-            {/* 🟢 NEW: Reminder for complex rules */}
             <div className="mt-3 pt-3 border-t border-slate-100 relative z-10 flex items-center justify-between">
                 <span className="text-[9px] text-slate-500 font-medium italic">Remember the Champion's Checklist!</span>
                 <Link href="/how-to-play" className="text-[9px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1">
@@ -220,6 +237,30 @@ export default async function Dashboard() {
             </div>
         </div>
       </div>
+
+      {/* 🟢 VIP UPSELL BANNER */}
+      {!isVipActive && latestWinner && (
+        <div className="px-4 mb-4">
+            <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-2xl p-4 text-slate-900 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full blur-[60px] opacity-20"></div>
+                <div className="relative z-10 flex items-center justify-between gap-4">
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-yellow-900 mb-0.5 flex items-center gap-1">
+                            <Trophy size={10} /> Last Month's Winner
+                        </p>
+                        <h4 className="font-black text-sm">
+                            {/* 🟢 Safely uses the extracted winnerName */}
+                            {winnerName} won <span className="text-white bg-black/20 px-1.5 py-0.5 rounded">{latestWinner.prize_amount}</span>!
+                        </h4>
+                        <p className="text-[9px] font-medium text-yellow-900 mt-1">Upgrade to VIP to qualify for this month's prizes.</p>
+                    </div>
+                    <Link href="/vip/upgrade" className="bg-slate-900 text-yellow-400 text-[10px] font-black uppercase px-3 py-2 rounded-xl shadow-lg shrink-0 hover:bg-black transition active:scale-95">
+                        Upgrade
+                    </Link>
+                </div>
+            </div>
+        </div>
+      )}
 
       <div className="px-4 mb-6">
         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 pl-1">Premium Tools</h3>
