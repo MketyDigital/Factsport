@@ -15,7 +15,7 @@ export default function TermsPage() {
             <h1 className="text-3xl font-black uppercase mb-3 flex items-center gap-3 text-slate-900">
                 <BookOpen className="text-blue-600" size={32} /> Terms of Service
             </h1>
-            <p className="text-slate-500 text-sm">Last Updated: February 2026</p>
+            <p className="text-slate-500 text-sm">Last Updated: March 1, 2026</p>
         </header>
 
         <div className="prose prose-slate prose-sm max-w-none space-y-8">
@@ -43,7 +43,7 @@ export default function TermsPage() {
                 <ul className="list-disc pl-5 space-y-2">
                     <li><strong>Virtual Points:</strong> Points awarded (3pts for Outcome, 10pts for Exact Score) have no cash value and cannot be exchanged for currency.</li>
                     <li><strong>Prize Eligibility:</strong> Monthly prizes are reserved strictly for <strong>VIP Members</strong>. Free users may appear on the leaderboard but are not eligible for physical or cash rewards.</li>
-                    <li><strong>Winning Criteria:</strong> To claim a 1st, 2nd, or 3rd place prize, a user must meet the specific criteria set out in our "How to Play" rules (e.g., minimum 3 Correct Scores per month).</li>
+                    <li><strong>Winning Criteria:</strong> To claim a 1st, 2nd, or 3rd place prize, a user must meet the specific criteria set out in our "How to Play" rules page (e.g., minimum 4 Correct Scores per month).</li>
                     <li><strong>Fair Play:</strong> We reserve the right to disqualify any user suspected of multi-accounting, bot usage, or exploiting system glitches.</li>
                 </ul>
             </section>
