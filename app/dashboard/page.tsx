@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { 
   Trophy, Star, User as UserIcon, 
   Crown, CheckCircle, Lock,
-  MessageCircle, Settings, Clock, Target, Info, ArrowRight
+  MessageCircle, Settings, Clock, Target, Info, ArrowRight, Award // Award added here for Leaderboard icon
 } from 'lucide-react';
 import SignOutButton from '@/app/components/SignOutButton';
 import DashboardHistory from '@/app/components/DashboardHistory'; 
@@ -285,6 +285,22 @@ export default async function Dashboard() {
             </div>
             <FreeTipsBanner />
         </div>
+      </div>
+
+      {/* 🚀 🟢 NEW: QUICK ACTION LINKS RESTORED */}
+      <div className="grid grid-cols-3 gap-3 px-4 pb-6">
+          <Link href="/matches" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
+              <Trophy className="text-yellow-500" size={20} />
+              <span className="text-[10px] font-bold text-slate-700">Predict</span>
+          </Link>
+          <Link href="/leaderboard" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
+              <Award className="text-yellow-500" size={20} />
+              <span className="text-[10px] font-bold text-slate-700">Leaders</span>
+          </Link>
+          <a href="https://t.me/factsportlive" target="_blank" rel="noopener noreferrer" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
+              <MessageCircle className="text-blue-500" size={20} />
+              <span className="text-[10px] font-bold text-slate-700">Community</span>
+          </a>
       </div>
 
       <DashboardHistory predictions={predictions || []} pastWins={pastWins || []} />
