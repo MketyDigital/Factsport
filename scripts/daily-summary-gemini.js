@@ -92,8 +92,6 @@ async function generateDailySummaries() {
             const headline = lines[0].replace(/^#+\s*/, '').replace(/[\*"]/g, ''); 
             const body = lines.slice(1).join('\n').trim();
 
-            const isBigLeague = ['Premier League', 'Champions League', 'La Liga'].includes(leagueName);
-
             let featureMatch = leagueMatches[0];
 
             const { error } = await supabase.from('news').insert([{
@@ -103,8 +101,8 @@ async function generateDailySummaries() {
                 image_url: null, 
                 team_1_logo: featureMatch ? featureMatch.home_logo : null, 
                 team_2_logo: featureMatch ? featureMatch.away_logo : null,
-                is_breaking: true,         
-                is_headline: isBigLeague  
+                is_breaking: false, // 🟢 NOW FALSE
+                is_headline: false  // 🟢 NOW FALSE
             }]);
 
             if (error) {

@@ -69,7 +69,7 @@ export default function FactSportPlayer({ videoUrl }: { videoUrl: string }) {
 
   // --- RENDERERS ---
 
-  // 1. YouTube Renderer (Max Privacy)
+  // 1. YouTube Renderer (Max Whitelabel Privacy)
   const renderYouTube = (url: string) => {
     let videoId = '';
     if (url.includes('v=')) videoId = url.split('v=')[1]?.split('&')[0];
@@ -77,10 +77,15 @@ export default function FactSportPlayer({ videoUrl }: { videoUrl: string }) {
     else if (url.includes('embed/')) videoId = url.split('embed/')[1];
 
     return (
-      <div className="w-full h-full bg-black relative">
+      <div className="w-full h-full bg-black relative overflow-hidden group">
+        {/* 🟢 WHITELABEL HACK: Top Gradient to hide YouTube Video Title and Avatar */}
+        <div className="absolute top-0 left-0 w-full h-20 bg-gradient-to-b from-black/90 to-transparent z-10 pointer-events-none transition-opacity duration-500 group-hover:opacity-0"></div>
+
         <iframe 
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&showinfo=0&controls=1&playsinline=1&fs=1&color=white&iv_load_policy=3`} 
-          className="w-full h-full" 
+          // 🟢 Added disablekb=1 and strictly enforced modestbranding
+          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&showinfo=0&controls=1&playsinline=1&fs=1&color=white&iv_load_policy=3&disablekb=1`} 
+          // 🟢 WHITELABEL HACK: scale-[1.03] crops out the thin YouTube borders and top links 
+          className="w-full h-full scale-[1.03] pointer-events-auto" 
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
           allowFullScreen
         ></iframe>
@@ -110,7 +115,7 @@ export default function FactSportPlayer({ videoUrl }: { videoUrl: string }) {
   // 3. Custom HTML5 Player (The "White Label" King)
   const renderCustomPlayer = (url: string) => {
     return (
-      <div className="w-full h-full bg-black relative group" id="factsport-player-container">
+      <div className="w-full h-full bg-black relative group overflow-hidden" id="factsport-player-container">
         <video 
           ref={videoRef}
           src={url} 
@@ -154,7 +159,7 @@ export default function FactSportPlayer({ videoUrl }: { videoUrl: string }) {
     if (viewState === 'thumbnail') {
       return (
         <div 
-          className="absolute inset-0 flex items-center justify-center bg-[#0a1428] cursor-pointer group" 
+          className="absolute inset-0 flex items-center justify-center bg-[#0a1428] cursor-pointer group overflow-hidden" 
           onClick={() => {
             // 🟢 SAFETY CHECK: Only show ads for Non-YouTube videos
             if (isYouTube) {
@@ -164,15 +169,19 @@ export default function FactSportPlayer({ videoUrl }: { videoUrl: string }) {
             }
           }}
         >
-           {/* Fallback pattern if no image */}
-           <div className="absolute inset-0 opacity-30 bg-[radial-gradient(#ffffff33_1px,transparent_1px)] [background-size:16px_16px]"></div>
-           <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+           {/* 🟢 NEW: Blurred Tournament Background Image */}
+           <div className="absolute inset-0 bg-[url('/tournaments/default-bg.jpg')] bg-cover bg-center blur-[4px] scale-105 opacity-60 transition-transform duration-700 group-hover:scale-110"></div>
+           
+           {/* Dark gradient to ensure the play button pops */}
+           <div className="absolute inset-0 bg-gradient-to-t from-[#0a1428] via-[#0a1428]/40 to-transparent"></div>
            
            <div className="relative z-10 flex flex-col items-center">
              <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.6)] group-hover:scale-110 transition duration-300 animate-pulse">
                  <Play className="text-white fill-white ml-1" size={32} />
              </div>
-             <p className="text-white text-xs font-bold mt-4 tracking-widest uppercase opacity-80 group-hover:opacity-100">Watch Highlights</p>
+             <p className="text-white text-xs font-bold mt-4 tracking-widest uppercase opacity-90 group-hover:opacity-100 drop-shadow-md">
+                 Watch Highlights
+             </p>
            </div>
         </div>
       );
@@ -181,7 +190,7 @@ export default function FactSportPlayer({ videoUrl }: { videoUrl: string }) {
     // B. ADVERTISEMENT (Revenue)
     if (viewState === 'ad') {
       return (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-50">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-50 overflow-hidden">
            <img src={AD_CONFIG.image} className="absolute inset-0 w-full h-full object-cover opacity-80" />
            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black"></div>
 
