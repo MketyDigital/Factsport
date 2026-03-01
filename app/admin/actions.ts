@@ -1,26 +1,36 @@
 'use server'; 
-// The 'use server' tag guarantees this code NEVER touches the user's browser.
-// It runs strictly on your secure backend.
 
 export async function triggerAuditAction() {
-    // We safely pull the hidden secrets directly from the server environment
     const CRON_KEY = process.env.CRON_KEY;
-    
-    // Fallback to localhost if testing locally, otherwise use your live URL
-    const SITE_URL = process.env.PRODUCTION_SITE_URL || 'http://localhost:3000';
+    // Fallback directly to your live URL just in case the env variable is missing
+    const SITE_URL = process.env.PRODUCTION_SITE_URL || 'https://factsport.com';
 
     try {
         const res = await fetch(`${SITE_URL}/api/admin/run-audit?key=${CRON_KEY}`, {
-            cache: 'no-store'
+            cache: 'no-store',
+            headers: {
+                // 🟢 NEW: Disguise the request as a normal Chrome browser to bypass Cloudflare Bot Fight Mode
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'application/json'
+            }
         });
         
-        const data = await res.json();
+        // 🟢 NEW: Read as raw text first so it doesn't crash if Cloudflare sends an HTML error page
+        const rawText = await res.text(); 
         
-        if (!res.ok) {
-            return { success: false, error: data.error || "Unauthorized or failed." };
+        try {
+            const data = JSON.parse(rawText);
+            
+            if (!res.ok) {
+                return { success: false, error: data.error || "Unauthorized or failed." };
+            }
+            return { success: true, message: data.message };
+            
+        } catch (parseError) {
+            console.error("Blocked Response from Cloudflare:", rawText);
+            return { success: false, error: "Cloudflare blocked the internal request. Use the GitHub Action or check your WAF settings." };
         }
         
-        return { success: true, message: data.message };
     } catch (error: any) {
         return { success: false, error: error.message || "Failed to reach the audit server." };
     }

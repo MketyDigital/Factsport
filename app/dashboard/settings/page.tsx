@@ -23,15 +23,25 @@ export default function SettingsPage() {
       if (data) setName(data.full_name || '');
     };
     fetchProfile();
-  }, []);
+  }, [router, supabase]);
 
   const handleUpdate = async () => {
+    // 🟢 NEW: Basic Validation Security
+    if (!name.trim()) {
+        setMsg('Error: Display name cannot be empty.');
+        return;
+    }
+    if (name.trim().length > 30) {
+        setMsg('Error: Display name must be under 30 characters.');
+        return;
+    }
+
     setLoading(true);
     setMsg('');
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
-        const { error } = await supabase.from('profiles').update({ full_name: name }).eq('id', user.id);
+        const { error } = await supabase.from('profiles').update({ full_name: name.trim() }).eq('id', user.id);
         if (error) setMsg('Error updating profile.');
         else {
             setMsg('Profile updated successfully!');
