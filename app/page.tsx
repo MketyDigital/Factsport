@@ -90,7 +90,7 @@ const getDiverseMatches = (allMatches: any[], limit: number) => {
 
 async function getHomepageData(leagueFilter: string | undefined) {
   const supabase = createClient();
-   
+    
   let matchQuery = supabase.from('matches').select('*');
 
   // 🟢 LOGIC 1: LEAGUE FILTER
@@ -161,18 +161,18 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   noStore(); // 🛑 Kills cache for instant updates
   const resolvedParams = await searchParams;
   const selectedLeague = resolvedParams.league;
-   
+    
   const { matches, news, highlights, featuredMatches } = await getHomepageData(selectedLeague);
 
-  // 🟢 THE NEWS WATERFALL FIX
-  const breakingNews = news.filter(n => n.is_breaking); 
-  const rawTicker = breakingNews.length > 0 ? breakingNews : news.slice(0, 5);
+  // 🟢 UPDATED TICKER LOGIC: Fetches top 15 news globally
+  const rawTicker = news.slice(0, 15);
   const tickerNews = [...rawTicker, ...rawTicker, ...rawTicker, ...rawTicker]; 
   
-  const headlines = news.filter(n => n.is_headline);
-  const finalHeadlines = headlines.length > 0 ? headlines.slice(0, 3) : news.slice(0, 3);
+  // 🟢 UPDATED HEADLINES LOGIC: Strictly uses Admin 'is_headline' marker
+  const finalHeadlines = news.filter(n => n.is_headline).slice(0, 3);
   
-  const latestNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id) && !n.is_breaking).slice(0, 5);
+  // 🟢 UPDATED LATEST NEWS LOGIC: Show anything not in the finalHeadlines
+  const latestNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id)).slice(0, 5);
 
   // 🟢 SMART HERO LOGIC: Max 3 Matches, Disappears After Match Day
   let heroMatches: any[] = [];
@@ -212,9 +212,10 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-0 overflow-x-hidden">
       
+      {/* 🟢 CSS UPDATED: Changed from 60s to 180s to significantly reduce scroll speed for readabillity */}
       <style>{`
         @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-        .animate-scroll { display: flex; width: max-content; animation: scroll 60s linear infinite; }
+        .animate-scroll { display: flex; width: max-content; animation: scroll 180s linear infinite; }
         .ticker-item { white-space: nowrap; display: flex; align-items: center; }
       `}</style>
 
@@ -222,14 +223,15 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       {tickerNews.length > 0 && (
         <div className="bg-yellow-400 text-black text-[10px] font-black h-9 overflow-hidden relative flex items-center shadow-md z-40 border-b border-yellow-500">
             <div className="absolute left-0 h-full bg-yellow-500 px-3 flex items-center z-20 shadow-[4px_0_10px_rgba(0,0,0,0.1)] border-r border-yellow-600 whitespace-nowrap">
-                <Activity size={12} className="mr-1 animate-pulse text-red-600" /> BREAKING
+                <Activity size={12} className="mr-1 animate-pulse text-red-600" /> FACTSPORT
             </div>
             <div className="w-full overflow-hidden flex pl-24"> 
                 <div className="animate-scroll flex items-center">
                     {tickerNews.map((n, i) => ( 
                         <div key={`${n.id}-${i}`} className="ticker-item flex items-center mx-6">
                             <Link href={`/news/${n.slug}`} className="uppercase tracking-wide hover:underline hover:text-red-700 transition">
-                                🚨 {n.title}
+                                {/* 🟢 Displays the siren ONLY if Admin marked it as Breaking */}
+                                {n.is_breaking && "🚨 "} {n.title}
                             </Link>
                             <span className="text-yellow-700/50 ml-6">•</span>
                         </div> 
@@ -247,7 +249,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         <div className="mt-4 px-4">
              <div className="flex justify-between items-center mb-3">
                 <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2"><PlayCircle size={14} className="text-red-600" /> Highlights</h3>
-                {/* 🟢 NEW: View All Highlights Link */}
                 <Link href="/highlights" className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded hover:bg-blue-100 transition">View All</Link>
             </div>
             <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 scrollbar-hide">

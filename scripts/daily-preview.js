@@ -95,8 +95,8 @@ async function generateDailyPreview() {
             image_url: null, 
             team_1_logo: featureMatch ? featureMatch.home_logo : null, 
             team_2_logo: featureMatch ? featureMatch.away_logo : null,
-            is_breaking: false, 
-            is_headline: true 
+            is_breaking: false, // 🟢 NOW FALSE
+            is_headline: false  // 🟢 NOW FALSE
         }]);
 
         if (error) {
