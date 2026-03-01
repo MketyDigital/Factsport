@@ -1,0 +1,17 @@
+name: Monthly Champion Audit
+
+on:
+  schedule:
+    # Runs at 00:00 UTC on the 1st day of every month
+    - cron: '0 0 1 * *'
+  workflow_dispatch: 
+
+jobs:
+  run-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Audit API
+        env:
+          CRON_KEY: ${{ secrets.CRON_KEY }}
+        run: |
+          curl -X GET "https://factsport.com/api/admin/run-audit?key=${CRON_KEY}"
