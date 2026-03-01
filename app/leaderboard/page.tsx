@@ -44,13 +44,23 @@ export default async function LeaderboardPage() {
     .order('created_at', { ascending: false })
     .limit(15);
 
-  const pastWinners = approvedWinners?.map(w => ({
-    month: w.month_year,
-    name: w.user?.full_name || 'Champion',
-    points: w.points,
-    prize: w.prize_amount || 'Mystery Prize',
-    rank: w.rank
-  })) || [];
+  // 🟢 TS FIX: Safely map the winners and handle the full_name whether it's an array or object
+  const pastWinners = approvedWinners?.map(w => {
+    let winnerName = 'Champion';
+    if (w.user) {
+        winnerName = Array.isArray(w.user) 
+            ? w.user[0]?.full_name 
+            : (w.user as any).full_name;
+    }
+    
+    return {
+        month: w.month_year,
+        name: winnerName,
+        points: w.points,
+        prize: w.prize_amount || 'Mystery Prize',
+        rank: w.rank
+    };
+  }) || [];
 
   const TELEGRAM_LINK = "https://t.me/factsportlive"; 
   const BETTING_LINK = "https://melbet.com";
