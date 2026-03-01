@@ -1,13 +1,14 @@
+// ✅ RUNS ON EDGE
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/app/lib/supabase/server';
-import { Trophy, Star, Crown, History, TrendingUp, Calendar, Send, ExternalLink } from 'lucide-react';
+import { Trophy, Star, Crown, History, TrendingUp, Calendar, Send, ExternalLink, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
 
 export default async function LeaderboardPage() {
   const supabase = createClient();
 
-  // 1. 🟢 FETCH DYNAMIC RULES
   const { data: settings } = await supabase
     .from('site_settings')
     .select('target_exact_scores, min_points_floor')
@@ -17,21 +18,25 @@ export default async function LeaderboardPage() {
   const targetCS = settings?.target_exact_scores || 4;
   const floorPts = settings?.min_points_floor || 100;
 
-  // 2. FETCH USERS
   const { data: users } = await supabase
     .from('profiles')
-    .select('full_name, monthly_points, points, monthly_correct_scores, is_vip')
+    .select('full_name, monthly_points, points, monthly_correct_scores, eligible_monthly_points, eligible_monthly_correct_scores, is_vip')
     .order('monthly_points', { ascending: false })
     .order('monthly_correct_scores', { ascending: false })
     .limit(50);
 
-  // 3. 🟢 DYNAMIC PODIUM LOGIC
-  const podiumQualifiers = users?.filter(u => u.is_vip && u.monthly_correct_scores >= targetCS && u.monthly_points >= floorPts) || [];
+  // STRICT PODIUM LOGIC
+  const podiumQualifiers = users?.filter(u => 
+      u.is_vip && 
+      u.eligible_monthly_correct_scores >= targetCS && 
+      u.eligible_monthly_points >= floorPts
+  ).sort((a, b) => b.eligible_monthly_points - a.eligible_monthly_points) || [];
   
   const first = podiumQualifiers[0];
   const second = podiumQualifiers[1];
   const third = podiumQualifiers[2];
 
+  // (Optional: You can fetch real approved past winners from the 'monthly_winners' table here later!)
   const pastWinners = [
     { month: 'December 2025', name: 'Sarah J.', points: 145, prize: '$500' },
     { month: 'November 2025', name: 'Mike T.', points: 132, prize: '$300' },
@@ -57,7 +62,6 @@ export default async function LeaderboardPage() {
                     <div className="flex flex-col items-center justify-center h-full opacity-50 mt-4 text-center">
                         <Trophy size={24} className="text-slate-500 mb-2" />
                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Unclaimed</span>
-                        {/* Dynamic requirement message */}
                         <span className="text-[8px] text-slate-500 mt-1 max-w-[100px] leading-tight">Need VIP + {targetCS} CS + {floorPts} Pts</span>
                     </div>
                 ) : (
@@ -66,12 +70,12 @@ export default async function LeaderboardPage() {
                         <h3 className="font-bold text-white text-sm line-clamp-1 text-center">{user.full_name}</h3>
                         <div className="mt-2 flex flex-col gap-1 w-full px-2">
                              <div className="bg-slate-900/50 rounded flex justify-between px-2 py-1 border border-white/5">
-                                 <span className="text-[9px] text-slate-400">PTS</span>
-                                 <span className="text-[9px] font-bold text-yellow-400">{user.monthly_points}</span>
+                                 <span className="text-[9px] text-slate-400">ELIGIBLE PTS</span>
+                                 <span className="text-[9px] font-bold text-yellow-400">{user.eligible_monthly_points}</span>
                              </div>
                              <div className="bg-slate-900/50 rounded flex justify-between px-2 py-1 border border-white/5">
-                                 <span className="text-[9px] text-slate-400">CS</span>
-                                 <span className="text-[9px] font-bold text-green-400">{user.monthly_correct_scores}</span>
+                                 <span className="text-[9px] text-slate-400">ELIGIBLE CS</span>
+                                 <span className="text-[9px] font-bold text-green-400">{user.eligible_monthly_correct_scores}</span>
                              </div>
                         </div>
                     </div>
@@ -83,7 +87,7 @@ export default async function LeaderboardPage() {
 
   return (
     <div className="min-h-screen bg-[#0a1428] pb-24 font-sans text-white p-4">
-        <div className="text-center mb-10 pt-4">
+        <div className="text-center mb-6 pt-4">
             <h1 className="text-3xl font-black italic flex items-center justify-center gap-2 mb-2">
                 <Trophy className="text-yellow-500 fill-yellow-500" /> Monthly Kings
             </h1>
@@ -92,17 +96,21 @@ export default async function LeaderboardPage() {
             </p>
         </div>
 
-        <div className="flex items-end justify-center gap-2 mb-8 max-w-lg mx-auto h-[260px]">
-            <div className="w-1/3 flex justify-center">{renderPodiumCard(second, 2, 'border-slate-400/30 shadow-[0_-5px_20px_rgba(148,163,184,0.1)]', 'h-[180px]')}</div>
-            <div className="w-1/3 flex justify-center z-10">{renderPodiumCard(first, 1, 'border-yellow-500/50 shadow-[0_-5px_30px_rgba(234,179,8,0.2)]', 'h-[230px]')}</div>
-            <div className="w-1/3 flex justify-center">{renderPodiumCard(third, 3, 'border-orange-600/30 shadow-[0_-5px_20px_rgba(234,88,12,0.1)]', 'h-[160px]')}</div>
+        <div className="flex items-end justify-center gap-2 mb-4 max-w-lg mx-auto h-[320px]">
+            <div className="w-1/3 flex justify-center">{renderPodiumCard(second, 2, 'border-slate-400/30 shadow-[0_-5px_20px_rgba(148,163,184,0.1)]', 'h-[240px]')}</div>
+            <div className="w-1/3 flex justify-center z-10">{renderPodiumCard(first, 1, 'border-yellow-500/50 shadow-[0_-5px_30px_rgba(234,179,8,0.2)]', 'h-[300px]')}</div>
+            <div className="w-1/3 flex justify-center">{renderPodiumCard(third, 3, 'border-orange-600/30 shadow-[0_-5px_20px_rgba(234,88,12,0.1)]', 'h-[220px]')}</div>
+        </div>
+
+        <div className="text-center mt-4 mb-8">
+            <Link href="/how-to-play" className="text-xs font-bold text-blue-400 hover:text-blue-300 flex items-center justify-center gap-1">
+                Read the Champion's Audit rules to see how winners are verified <ArrowRight size={12} />
+            </Link>
         </div>
 
         <div className="bg-gradient-to-r from-blue-900/40 to-slate-900/40 border border-blue-500/20 rounded-xl p-3 mb-6 text-center backdrop-blur-md">
             <p className="text-[10px] text-blue-200 font-medium">
-                {/* Dynamic banner text */}
-                🏆 <span className="font-bold text-white">To Win:</span> You must be <span className="text-yellow-400 font-bold">VIP</span>, score <span className="text-white font-bold">{floorPts}+ Pts</span>, and hit <span className="text-green-400 font-bold">{targetCS}+ Correct Scores</span>.
-                <br/><span className="text-[8px] text-blue-300 opacity-80 mt-1 block">*Winner is verified against Champion's Checklist Audit before payout.</span>
+                🏆 <span className="font-bold text-white">To Win:</span> You must be <span className="text-yellow-400 font-bold">VIP</span>, score <span className="text-white font-bold">{floorPts}+ Elig. Pts</span>, and hit <span className="text-green-400 font-bold">{targetCS}+ Elig. CS</span>.
             </p>
         </div>
 
@@ -118,16 +126,16 @@ export default async function LeaderboardPage() {
         <div className="bg-white/5 rounded-3xl border border-white/10 overflow-hidden mb-12 shadow-2xl">
             <div className="p-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
                 <h3 className="font-bold text-sm flex items-center gap-2"><TrendingUp size={16} /> Live Standings</h3>
-                <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-slate-300">Top 50</span>
+                <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-slate-300">Total Points</span>
             </div>
             <table className="w-full text-sm text-left">
                 <thead className="text-[9px] uppercase text-slate-400 bg-black/20">
                     <tr>
                         <th className="p-3 pl-4">Rank</th>
                         <th className="p-3">User</th>
-                        <th className="p-3 text-center">Month</th>
+                        <th className="p-3 text-center">Total Pts</th>
                         <th className="p-3 text-center">Overall</th>
-                        <th className="p-3 text-right pr-4">C.S.</th>
+                        <th className="p-3 text-right pr-4">Total CS</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -142,8 +150,7 @@ export default async function LeaderboardPage() {
                             </td>
                             <td className="p-3 text-center"><span className="bg-yellow-500/10 text-yellow-400 px-2 py-1 rounded font-mono font-bold text-xs border border-yellow-500/20">{u.monthly_points}</span></td>
                             <td className="p-3 text-center font-mono text-slate-400 text-xs">{u.points}</td>
-                            {/* Dynamic Table Highlight */}
-                            <td className="p-3 pr-4 text-right"><span className={`font-mono font-bold text-xs ${u.monthly_correct_scores >= targetCS ? 'text-green-400' : 'text-slate-500'}`}>{u.monthly_correct_scores}</span></td>
+                            <td className="p-3 pr-4 text-right"><span className="font-mono font-bold text-xs text-slate-300">{u.monthly_correct_scores}</span></td>
                         </tr>
                     ))}
                 </tbody>
