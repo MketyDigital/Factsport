@@ -24,7 +24,6 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
     
-    // ✅ Correct Table
     const { data } = await supabase
         .from('user_predictions')
         .select('*')
@@ -36,20 +35,16 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
   };
 
   const handleSubmit = async () => {
-    // 1. Basic Validation
     if (!outcome || scoreHome === '' || scoreAway === '') { 
         alert("Select Winner & Score"); 
         return; 
     }
 
-    // 🛡️ SECURITY LAYER 2: TIME CHECK
-    // We check the time RIGHT NOW, inside the function.
-    // This prevents users from betting if they kept the tab open past kickoff.
     const now = new Date();
     const kickoff = new Date(matchDate);
     if (now >= kickoff) {
         alert("⛔ Betting Closed! The match has already started.");
-        window.location.reload(); // Refresh to show the locked UI
+        window.location.reload(); 
         return;
     }
 
@@ -64,7 +59,9 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
         predicted_outcome: outcome, 
         predicted_home_score: parseInt(scoreHome), 
         predicted_away_score: parseInt(scoreAway),
-        status: 'PENDING' 
+        status: 'PENDING',
+        // 🟢 FIX: Provide a default so the DB trigger doesn't panic
+        is_eligible_for_prize: false 
     });
 
     if (error) {
@@ -81,7 +78,6 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
 
   // --- RENDER: LOCKED / STARTED ---
   if (isLocked) {
-    // Check if status is finalized (WON or LOST)
     const status = existingPred?.status?.toUpperCase();
     const isFinalized = status === 'WON' || status === 'LOST';
 
