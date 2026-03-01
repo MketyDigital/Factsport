@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { TrendingUp, ExternalLink, Minus, Zap, ChevronDown, Trophy, ArrowRight } from 'lucide-react';
+import { TrendingUp, ExternalLink, Minus, ChevronDown, Trophy, ArrowRight, Target, Gamepad2 } from 'lucide-react';
 
 export default function DashboardHistory({ predictions, pastWins }: { predictions: any[], pastWins: any[] }) {
   const [visibleCount, setVisibleCount] = useState(10);
@@ -9,7 +9,6 @@ export default function DashboardHistory({ predictions, pastWins }: { prediction
   const hasCurrentData = predictions && predictions.length > 0;
   const hasPastWins = pastWins && pastWins.length > 0;
   
-  // Decide which list to show
   const displayList = hasCurrentData ? predictions : pastWins;
   const isPastWinsView = !hasCurrentData && hasPastWins;
 
@@ -19,7 +18,6 @@ export default function DashboardHistory({ predictions, pastWins }: { prediction
 
   return (
     <div className="px-4">
-        {/* Header */}
         <div className="flex items-center justify-between mb-3 px-1">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                 <TrendingUp size={14} /> {isPastWinsView ? 'Recent Victories' : 'Monthly Activity'}
@@ -29,7 +27,6 @@ export default function DashboardHistory({ predictions, pastWins }: { prediction
             </Link>
         </div>
 
-        {/* --- START PREDICTING CTA (Only if no current data) --- */}
         {!hasCurrentData && (
              <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-5 mb-4 text-white shadow-lg relative overflow-hidden">
                 <div className="absolute right-0 bottom-0 opacity-10"><Trophy size={100} /></div>
@@ -47,11 +44,9 @@ export default function DashboardHistory({ predictions, pastWins }: { prediction
              </div>
         )}
 
-        {/* List Container */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden min-h-[100px]">
             {displayList && displayList.length > 0 ? (
                 <>
-                {/* Optional Header for Past Wins */}
                 {isPastWinsView && (
                     <div className="bg-yellow-50 px-4 py-2 border-b border-yellow-100">
                         <p className="text-[10px] font-bold text-yellow-700 flex items-center gap-1">
@@ -67,16 +62,13 @@ export default function DashboardHistory({ predictions, pastWins }: { prediction
                         return (
                             <div key={pred.id} className="p-4 flex justify-between items-center hover:bg-slate-50 transition">
                                 <div>
-                                    {/* Match Title */}
                                     <div className="text-xs font-bold text-slate-800 mb-2 flex items-center gap-1.5">
                                         {pred.match ? (
                                             <>{pred.match.home_team} <span className="text-slate-300 text-[10px] font-normal">vs</span> {pred.match.away_team}</>
                                         ) : <span className="text-slate-400 italic">Match Data Unavailable</span>}
                                     </div>
 
-                                    {/* Selection Display */}
                                     <div className="flex items-center gap-4">
-                                        {/* User Prediction */}
                                         <div>
                                             <span className="text-[9px] text-slate-400 font-bold uppercase block mb-0.5">Your Pick</span>
                                             <div className="flex items-center gap-2">
@@ -91,7 +83,6 @@ export default function DashboardHistory({ predictions, pastWins }: { prediction
                                         
                                         {hasRealScore && <Minus size={12} className="text-slate-300 rotate-90" />}
 
-                                        {/* Real Result */}
                                         {hasRealScore ? (
                                             <div>
                                                 <span className="text-[9px] text-slate-400 font-bold uppercase block mb-0.5">Result</span>
@@ -112,7 +103,6 @@ export default function DashboardHistory({ predictions, pastWins }: { prediction
                                     </div>
                                 </div>
 
-                                {/* Status Badge */}
                                 <div className="text-right pl-2">
                                     {pred.status?.toLowerCase() === 'pending' ? (
                                         <div className="flex flex-col items-end">
@@ -125,14 +115,25 @@ export default function DashboardHistory({ predictions, pastWins }: { prediction
                                             </span>
                                         </div>
                                     )}
-                                    <div className="text-[9px] text-slate-300 mt-2 font-medium">{new Date(pred.created_at).toLocaleDateString()}</div>
+                                    <div className="text-[9px] text-slate-300 mt-2 font-medium mb-1">{new Date(pred.created_at).toLocaleDateString()}</div>
+                                    
+                                    <div className="flex justify-end mt-1">
+                                        {pred.is_eligible_for_prize ? (
+                                            <span className="flex items-center gap-1 text-[8px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-100" title="Counts towards monthly prize!">
+                                                <Target size={8} /> ELIGIBLE
+                                            </span>
+                                        ) : (
+                                            <span className="flex items-center gap-1 text-[8px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200" title="Over daily limit. Just for fun points.">
+                                                <Gamepad2 size={8} /> FOR FUN
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );
                     })}
                 </div>
 
-                {/* Show More Button (Only if there are more items to show) */}
                 {visibleCount < displayList.length && (
                     <button 
                         onClick={showMore}
@@ -143,7 +144,6 @@ export default function DashboardHistory({ predictions, pastWins }: { prediction
                 )}
                 </>
             ) : (
-                /* EMPTY STATE (No Current, No Past Wins) - CTA already shown above, just show placeholder */
                  <div className="flex flex-col items-center justify-center py-8 text-center opacity-50">
                     <p className="text-xs font-bold text-slate-400">History is empty</p>
                 </div>
