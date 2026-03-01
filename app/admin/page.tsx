@@ -9,8 +9,9 @@ import ApproveButton from '@/app/components/ApproveButton';
 import ResetMonthButton from './components/ResetMonthButton'; 
 import CleanupButton from './components/CleanupButton'; 
 import PromoSettingsManager from '@/app/components/PromoSettingsManager';
-// 🟢 NEW: Import your fully functional rules manager!
 import GameRulesManager from '@/app/components/GameRulesManager';
+// 🟢 NEW: Import the automated Champion's Checklist Audit Manager
+import AuditManager from '@/app/components/AuditManager';
 
 export default async function AdminDashboard() {
   const supabase = createClient();
@@ -101,8 +102,11 @@ export default async function AdminDashboard() {
 
               <PromoSettingsManager />
 
-              {/* 🟢 REPLACED: Render your actual working Client Component here */}
+              {/* 🟢 Render Game Rules Manager */}
               <GameRulesManager />
+
+              {/* 🟢 NEW: Render Winner Audit Manager directly below rules */}
+              <AuditManager />
 
           </div>
 

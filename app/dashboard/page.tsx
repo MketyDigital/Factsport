@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { 
   Trophy, Star, User as UserIcon, 
   Crown, CheckCircle, Lock,
-  MessageCircle, Settings, Clock, Target
+  MessageCircle, Settings, Clock, Target, Info, ArrowRight
 } from 'lucide-react';
 import SignOutButton from '@/app/components/SignOutButton';
 import DashboardHistory from '@/app/components/DashboardHistory'; 
@@ -23,25 +23,22 @@ async function getUserData() {
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  // 1. Fetch Profile
   const { data: profile } = await supabase
     .from('profiles')
-    .select('*, monthly_points, monthly_correct_scores')
+    .select('*, monthly_points, monthly_correct_scores, eligible_monthly_points, eligible_monthly_correct_scores')
     .eq('id', user.id)
     .single();
 
-  // 2. 🟢 NEW: Fetch Dynamic Game Rules
   const { data: settings } = await supabase
     .from('site_settings')
     .select('target_exact_scores, min_points_floor, daily_limit')
     .limit(1)
     .single();
 
-  // 3. Fetch Current Month Predictions
   const { data: currentPredictions } = await supabase
     .from('user_predictions')
     .select(`
-        id, predicted_outcome, predicted_home_score, predicted_away_score, points_awarded, status, created_at,
+        id, predicted_outcome, predicted_home_score, predicted_away_score, points_awarded, status, created_at, is_eligible_for_prize,
         match:matches ( home_team, away_team, home_score, away_score, status ) 
     `)
     .eq('user_id', user.id)
@@ -49,13 +46,12 @@ async function getUserData() {
     .order('created_at', { ascending: false })
     .limit(50);
 
-  // 4. FALLBACK: Last 5 Wins
   let pastWins: any[] = [];
   if (!currentPredictions || currentPredictions.length === 0) {
       const { data: wins } = await supabase
         .from('user_predictions')
         .select(`
-            id, predicted_outcome, predicted_home_score, predicted_away_score, points_awarded, status, created_at,
+            id, predicted_outcome, predicted_home_score, predicted_away_score, points_awarded, status, created_at, is_eligible_for_prize,
             match:matches ( home_team, away_team, home_score, away_score, status ) 
         `)
         .eq('user_id', user.id)
@@ -75,18 +71,17 @@ export default async function Dashboard() {
 
   const { profile, settings, predictions, pastWins } = data;
     
-  // --- 🟢 DYNAMIC VIP & STATS LOGIC ---
   const expiryDate = profile?.vip_expires_at ? new Date(profile.vip_expires_at) : null;
   const isVipActive = profile?.is_vip && (!expiryDate || expiryDate > new Date());
 
-  const csCount = profile?.monthly_correct_scores || 0;
-  const csTarget = settings?.target_exact_scores || 4; // Dynamic Target
-  const csProgress = Math.min((csCount / csTarget) * 100, 100);
-  const isCsQualified = csCount >= csTarget;
+  const csCountEligible = profile?.eligible_monthly_correct_scores || 0;
+  const csTarget = settings?.target_exact_scores || 4;
+  const csProgress = Math.min((csCountEligible / csTarget) * 100, 100);
+  const isCsQualified = csCountEligible >= csTarget;
 
-  const ptsCount = profile?.monthly_points || 0;
-  const ptsTarget = settings?.min_points_floor || 100; // Dynamic Floor
-  const isPtsQualified = ptsCount >= ptsTarget;
+  const ptsCountEligible = profile?.eligible_monthly_points || 0;
+  const ptsTarget = settings?.min_points_floor || 100;
+  const isPtsQualified = ptsCountEligible >= ptsTarget;
 
   const isFullyQualified = isCsQualified && isVipActive && isPtsQualified;
 
@@ -104,7 +99,6 @@ export default async function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans text-slate-900">
-      {/* HEADER */}
       <div className="bg-[#0a1428] text-white pt-8 pb-24 px-6 rounded-b-[2.5rem] relative overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600 rounded-full blur-[100px] opacity-20"></div>
         <div className="relative z-10 flex justify-between items-start mb-6">
@@ -144,22 +138,24 @@ export default async function Dashboard() {
         </div>
       </div>
 
-      {/* STATS */}
       <div className="grid grid-cols-2 gap-3 px-4 -mt-16 relative z-20 mb-4">
             <div className="bg-white p-4 rounded-2xl shadow-lg border border-slate-100 relative overflow-hidden group">
                 <div className="absolute right-0 top-0 w-16 h-16 bg-yellow-50 rounded-bl-full -mr-2 -mt-2 transition group-hover:bg-yellow-100"></div>
                 <div className="relative z-10">
                     <div className="flex justify-between items-center mb-1">
                         <div className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
-                            <Star size={12} className="text-yellow-500 fill-yellow-500" /> Monthly
+                            <Star size={12} className="text-yellow-500 fill-yellow-500" /> Total Month
                         </div>
                         <span className="text-[9px] font-bold text-slate-300 flex items-center gap-1">
-                            <Clock size={10} /> {daysLeft} days left
+                            <Clock size={10} /> {daysLeft} days
                         </span>
                     </div>
                     <div className="text-3xl font-black text-slate-900 tracking-tighter">{profile?.monthly_points || 0}</div>
-                    <div className="text-[10px] text-slate-500 mt-1 font-medium">
-                        Correct Scores: <b className="text-green-600 bg-green-50 px-1 rounded">{profile?.monthly_correct_scores || 0}</b>
+                    <div className="text-[10px] text-slate-500 mt-1 font-medium flex justify-between items-center">
+                        <span>Total C.S.: <b className="text-green-600">{profile?.monthly_correct_scores || 0}</b></span>
+                        <span className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded text-[8px] font-bold flex items-center gap-1 border border-slate-200" title="Points from your first predictions daily">
+                             <Target size={8}/> Elig: {profile?.eligible_monthly_points || 0}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -176,7 +172,6 @@ export default async function Dashboard() {
             </div>
       </div>
 
-      {/* QUALIFICATION */}
       <div className="px-4 mb-4">
         <div className={`rounded-2xl border p-4 shadow-sm relative overflow-hidden ${isFullyQualified ? 'bg-gradient-to-r from-green-900 to-emerald-900 border-green-700 text-white' : 'bg-white border-slate-200'}`}>
             <div className="flex justify-between items-start mb-2 relative z-10">
@@ -186,10 +181,14 @@ export default async function Dashboard() {
                 </h3>
                 {isFullyQualified && <span className="bg-green-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase">Qualified</span>}
             </div>
+            
+            <p className={`text-[9px] mb-3 flex items-center gap-1 ${isFullyQualified ? 'text-green-200/80' : 'text-slate-400'}`}>
+                <Info size={10} /> Progress below strictly tracks your eligible predictions.
+            </p>
 
             <div className="relative z-10 mb-3">
                 <div className="flex justify-between text-[10px] font-bold mb-1">
-                    <span className={isFullyQualified ? "text-green-100" : "text-slate-600"}>Correct Scores ({csCount}/{csTarget})</span>
+                    <span className={isFullyQualified ? "text-green-100" : "text-slate-600"}>Eligible Scores ({csCountEligible}/{csTarget})</span>
                     <span className={isFullyQualified ? "text-green-100" : "text-slate-400"}>{Math.round(csProgress)}%</span>
                 </div>
                 <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-100">
@@ -204,17 +203,24 @@ export default async function Dashboard() {
                 </div>
                 <div className={`flex flex-col items-center justify-center text-center gap-1 text-[9px] font-bold p-2 rounded-lg border ${isCsQualified ? (isFullyQualified ? 'bg-white/10 border-white/10 text-white' : 'bg-green-50 border-green-200 text-green-700') : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
                     {isCsQualified ? <CheckCircle size={12} /> : <Target size={12} />}
-                    <span>{csTarget} Exact Scores</span>
+                    <span>{csTarget} Elig. Scores</span>
                 </div>
                 <div className={`flex flex-col items-center justify-center text-center gap-1 text-[9px] font-bold p-2 rounded-lg border ${isPtsQualified ? (isFullyQualified ? 'bg-white/10 border-white/10 text-white' : 'bg-green-50 border-green-200 text-green-700') : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
                     {isPtsQualified ? <CheckCircle size={12} /> : <Trophy size={12} />}
-                    <span>{ptsTarget} Pts Floor</span>
+                    <span>{ptsTarget} Elig. Floor</span>
                 </div>
+            </div>
+            
+            {/* 🟢 NEW: Reminder for complex rules */}
+            <div className="mt-3 pt-3 border-t border-slate-100 relative z-10 flex items-center justify-between">
+                <span className="text-[9px] text-slate-500 font-medium italic">Remember the Champion's Checklist!</span>
+                <Link href="/how-to-play" className="text-[9px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                    View full rules <ArrowRight size={10} />
+                </Link>
             </div>
         </div>
       </div>
 
-      {/* REVENUE & TOOLS */}
       <div className="px-4 mb-6">
         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 pl-1">Premium Tools</h3>
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
