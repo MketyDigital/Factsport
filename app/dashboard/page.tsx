@@ -62,7 +62,7 @@ async function getUserData() {
       pastWins = wins || [];
   }
 
-  // 🟢 NEW: Fetch latest Rank #1 winner for the VIP Upsell banner
+  // 🟢 Fetch latest Rank #1 winner for the VIP Upsell banner
   const { data: latestWinner } = await supabase
     .from('monthly_winners')
     .select('prize_amount, user:profiles(full_name)')
@@ -79,7 +79,7 @@ export default async function Dashboard() {
   const data = await getUserData();
   if (!data) redirect('/login');
 
-  const { profile, settings, predictions, pastWins } = data;
+  const { profile, settings, predictions, pastWins, latestWinner } = data;
     
   const expiryDate = profile?.vip_expires_at ? new Date(profile.vip_expires_at) : null;
   const isVipActive = profile?.is_vip && (!expiryDate || expiryDate > new Date());
@@ -106,6 +106,14 @@ export default async function Dashboard() {
       if(s === 'lost') return 'L';
       return 'P';
   }).reverse() || [];
+
+  // 🟢 TS FIX: Safely extract the name whether Supabase returns an object or an array
+  let winnerName = 'A Champion';
+  if (latestWinner?.user) {
+      winnerName = Array.isArray(latestWinner.user) 
+          ? latestWinner.user[0]?.full_name 
+          : (latestWinner.user as any).full_name;
+  }
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans text-slate-900">
@@ -230,8 +238,8 @@ export default async function Dashboard() {
         </div>
       </div>
 
-      {/* 🟢 NEW: VIP UPSELL BANNER (Only shows if they are NOT VIP and there is a past winner) */}
-      {!isVipActive && data.latestWinner && (
+      {/* 🟢 VIP UPSELL BANNER */}
+      {!isVipActive && latestWinner && (
         <div className="px-4 mb-4">
             <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-2xl p-4 text-slate-900 shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full blur-[60px] opacity-20"></div>
@@ -241,7 +249,8 @@ export default async function Dashboard() {
                             <Trophy size={10} /> Last Month's Winner
                         </p>
                         <h4 className="font-black text-sm">
-                            {data.latestWinner.user?.full_name || 'A user'} won <span className="text-white bg-black/20 px-1.5 py-0.5 rounded">{data.latestWinner.prize_amount}</span>!
+                            {/* 🟢 Safely uses the extracted winnerName */}
+                            {winnerName} won <span className="text-white bg-black/20 px-1.5 py-0.5 rounded">{latestWinner.prize_amount}</span>!
                         </h4>
                         <p className="text-[9px] font-medium text-yellow-900 mt-1">Upgrade to VIP to qualify for this month's prizes.</p>
                     </div>
