@@ -12,6 +12,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+// 🟢 NEW: Import the image compression tool
+import imageCompression from 'browser-image-compression';
+
 export default function VipUpgradePage() {
   const [loading, setLoading] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
@@ -106,15 +109,33 @@ export default function VipUpgradePage() {
     let proofUrl = null;
 
     if (file) {
-        // Security Check: Sanitize file name before upload
-        const fileExt = file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'img';
-        const fileName = `proof-${user.id}-${Date.now()}.${fileExt}`;
-        
-        const { error: uploadErr } = await supabase.storage.from('payment_proofs').upload(fileName, file);
-        if (uploadErr) { setUploadError(`Upload Failed: ${uploadErr.message}`); setLoading(false); return; }
-        
-        const { data: publicUrlData } = supabase.storage.from('payment_proofs').getPublicUrl(fileName);
-        proofUrl = publicUrlData.publicUrl;
+        try {
+            // 🟢 NEW: Compress the image BEFORE uploading
+            const options = {
+                maxSizeMB: 0.2,          // 200KB max size (small enough for storage, big enough to read text)
+                maxWidthOrHeight: 1200,  // Good resolution for a receipt
+                useWebWorker: true
+            };
+            
+            const compressedFile = await imageCompression(file, options);
+
+            // Security Check: Sanitize file name before upload
+            const fileExt = file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'img';
+            const fileName = `proof-${user.id}-${Date.now()}.${fileExt}`;
+            
+            // Upload the COMPRESSED file instead of the raw file
+            const { error: uploadErr } = await supabase.storage.from('payment_proofs').upload(fileName, compressedFile);
+            if (uploadErr) { setUploadError(`Upload Failed: ${uploadErr.message}`); setLoading(false); return; }
+            
+            const { data: publicUrlData } = supabase.storage.from('payment_proofs').getPublicUrl(fileName);
+            proofUrl = publicUrlData.publicUrl;
+            
+        } catch (compressionErr: any) {
+            console.error('Compression error:', compressionErr);
+            setUploadError("Failed to process image. Please try another screenshot.");
+            setLoading(false);
+            return;
+        }
     }
 
     const { error } = await supabase.from('subscriptions').insert({

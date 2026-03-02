@@ -11,24 +11,32 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
 
   useEffect(() => {
     const supabase = createClient();
-    const channel = supabase.channel(`header-${matchId}`)
-      .on('postgres_changes', { 
-          event: 'UPDATE', 
-          schema: 'public', 
-          table: 'matches', 
-          filter: `id=eq.${matchId}` 
-      }, (payload) => {
+    
+    const fetchHeaderData = async () => {
+      const { data: payload } = await supabase
+        .from('matches')
+        .select('status, home_score, away_score, widget_id, displayClock')
+        .eq('id', matchId)
+        .single();
+        
+      if (payload) {
           setData((prev:any) => ({ 
-             ...prev, 
-             status: payload.new.status, 
-             home_score: payload.new.home_score, 
-             away_score: payload.new.away_score,
-             widget_id: payload.new.widget_id,
-             displayClock: payload.new.displayClock
+              ...prev, 
+              status: payload.status, 
+              home_score: payload.home_score, 
+              away_score: payload.away_score,
+              widget_id: payload.widget_id,
+              displayClock: payload.displayClock
           }));
-      }).subscribe();
+      }
+    };
 
-    return () => { supabase.removeChannel(channel); };
+    // 1. Fetch immediately on mount so it doesn't wait 15s to show the first update
+    fetchHeaderData();
+
+    // 2. Start the silent 15-second polling loop
+    const interval = setInterval(fetchHeaderData, 15000);
+    return () => clearInterval(interval);
   }, [matchId]);
 
   if (hasPremiumWidget) {
