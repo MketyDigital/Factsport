@@ -15,21 +15,29 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
 
   useEffect(() => {
     const supabase = createClient();
-    const channel = supabase.channel(`stats-${matchId}`)
-      .on('postgres_changes', { 
-          event: 'UPDATE', 
-          schema: 'public', 
-          table: 'matches', 
-          filter: `id=eq.${matchId}` 
-      }, (payload) => {
+    
+    const fetchStatsData = async () => {
+      const { data: payload } = await supabase
+        .from('matches')
+        .select('stats, lineups, match_events')
+        .eq('id', matchId)
+        .single();
+        
+      if (payload) {
           setLiveData(prev => ({
-              stats: payload.new?.stats || prev.stats,
-              lineups: payload.new?.lineups || prev.lineups,
-              events: payload.new?.match_events || prev.events
+              stats: payload.stats || prev.stats,
+              lineups: payload.lineups || prev.lineups,
+              events: payload.match_events || prev.events
           }));
-      }).subscribe();
+      }
+    };
 
-    return () => { supabase.removeChannel(channel); };
+    // 1. Fetch immediately on mount
+    fetchStatsData();
+
+    // 2. Poll every 15 seconds to grab new goals, cards, or lineup drops
+    const interval = setInterval(fetchStatsData, 15000);
+    return () => clearInterval(interval);
   }, [matchId]);
 
   const { stats, lineups, events } = liveData;
