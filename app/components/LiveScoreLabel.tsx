@@ -12,22 +12,31 @@ export default function LiveScoreLabel({ matchId, initialStatus, homeScore, away
 
   useEffect(() => {
     const supabase = createClient();
-    const channel = supabase.channel(`label-${matchId}`)
-      .on('postgres_changes', { 
-          event: 'UPDATE', 
-          schema: 'public', 
-          table: 'matches', 
-          filter: `id=eq.${matchId}` 
-      }, (payload) => {
-          setData({ 
-              status: payload.new.status, 
-              home: payload.new.home_score, 
-              away: payload.new.away_score,
-              clock: payload.new.displayClock
-          });
-      }).subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // 1. Define the function that grabs the score instantly
+    const fetchLiveScore = async () => {
+      const { data: matchData } = await supabase
+        .from('matches')
+        .select('status, home_score, away_score, displayClock')
+        .eq('id', matchId)
+        .single();
+
+      if (matchData) {
+        setData({ 
+            status: matchData.status, 
+            home: matchData.home_score, 
+            away: matchData.away_score,
+            clock: matchData.displayClock
+        });
+      }
+    };
+
+    // 2. Set up the silent polling timer (every 15 seconds)
+    // 15 seconds is fast enough for sports, but slow enough to cost $0 at scale
+    const interval = setInterval(fetchLiveScore, 15000);
+
+    // 3. Clean up the timer if the user leaves the page
+    return () => clearInterval(interval);
   }, [matchId]);
 
   const userTime = new Date(matchDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
