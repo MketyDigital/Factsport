@@ -15,14 +15,12 @@ export async function GET(request: Request) {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     const today = new Date().toISOString().split('T')[0];
 
-    // 🔒 THE IDEMPOTENCY LOCK: Try to sign the logbook for today.
-    // If today is already signed, Supabase throws an error and we stop.
+    // 🔒 The Morning Lock
     const { error: lockError } = await supabase.from('cron_logs').insert([{ run_date: today }]);
     if (lockError) {
         return NextResponse.json({ message: "Already posted today. Skipping." });
     }
     
-    // 🟢 Robust Start and End of Day (UTC)
     const now = new Date();
     const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
     const endOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999)).toISOString();
@@ -35,31 +33,40 @@ export async function GET(request: Request) {
         .order('match_date', { ascending: true });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    if (!matches || matches.length === 0) return NextResponse.json({ message: "No games today" });
+    if (!matches || matches.length === 0) return NextResponse.json({ message: "No games today." });
 
-   // 1. Build FB1 Text List (We hardcode the link here now!)
-    let fb1Text = `📅 MATCHDAY SCHEDULE!\n\nAll games happening today:\n\n`;
+    // 🔗 THE URL SPLIT
+    const frontendUrl = 'https://factsport.com'; 
+    const imageUrl = 'https://factsport.vercel.app'; 
+
+    // 🧠 DYNAMIC DATE GENERATOR (e.g., "Thursday, 5 Mar")
+    const todayString = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+
+    // 1. DYNAMIC FB1 TEXT
+    let fb1Text = `📅 ${todayString.toUpperCase()} MATCHDAY SCHEDULE!\n\nAll games happening today:\n\n`;
     matches.forEach(m => {
         const time = new Date(m.match_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         fb1Text += `⚽ ${m.home_team} vs ${m.away_team} (${time})\n`;
     });
-    fb1Text += `\nCatch all live scores and stats on: https://factsport.com`;
+    // Link points to the live website
+    fb1Text += `\nCatch all live scores and stats on: ${frontendUrl}`;
 
-    // 2. Build X Graphic Data
+    // 2. BUILD X GRAPHIC DATA
     const topMatches = matches.slice(0, 14);
     const ogMatchesString = topMatches.map(m => {
         const time = new Date(m.match_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         return `${m.home_team}_${m.away_team}_${time}`;
     }).join('|');
     
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://factsport.com';
-    const scheduleOgUrl = `${baseUrl}/api/og?key=${process.env.CRON_KEY}&type=schedule&matches=${encodeURIComponent(ogMatchesString)}&ext=.png`;
+    // Image URL points to the Vercel app
+    const scheduleOgUrl = `${imageUrl}/api/og?type=schedule&matches=${encodeURIComponent(ogMatchesString)}&ext=.png`;
 
-    // 🟢 THE FIX: We removed 'link: baseUrl' from the payload. 
-    // Now Twitter won't get distracted by a URL and will post the image!
+    // 3. DYNAMIC X TEXT
+    const dynamicXText = `📅 ${todayString} Matchday is here!\n\nWe have ${matches.length} massive games lined up today. Who are you backing? Drop your predictions below 👇`;
+
     await postToSocials({
         fb1Message: fb1Text,
-        xMessage: "📅 Matchday is here! Who you got? Drop your predictions below 👇",
+        xMessage: dynamicXText,
         xImageUrl: scheduleOgUrl
     }); 
 
