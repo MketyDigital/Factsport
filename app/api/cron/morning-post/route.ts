@@ -2,8 +2,9 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
+// 👇 These were the missing imports causing the build crash!
 import { createClient } from '@supabase/supabase-js';
-import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server'; 
 import { postToSocials } from '@/app/lib/socialService';
 
 export async function GET(request: Request) {
@@ -13,13 +14,23 @@ export async function GET(request: Request) {
     }
     
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-    const today = new Date().toISOString().split('T')[0];
+    
+    // 🟢 Robust Start and End of Day (UTC)
+    const now = new Date();
+    const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
+    const endOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999)).toISOString();
 
-    const { data: matches } = await supabase
+    const { data: matches, error } = await supabase
         .from('matches')
         .select('*')
-        .like('match_date', `${today}%`)
+        .gte('match_date', startOfDay)
+        .lte('match_date', endOfDay)
         .order('match_date', { ascending: true });
+
+    if (error) {
+        console.error("Supabase Error:", error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     if (!matches || matches.length === 0) return NextResponse.json({ message: "No games today" });
 
