@@ -1,23 +1,28 @@
-export const runtime = 'edge';
-
 import { NextResponse } from 'next/server';
 import { isBigTeamMatch, postToSocials } from '@/app/lib/socialService';
 
 export async function POST(request: Request) {
+    // 1. Check Auth (This is where your 401 error came from if the keys didn't match!)
     const authHeader = request.headers.get('Authorization');
     if (authHeader !== `Bearer ${process.env.CRON_KEY}`) {
         return NextResponse.json({ error: 'Unauthorized intruder' }, { status: 401 });
     }
 
     const body = await request.json();
-    const oldState = body.old_record;
     const newState = body.record;
+    
+    // 🟢 THE FIX: If old_record is null (new match), pretend the old score was 0-0
+    const oldState = body.old_record || { 
+        home_score: 0, 
+        away_score: 0, 
+        status: 'PRE_MATCH',
+        lineups: { home: [], away: [] } 
+    };
 
     if (!newState || !isBigTeamMatch(newState.home_team, newState.away_team)) {
         return NextResponse.json({ message: "Not a VIP team, ignoring." });
     }
 
-    // 🟢 UPDATED: Points directly to your live production match page
     const matchUrl = `https://factsport.com/match/${newState.id}`; 
     let messageToPost = "";
 
@@ -39,13 +44,7 @@ export async function POST(request: Request) {
         const timeNote = newState.status === 'AET' ? ' (After Extra Time)' : (newState.status === 'PEN' ? ' (After Penalties)' : '');
         messageToPost = `⏹️ FULL TIME!${timeNote}\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\nGet the full post-match breakdown, player ratings, and stats on FactSport.`;
     }
-    // 📋 DETECT LINEUPS
-    else if (!oldState.lineups?.home?.length && newState.lineups?.home?.length) {
-        const homeStarters = newState.lineups.home.filter((p: any) => p.is_starter).map((p:any) => p.name).join(', ');
-        const awayStarters = newState.lineups.away.filter((p: any) => p.is_starter).map((p:any) => p.name).join(', ');
-        messageToPost = `📋 TEAM NEWS IS IN!\n\n🏠 ${newState.home_team} XI: ${homeStarters}\n\n✈️ ${newState.away_team} XI: ${awayStarters}\n\nTo see the full benches and tactical setups, hit the Match Center.`;
-    }
-
+    
     if (!messageToPost) return NextResponse.json({ message: "No postable event occurred." });
 
     await postToSocials(messageToPost, matchUrl);
