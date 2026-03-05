@@ -23,7 +23,6 @@ async function generateDailySummaries() {
     const endOfDay = new Date(today.setHours(23,59,59,999)).toISOString();
     const dateSlug = today.toISOString().split('T')[0];
 
-    // 1. Fetch Finished Matches
     const { data: matches } = await supabase
         .from('matches')
         .select('*')
@@ -36,7 +35,6 @@ async function generateDailySummaries() {
         return;
     }
 
-    // 2. Group by League
     const leagues = {};
     matches.forEach(m => {
         if (!leagues[m.league]) leagues[m.league] = [];
@@ -56,28 +54,27 @@ async function generateDailySummaries() {
 
         console.log(`   ✍️ Writing Summary for ${leagueName}...`);
 
-        // 3. Prepare AI Prompt
         const matchSummaries = leagueMatches.map(m => {
             const scorers = (m.match_events || [])
                 .filter(e => e.type === 'goal')
                 .map(e => `${e.player} (${e.time})`)
                 .join(', ');
-            // 🟢 AI UPGRADE: Feeding the Match ID to Gemini
             return `- MATCH ID: ${m.id} | ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} (Scorers: ${scorers || 'None'})`;
         }).join('\n');
 
-        // 🟢 AI UPGRADE: Strict Markdown Linking Instructions
+        // 🟢 AI UPGRADE: Expert Post-Match Analyst
         const prompt = `
-            You are a senior football analyst for 'FactSport'.
-            Write a "Matchday Round-Up" article for the ${leagueName} played on ${dateSlug}.
+            You are a top-tier European football journalist and master tactical analyst writing for 'FactSport'.
+            Write a deep, engaging "Matchday Round-Up" article for the ${leagueName} played on ${dateSlug}.
             
             Results:
             ${matchSummaries}
 
             Guidelines:
-            - Headline: Catchy (e.g., "Arsenal Stun City"). Keep it under 10 words.
-            - Content: Summary of the action, key games, and table implications.
-            - Length: 300 words.
+            - Headline: Catchy and dramatic, capturing the biggest storyline or shock of the day. Under 10 words.
+            - Analysis: Don't just list the scores. Tell us *why* it happened. Focus on tactical shifts, manager decisions, shocking moments, and how these results drastically change the league table.
+            - Narrative: Highlight the biggest winner and the biggest loser of the day. Write with a strong, human, journalistic voice that sparks debate.
+            - Length: 400-500 words.
             - Output: Plain text only. Do not use asterisks for bolding.
             - CRITICAL LINKING RULE: You MUST wrap EVERY match you mention in a Markdown link pointing to its Match ID. 
               Format strictly as: [View Match Stats](/match/INSERT_MATCH_ID_HERE). Do this for every single game you discuss!
@@ -101,14 +98,29 @@ async function generateDailySummaries() {
                 image_url: null, 
                 team_1_logo: featureMatch ? featureMatch.home_logo : null, 
                 team_2_logo: featureMatch ? featureMatch.away_logo : null,
-                is_breaking: false, // 🟢 NOW FALSE
-                is_headline: false  // 🟢 NOW FALSE
+                is_breaking: false, 
+                is_headline: false  
             }]);
 
             if (error) {
                 console.error(`   ❌ Supabase DB Error:`, error.message);
             } else {
                 console.log(`   ✅ Published: ${headline}`);
+                
+                // 🟢 INTEGRATION: Send to Make.com for Facebook Page 2
+                if (process.env.MAKE_WEBHOOK_URL) {
+                    const articleUrl = `https://factsport.com/news/${reportSlug}`;
+                    await fetch(process.env.MAKE_WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            fb2_text: `STATEMENT MADE. 🤯 Did your team survive the weekend? Catch up on all the goals, shock results, and table changes in our Matchday Round-Up 👇\n\n${articleUrl}`,
+                            x_text: null,
+                            x_image_url: null
+                        })
+                    });
+                    console.log(`   📡 Sent ${leagueName} Roundup to FB Page 2 via Make.com`);
+                }
             }
 
         } catch (e) {
