@@ -22,7 +22,6 @@
     "react-player": "^2.16.0",
     "@marsidev/react-turnstile": "^1.1.0",
     "browser-image-compression": "^2.0.2",
-    "axios": "^1.6.8",
     "twitter-api-v2": "^1.19.0",
     "tailwind-merge": "^2.5.2"
   },
