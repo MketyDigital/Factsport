@@ -33,7 +33,6 @@ export async function postToSocials(message: string, link: string) {
   } catch (error) {
       console.error("❌ X Post Failed:", error);
   }
-
 // -- FACEBOOK POST --
   try {
       if (!process.env.FB_PAGE_ID || !process.env.FB_PAGE_ACCESS_TOKEN) {
