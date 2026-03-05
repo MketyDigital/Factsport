@@ -10,7 +10,7 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'a.espncdn.com',
       },
-      // 🟢 Allows Next.js Image component to work with Cloudinary
+      // Allows Next.js Image component to work with Cloudinary
       {
         protocol: 'https',
         hostname: 'res.cloudinary.com',
@@ -18,7 +18,7 @@ const nextConfig = {
     ],
   },
   
-  // 🟢 The Secret Proxy Tunnel to Cloudinary
+  // The Secret Proxy Tunnel to Cloudinary
   async rewrites() {
     return [
       {
@@ -30,7 +30,7 @@ const nextConfig = {
     ];
   },
 
-  // 🛡️ HTTP Security Headers
+  // HTTP Security Headers
   async headers() {
     return [
       {
@@ -66,7 +66,7 @@ const nextConfig = {
     ];
   },
 
-  // 🛠️ BUILD FIX: Prevents Webpack from crashing on Edge/Cloudflare due to Twitter SDK
+  // BUILD FIX: Comprehensive fallback list for Twitter SDK on Edge/Cloudflare
   webpack: (config, { nextRuntime }) => {
     if (nextRuntime === 'edge') {
       config.resolve.fallback = {
@@ -75,6 +75,13 @@ const nextConfig = {
         net: false,
         tls: false,
         child_process: false,
+        zlib: false,
+        stream: false,
+        http: false,
+        https: false,
+        crypto: false,
+        os: false,
+        path: false,
       };
     }
     return config;
