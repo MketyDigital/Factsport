@@ -34,11 +34,13 @@ export async function postToSocials(message: string, link: string) {
       console.error("❌ X Post Failed:", error);
   }
 
-  // -- FACEBOOK POST --
+// -- FACEBOOK POST --
   try {
-      if (process.env.FB_PAGE_ID && process.env.FB_PAGE_ACCESS_TOKEN) {
+      if (!process.env.FB_PAGE_ID || !process.env.FB_PAGE_ACCESS_TOKEN) {
+          console.log("⚠️ Facebook skipped: Missing FB_PAGE_ID or FB_PAGE_ACCESS_TOKEN in Vercel.");
+      } else {
           const fbUrl = `https://graph.facebook.com/v19.0/${process.env.FB_PAGE_ID}/feed`;
-          await fetch(fbUrl, {
+          const fbResponse = await fetch(fbUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -46,8 +48,16 @@ export async function postToSocials(message: string, link: string) {
                   access_token: process.env.FB_PAGE_ACCESS_TOKEN
               })
           });
+
+          // 🟢 NEW: Read Facebook's actual response
+          const fbData = await fbResponse.json();
+
+          if (!fbResponse.ok) {
+              console.error("❌ Facebook API Error:", fbData);
+          } else {
+              console.log("✅ Facebook Post Success!", fbData);
+          }
       }
   } catch (error) {
-      console.error("❌ Facebook Post Failed:", error);
+      console.error("❌ Facebook Network Error:", error);
   }
-}
