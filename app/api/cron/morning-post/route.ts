@@ -37,13 +37,13 @@ export async function GET(request: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!matches || matches.length === 0) return NextResponse.json({ message: "No games today" });
 
-    // 1. Build FB1 Text List
+   // 1. Build FB1 Text List (We hardcode the link here now!)
     let fb1Text = `📅 MATCHDAY SCHEDULE!\n\nAll games happening today:\n\n`;
     matches.forEach(m => {
         const time = new Date(m.match_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         fb1Text += `⚽ ${m.home_team} vs ${m.away_team} (${time})\n`;
     });
-    fb1Text += `\nCatch all live scores and stats on FactSport!`;
+    fb1Text += `\nCatch all live scores and stats on: https://factsport.com`;
 
     // 2. Build X Graphic Data
     const topMatches = matches.slice(0, 14);
@@ -53,14 +53,14 @@ export async function GET(request: Request) {
     }).join('|');
     
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://factsport.com';
-    // NOTE: Added a fake .png extension at the end so Buffer knows it is an image file!
     const scheduleOgUrl = `${baseUrl}/api/og?key=${process.env.CRON_KEY}&type=schedule&matches=${encodeURIComponent(ogMatchesString)}&ext=.png`;
 
+    // 🟢 THE FIX: We removed 'link: baseUrl' from the payload. 
+    // Now Twitter won't get distracted by a URL and will post the image!
     await postToSocials({
         fb1Message: fb1Text,
         xMessage: "📅 Matchday is here! Who you got? Drop your predictions below 👇",
-        xImageUrl: scheduleOgUrl,
-        link: baseUrl
+        xImageUrl: scheduleOgUrl
     }); 
 
     return NextResponse.json({ success: true, total_matches: matches.length });
