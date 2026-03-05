@@ -2,9 +2,8 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-// 👇 These were the missing imports causing the build crash!
 import { createClient } from '@supabase/supabase-js';
-import { NextResponse } from 'next/server'; 
+import { NextResponse } from 'next/server';
 import { postToSocials } from '@/app/lib/socialService';
 
 export async function GET(request: Request) {
@@ -14,6 +13,14 @@ export async function GET(request: Request) {
     }
     
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const today = new Date().toISOString().split('T')[0];
+
+    // 🔒 THE IDEMPOTENCY LOCK: Try to sign the logbook for today.
+    // If today is already signed, Supabase throws an error and we stop.
+    const { error: lockError } = await supabase.from('cron_logs').insert([{ run_date: today }]);
+    if (lockError) {
+        return NextResponse.json({ message: "Already posted today. Skipping." });
+    }
     
     // 🟢 Robust Start and End of Day (UTC)
     const now = new Date();
@@ -27,11 +34,7 @@ export async function GET(request: Request) {
         .lte('match_date', endOfDay)
         .order('match_date', { ascending: true });
 
-    if (error) {
-        console.error("Supabase Error:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!matches || matches.length === 0) return NextResponse.json({ message: "No games today" });
 
     // 1. Build FB1 Text List
@@ -42,7 +45,7 @@ export async function GET(request: Request) {
     });
     fb1Text += `\nCatch all live scores and stats on FactSport!`;
 
-    // 2. Build X Graphic Data (Max 14 matches for the image layout)
+    // 2. Build X Graphic Data
     const topMatches = matches.slice(0, 14);
     const ogMatchesString = topMatches.map(m => {
         const time = new Date(m.match_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -50,7 +53,8 @@ export async function GET(request: Request) {
     }).join('|');
     
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://factsport.com';
-    const scheduleOgUrl = `${baseUrl}/api/og?key=${process.env.CRON_KEY}&type=schedule&matches=${encodeURIComponent(ogMatchesString)}`;
+    // NOTE: Added a fake .png extension at the end so Buffer knows it is an image file!
+    const scheduleOgUrl = `${baseUrl}/api/og?key=${process.env.CRON_KEY}&type=schedule&matches=${encodeURIComponent(ogMatchesString)}&ext=.png`;
 
     await postToSocials({
         fb1Message: fb1Text,
