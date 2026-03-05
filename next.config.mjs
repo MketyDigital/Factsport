@@ -10,7 +10,7 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'a.espncdn.com',
       },
-      // Allows Next.js Image component to work with Cloudinary
+      // 🟢 ADDED: Allows Next.js Image component to work with Cloudinary
       {
         protocol: 'https',
         hostname: 'res.cloudinary.com',
@@ -18,7 +18,7 @@ const nextConfig = {
     ],
   },
   
-  // The Secret Proxy Tunnel to Cloudinary
+  // 🟢 ADDED: The Secret Proxy Tunnel to Cloudinary
   async rewrites() {
     return [
       {
@@ -30,7 +30,7 @@ const nextConfig = {
     ];
   },
 
-  // HTTP Security Headers
+  // 🛡️ SECURITY ADDITION: HTTP Security Headers
   async headers() {
     return [
       {
@@ -47,44 +47,23 @@ const nextConfig = {
           },
           {
             key: 'X-Frame-Options',
-            value: 'SAMEORIGIN' // Prevents clickjacking
+            value: 'SAMEORIGIN' // Prevents your site from being embedded in a malicious iframe (Clickjacking)
           },
           {
             key: 'X-Content-Type-Options',
-            value: 'nosniff' // Stops XSS
+            value: 'nosniff' // Prevents browsers from guessing file types (Stops XSS)
           },
           {
             key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin' 
+            value: 'strict-origin-when-cross-origin' // Protects user privacy on external links
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()' 
+            value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()' // Blocks malicious browser feature access
           }
         ],
       },
     ];
-  },
-
-  // BUILD FIX: Comprehensive fallback list for Twitter SDK on Edge/Cloudflare
-  webpack: (config, { nextRuntime }) => {
-    if (nextRuntime === 'edge') {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        net: false,
-        tls: false,
-        child_process: false,
-        zlib: false,
-        stream: false,
-        http: false,
-        https: false,
-        crypto: false,
-        os: false,
-        path: false,
-      };
-    }
-    return config;
   },
 };
 
