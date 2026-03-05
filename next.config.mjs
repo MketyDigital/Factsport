@@ -10,7 +10,7 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'a.espncdn.com',
       },
-      // 🟢 ADDED: Allows Next.js Image component to work with Cloudinary
+      // 🟢 Allows Next.js Image component to work with Cloudinary
       {
         protocol: 'https',
         hostname: 'res.cloudinary.com',
@@ -18,7 +18,7 @@ const nextConfig = {
     ],
   },
   
-  // 🟢 ADDED: The Secret Proxy Tunnel to Cloudinary
+  // 🟢 The Secret Proxy Tunnel to Cloudinary
   async rewrites() {
     return [
       {
@@ -30,7 +30,7 @@ const nextConfig = {
     ];
   },
 
-  // 🛡️ SECURITY ADDITION: HTTP Security Headers
+  // 🛡️ HTTP Security Headers
   async headers() {
     return [
       {
@@ -47,23 +47,37 @@ const nextConfig = {
           },
           {
             key: 'X-Frame-Options',
-            value: 'SAMEORIGIN' // Prevents your site from being embedded in a malicious iframe (Clickjacking)
+            value: 'SAMEORIGIN' // Prevents clickjacking
           },
           {
             key: 'X-Content-Type-Options',
-            value: 'nosniff' // Prevents browsers from guessing file types (Stops XSS)
+            value: 'nosniff' // Stops XSS
           },
           {
             key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin' // Protects user privacy on external links
+            value: 'strict-origin-when-cross-origin' 
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()' // Blocks malicious browser feature access
+            value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()' 
           }
         ],
       },
     ];
+  },
+
+  // 🛠️ BUILD FIX: Prevents Webpack from crashing on Edge/Cloudflare due to Twitter SDK
+  webpack: (config, { nextRuntime }) => {
+    if (nextRuntime === 'edge') {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        child_process: false,
+      };
+    }
+    return config;
   },
 };
 

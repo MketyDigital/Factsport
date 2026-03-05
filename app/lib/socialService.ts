@@ -1,7 +1,6 @@
 import { TwitterApi } from 'twitter-api-v2';
-import axios from 'axios';
 
-// 🟢 THE VIP LIST: Mapped exactly to your live database strings
+// 🟢 THE VIP LIST
 const VIP_DB_NAMES = [
   'Arsenal', 'Chelsea', 'Liverpool', 'Man City', 'Man United', 'Tottenham', 'Spurs',
   'Barcelona', 'Barça', 'Atlético', 'Atleti', 'Real Madrid',
@@ -18,6 +17,7 @@ export const isBigTeamMatch = (homeTeam: string, awayTeam: string) => {
 export async function postToSocials(message: string, link: string) {
   const fullMessage = `${message}\n\n👇\n${link}`;
 
+  // -- X / TWITTER POST --
   try {
       if (process.env.TWITTER_API_KEY) {
           const twitterClient = new TwitterApi({
@@ -32,13 +32,17 @@ export async function postToSocials(message: string, link: string) {
       console.error("❌ X Post Failed:", error);
   }
 
+  // -- FACEBOOK POST (Using Edge-Native Fetch!) --
   try {
       if (process.env.FB_PAGE_ID && process.env.FB_PAGE_ACCESS_TOKEN) {
-          await axios.post(`https://graph.facebook.com/v19.0/${process.env.FB_PAGE_ID}/feed`, null, {
-              params: {
+          const fbUrl = `https://graph.facebook.com/v19.0/${process.env.FB_PAGE_ID}/feed`;
+          await fetch(fbUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
                   message: fullMessage,
                   access_token: process.env.FB_PAGE_ACCESS_TOKEN
-              }
+              })
           });
       }
   } catch (error) {
