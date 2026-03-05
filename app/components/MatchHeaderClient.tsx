@@ -1,6 +1,5 @@
 'use client';
-import { createClient } from '@/app/lib/supabase/client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget'; 
 import { getLeagueAssets } from '@/app/lib/league-assets';
 import MatchTime from '@/app/components/MatchTime';
@@ -8,53 +7,64 @@ import MatchTime from '@/app/components/MatchTime';
 export default function MatchHeaderClient({ matchId, initialData }: any) {
   const [data, setData] = useState(initialData);
   const hasPremiumWidget = !!initialData?.widget_id;
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-    
     const fetchHeaderData = async () => {
-      const { data: payload } = await supabase
-        .from('matches')
-        .select('status, home_score, away_score, widget_id, displayClock')
-        .eq('id', matchId)
-        .single();
-        
-      if (payload) {
-          setData((prev:any) => ({ 
-              ...prev, 
-              status: payload.status, 
-              home_score: payload.home_score, 
-              away_score: payload.away_score,
-              widget_id: payload.widget_id,
-              displayClock: payload.displayClock
-          }));
-      }
+      if (document.visibilityState !== 'visible') return;
+
+      try {
+          const res = await fetch(`/api/match-data?id=${matchId}`);
+          if (!res.ok) return;
+          const payload = await res.json();
+          
+          if (payload && !payload.error) {
+              setData((prev:any) => ({ 
+                  ...prev, 
+                  status: payload.status, 
+                  home_score: payload.home_score, 
+                  away_score: payload.away_score,
+                  widget_id: payload.widget_id,
+                  displayClock: payload.displayClock
+              }));
+
+              if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
+                  if (intervalRef.current) clearInterval(intervalRef.current);
+              }
+          }
+      } catch (error) {}
     };
 
-    // 1. Fetch immediately on mount so it doesn't wait 15s to show the first update
     fetchHeaderData();
 
-    // 2. Start the silent 15-second polling loop
-    const interval = setInterval(fetchHeaderData, 15000);
-    return () => clearInterval(interval);
-  }, [matchId]);
+    if (!['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(initialData?.status)) {
+        intervalRef.current = setInterval(fetchHeaderData, 5000);
+    }
+
+    const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') fetchHeaderData();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [matchId, initialData?.status]);
 
   if (hasPremiumWidget) {
       return <ScoreAxisWidget matchId={initialData.widget_id} />;
   }
 
-  // 🟢 SAFETY FIX: Catches Extra Time, Penalties, and handles null safely
   const currentStatus = data?.status?.toUpperCase() || '';
   const isLive = ['LIVE', 'HT', 'IN_PLAY'].includes(currentStatus);
   const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'].includes(currentStatus);
 
-  // 🟢 FETCH THE UNIFIED BACKGROUND
   const leagueData = getLeagueAssets(initialData?.league);
 
   return (
     <div className="relative z-10 px-4 mt-1 pb-6 pt-2 rounded-b-3xl overflow-hidden bg-slate-900 shadow-2xl">
         
-        {/* 🟢 1. UNIFIED STADIUM BACKGROUND (Bottom Layer) */}
         <div className="absolute inset-0 z-0 pointer-events-none">
             <img 
                 src={leagueData.bg} 
@@ -63,15 +73,12 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
             />
         </div>
 
-        {/* 🟢 2. COLOR GRADIENTS FOR READABILITY */}
         <div className="absolute inset-0 z-0 pointer-events-none">
             <div className="absolute inset-0 bg-slate-900/40" />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />
         </div>
 
-        {/* 🟢 3. ORIGINAL CONTENT LAYER (Top Layer) */}
         <div className="relative z-10">
-            {/* Status Indicator */}
             <div className="flex justify-center mb-6">
                 {isLive ? (
                     <div className="flex flex-col items-center">
@@ -88,9 +95,7 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                 )}
             </div>
 
-            {/* Teams & Score */}
             <div className="flex justify-between items-start">
-                {/* Home Team */}
                 <div className="flex flex-col items-center w-[35%] group">
                     <div className="w-20 h-20 bg-white/10 p-4 rounded-2xl mb-3 flex items-center justify-center border border-white/10 shadow-2xl backdrop-blur-md transition-transform group-hover:scale-105">
                         {initialData?.home_logo ? <img src={initialData.home_logo} className="w-full h-full object-contain drop-shadow-md" /> : <div className="font-black text-slate-500">H</div>}
@@ -98,7 +103,6 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                     <h2 className="font-bold text-center text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md">{initialData?.home_team}</h2>
                 </div>
                 
-                {/* Score */}
                 <div className="flex flex-col items-center justify-center w-[30%] pt-4">
                     {currentStatus === 'SCHEDULED' || currentStatus === 'PRE' ? (
                          <div className="text-4xl font-black text-white/20">VS</div>
@@ -111,7 +115,6 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                     )}
                 </div>
 
-                {/* Away Team */}
                 <div className="flex flex-col items-center w-[35%] group">
                     <div className="w-20 h-20 bg-white/10 p-4 rounded-2xl mb-3 flex items-center justify-center border border-white/10 shadow-2xl backdrop-blur-md transition-transform group-hover:scale-105">
                         {initialData?.away_logo ? <img src={initialData.away_logo} className="w-full h-full object-contain drop-shadow-md" /> : <div className="font-black text-slate-500">A</div>}
