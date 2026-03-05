@@ -1,6 +1,3 @@
-import { TwitterApi } from 'twitter-api-v2';
-
-// 🟢 THE VIP LIST
 const VIP_DB_NAMES = [
   'Arsenal', 'Chelsea', 'Liverpool', 'Man City', 'Man United', 'Tottenham', 'Spurs',
   'Barcelona', 'Barça', 'Atlético', 'Atleti', 'Real Madrid',
@@ -13,50 +10,53 @@ export const isBigTeamMatch = (homeTeam: string, awayTeam: string) => {
   return VIP_DB_NAMES.includes(homeTeam) || VIP_DB_NAMES.includes(awayTeam);
 };
 
-// 🟢 THE POSTER
-export async function postToSocials(message: string, link: string) {
-  const fullMessage = `${message}\n\n👇\n${link}`;
+export async function postToSocials(fbMessage: string, xMessage: string | null, link: string) {
+  // -- X / TWITTER POST (RapidAPI) --
+  if (xMessage) {
+      try {
+          let safeXMessage = xMessage.length > 250 ? xMessage.substring(0, 247) + '...' : xMessage;
+          const fullXMessage = `${safeXMessage}\n\n👇\n${link}`;
 
-  // -- X / TWITTER POST --
-  try {
-      if (process.env.TWITTER_API_KEY) {
-          const twitterClient = new TwitterApi({
-              appKey: process.env.TWITTER_API_KEY!,
-              appSecret: process.env.TWITTER_API_SECRET!,
-              accessToken: process.env.TWITTER_ACCESS_TOKEN!,
-              accessSecret: process.env.TWITTER_ACCESS_SECRET!,
-          });
-          await twitterClient.v2.tweet(fullMessage);
+          if (!process.env.X_RAPIDAPI_KEY) {
+              console.log("⚠️ X skipped: Missing X_RAPIDAPI_KEY.");
+          } else {
+              const xResponse = await fetch("https://twitter-x-full-api.p.rapidapi.com/api/v2/CreateTweet", {
+                  method: 'POST',
+                  headers: {
+                      'x-rapidapi-key': process.env.X_RAPIDAPI_KEY,
+                      'x-rapidapi-host': 'twitter-x-full-api.p.rapidapi.com',
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ text: fullXMessage })
+              });
+              const xData = await xResponse.json();
+              console.log("✅ X API Response:", JSON.stringify(xData));
+          }
+      } catch (error) {
+          console.error("❌ X Network Error:", error);
       }
-  } catch (error) {
-      console.error("❌ X Post Failed:", error);
   }
 
   // -- FACEBOOK POST --
   try {
+      const fullFbMessage = `${fbMessage}\n\n👇\n${link}`;
+      
       if (!process.env.FB_PAGE_ID || !process.env.FB_PAGE_ACCESS_TOKEN) {
-          console.log("⚠️ Facebook skipped: Missing FB_PAGE_ID or FB_PAGE_ACCESS_TOKEN in Vercel.");
+          console.log("⚠️ Facebook skipped: Missing Keys.");
       } else {
           const fbUrl = `https://graph.facebook.com/v19.0/${process.env.FB_PAGE_ID}/feed`;
           const fbResponse = await fetch(fbUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                  message: fullMessage,
+                  message: fullFbMessage,
                   access_token: process.env.FB_PAGE_ACCESS_TOKEN
               })
           });
-
-          // 🟢 NEW: Read Facebook's actual response
           const fbData = await fbResponse.json();
-
-          if (!fbResponse.ok) {
-              console.error("❌ Facebook API Error:", JSON.stringify(fbData));
-          } else {
-              console.log("✅ Facebook Post Success!", fbData);
-          }
+          console.log("✅ Facebook Response:", JSON.stringify(fbData));
       }
   } catch (error) {
       console.error("❌ Facebook Network Error:", error);
   }
-} // <--- This was the missing brace!
+}
