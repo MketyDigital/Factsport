@@ -43,9 +43,11 @@ export async function POST(request: Request) {
         }
     }
 
-    // 🟢 THE FIX: Hardcoded to Vercel so Buffer can actually find the image!
-    const baseUrl = 'https://factsport.vercel.app';
-    const matchUrl = `${baseUrl}/match/${newState.id}`; 
+    // 🔗 THE URL SPLIT
+    const frontendUrl = 'https://factsport.com'; // What the users click
+    const imageUrl = 'https://factsport.vercel.app'; // Where Buffer fetches the image
+
+    const matchUrl = `${frontendUrl}/match/${newState.id}`; 
     
     let payload: SocialPayload = {}; 
 
@@ -74,9 +76,14 @@ export async function POST(request: Request) {
     }
     // 📋 DETECT LINEUPS (FB1 Text + X Graphic)
     else if (oldState.status === 'PRE_MATCH' && (!oldState.lineups?.home || oldState.lineups.home.length === 0) && newState.lineups?.home?.length > 0) {
+        const homeXI = newState.lineups.home.slice(0, 11).join(',');
+        const awayXI = newState.lineups.away.slice(0, 11).join(',');
+
         payload.fb1Message = `📋 STARTING XI ANNOUNCED!\n\n${newState.home_team} vs ${newState.away_team}\n\nHome XI: ${newState.lineups.home.join(', ')}\n\nAway XI: ${newState.lineups.away.join(', ')}\n\n👇\n${matchUrl}`;
         payload.xMessage = `🚨 TEAM NEWS IS IN!\n\nA massive clash ahead: ${newState.home_team} vs ${newState.away_team}. Full lineups and bench here:`;
-        payload.xImageUrl = `${baseUrl}/api/og?key=${process.env.CRON_KEY}&type=versus&label=STARTING%20XI&home=${encodeURIComponent(newState.home_team)}&away=${encodeURIComponent(newState.away_team)}&homeLogo=${encodeURIComponent(newState.home_logo || '')}&awayLogo=${encodeURIComponent(newState.away_logo || '')}&ext=.png`;
+        
+        // Notice we use the `imageUrl` specifically for the graphic!
+        payload.xImageUrl = `${imageUrl}/api/og?type=versus&label=STARTING%20XI&home=${encodeURIComponent(newState.home_team)}&away=${encodeURIComponent(newState.away_team)}&homeLogo=${encodeURIComponent(newState.home_logo || '')}&awayLogo=${encodeURIComponent(newState.away_logo || '')}&homeXI=${encodeURIComponent(homeXI)}&awayXI=${encodeURIComponent(awayXI)}&ext=.png`;
     }
     // ⏸️ DETECT HALF TIME (FB1 Only)
     else if (oldState.status !== 'HT' && newState.status === 'HT') {
@@ -87,7 +94,9 @@ export async function POST(request: Request) {
         const timeNote = newState.status === 'AET' ? ' (After Extra Time)' : (newState.status === 'PEN' ? ' (After Penalties)' : '');
         payload.fb1Message = `⏹️ FULL TIME!${timeNote}\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\nMatch stats and ratings available now:\n\n👇\n${matchUrl}`;
         payload.xMessage = `⏹️ FULL TIME.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}. Rate the performance out of 10!`;
-        payload.xImageUrl = `${baseUrl}/api/og?key=${process.env.CRON_KEY}&type=versus&label=FULL%20TIME&home=${encodeURIComponent(newState.home_team)}&away=${encodeURIComponent(newState.away_team)}&hScore=${newState.home_score}&aScore=${newState.away_score}&homeLogo=${encodeURIComponent(newState.home_logo || '')}&awayLogo=${encodeURIComponent(newState.away_logo || '')}&ext=.png`;
+        
+        // Notice we use the `imageUrl` specifically for the graphic!
+        payload.xImageUrl = `${imageUrl}/api/og?type=versus&label=FULL%20TIME&home=${encodeURIComponent(newState.home_team)}&away=${encodeURIComponent(newState.away_team)}&hScore=${newState.home_score}&aScore=${newState.away_score}&homeLogo=${encodeURIComponent(newState.home_logo || '')}&awayLogo=${encodeURIComponent(newState.away_logo || '')}&ext=.png`;
     }
     
     if (!payload.fb1Message && !payload.xMessage) return NextResponse.json({ message: "No postable event occurred." });
