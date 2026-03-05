@@ -20,19 +20,21 @@ export async function postToSocials(message: string, link: string) {
   // -- X / TWITTER POST --
   try {
       if (process.env.TWITTER_API_KEY) {
+          // Fixed syntax: Passing keys directly as strings or using the ! operator
           const twitterClient = new TwitterApi({
-              appKey: process.env.TWITTER_API_KEY,
-              appSecret: process.env.TWITTER_API_SECRET,
-              accessToken: process.env.TWITTER_ACCESS_TOKEN,
-              accessSecret: process.env.TWITTER_ACCESS_SECRET,
+              appKey: process.env.TWITTER_API_KEY!,
+              appSecret: process.env.TWITTER_API_SECRET!,
+              accessToken: process.env.TWITTER_ACCESS_TOKEN!,
+              accessSecret: process.env.TWITTER_ACCESS_SECRET!,
           });
+          
           await twitterClient.v2.tweet(fullMessage);
       }
   } catch (error) {
       console.error("❌ X Post Failed:", error);
   }
 
-  // -- FACEBOOK POST (Using Edge-Native Fetch!) --
+  // -- FACEBOOK POST --
   try {
       if (process.env.FB_PAGE_ID && process.env.FB_PAGE_ACCESS_TOKEN) {
           const fbUrl = `https://graph.facebook.com/v19.0/${process.env.FB_PAGE_ID}/feed`;
