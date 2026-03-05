@@ -1,45 +1,91 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { createClient } from '@/app/lib/supabase/client';
+import { useState, useEffect, useRef } from 'react';
 
-export default function LiveScoreLabel({ matchId, initialStatus, homeScore, awayScore, matchDate }: any) {
+export default function LiveScoreLabel({ 
+    matchId, 
+    initialStatus, 
+    homeScore, 
+    awayScore, 
+    matchDate,
+    variant = 'small', 
+    homeTeam,
+    awayTeam 
+}: any) {
   const [data, setData] = useState({ 
       status: initialStatus, 
       home: homeScore, 
       away: awayScore, 
       clock: '' 
   });
+  
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-
-    // 1. Define the function that grabs the score instantly
     const fetchLiveScore = async () => {
-      const { data: matchData } = await supabase
-        .from('matches')
-        .select('status, home_score, away_score, displayClock')
-        .eq('id', matchId)
-        .single();
+      if (document.visibilityState !== 'visible') return;
 
-      if (matchData) {
-        setData({ 
-            status: matchData.status, 
-            home: matchData.home_score, 
-            away: matchData.away_score,
-            clock: matchData.displayClock
-        });
+      try {
+          const res = await fetch(`/api/match-data?id=${matchId}`);
+          if (!res.ok) return;
+          const matchData = await res.json();
+
+          if (matchData && !matchData.error) {
+            setData({ 
+                status: matchData.status, 
+                home: matchData.home_score, 
+                away: matchData.away_score,
+                clock: matchData.displayClock
+            });
+
+            if (['FT', 'FINISHED', 'AET', 'PEN', 'ABD'].includes(matchData.status)) {
+                if (intervalRef.current) clearInterval(intervalRef.current);
+            }
+          }
+      } catch (error) {
+          console.error("Failed to fetch score");
       }
     };
 
-    // 2. Set up the silent polling timer (every 15 seconds)
-    // 15 seconds is fast enough for sports, but slow enough to cost $0 at scale
-    const interval = setInterval(fetchLiveScore, 15000);
+    if (!['FT', 'FINISHED', 'AET', 'PEN', 'ABD'].includes(data.status)) {
+        intervalRef.current = setInterval(fetchLiveScore, 5000);
+    }
 
-    // 3. Clean up the timer if the user leaves the page
-    return () => clearInterval(interval);
-  }, [matchId]);
+    const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') fetchLiveScore();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [matchId, data.status]);
 
   const userTime = new Date(matchDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+  if (variant === 'badge') {
+      const isLive = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT'].includes(data.status);
+      if (isLive) {
+          return <span className="bg-red-600 text-white text-[9px] font-black px-2 py-1 rounded animate-pulse shadow-sm">LIVE</span>;
+      }
+      return <span className="bg-slate-200 text-slate-500 text-[9px] font-bold px-2 py-1 rounded shadow-inner">UPCOMING</span>;
+  }
+
+  if (variant === 'large') {
+      return (
+          <div className="flex justify-between items-center mb-4">
+              <div className="text-center w-1/3">
+                  <div className="text-2xl font-black">{data.home ?? 0}</div>
+                  <div className="text-xs font-bold text-slate-600 line-clamp-1">{homeTeam}</div>
+              </div>
+              <div className="text-slate-200 font-black text-lg">VS</div>
+              <div className="text-center w-1/3">
+                  <div className="text-2xl font-black">{data.away ?? 0}</div>
+                  <div className="text-xs font-bold text-slate-600 line-clamp-1">{awayTeam}</div>
+              </div>
+          </div>
+      );
+  }
 
   if (['LIVE', 'IN_PLAY', 'HT'].includes(data.status)) {
     return (

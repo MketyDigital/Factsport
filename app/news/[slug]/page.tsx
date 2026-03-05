@@ -1,4 +1,5 @@
 export const runtime = 'edge';
+export const revalidate = 300;
 
 import { createClient } from '@/app/lib/supabase/server';
 import { notFound } from 'next/navigation';
