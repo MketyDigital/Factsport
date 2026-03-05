@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
+export const revalidate = 300;
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';

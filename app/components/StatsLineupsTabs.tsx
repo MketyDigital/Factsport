@@ -1,48 +1,59 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { createClient } from '@/app/lib/supabase/client';
+import { useState, useEffect, useRef } from 'react';
 import { BarChart2, Users, List, AlertCircle } from 'lucide-react';
 
 export default function StatsLineupsTabs({ matchId, initialData }: { matchId: string, initialData: any }) {
   const [activeTab, setActiveTab] = useState('events');
 
-  // 🟢 SAFETY FIX: Added optional chaining so it doesn't crash on null
   const [liveData, setLiveData] = useState({
       stats: initialData?.stats || { home: {}, away: {} },
       lineups: initialData?.lineups || { home: [], away: [] },
       events: initialData?.goals || initialData?.match_events || [] 
   });
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-    
     const fetchStatsData = async () => {
-      const { data: payload } = await supabase
-        .from('matches')
-        .select('stats, lineups, match_events')
-        .eq('id', matchId)
-        .single();
-        
-      if (payload) {
-          setLiveData(prev => ({
-              stats: payload.stats || prev.stats,
-              lineups: payload.lineups || prev.lineups,
-              events: payload.match_events || prev.events
-          }));
-      }
+      if (document.visibilityState !== 'visible') return;
+
+      try {
+          const res = await fetch(`/api/match-data?id=${matchId}`);
+          if (!res.ok) return;
+          const payload = await res.json();
+          
+          if (payload && !payload.error) {
+              setLiveData(prev => ({
+                  stats: payload.stats || prev.stats,
+                  lineups: payload.lineups || prev.lineups,
+                  events: payload.match_events || payload.goals || prev.events
+              }));
+
+              if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
+                  if (intervalRef.current) clearInterval(intervalRef.current);
+              }
+          }
+      } catch (error) {}
     };
 
-    // 1. Fetch immediately on mount
     fetchStatsData();
 
-    // 2. Poll every 15 seconds to grab new goals, cards, or lineup drops
-    const interval = setInterval(fetchStatsData, 15000);
-    return () => clearInterval(interval);
-  }, [matchId]);
+    if (!['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(initialData?.status)) {
+        intervalRef.current = setInterval(fetchStatsData, 5000);
+    }
+
+    const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') fetchStatsData();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [matchId, initialData?.status]);
 
   const { stats, lineups, events } = liveData;
   
-  // 🟢 SAFETY FIX: Protect against undefined lengths
   const hasLineups = lineups?.home?.length > 0 || lineups?.away?.length > 0;
   const hasStats = stats?.home?.possession || stats?.home?.shots;
 
@@ -50,7 +61,6 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
       if (!players || !Array.isArray(players)) return [];
       const hasStarterInfo = players.some((p: any) => p.is_starter);
       if (hasStarterInfo) {
-          // 🟢 SAFETY FIX: [...players] prevents mutating state directly
           return [...players].sort((a: any, b: any) => (a.is_starter === b.is_starter) ? 0 : a.is_starter ? -1 : 1);
       }
       return players;
@@ -118,7 +128,6 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
 }
 
 function StatRow({ label, home, away }: any) {
-    // 🟢 SAFETY FIX: ?.toString() prevents crash if data is totally missing
     const hVal = parseInt(home?.toString().replace(/\D/g,'')) || 0;
     const aVal = parseInt(away?.toString().replace(/\D/g,'')) || 0;
     const total = hVal + aVal || 1;
