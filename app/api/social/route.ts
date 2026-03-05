@@ -46,33 +46,39 @@ export async function POST(request: Request) {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://factsport.com';
     const matchUrl = `${baseUrl}/match/${newState.id}`; 
     
-    let payload: SocialPayload = { link: matchUrl };
+    // 🟢 THE FIX 1: Start with an empty payload. We will NOT pass the global 'link' 
+    // because it distracts Twitter. We will manually add the link to Facebook messages only.
+    let payload: SocialPayload = {}; 
 
     // ⚽ DETECT GOALS (FB1 Only)
     if (newState.home_score > oldState.home_score || newState.away_score > oldState.away_score) {
         let statusText = ['IN_PLAY', 'LIVE'].includes(newState.status) ? '' : ` (${newState.status})`;
-        payload.fb1Message = `🚨 GOAL!\n\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}`;
+        payload.fb1Message = `🚨 GOAL!\n\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n\n👇\n${matchUrl}`;
         
         if (newState.status === 'PEN') {
-            payload.fb1Message = `🥅 PENALTY SCORED!\n\nShootout: ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}`;
+            payload.fb1Message = `🥅 PENALTY SCORED!\n\nShootout: ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
         }
     }
     // 📋 DETECT LINEUPS (FB1 Text + X Graphic)
     else if (oldState.status === 'PRE_MATCH' && (!oldState.lineups?.home || oldState.lineups.home.length === 0) && newState.lineups?.home?.length > 0) {
-        payload.fb1Message = `📋 STARTING XI ANNOUNCED!\n\n${newState.home_team} vs ${newState.away_team}\n\nHome XI: ${newState.lineups.home.join(', ')}\n\nAway XI: ${newState.lineups.away.join(', ')}`;
+        payload.fb1Message = `📋 STARTING XI ANNOUNCED!\n\n${newState.home_team} vs ${newState.away_team}\n\nHome XI: ${newState.lineups.home.join(', ')}\n\nAway XI: ${newState.lineups.away.join(', ')}\n\n👇\n${matchUrl}`;
         payload.xMessage = `🚨 TEAM NEWS IS IN!\n\nA massive clash ahead: ${newState.home_team} vs ${newState.away_team}. Full lineups and bench here:`;
-        payload.xImageUrl = `${baseUrl}/api/og?key=${process.env.CRON_KEY}&type=versus&label=STARTING%20XI&home=${encodeURIComponent(newState.home_team)}&away=${encodeURIComponent(newState.away_team)}&homeLogo=${encodeURIComponent(newState.home_logo || '')}&awayLogo=${encodeURIComponent(newState.away_logo || '')}`;
+        
+        // 🟢 THE FIX 2: Added '&ext=.png' at the very end so Buffer knows this is an image file!
+        payload.xImageUrl = `${baseUrl}/api/og?key=${process.env.CRON_KEY}&type=versus&label=STARTING%20XI&home=${encodeURIComponent(newState.home_team)}&away=${encodeURIComponent(newState.away_team)}&homeLogo=${encodeURIComponent(newState.home_logo || '')}&awayLogo=${encodeURIComponent(newState.away_logo || '')}&ext=.png`;
     }
     // ⏸️ DETECT HALF TIME (FB1 Only)
     else if (oldState.status !== 'HT' && newState.status === 'HT') {
-        payload.fb1Message = `⏸️ Half-Time whistle blows.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\nTap in for live match stats and second-half updates.`;
+        payload.fb1Message = `⏸️ Half-Time whistle blows.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\nTap in for live match stats and second-half updates:\n\n👇\n${matchUrl}`;
     }
     // ⏹️ DETECT FULL TIME (FB1 Text + X Graphic)
     else if (!['FT', 'FINISHED', 'AET', 'AWARDED'].includes(oldState.status) && ['FT', 'FINISHED', 'AET', 'AWARDED'].includes(newState.status)) {
         const timeNote = newState.status === 'AET' ? ' (After Extra Time)' : (newState.status === 'PEN' ? ' (After Penalties)' : '');
-        payload.fb1Message = `⏹️ FULL TIME!${timeNote}\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\nMatch stats and ratings available now.`;
+        payload.fb1Message = `⏹️ FULL TIME!${timeNote}\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\nMatch stats and ratings available now:\n\n👇\n${matchUrl}`;
         payload.xMessage = `⏹️ FULL TIME.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}. Rate the performance out of 10!`;
-        payload.xImageUrl = `${baseUrl}/api/og?key=${process.env.CRON_KEY}&type=versus&label=FULL%20TIME&home=${encodeURIComponent(newState.home_team)}&away=${encodeURIComponent(newState.away_team)}&hScore=${newState.home_score}&aScore=${newState.away_score}&homeLogo=${encodeURIComponent(newState.home_logo || '')}&awayLogo=${encodeURIComponent(newState.away_logo || '')}`;
+        
+        // 🟢 THE FIX 2: Added '&ext=.png' at the very end
+        payload.xImageUrl = `${baseUrl}/api/og?key=${process.env.CRON_KEY}&type=versus&label=FULL%20TIME&home=${encodeURIComponent(newState.home_team)}&away=${encodeURIComponent(newState.away_team)}&hScore=${newState.home_score}&aScore=${newState.away_score}&homeLogo=${encodeURIComponent(newState.home_logo || '')}&awayLogo=${encodeURIComponent(newState.away_logo || '')}&ext=.png`;
     }
     
     if (!payload.fb1Message && !payload.xMessage) return NextResponse.json({ message: "No postable event occurred." });
