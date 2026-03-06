@@ -28,8 +28,10 @@ export async function GET(request: Request) {
         .in('status', ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'])
         .order('match_date', { ascending: true });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    if (!matches || matches.length === 0) return NextResponse.json({ message: "No finished games to report today." });
+    if (error || !matches || matches.length === 0) {
+        await supabase.from('cron_logs_evening').delete().eq('run_date', today);
+        return NextResponse.json({ message: "No games or error. Lock removed." });
+    }
 
     const frontendUrl = 'https://factsport.com'; 
 
@@ -37,7 +39,6 @@ export async function GET(request: Request) {
     matches.forEach(m => {
         fb1Text += `⚽ ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team}\n`;
     });
-    // BUMPER EMOJI APPLIED
     fb1Text += `\nFull stats & news: ${frontendUrl} 🏆`;
 
     let xText = `🏁 DAILY RESULTS!\n\n`;
@@ -46,10 +47,12 @@ export async function GET(request: Request) {
     });
     xText += `\nFull stats & news: ${frontendUrl}`;
 
-    await postToSocials({
-        fb1Message: fb1Text,
-        xMessage: xText
-    }); 
-
-    return NextResponse.json({ success: true, total_matches: matches.length });
+    try {
+        await postToSocials({ fb1Message: fb1Text, xMessage: xText }); 
+        return NextResponse.json({ success: true, total_matches: matches.length });
+    } catch (e) {
+        // 🚨 SELF-HEALING: Delete the lock if it fails
+        await supabase.from('cron_logs_evening').delete().eq('run_date', today);
+        return NextResponse.json({ error: "Posting failed. Lock removed for retry." }, { status: 500 });
+    }
 }
