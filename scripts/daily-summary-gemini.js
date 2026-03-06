@@ -18,15 +18,14 @@ async function generateDailySummaries() {
     console.log("🌙 Starting Daily Matchday Analysis...");
 
     const now = new Date();
-    
-    // 🛡️ THE GITHUB ACTIONS DELAY FIX
     if (now.getUTCHours() < 6) {
         now.setUTCDate(now.getUTCDate() - 1);
-        console.log("   ⏰ Late run detected. Winding clock back to yesterday.");
     }
 
     const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
     const endOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999)).toISOString();
+    
+    const exactDateString = now.toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const dateSlug = now.toISOString().split('T')[0];
 
     const { data: matches } = await supabase
@@ -65,20 +64,23 @@ async function generateDailySummaries() {
             return `- MATCH ID: ${m.id} | ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} (Scorers: ${scorers || 'None'})`;
         }).join('\n');
 
+        // 🛡️ THE IRONCLAD ROUNDUP PROMPT
         const prompt = `
             You are a top-tier European football journalist and master tactical analyst writing for 'FactSport'.
-            Write a deep, engaging "Matchday Round-Up" article for the ${leagueName} played on ${dateSlug}.
+            Write a deep, engaging "Matchday Round-Up" article for the ${leagueName}.
             
-            Results:
+            TODAY'S EXACT DATE: ${exactDateString}
+            
+            Results & Verified Scorers:
             ${matchSummaries}
 
-            Guidelines:
-            - Headline: Catchy and dramatic. Under 10 words.
-            - Analysis: Tell us *why* it happened. Focus on tactical shifts.
-            - Narrative: Highlight biggest winner/loser.
-            - Length: 400-500 words.
-            - Output: Plain text only. No asterisks.
-            - CRITICAL LINKING RULE: Format strictly as: [View Match Stats](/match/INSERT_MATCH_ID_HERE). Do this for every single game!
+            STRICT FACTUAL GUIDELINES (CRITICAL TO YOUR INSTRUCTIONS):
+            1. APPROVED NAMES ONLY: You may ONLY mention the specific players listed in the "Scorers" data above. 
+            2. ZERO HALLUCINATIONS: Do not guess, assume, or name any other players, current managers, or goalkeepers. If a player is not in the data above, they do not exist in this article.
+            3. THE NARRATIVE: Focus your analysis on the club philosophies, the shock value of the final scores, and what the results mean for the clubs' momentum.
+            4. Headline: Catchy and dramatic, capturing the biggest storyline. Under 10 words. Do not use asterisks (*).
+            5. Length: 400-500 words. Plain text only.
+            6. CRITICAL LINKING RULE: You MUST wrap EVERY match you mention in a Markdown link pointing to its Match ID. Format strictly as: [View Match Stats](/match/INSERT_MATCH_ID_HERE). Do this for every single game!
         `;
 
         try {
