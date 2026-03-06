@@ -8,6 +8,7 @@ const VIP_DB_NAMES = [
 ];
 
 export const isBigTeamMatch = (homeTeam: string, awayTeam: string) => {
+  // Uses OR (||) so it fires if AT LEAST ONE team is a VIP. This is perfect.
   return VIP_DB_NAMES.includes(homeTeam) || VIP_DB_NAMES.includes(awayTeam);
 };
 

@@ -14,8 +14,31 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
+// 🟢 BULLETPROOF H2H EXTRACTOR FOR AI
+function extractH2HStats(match) {
+    if (!match.h2h) return null;
+    
+    let parsedH2h = match.h2h;
+    if (typeof parsedH2h === 'string') {
+        try { parsedH2h = JSON.parse(parsedH2h); } catch (e) { return null; }
+    }
+
+    const h2hObj = parsedH2h?.aggregates || parsedH2h || {};
+    const homeData = typeof h2hObj.homeTeam === 'object' ? h2hObj.homeTeam : {};
+    const awayData = typeof h2hObj.awayTeam === 'object' ? h2hObj.awayTeam : {};
+
+    const homeWins = Number(homeData.wins ?? h2hObj.homeWins ?? h2hObj.home_wins ?? 0);
+    const draws = Number(homeData.draws ?? h2hObj.draws ?? 0);
+    const awayWins = Number(awayData.wins ?? homeData.losses ?? h2hObj.awayWins ?? h2hObj.away_wins ?? 0);
+
+    const total = homeWins + draws + awayWins;
+    if (total === 0) return null; // Skip if no historical data
+
+    return `Historical Record: ${match.home_team} has ${homeWins} wins, ${match.away_team} has ${awayWins} wins, and ${draws} draws.`;
+}
+
 async function generateDailyPreview() {
-    console.log("☀️ Starting Daily Preview...");
+    console.log("☀️ Starting Daily Preview with H2H Data...");
 
     const now = new Date();
     const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
@@ -46,12 +69,18 @@ async function generateDailyPreview() {
         leagues[m.league].push(m);
     });
 
+    // 🟢 INJECT H2H INTO THE AI FEED
     let briefingData = "";
     for (const [league, games] of Object.entries(leagues)) {
         briefingData += `\n${league}:\n`;
         games.forEach(g => {
             const time = new Date(g.match_date).toLocaleTimeString('en-GB', {timeZone: 'UTC', hour: '2-digit', minute:'2-digit'});
+            const h2hText = extractH2HStats(g);
+            
             briefingData += `- MATCH ID: ${g.id} | ${g.home_team} vs ${g.away_team} at ${time} GMT\n`;
+            if (h2hText) {
+                briefingData += `  * ${h2hText}\n`;
+            }
         });
     }
 
@@ -61,13 +90,13 @@ async function generateDailyPreview() {
         
         TODAY'S EXACT DATE: ${exactDateString}
         
-        Schedule:
+        Schedule & Head-to-Head Data:
         ${briefingData}
 
         STRICT FACTUAL GUIDELINES:
         1. TIME AWARENESS: It is currently 2026. 
         2. ZERO NAME GUESSING: You MUST NOT mention ANY specific player names or current managers. Do not guess.
-        3. FOCUS ON THE CLUBS: Write passionately about the historical identities of the clubs, tactical playstyles, and the fixture pressure. 
+        3. FOCUS ON THE CLUBS & HISTORY: Use the provided "Historical Record" data to talk about the rivalries! Mention if one team historically dominates the other, or if they are dead even.
         4. Headline: Punchy and narrative-driven. Under 10 words. Do not use asterisks (*).
         5. Tone: Insightful, opinionated, and highly engaging. 
         6. Length: 400-500 words. Plain text only.
