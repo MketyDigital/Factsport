@@ -8,18 +8,13 @@ import { postToSocials } from '@/app/lib/socialService';
 
 export async function GET(request: Request) {
     const url = new URL(request.url);
-    if (url.searchParams.get('key') !== process.env.CRON_KEY) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (url.searchParams.get('key') !== process.env.CRON_KEY) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     const today = new Date().toISOString().split('T')[0];
 
-    // 🔒 The Evening Lock
     const { error: lockError } = await supabase.from('cron_logs_evening').insert([{ run_date: today }]);
-    if (lockError) {
-        return NextResponse.json({ message: "Evening roundup already posted today. Skipping." });
-    }
+    if (lockError) return NextResponse.json({ message: "Evening roundup already posted today. Skipping." });
     
     const now = new Date();
     const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
@@ -33,8 +28,10 @@ export async function GET(request: Request) {
         .in('status', ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'])
         .order('match_date', { ascending: true });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    if (!matches || matches.length === 0) return NextResponse.json({ message: "No finished games to report today." });
+    if (error || !matches || matches.length === 0) {
+        await supabase.from('cron_logs_evening').delete().eq('run_date', today);
+        return NextResponse.json({ message: "No games or error. Lock removed." });
+    }
 
     const frontendUrl = 'https://factsport.com'; 
 
@@ -42,7 +39,7 @@ export async function GET(request: Request) {
     matches.forEach(m => {
         fb1Text += `⚽ ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team}\n`;
     });
-    fb1Text += `\nFull stats & news: ${frontendUrl}`;
+    fb1Text += `\nFull stats & news: ${frontendUrl} 🏆`;
 
     let xText = `🏁 DAILY RESULTS!\n\n`;
     matches.slice(0, 8).forEach(m => {
@@ -50,11 +47,12 @@ export async function GET(request: Request) {
     });
     xText += `\nFull stats & news: ${frontendUrl}`;
 
-    // Text-only, no images!
-    await postToSocials({
-        fb1Message: fb1Text,
-        xMessage: xText
-    }); 
-
-    return NextResponse.json({ success: true, total_matches: matches.length });
+    try {
+        await postToSocials({ fb1Message: fb1Text, xMessage: xText }); 
+        return NextResponse.json({ success: true, total_matches: matches.length });
+    } catch (e) {
+        // 🚨 SELF-HEALING: Delete the lock if it fails
+        await supabase.from('cron_logs_evening').delete().eq('run_date', today);
+        return NextResponse.json({ error: "Posting failed. Lock removed for retry." }, { status: 500 });
+    }
 }
