@@ -4,20 +4,34 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { isBigTeamMatch, postToSocials, SocialPayload } from '@/app/lib/socialService';
 
+// 🟢 HELPER: Safely counts valid goals to prevent "Attempt saved" bugs
+const getValidGoals = (eventsArr: any[]) => {
+    if (!Array.isArray(eventsArr)) return [];
+    return eventsArr.filter((e: any) => {
+        if (!e) return false;
+        const typeStr = String(e.type || e.detail || '').trim().toLowerCase();
+        const textStr = String(e.text || e.description || e.comment || e.comments || '');
+        if (textStr.includes('Attempt saved') || textStr.includes('Missed penalty') || textStr.includes('Attempt missed')) return false;
+        if (typeStr === 'goal' || typeStr === 'penalty') return true;
+        if (textStr.startsWith('Goal ') || textStr.startsWith('Goal!') || textStr.includes('⚽')) return true;
+        return false;
+    });
+};
+
 export async function POST(request: Request) {
     const authHeader = request.headers.get('Authorization');
     if (authHeader !== `Bearer ${process.env.CRON_KEY}`) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
     const newState = body.record;
-    const oldState = body.old_record || { home_score: 0, away_score: 0, status: 'PRE_MATCH', lineups: { home: [], away: [] } };
+    const oldState = body.old_record || { home_score: 0, away_score: 0, status: 'PRE_MATCH', lineups: { home: [], away: [] }, match_events: [] };
 
     if (!newState) return NextResponse.json({ message: "No record found" });
 
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     let isVIP = isBigTeamMatch(newState.home_team, newState.away_team);
 
     if (!isVIP) {
-        const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
         const today = new Date().toISOString().split('T')[0];
         const { data: todaysMatches } = await supabase.from('matches').select('id, home_team, away_team').like('match_date', `${today}%`).order('match_date', { ascending: true });
         const hasVIPToday = todaysMatches?.some(m => isBigTeamMatch(m.home_team, m.away_team));
@@ -29,59 +43,66 @@ export async function POST(request: Request) {
         }
     }
 
-    const oldHasBothLineups = Array.isArray(oldState.lineups?.home) && oldState.lineups.home.length > 0 && 
-                              Array.isArray(oldState.lineups?.away) && oldState.lineups.away.length > 0;
-                              
-    const newHasBothLineups = Array.isArray(newState.lineups?.home) && newState.lineups.home.length > 0 && 
-                              Array.isArray(newState.lineups?.away) && newState.lineups.away.length > 0;
+    const oldHasBothLineups = Array.isArray(oldState.lineups?.home) && oldState.lineups.home.length > 0 && Array.isArray(oldState.lineups?.away) && oldState.lineups.away.length > 0;
+    const newHasBothLineups = Array.isArray(newState.lineups?.home) && newState.lineups.home.length > 0 && Array.isArray(newState.lineups?.away) && newState.lineups.away.length > 0;
 
     const frontendUrl = 'https://factsport.com'; 
     const imageUrl = 'https://factsport.vercel.app'; 
     const matchUrl = `${frontendUrl}/match/${newState.id}`; 
     let payload: SocialPayload = {}; 
 
-    // 🟢 1. GOALS, SCORERS, AND ASSISTS (Now hunting for rich commentary!)
-    if (newState.home_score > oldState.home_score || newState.away_score > oldState.away_score) {
+    const scoreIncreased = (newState.home_score + newState.away_score) > (oldState.home_score + oldState.away_score);
+    let matchEvents = newState.match_events;
+    let newGoals = getValidGoals(matchEvents);
+
+    // 🟢 1. GOALS & SCORERS (The Patience Pattern)
+    if (scoreIncreased) {
         let statusText = ['IN_PLAY', 'LIVE', '1H', '2H'].includes(newState.status) ? '' : ` (${newState.status})`;
-        let scorerText = "";
         
-        if (Array.isArray(newState.match_events)) {
-            const goals = newState.match_events.filter((e: any) => 
-                e && (typeof e === 'string' ? e.toLowerCase().includes('goal') : (e.type === 'goal' || e.type === 'penalty'))
-            );
+        // 🔥 MICRO-DELAY LOGIC: If the score went up but the commentary event isn't in the array yet
+        if (newGoals.length < (newState.home_score + newState.away_score)) {
+            console.log("⏳ API Lag detected. Waiting 4 seconds to grab rich text...");
+            // We wait exactly 4 seconds. This is the "Safe Zone" for Vercel Edge functions.
+            await new Promise(resolve => setTimeout(resolve, 4000));
             
-            if (goals.length > 0) {
-                const latestGoal = goals[goals.length - 1];
-                
-                if (typeof latestGoal === 'string') {
-                    scorerText = `\n${latestGoal}\n`;
-                } else {
-                    // 🔥 THE MAGIC CATCHER: Grabs the rich play-by-play text you saw in the app
-                    const richText = latestGoal.text || latestGoal.description || latestGoal.comment || latestGoal.comments || latestGoal.detail;
-                    
-                    if (richText) {
-                        // If the API provided the rich text (e.g., "⚽ Goal! Tottenham Hotspur 1..."), we use it directly!
-                        // We check if time is already included in the text to avoid duplicating "45'+7' - 45'+7'"
-                        const timeStr = latestGoal.time || latestGoal.minute ? `${latestGoal.time || latestGoal.minute}' ` : '';
-                        const prefix = richText.includes(timeStr.trim()) ? '' : timeStr;
-                        scorerText = `\n${prefix}${richText}\n`;
-                    } else {
-                        // Safe Fallback if the rich text doesn't exist
-                        const player = latestGoal.player || latestGoal.playerName || latestGoal.name || "Goalscorer";
-                        const time = latestGoal.time || latestGoal.minute || "";
-                        const assist = latestGoal.assist || latestGoal.assist_name || latestGoal.assistName;
-                        
-                        scorerText = `\n🎯 ${player} ${time ? `(${time}')` : ''}`;
-                        if (assist) scorerText += `\n🤝 Assist: ${assist}`;
-                        scorerText += `\n`;
-                    }
-                }
+            // We reach out to Supabase to get a "Fresh" look at the database 4 seconds later
+            const { data: freshMatch } = await supabase.from('matches').select('match_events').eq('id', newState.id).single();
+            if (freshMatch && freshMatch.match_events) {
+                matchEvents = freshMatch.match_events;
+                newGoals = getValidGoals(matchEvents);
             }
         }
+
+        let scorerText = "";
         
-        payload.fb1Message = `🚨 GOAL ALERT!\n\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\nTap in for full live match updates:\n👇\n${matchUrl} ⚽`;
+        if (newGoals.length > 0) {
+            // SUCCESS: We have the goal event now.
+            const latestGoal = newGoals[newGoals.length - 1];
+            if (typeof latestGoal === 'string') {
+                scorerText = `\n${latestGoal}\n`;
+            } else {
+                const richText = latestGoal.text || latestGoal.description || latestGoal.comment || latestGoal.comments || latestGoal.detail || "";
+                if (richText) {
+                    const timeStr = latestGoal.time || latestGoal.minute ? `${latestGoal.time || latestGoal.minute}' ` : '';
+                    const prefix = richText.includes(String(latestGoal.time)) ? '' : timeStr;
+                    scorerText = `\n${prefix}${richText}\n`;
+                } else {
+                    const player = latestGoal.player || latestGoal.playerName || latestGoal.name || "Goalscorer";
+                    const time = latestGoal.time || latestGoal.minute || "";
+                    const assist = latestGoal.assist || latestGoal.assist_name || latestGoal.assistName;
+                    scorerText = `\n🎯 ${player} ${time ? `(${time}')` : ''}`;
+                    if (assist) scorerText += `\n🤝 Assist: ${assist}`;
+                    scorerText += `\n`;
+                }
+            }
+        } else {
+            // 🚨 FINAL FALLBACK: 4 seconds passed and still no event. 
+            // We post the score immediately to keep the site "Live" but ask users to check the link for details.
+            scorerText = `\n⚽ Goal confirmed! Scorer details updating...\nCheck live updates and assists here: 👇\n`;
+        }
         
-        // Shootout Override
+        payload.fb1Message = `🚨 GOAL ALERT!\n\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\n${matchUrl} ⚽`;
+        
         if (['PEN', 'PEN_SHOOT_OUT'].includes(newState.status)) {
             payload.fb1Message = `🥅 PENALTY SCORED!\n\nShootout: ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl} ⚽`;
         }
@@ -117,10 +138,8 @@ export async function POST(request: Request) {
         payload.xImageUrl = `${imageUrl}/api/og?data=${safeBase64}&ext=.png`;
     }
     
-    // 🟢 ABORT IF NOTHING HAPPENED
     if (!payload.fb1Message && !payload.xMessage) return NextResponse.json({ message: "No postable event occurred." });
 
-    // 🟢 FIRE!
     await postToSocials(payload);
     return NextResponse.json({ success: true, event: "Posted successfully" });
 }
