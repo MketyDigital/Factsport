@@ -14,7 +14,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-3-flash" }); 
 
-// 🟢 INTEGRITY HELPER: Ensures AI only writes about verified goals
+// 🟢 INTEGRITY HELPER: Ensures AI only sees real goals
 const getValidScorers = (eventsArr) => {
     if (!Array.isArray(eventsArr)) return 'None';
     return eventsArr
@@ -22,8 +22,8 @@ const getValidScorers = (eventsArr) => {
             if (!e) return false;
             const text = String(e.text || e.description || '').toLowerCase();
             const type = String(e.type || '').toLowerCase();
-            // ❌ BAN LIST: Kill false goal alerts before the AI sees them
-            if (text.includes('attempt saved') || text.includes('missed') || text.includes('disallowed') || text.includes('cancelled')) return false;
+            // ❌ BAN LIST
+            if (text.includes('attempt saved') || text.includes('missed') || text.includes('disallowed') || text.includes('cancelled') || text.includes('no goal')) return false;
             return type === 'goal' || type === 'penalty' || text.includes('goal') || text.includes('⚽');
         })
         .map(e => `${e.player || e.playerName || 'Unknown'} (${e.time || e.minute}')`)
@@ -34,7 +34,7 @@ async function generateDailySummaries() {
     console.log("🌙 Starting Daily Matchday Analysis...");
 
     const now = new Date();
-    // 🛡️ DATE-DRIFT: If running after midnight, look back at "yesterday's" data
+    // 🛡️ DATE-DRIFT CHECK
     if (now.getUTCHours() < 6) {
         now.setUTCDate(now.getUTCDate() - 1);
     }
