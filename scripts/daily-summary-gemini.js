@@ -12,12 +12,29 @@ if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
+const model = genAI.getGenerativeModel({ model: "gemini-3-flash" }); 
+
+// 🟢 INTEGRITY HELPER: Ensures AI only writes about verified goals
+const getValidScorers = (eventsArr) => {
+    if (!Array.isArray(eventsArr)) return 'None';
+    return eventsArr
+        .filter(e => {
+            if (!e) return false;
+            const text = String(e.text || e.description || '').toLowerCase();
+            const type = String(e.type || '').toLowerCase();
+            // ❌ BAN LIST: Kill false goal alerts before the AI sees them
+            if (text.includes('attempt saved') || text.includes('missed') || text.includes('disallowed') || text.includes('cancelled')) return false;
+            return type === 'goal' || type === 'penalty' || text.includes('goal') || text.includes('⚽');
+        })
+        .map(e => `${e.player || e.playerName || 'Unknown'} (${e.time || e.minute}')`)
+        .join(', ') || 'None';
+};
 
 async function generateDailySummaries() {
     console.log("🌙 Starting Daily Matchday Analysis...");
 
     const now = new Date();
+    // 🛡️ DATE-DRIFT: If running after midnight, look back at "yesterday's" data
     if (now.getUTCHours() < 6) {
         now.setUTCDate(now.getUTCDate() - 1);
     }
@@ -31,12 +48,12 @@ async function generateDailySummaries() {
     const { data: matches } = await supabase
         .from('matches')
         .select('*')
-        .eq('status', 'FT')
+        .in('status', ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'])
         .gte('match_date', startOfDay)
         .lte('match_date', endOfDay);
 
     if (!matches || matches.length === 0) {
-        console.log("   💤 No finished matches today.");
+        console.log("   💤 No finished matches found for this date.");
         return;
     }
 
@@ -51,6 +68,7 @@ async function generateDailySummaries() {
 
         const reportSlug = `${leagueName.toLowerCase().replace(/\s+/g, '-')}-roundup-${dateSlug}`;
         
+        // 🔒 CHECK FOR DUPLICATES
         const { data: existing } = await supabase.from('news').select('id').eq('slug', reportSlug).single();
         if (existing) {
             console.log(`   ⏩ Already reported: ${leagueName}`);
@@ -60,8 +78,8 @@ async function generateDailySummaries() {
         console.log(`   ✍️ Writing Summary for ${leagueName}...`);
 
         const matchSummaries = leagueMatches.map(m => {
-            const scorers = (m.match_events || []).filter(e => e.type === 'goal').map(e => `${e.player} (${e.time})`).join(', ');
-            return `- MATCH ID: ${m.id} | ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} (Scorers: ${scorers || 'None'})`;
+            const scorers = getValidScorers(m.match_events);
+            return `- MATCH ID: ${m.id} | ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} (Scorers: ${scorers})`;
         }).join('\n');
 
         const prompt = `
@@ -76,11 +94,11 @@ async function generateDailySummaries() {
             STRICT FACTUAL GUIDELINES:
             1. APPROVED NAMES ONLY: You may ONLY mention the specific players listed in the "Scorers" data above. 
             2. ZERO HALLUCINATIONS: Do not guess or assume any other players or managers.
-            3. THE NARRATIVE: Focus your analysis on the shock value of the final scores and team momentum.
+            3. THE NARRATIVE: Focus your analysis on the drama of the results and team momentum.
             4. Headline: Catchy and dramatic. Under 10 words. Do not use asterisks (*).
             5. Length: 400-500 words. Plain text only.
             6. CRITICAL LINKING RULE: You MUST wrap EVERY match you mention in a Markdown link. Format strictly as: [View Match Stats](/match/INSERT_MATCH_ID_HERE).
-            7. FACEBOOK SUMMARY: At the very end of your entire response, skip a line and write the exact text "FB_POST:" followed by a short, punchy 2-3 sentence Facebook post. Mention the major scorelines, winning teams, and tease the article. Do not use hashtags.
+            7. FACEBOOK SUMMARY: At the very end, skip a line and write the exact text "FB_POST:" followed by a short, punchy 2-sentence Facebook post. Mention major scorelines and tease the article. Do not use hashtags.
         `;
 
         try {
@@ -89,7 +107,7 @@ async function generateDailySummaries() {
 
             const splitText = text.split('FB_POST:');
             const articleContent = splitText[0].trim();
-            const generatedFbText = splitText.length > 1 ? splitText[1].trim() : "🏁 FULL TIME! Absolute drama on the pitch today. 🤯 Did your team survive the chaos or drop vital points? Have your say below and tap the link for our complete Matchday Round-Up! 👇";
+            const generatedFbText = splitText.length > 1 ? splitText[1].trim() : "🏁 FULL TIME! Absolute drama on the pitch today. 🤯 Tap the link for our complete Round-Up! 👇";
 
             const lines = articleContent.split('\n').filter(line => line.trim() !== '');
             const headline = lines[0].replace(/^#+\s*/, '').replace(/[\*"]/g, ''); 
@@ -98,28 +116,35 @@ async function generateDailySummaries() {
             let featureMatch = leagueMatches[0];
 
             const { error } = await supabase.from('news').insert([{
-                title: headline, slug: reportSlug, body: body,
-                image_url: null, team_1_logo: featureMatch ? featureMatch.home_logo : null, 
+                title: headline, 
+                slug: reportSlug, 
+                body: body,
+                image_url: null, 
+                team_1_logo: featureMatch ? featureMatch.home_logo : null, 
                 team_2_logo: featureMatch ? featureMatch.away_logo : null,
-                is_breaking: false, is_headline: false  
+                is_breaking: false, 
+                is_headline: false  
             }]);
 
-            if (error) console.error(`   ❌ Supabase DB Error:`, error.message);
-            else {
+            if (error) {
+                console.error(`   ❌ Supabase DB Error:`, error.message);
+            } else {
                 console.log(`   ✅ Published: ${headline}`);
                 if (process.env.MAKE_WEBHOOK_URL) {
                     const articleUrl = `https://factsport.com/news/${reportSlug}`;
                     await fetch(process.env.MAKE_WEBHOOK_URL, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             fb2_text: `${generatedFbText}\n\n👇 Full stats and analysis here:\n${articleUrl} 🏆`,
-                            x_text: null, x_image_url: null
+                            x_text: null, 
+                            x_image_url: null
                         })
                     });
                 }
             }
         } catch (e) {
-            console.error(`   🔥 Gemini Error: ${e.message}`);
+            console.error(`   🔥 Gemini Error for ${leagueName}: ${e.message}`);
         }
     }
 }
