@@ -18,9 +18,11 @@ async function generateDailyPreview() {
     console.log("☀️ Starting Daily Preview...");
 
     const now = new Date();
-    // Strict UTC time matching for perfect daily accuracy
     const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
     const endOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999)).toISOString();
+    
+    // We grab the exact date string (e.g., "Friday, March 6, 2026") to feed to the AI
+    const exactDateString = now.toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const dateSlug = now.toISOString().split('T')[0];
 
     const { data: matches } = await supabase
@@ -54,21 +56,24 @@ async function generateDailyPreview() {
         });
     }
 
+    // 🛡️ THE IRONCLAD 2026 PROMPT
     const prompt = `
         You are a top-tier European football journalist and master tactical analyst writing for 'FactSport'.
-        Write a deep, engaging "Daily Briefing" article previewing today's football action (${dateSlug}).
+        Write a deep, engaging "Daily Briefing" article previewing today's football action.
+        
+        TODAY'S EXACT DATE: ${exactDateString}
         
         Schedule:
         ${briefingData}
 
-        Guidelines:
-        - Headline: Punchy and narrative-driven. Under 10 words.
-        - Intro: Hook the reader immediately. Set stakes.
-        - Tactical Analysis: Pick the 2-3 biggest matches. Analyze matchups.
-        - Tone: Insightful, opinionated.
-        - Length: 400-500 words.
-        - Output: Plain text only. No asterisks.
-        - CRITICAL LINKING RULE: Format strictly as: [Arsenal vs Chelsea](/match/INSERT_MATCH_ID_HERE). Do this for every single game you discuss!
+        STRICT FACTUAL GUIDELINES (CRITICAL TO YOUR INSTRUCTIONS):
+        1. TIME AWARENESS: It is currently the year 2026. Your internal training data is outdated. Players have transferred, and managers have been sacked. 
+        2. ZERO NAME GUESSING: You MUST NOT mention ANY specific player names or current managers. You do not know who is on the roster today. Do not guess.
+        3. FOCUS ON THE CLUBS: Write passionately about the historical identities of the clubs, their traditional playstyles, the pressure of the fixture, and the hostility of the stadiums. 
+        4. Headline: Punchy and narrative-driven (e.g., "A Clash of Philosophies in Ligue 1"). Under 10 words. Do not use asterisks (*).
+        5. Tone: Insightful, opinionated, and highly engaging to hype up fans. 
+        6. Length: 400-500 words. Plain text only.
+        7. CRITICAL LINKING RULE: You MUST wrap EVERY match you mention in a Markdown link pointing to its Match ID. Format strictly as: [Arsenal vs Chelsea](/match/INSERT_MATCH_ID_HERE). Do this for every game!
     `;
 
     try {
