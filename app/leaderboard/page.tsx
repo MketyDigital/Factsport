@@ -1,6 +1,6 @@
 // ✅ RUNS ON EDGE
 export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
+export const revalidate = 15;
 
 import { createClient } from '@/app/lib/supabase/server';
 import { Trophy, Star, Crown, History, TrendingUp, Calendar, Send, ExternalLink, ArrowRight } from 'lucide-react';
