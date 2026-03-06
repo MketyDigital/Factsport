@@ -22,8 +22,16 @@ export async function GET(request: Request) {
       (
         <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', backgroundColor: '#0f172a', color: 'white', fontFamily: 'sans-serif', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
           
-          <div style={{ fontSize: 60, fontWeight: 'bold', color: '#fbbf24', marginBottom: 30, textTransform: 'uppercase', letterSpacing: '4px' }}>
-            {label}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 30 }}>
+            <div style={{ fontSize: 60, fontWeight: 'bold', color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '4px' }}>
+              {label}
+            </div>
+            {/* 🌍 GMT TIMEZONE BADGE FOR SCHEDULE */}
+            {type === 'schedule' && (
+              <div style={{ fontSize: 20, fontWeight: 'bold', color: '#94a3b8', backgroundColor: 'rgba(255,255,255,0.1)', padding: '5px 15px', borderRadius: '20px', marginTop: '10px', letterSpacing: '2px' }}>
+                ALL KICK-OFF TIMES IN GMT
+              </div>
+            )}
           </div>
 
           {/* 📅 SCHEDULE LAYOUT */}
@@ -49,7 +57,6 @@ export async function GET(request: Request) {
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '40%' }}>
                 <div style={{ fontSize: 48, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' }}>{data.home}</div>
                 {data.hScore !== undefined && <div style={{ fontSize: 80, fontWeight: 'bold', color: '#fbbf24', marginBottom: 10 }}>{data.hScore}</div>}
-                
                 {data.homeXI && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 15, fontSize: 22, color: '#e2e8f0', lineHeight: 1.3 }}>
                     {data.homeXI.split(',').map((player: string, index: number) => (
@@ -64,7 +71,6 @@ export async function GET(request: Request) {
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '40%' }}>
                 <div style={{ fontSize: 48, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' }}>{data.away}</div>
                 {data.aScore !== undefined && <div style={{ fontSize: 80, fontWeight: 'bold', color: '#fbbf24', marginBottom: 10 }}>{data.aScore}</div>}
-                
                 {data.awayXI && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 15, fontSize: 22, color: '#e2e8f0', lineHeight: 1.3 }}>
                     {data.awayXI.split(',').map((player: string, index: number) => (

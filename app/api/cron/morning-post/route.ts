@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     const today = new Date().toISOString().split('T')[0];
 
+    // 🔒 THE INITIAL LOCK
     const { error: lockError } = await supabase.from('cron_logs').insert([{ run_date: today }]);
     if (lockError) return NextResponse.json({ message: "Already posted today. Skipping." });
     
@@ -29,40 +30,52 @@ export async function GET(request: Request) {
         .lte('match_date', endOfDay)
         .order('match_date', { ascending: true });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    if (!matches || matches.length === 0) return NextResponse.json({ message: "No games today." });
+    if (error || !matches || matches.length === 0) {
+        await supabase.from('cron_logs').delete().eq('run_date', today);
+        return NextResponse.json({ message: "No games or error. Lock removed." });
+    }
 
     const frontendUrl = 'https://factsport.com'; 
     const imageUrl = 'https://factsport.vercel.app'; 
     const todayString = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
 
-    let fb1Text = `📅 ${todayString.toUpperCase()} MATCHDAY SCHEDULE!\n\nAll games happening today:\n\n`;
+    // 🏆 GROUP MATCHES BY LEAGUE
+    const leagues: Record<string, any[]> = {};
     matches.forEach(m => {
-        const time = new Date(m.match_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        fb1Text += `⚽ ${m.home_team} vs ${m.away_team} (${time})\n`;
+        if (!leagues[m.league]) leagues[m.league] = [];
+        leagues[m.league].push(m);
     });
-    // BUMPER EMOJI APPLIED TO PREVENT WAF ALARMS
-    fb1Text += `\nCatch all live scores and stats on: ${frontendUrl} 🏆`;
+
+    let fb1Text = `📅 ${todayString.toUpperCase()} MATCHDAY SCHEDULE!\n\n`;
+    for (const [league, leagueMatches] of Object.entries(leagues)) {
+        fb1Text += `🏆 ${league}\n`;
+        leagueMatches.forEach(m => {
+            const time = new Date(m.match_date).toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute:'2-digit' });
+            fb1Text += `⚽ ${m.home_team} vs ${m.away_team} (${time})\n`;
+        });
+        fb1Text += `\n`; 
+    }
+    fb1Text += `⏰ All kick-off times are in GMT.\nCatch all live scores and stats on: ${frontendUrl} 🏆`;
 
     // 🔒 BASE64 ENCRYPTION FOR IMAGE URL
     const topMatches = matches.slice(0, 14).map(m => ({
         home: m.home_team,
         away: m.away_team,
-        time: new Date(m.match_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+        time: new Date(m.match_date).toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute:'2-digit' })
     }));
     
     const ogPayload = { type: 'schedule', label: 'MATCHDAY', matches: topMatches };
-    const base64Data = Buffer.from(JSON.stringify(ogPayload)).toString('base64');
-    const safeBase64 = encodeURIComponent(base64Data);
-    
+    const safeBase64 = encodeURIComponent(Buffer.from(JSON.stringify(ogPayload)).toString('base64'));
     const scheduleOgUrl = `${imageUrl}/api/og?data=${safeBase64}&ext=.png`;
+    
     const dynamicXText = `📅 ${todayString} Matchday is here!\n\nWe have ${matches.length} massive games lined up today. Who are you backing? Drop your predictions below 👇`;
 
-    await postToSocials({
-        fb1Message: fb1Text,
-        xMessage: dynamicXText,
-        xImageUrl: scheduleOgUrl
-    }); 
-
-    return NextResponse.json({ success: true, total_matches: matches.length });
+    try {
+        await postToSocials({ fb1Message: fb1Text, xMessage: dynamicXText, xImageUrl: scheduleOgUrl }); 
+        return NextResponse.json({ success: true, total_matches: matches.length });
+    } catch (e) {
+        // 🚨 SELF-HEALING: If posting fails, delete the lock so we can try again!
+        await supabase.from('cron_logs').delete().eq('run_date', today);
+        return NextResponse.json({ error: "Posting failed. Lock removed for retry." }, { status: 500 });
+    }
 }
