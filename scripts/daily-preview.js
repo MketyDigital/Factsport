@@ -1,7 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Config
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const GEMINI_KEY = process.env.GEMINI_API_KEY; 
@@ -18,10 +17,13 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 async function generateDailyPreview() {
     console.log("☀️ Starting Daily Preview...");
 
-    const today = new Date();
-    const startOfDay = new Date(today.setHours(0,0,0,0)).toISOString();
-    const endOfDay = new Date(today.setHours(23,59,59,999)).toISOString();
-    const dateSlug = today.toISOString().split('T')[0];
+    const now = new Date();
+    const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
+    const endOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999)).toISOString();
+    
+    // We grab the exact date string (e.g., "Friday, March 6, 2026") to feed to the AI
+    const exactDateString = now.toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const dateSlug = now.toISOString().split('T')[0];
 
     const { data: matches } = await supabase
         .from('matches')
@@ -46,32 +48,32 @@ async function generateDailyPreview() {
     });
 
     let briefingData = "";
-
     for (const [league, games] of Object.entries(leagues)) {
         briefingData += `\n${league}:\n`;
         games.forEach(g => {
-            const time = new Date(g.match_date).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
-            briefingData += `- MATCH ID: ${g.id} | ${g.home_team} vs ${g.away_team} at ${time}\n`;
+            const time = new Date(g.match_date).toLocaleTimeString('en-GB', {timeZone: 'UTC', hour: '2-digit', minute:'2-digit'});
+            briefingData += `- MATCH ID: ${g.id} | ${g.home_team} vs ${g.away_team} at ${time} GMT\n`;
         });
     }
 
-    // 🟢 AI UPGRADE: Expert Tactical Preview
+    // 🛡️ THE IRONCLAD 2026 PROMPT
     const prompt = `
         You are a top-tier European football journalist and master tactical analyst writing for 'FactSport'.
-        Write a deep, engaging "Daily Briefing" article previewing today's football action (${dateSlug}).
+        Write a deep, engaging "Daily Briefing" article previewing today's football action.
+        
+        TODAY'S EXACT DATE: ${exactDateString}
         
         Schedule:
         ${briefingData}
 
-        Guidelines:
-        - Headline: Punchy and narrative-driven (e.g., "The Midfield Battle That Could Define the Title Race"). Under 10 words.
-        - Intro: Hook the reader immediately. Set the stakes for the day and ask provocative questions (e.g., "Who will drop vital points today?").
-        - Tactical Analysis: Pick the 2-3 biggest matches. Don't just list the times—analyze the tactical matchups, key player battles, and what a win or loss means for the managers. Write like a passionate human expert.
-        - Tone: Insightful, opinionated, and highly engaging.
-        - Length: 400-500 words.
-        - Output: Plain text only. Do not use asterisks for bolding.
-        - CRITICAL LINKING RULE: You MUST wrap EVERY match you mention in a Markdown link pointing to its Match ID. 
-          Format strictly as: [Arsenal vs Chelsea](/match/INSERT_MATCH_ID_HERE). Do this for every single game you discuss!
+        STRICT FACTUAL GUIDELINES (CRITICAL TO YOUR INSTRUCTIONS):
+        1. TIME AWARENESS: It is currently the year 2026. Your internal training data is outdated. Players have transferred, and managers have been sacked. 
+        2. ZERO NAME GUESSING: You MUST NOT mention ANY specific player names or current managers. You do not know who is on the roster today. Do not guess.
+        3. FOCUS ON THE CLUBS: Write passionately about the historical identities of the clubs, their traditional playstyles, the pressure of the fixture, and the hostility of the stadiums. 
+        4. Headline: Punchy and narrative-driven (e.g., "A Clash of Philosophies in Ligue 1"). Under 10 words. Do not use asterisks (*).
+        5. Tone: Insightful, opinionated, and highly engaging to hype up fans. 
+        6. Length: 400-500 words. Plain text only.
+        7. CRITICAL LINKING RULE: You MUST wrap EVERY match you mention in a Markdown link pointing to its Match ID. Format strictly as: [Arsenal vs Chelsea](/match/INSERT_MATCH_ID_HERE). Do this for every game!
     `;
 
     try {
@@ -86,37 +88,26 @@ async function generateDailyPreview() {
         let featureMatch = matches.find(g => giants.some(t => g.home_team.includes(t) || g.away_team.includes(t))) || matches[0];
 
         const { error } = await supabase.from('news').insert([{
-            title: headline,
-            slug: reportSlug,
-            body: body,
-            image_url: null, 
-            team_1_logo: featureMatch ? featureMatch.home_logo : null, 
+            title: headline, slug: reportSlug, body: body,
+            image_url: null, team_1_logo: featureMatch ? featureMatch.home_logo : null, 
             team_2_logo: featureMatch ? featureMatch.away_logo : null,
-            is_breaking: false, 
-            is_headline: false  
+            is_breaking: false, is_headline: false  
         }]);
 
-        if (error) {
-            console.error(`   ❌ Supabase DB Error:`, error.message);
-        } else {
+        if (error) console.error(`   ❌ Supabase DB Error:`, error.message);
+        else {
             console.log(`   ✅ Published Preview: ${headline}`);
-            
-            // 🟢 INTEGRATION: Send to Make.com for Facebook Page 2
             if (process.env.MAKE_WEBHOOK_URL) {
                 const articleUrl = `https://factsport.com/news/${reportSlug}`;
                 await fetch(process.env.MAKE_WEBHOOK_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        fb2_text: `Who drops points today? 🧐 Read our full tactical breakdown of today's biggest clashes and predictions 👇\n\n${articleUrl}`,
-                        x_text: null,
-                        x_image_url: null
+                        fb2_text: `Who drops points today? 🧐 Read our full tactical breakdown of today's biggest clashes and predictions 👇\n\n${articleUrl} 🏆`,
+                        x_text: null, x_image_url: null
                     })
                 });
-                console.log("   📡 Sent AI Preview to FB Page 2 via Make.com");
             }
         }
-
     } catch (e) {
         console.error(`   🔥 Gemini Error: ${e.message}`);
     }
