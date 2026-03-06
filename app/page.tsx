@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
+export const revalidate = 3;
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
@@ -9,7 +9,6 @@ import NewsArtwork from '@/app/components/NewsArtwork';
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 import MatchTime from '@/app/components/MatchTime';
-import { unstable_noStore as noStore } from 'next/cache'; // 🛑 FORCE FRESH DATA
 
 // 🟢 CONFIG: Your Default 1xBet Link
 const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599"; 
@@ -158,7 +157,6 @@ async function getHomepageData(leagueFilter: string | undefined) {
 }
 
 export default async function Home({ searchParams }: { searchParams: { league?: string } }) {
-  noStore(); // 🛑 Kills cache for instant updates
   const resolvedParams = await searchParams;
   const selectedLeague = resolvedParams.league;
     
@@ -322,7 +320,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         {!selectedLeague && heroMatches.length > 0 && (
          <div className="px-4 mb-4 flex gap-2 overflow-x-auto">
              {heroMatches.map((match) => (
-                <Link key={match.id} href={`/match/${match.id}`} className={`block relative z-10 ${heroMatches.length > 1 ? 'w-[85%] shrink-0' : 'w-full'}`}>
+                <Link key={match.id} href={`/match/${match.id}`} className={`block relative z-10 ${heroMatches.length > 1 ? 'w-[85%]' : 'w-full'} shrink-0`}>
                     {/* Notice the reduced padding: p-3 instead of p-4, and rounded-xl */}
                     <div className="bg-[#0a1428] rounded-xl p-3 shadow-xl border border-white/10 relative overflow-hidden group hover:scale-[1.01] transition-transform">
                         

@@ -14,14 +14,36 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
+// 🟢 BULLETPROOF H2H EXTRACTOR FOR AI
+function extractH2HStats(match) {
+    if (!match.h2h) return null;
+    
+    let parsedH2h = match.h2h;
+    if (typeof parsedH2h === 'string') {
+        try { parsedH2h = JSON.parse(parsedH2h); } catch (e) { return null; }
+    }
+
+    const h2hObj = parsedH2h?.aggregates || parsedH2h || {};
+    const homeData = typeof h2hObj.homeTeam === 'object' ? h2hObj.homeTeam : {};
+    const awayData = typeof h2hObj.awayTeam === 'object' ? h2hObj.awayTeam : {};
+
+    const homeWins = Number(homeData.wins ?? h2hObj.homeWins ?? h2hObj.home_wins ?? 0);
+    const draws = Number(homeData.draws ?? h2hObj.draws ?? 0);
+    const awayWins = Number(awayData.wins ?? homeData.losses ?? h2hObj.awayWins ?? h2hObj.away_wins ?? 0);
+
+    const total = homeWins + draws + awayWins;
+    if (total === 0) return null; // Skip if no historical data
+
+    return `Historical Record: ${match.home_team} has ${homeWins} wins, ${match.away_team} has ${awayWins} wins, and ${draws} draws.`;
+}
+
 async function generateDailyPreview() {
-    console.log("☀️ Starting Daily Preview...");
+    console.log("☀️ Starting Daily Preview with H2H Data...");
 
     const now = new Date();
     const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
     const endOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999)).toISOString();
     
-    // We grab the exact date string (e.g., "Friday, March 6, 2026") to feed to the AI
     const exactDateString = now.toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const dateSlug = now.toISOString().split('T')[0];
 
@@ -47,40 +69,50 @@ async function generateDailyPreview() {
         leagues[m.league].push(m);
     });
 
+    // 🟢 INJECT H2H INTO THE AI FEED
     let briefingData = "";
     for (const [league, games] of Object.entries(leagues)) {
         briefingData += `\n${league}:\n`;
         games.forEach(g => {
             const time = new Date(g.match_date).toLocaleTimeString('en-GB', {timeZone: 'UTC', hour: '2-digit', minute:'2-digit'});
+            const h2hText = extractH2HStats(g);
+            
             briefingData += `- MATCH ID: ${g.id} | ${g.home_team} vs ${g.away_team} at ${time} GMT\n`;
+            if (h2hText) {
+                briefingData += `  * ${h2hText}\n`;
+            }
         });
     }
 
-    // 🛡️ THE IRONCLAD 2026 PROMPT
     const prompt = `
         You are a top-tier European football journalist and master tactical analyst writing for 'FactSport'.
         Write a deep, engaging "Daily Briefing" article previewing today's football action.
         
         TODAY'S EXACT DATE: ${exactDateString}
         
-        Schedule:
+        Schedule & Head-to-Head Data:
         ${briefingData}
 
-        STRICT FACTUAL GUIDELINES (CRITICAL TO YOUR INSTRUCTIONS):
-        1. TIME AWARENESS: It is currently the year 2026. Your internal training data is outdated. Players have transferred, and managers have been sacked. 
-        2. ZERO NAME GUESSING: You MUST NOT mention ANY specific player names or current managers. You do not know who is on the roster today. Do not guess.
-        3. FOCUS ON THE CLUBS: Write passionately about the historical identities of the clubs, their traditional playstyles, the pressure of the fixture, and the hostility of the stadiums. 
-        4. Headline: Punchy and narrative-driven (e.g., "A Clash of Philosophies in Ligue 1"). Under 10 words. Do not use asterisks (*).
-        5. Tone: Insightful, opinionated, and highly engaging to hype up fans. 
+        STRICT FACTUAL GUIDELINES:
+        1. TIME AWARENESS: It is currently 2026. 
+        2. ZERO NAME GUESSING: You MUST NOT mention ANY specific player names or current managers. Do not guess.
+        3. FOCUS ON THE CLUBS & HISTORY: Use the provided "Historical Record" data to talk about the rivalries! Mention if one team historically dominates the other, or if they are dead even.
+        4. Headline: Punchy and narrative-driven. Under 10 words. Do not use asterisks (*).
+        5. Tone: Insightful, opinionated, and highly engaging. 
         6. Length: 400-500 words. Plain text only.
-        7. CRITICAL LINKING RULE: You MUST wrap EVERY match you mention in a Markdown link pointing to its Match ID. Format strictly as: [Arsenal vs Chelsea](/match/INSERT_MATCH_ID_HERE). Do this for every game!
+        7. CRITICAL LINKING RULE: You MUST wrap EVERY match you mention in a Markdown link pointing to its Match ID. Format strictly as: [Arsenal vs Chelsea](/match/INSERT_MATCH_ID_HERE).
+        8. FACEBOOK SUMMARY: At the very end of your entire response, skip a line and write the exact text "FB_POST:" followed by a short, punchy 2-3 sentence Facebook post summarizing your article. Mention the specific big matches you discussed. Do not use hashtags.
     `;
 
     try {
         const result = await model.generateContent(prompt);
         const text = (await result.response).text();
 
-        const lines = text.split('\n').filter(line => line.trim() !== '');
+        const splitText = text.split('FB_POST:');
+        const articleContent = splitText[0].trim();
+        const generatedFbText = splitText.length > 1 ? splitText[1].trim() : "🚨 MATCHDAY IS HERE! The stakes are massive across Europe today. Who are you backing to secure all 3 points? 🤔 Drop your predictions in the comments and tap below for our full tactical preview! 👇";
+
+        const lines = articleContent.split('\n').filter(line => line.trim() !== '');
         const headline = lines[0].replace(/^#+\s*/, '').replace(/[\*"]/g, ''); 
         const body = lines.slice(1).join('\n').trim();
 
@@ -102,7 +134,7 @@ async function generateDailyPreview() {
                 await fetch(process.env.MAKE_WEBHOOK_URL, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        fb2_text: `Who drops points today? 🧐 Read our full tactical breakdown of today's biggest clashes and predictions 👇\n\n${articleUrl} 🏆`,
+                        fb2_text: `${generatedFbText}\n\n👇 Read the full breakdown here:\n${articleUrl} 🏆`,
                         x_text: null, x_image_url: null
                     })
                 });
