@@ -15,15 +15,21 @@ export async function GET(request: Request) {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     
     const now = new Date();
-    // 🛡️ DATE-DRIFT CHECK
+    // 🛡️ DATE-DRIFT CHECK: Handles midnight/early morning runs perfectly
     if (now.getUTCHours() < 6) {
         now.setUTCDate(now.getUTCDate() - 1);
     }
-    const today = now.toISOString().split('T')[0];
+    const targetDate = now.toISOString().split('T')[0];
 
-    // 🔒 THE LOCK
-    const { error: lockError } = await supabase.from('cron_logs_evening').insert([{ run_date: today }]);
-    if (lockError) return NextResponse.json({ message: "Evening roundup already posted today. Skipping." });
+    // 🔒 THE LOCK (Now using the existing cron_logs table safely!)
+    const lockKey = `${targetDate}-evening`; // Example: "2026-03-06-evening"
+    
+    const { error: lockError } = await supabase.from('cron_logs').insert([{ run_date: lockKey }]);
+    
+    if (lockError) {
+        console.error("Lock Error:", lockError.message);
+        return NextResponse.json({ message: "Evening roundup already posted today. Skipping." });
+    }
     
     const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
     const endOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999)).toISOString();
@@ -37,12 +43,14 @@ export async function GET(request: Request) {
         .order('match_date', { ascending: true });
 
     if (error || !matches || matches.length === 0) {
-        await supabase.from('cron_logs_evening').delete().eq('run_date', today);
-        return NextResponse.json({ message: "No games finished yet. Lock removed." });
+        // 🚨 SELF-HEALING: Remove the exact evening lock if no games are found
+        await supabase.from('cron_logs').delete().eq('run_date', lockKey);
+        return NextResponse.json({ message: "No finished games found. Lock removed." });
     }
 
     const frontendUrl = 'https://factsport.com'; 
 
+    // 🏆 GROUP BY LEAGUE
     const leagues: Record<string, any[]> = {};
     matches.forEach(m => {
         if (!leagues[m.league]) leagues[m.league] = [];
@@ -69,7 +77,9 @@ export async function GET(request: Request) {
         await postToSocials({ fb1Message: fb1Text, xMessage: xText }); 
         return NextResponse.json({ success: true, total_matches: matches.length });
     } catch (e) {
-        await supabase.from('cron_logs_evening').delete().eq('run_date', today);
-        return NextResponse.json({ error: "Posting failed. Lock removed." }, { status: 500 });
+        // 🚨 SELF-HEALING: Remove the exact evening lock if posting fails
+        console.error("Posting Error:", e);
+        await supabase.from('cron_logs').delete().eq('run_date', lockKey);
+        return NextResponse.json({ error: "Posting failed. Lock removed for retry." }, { status: 500 });
     }
 }
