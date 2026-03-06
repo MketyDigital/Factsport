@@ -1,10 +1,9 @@
 export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
 import { PlayCircle, Calendar, ArrowLeft, Tv, ShieldCheck } from "lucide-react";
-import { unstable_noStore as noStore } from 'next/cache'; // 🛑 MAXIMUM SECURITY: FORCE FRESH DATA
 
 export const metadata = {
   title: 'Match Highlights | FactSport',
@@ -12,10 +11,6 @@ export const metadata = {
 };
 
 export default async function HighlightsPage() {
-  // 🛡️ SECURITY & FRESHNESS: Kills cache to prevent stale data. 
-  // Ensures DB is queried securely on the server for every request.
-  noStore(); 
-
   const supabase = createClient();
 
   // 🟢 FETCH LOGIC: 
