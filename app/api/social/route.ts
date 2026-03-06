@@ -29,6 +29,13 @@ export async function POST(request: Request) {
         }
     }
 
+    // 🟢 BULLETPROOF LINEUP LOCK: Checks if arrays actually exist and have players
+    const oldHasBothLineups = Array.isArray(oldState.lineups?.home) && oldState.lineups.home.length > 0 && 
+                              Array.isArray(oldState.lineups?.away) && oldState.lineups.away.length > 0;
+                              
+    const newHasBothLineups = Array.isArray(newState.lineups?.home) && newState.lineups.home.length > 0 && 
+                              Array.isArray(newState.lineups?.away) && newState.lineups.away.length > 0;
+
     const frontendUrl = 'https://factsport.com'; 
     const imageUrl = 'https://factsport.vercel.app'; 
     const matchUrl = `${frontendUrl}/match/${newState.id}`; 
@@ -47,11 +54,13 @@ export async function POST(request: Request) {
     else if (oldState.status === 'PRE_MATCH' && ['IN_PLAY', 'LIVE', '1H'].includes(newState.status)) {
         payload.fb1Message = `⏱️ KICK-OFF!\n\nWe are officially underway: ${newState.home_team} vs ${newState.away_team}.\n\nFollow live updates, stats, and scores here:\n👇\n${matchUrl} ⚽`;
     }
-    else if (oldState.status === 'PRE_MATCH' && (!oldState.lineups?.home || oldState.lineups.home.length === 0) && newState.lineups?.home?.length > 0) {
-        const homeXI = newState.lineups.home.slice(0, 11).join(',');
-        const awayXI = newState.lineups.away.slice(0, 11).join(',');
+    // 🟢 FIXED LINEUP TRIGGER: Only fires exactly when it transitions from not having both -> having both
+    else if (!oldHasBothLineups && newHasBothLineups) {
+        // Added .join(', ') with a space so it looks cleaner on Twitter/FB
+        const homeXI = newState.lineups.home.slice(0, 11).join(', ');
+        const awayXI = newState.lineups.away.slice(0, 11).join(', ');
 
-        payload.fb1Message = `📋 STARTING XI ANNOUNCED!\n\n${newState.home_team} vs ${newState.away_team}\n\nHome XI: ${newState.lineups.home.join(', ')}\n\nAway XI: ${newState.lineups.away.join(', ')}\n\n👇\n${matchUrl} ⚽`;
+        payload.fb1Message = `📋 STARTING XI ANNOUNCED!\n\n${newState.home_team} vs ${newState.away_team}\n\nHome XI: ${homeXI}\n\nAway XI: ${awayXI}\n\n👇\n${matchUrl} ⚽`;
         payload.xMessage = `🚨 TEAM NEWS IS IN!\n\nA massive clash ahead: ${newState.home_team} vs ${newState.away_team}. Full lineups and bench here:`;
         
         const ogPayload = { type: 'versus', label: 'STARTING XI', home: newState.home_team, away: newState.away_team, homeXI, awayXI };

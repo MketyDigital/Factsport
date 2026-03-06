@@ -1,4 +1,5 @@
 export const runtime = 'edge';
+export const revalidate = 3;
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
@@ -11,7 +12,6 @@ import StatsLineupsTabs from '@/app/components/StatsLineupsTabs';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 import { getExternalData } from '@/app/lib/matchService';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
-import { unstable_noStore as noStore } from 'next/cache'; 
 
 const sanitizeUrl = (url: string | null | undefined) => {
     if (!url) return null;
@@ -27,8 +27,6 @@ async function getSupabaseData(id: string) {
 }
 
 export default async function MatchDetailsPage({ params }: { params: { id: string } }) {
-  noStore(); 
-  
   const resolvedParams = await params;
   if (!resolvedParams?.id) return notFound();
 
