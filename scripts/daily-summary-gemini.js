@@ -64,7 +64,6 @@ async function generateDailySummaries() {
             return `- MATCH ID: ${m.id} | ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} (Scorers: ${scorers || 'None'})`;
         }).join('\n');
 
-        // 🛡️ THE IRONCLAD ROUNDUP PROMPT
         const prompt = `
             You are a top-tier European football journalist and master tactical analyst writing for 'FactSport'.
             Write a deep, engaging "Matchday Round-Up" article for the ${leagueName}.
@@ -74,20 +73,25 @@ async function generateDailySummaries() {
             Results & Verified Scorers:
             ${matchSummaries}
 
-            STRICT FACTUAL GUIDELINES (CRITICAL TO YOUR INSTRUCTIONS):
+            STRICT FACTUAL GUIDELINES:
             1. APPROVED NAMES ONLY: You may ONLY mention the specific players listed in the "Scorers" data above. 
-            2. ZERO HALLUCINATIONS: Do not guess, assume, or name any other players, current managers, or goalkeepers. If a player is not in the data above, they do not exist in this article.
-            3. THE NARRATIVE: Focus your analysis on the club philosophies, the shock value of the final scores, and what the results mean for the clubs' momentum.
-            4. Headline: Catchy and dramatic, capturing the biggest storyline. Under 10 words. Do not use asterisks (*).
+            2. ZERO HALLUCINATIONS: Do not guess or assume any other players or managers.
+            3. THE NARRATIVE: Focus your analysis on the shock value of the final scores and team momentum.
+            4. Headline: Catchy and dramatic. Under 10 words. Do not use asterisks (*).
             5. Length: 400-500 words. Plain text only.
-            6. CRITICAL LINKING RULE: You MUST wrap EVERY match you mention in a Markdown link pointing to its Match ID. Format strictly as: [View Match Stats](/match/INSERT_MATCH_ID_HERE). Do this for every single game!
+            6. CRITICAL LINKING RULE: You MUST wrap EVERY match you mention in a Markdown link. Format strictly as: [View Match Stats](/match/INSERT_MATCH_ID_HERE).
+            7. FACEBOOK SUMMARY: At the very end of your entire response, skip a line and write the exact text "FB_POST:" followed by a short, punchy 2-3 sentence Facebook post. Mention the major scorelines, winning teams, and tease the article. Do not use hashtags.
         `;
 
         try {
             const result = await model.generateContent(prompt);
             const text = (await result.response).text();
 
-            const lines = text.split('\n').filter(line => line.trim() !== '');
+            const splitText = text.split('FB_POST:');
+            const articleContent = splitText[0].trim();
+            const generatedFbText = splitText.length > 1 ? splitText[1].trim() : "🏁 FULL TIME! Absolute drama on the pitch today. 🤯 Did your team survive the chaos or drop vital points? Have your say below and tap the link for our complete Matchday Round-Up! 👇";
+
+            const lines = articleContent.split('\n').filter(line => line.trim() !== '');
             const headline = lines[0].replace(/^#+\s*/, '').replace(/[\*"]/g, ''); 
             const body = lines.slice(1).join('\n').trim();
 
@@ -108,7 +112,7 @@ async function generateDailySummaries() {
                     await fetch(process.env.MAKE_WEBHOOK_URL, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            fb2_text: `STATEMENT MADE. 🤯 Did your team survive the weekend? Catch up on all the goals, shock results, and table changes in our Matchday Round-Up 👇\n\n${articleUrl} 🏆`,
+                            fb2_text: `${generatedFbText}\n\n👇 Full stats and analysis here:\n${articleUrl} 🏆`,
                             x_text: null, x_image_url: null
                         })
                     });
