@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
+export const revalidate = 3;
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
@@ -7,7 +7,6 @@ import { ChevronLeft } from 'lucide-react';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner'; 
 import LeagueMatchGroup from '@/app/components/LeagueMatchGroup'; 
 import LeagueNavigator from '@/app/components/LeagueNavigator'; 
-import { unstable_noStore as noStore } from 'next/cache'; // 🛑 Kills Cache
 
 const PRIORITY_LEAGUES = [
     'Premier League', 'La Liga', 'Bundesliga', 
@@ -15,7 +14,6 @@ const PRIORITY_LEAGUES = [
 ];
 
 export default async function AllMatchesPage() {
-  noStore(); // 🛑 Forces the page to fetch fresh data every refresh
   const supabase = createClient();
    
   // 1. FETCH WINDOW: (-7 Days to +14 Days)
