@@ -37,28 +37,39 @@ export async function GET(request: Request) {
       (
         <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', backgroundColor: '#0f172a', color: 'white', fontFamily: 'sans-serif', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
           
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 30 }}>
-            <div style={{ display: 'flex', fontSize: 60, fontWeight: 'bold', color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '4px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: type === 'schedule' ? 15 : 30 }}>
+            <div style={{ display: 'flex', fontSize: type === 'schedule' ? 40 : 60, fontWeight: 'bold', color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '4px' }}>
               {label}
             </div>
             {/* 🌍 GMT TIMEZONE BADGE FOR SCHEDULE */}
             {type === 'schedule' && (
-              <div style={{ display: 'flex', fontSize: 20, fontWeight: 'bold', color: '#94a3b8', backgroundColor: 'rgba(255,255,255,0.1)', padding: '5px 15px', borderRadius: '20px', marginTop: '10px', letterSpacing: '2px' }}>
+              <div style={{ display: 'flex', fontSize: 16, fontWeight: 'bold', color: '#94a3b8', backgroundColor: 'rgba(255,255,255,0.1)', padding: '4px 12px', borderRadius: '20px', marginTop: '8px', letterSpacing: '2px' }}>
                 ALL KICK-OFF TIMES IN GMT
               </div>
             )}
           </div>
 
-          {/* 📅 SCHEDULE LAYOUT */}
+          {/* 📅 CONDENSED SCHEDULE LAYOUT (Fits up to 14 Matches) */}
           {type === 'schedule' && data.matches && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', width: '100%', padding: '0 40px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', width: '100%', padding: '0 20px' }}>
               {data.matches.map((match: any, index: number) => (
-                <div key={index} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '45%', backgroundColor: '#1e293b', margin: '10px', padding: '15px 25px', borderRadius: '12px', borderLeft: '6px solid #fbbf24' }}>
+                <div key={index} style={{ 
+                  display: 'flex', 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between', 
+                  width: '46%', 
+                  backgroundColor: '#1e293b', 
+                  margin: '6px 15px', 
+                  padding: '8px 12px', 
+                  borderRadius: '8px', 
+                  borderLeft: '4px solid #fbbf24' 
+                }}>
                   <div style={{ display: 'flex', flexDirection: 'column', width: '75%' }}>
-                    <div style={{ display: 'flex', fontSize: 26, fontWeight: 'bold', color: '#f8fafc', marginBottom: 5 }}>{match.home}</div>
-                    <div style={{ display: 'flex', fontSize: 26, fontWeight: 'bold', color: '#f8fafc' }}>{match.away}</div>
+                    <div style={{ display: 'flex', fontSize: 18, fontWeight: 'bold', color: '#f8fafc', marginBottom: 2 }}>{match.home}</div>
+                    <div style={{ display: 'flex', fontSize: 18, fontWeight: 'bold', color: '#f8fafc' }}>{match.away}</div>
                   </div>
-                  <div style={{ display: 'flex', fontSize: 24, fontWeight: 'bold', color: '#94a3b8', backgroundColor: '#0f172a', padding: '8px 12px', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', fontSize: 16, fontWeight: 'bold', color: '#94a3b8', backgroundColor: '#0f172a', padding: '6px 10px', borderRadius: '6px' }}>
                     {match.time}
                   </div>
                 </div>
@@ -66,7 +77,7 @@ export async function GET(request: Request) {
             </div>
           )}
 
-          {/* ⚔️ VERSUS LAYOUT (Lineups & FT) */}
+          {/* ⚔️ VERSUS LAYOUT (Lineups & FT - Keeps the bigger fonts) */}
           {type === 'versus' && (
             <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', padding: '0 80px' }}>
               
@@ -98,7 +109,7 @@ export async function GET(request: Request) {
             </div>
           )}
 
-          <div style={{ display: 'flex', position: 'absolute', bottom: 30, fontSize: 28, fontWeight: 'bold', color: '#64748b', letterSpacing: '2px' }}>
+          <div style={{ display: 'flex', position: 'absolute', bottom: 20, fontSize: 20, fontWeight: 'bold', color: '#64748b', letterSpacing: '2px' }}>
             FACTSPORT.COM
           </div>
         </div>
