@@ -12,25 +12,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-
-// ✅ REVERTED: Back to your verified working version
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
-
-// 🟢 INTEGRITY HELPER: Ensures AI only sees real goals
-const getValidScorers = (eventsArr) => {
-    if (!Array.isArray(eventsArr)) return 'None';
-    return eventsArr
-        .filter(e => {
-            if (!e) return false;
-            const text = String(e.text || e.description || '').toLowerCase();
-            const type = String(e.type || '').toLowerCase();
-            // ❌ BAN LIST
-            if (text.includes('attempt saved') || text.includes('missed') || text.includes('disallowed') || text.includes('cancelled') || text.includes('no goal')) return false;
-            return type === 'goal' || type === 'penalty' || text.includes('goal') || text.includes('⚽');
-        })
-        .map(e => `${e.player || e.playerName || 'Unknown'} (${e.time || e.minute}')`)
-        .join(', ') || 'None';
-};
 
 async function generateDailySummaries() {
     console.log("🌙 Starting Daily Matchday Analysis...");
@@ -79,28 +61,26 @@ async function generateDailySummaries() {
 
         console.log(`   ✍️ Writing Summary for ${leagueName}...`);
 
+        // 🟢 PRE-BUILT EXACT LINKS (Fixes the broken missing letters bug!)
         const matchSummaries = leagueMatches.map(m => {
-            const scorers = getValidScorers(m.match_events);
-            return `- MATCH ID: ${m.id} | ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} (Scorers: ${scorers})`;
+            return `- ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} | EXACT LINK TO USE: [View Match Stats](/match/${m.id})`;
         }).join('\n');
 
         const prompt = `
-            You are a top-tier European football journalist and master tactical analyst writing for 'FactSport'.
+            You are a top-tier European football journalist writing for 'FactSport'.
             Write a deep, engaging "Matchday Round-Up" article for the ${leagueName}.
             
             TODAY'S EXACT DATE: ${exactDateString}
             
-            Results & Verified Scorers:
+            Results to discuss:
             ${matchSummaries}
 
             STRICT FACTUAL GUIDELINES:
-            1. APPROVED NAMES ONLY: You may ONLY mention the specific players listed in the "Scorers" data above. 
-            2. ZERO HALLUCINATIONS: Do not guess or assume any other players or managers.
-            3. THE NARRATIVE: Focus your analysis on the drama of the results and team momentum.
-            4. Headline: Catchy and dramatic. Under 10 words. Do not use asterisks (*).
-            5. Length: 400-500 words. Plain text only.
-            6. CRITICAL LINKING RULE: You MUST wrap EVERY match you mention in a Markdown link. Format strictly as: [View Match Stats](/match/INSERT_MATCH_ID_HERE).
-            7. FACEBOOK SUMMARY: At the very end, skip a line and write the exact text "FB_POST:" followed by a short, punchy 2-sentence Facebook post. Mention major scorelines and tease the article. Do not use hashtags.
+            1. ZERO HALLUCINATIONS: Do NOT invent or name any specific goalscorers, players, or managers. You do not have that data. Focus entirely on the team performance, the final scoreline, and the tactical battle.
+            2. EXACT MATCH LINKS: When you mention a match, you MUST copy and paste the "EXACT LINK TO USE" provided in the data above. Do not try to write the URL yourself.
+            3. Headline: Catchy and dramatic. Under 10 words. Do not use asterisks (*).
+            4. Length: 400-500 words. Plain text only.
+            5. FACEBOOK SUMMARY: At the very end, skip a line and write the exact text "FB_POST:" followed by a short, punchy 2-sentence Facebook post. Mention major scorelines and tease the article. Do not use hashtags.
         `;
 
         try {
