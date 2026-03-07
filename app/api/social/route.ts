@@ -17,9 +17,9 @@ const getValidGoals = (eventsArr: any[]) => {
     });
 };
 
-// 🟢 THE MATH PARADOX FIX: Accurately weights stoppage time (e.g. 45'+3' becomes 4503, 48' becomes 4800)
+// 🟢 STOPPAGE TIME PARSER
 const parseTime = (t: any) => {
-    const str = String(t).replace(/[^0-9+]/g, ''); // Keep only numbers and '+'
+    const str = String(t).replace(/[^0-9+]/g, ''); 
     const parts = str.split('+');
     const base = parseInt(parts[0]) || 0;
     const extra = parseInt(parts[1]) || 0;
@@ -56,39 +56,28 @@ export async function POST(request: Request) {
     const oldTotal = (oldState.home_score || 0) + (oldState.away_score || 0);
     const newTotal = (newState.home_score || 0) + (newState.away_score || 0);
 
+    const oldGoalsList = getValidGoals(oldState.match_events || []);
+    const newGoalsList = getValidGoals(newState.match_events || []);
+
     // 🔴 1. VAR DISALLOWED LOGIC
     if (newTotal < oldTotal) {
         payload.fb1Message = `🚫 GOAL DISALLOWED!\n\nVAR decision: The previous goal has been overturned. The score returns to:\n\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
     }
     
-    // 🟢 2. GOAL / PENALTY ALERT
-    else if (newTotal > oldTotal) {
-        let statusText = ['IN_PLAY', 'LIVE', '1H', '2H'].includes(newState.status) ? '' : ` (${newState.status})`;
-        let matchEvents = newState.match_events || [];
-        let newGoals = getValidGoals(matchEvents);
+    // 🟢 2. GOAL / PENALTY ALERT (Triggered by Score OR new Text arriving)
+    else if (newTotal > oldTotal || newGoalsList.length > oldGoalsList.length) {
 
-        // 🔥 FAIL-PROOF POLLING LOOP
-        if (newGoals.length < newTotal) {
-            for (let i = 0; i < 5; i++) {
-                await new Promise(resolve => setTimeout(resolve, 5000));
-                const { data: fresh } = await supabase.from('matches').select('match_events').eq('id', newState.id).single();
-                
-                if (fresh?.match_events) {
-                    const freshGoals = getValidGoals(fresh.match_events);
-                    if (freshGoals.length >= newTotal) {
-                        matchEvents = fresh.match_events;
-                        newGoals = freshGoals;
-                        break; 
-                    }
-                }
-            }
+        // 🔥 THE "PATIENT CATCHER": If ESPN hasn't uploaded the text yet, safely abort and wait for the next 1-minute cron ping!
+        if (newGoalsList.length < newTotal) {
+            console.log(`[Webhook] Score is ${newTotal}, but only ${newGoalsList.length} goal events found. Waiting for next cron ping.`);
+            return NextResponse.json({ message: "ESPN text lagging behind scoreboard. Waiting for next ping." });
         }
 
+        let statusText = ['IN_PLAY', 'LIVE', '1H', '2H'].includes(newState.status) ? '' : ` (${newState.status})`;
         let scorerText = "";
         
-        if (newGoals.length > 0) {
-            // Updated sorting using the fixed parseTime function
-            const sortedGoals = [...newGoals].sort((a, b) => parseTime(b.time || b.minute) - parseTime(a.time || a.minute));
+        if (newGoalsList.length > 0) {
+            const sortedGoals = [...newGoalsList].sort((a, b) => parseTime(b.time || b.minute) - parseTime(a.time || a.minute));
             const latest = sortedGoals[0];
             const rich = latest.text || latest.description || "";
             const time = latest.time || latest.minute ? `${latest.time || latest.minute}' ` : '';
