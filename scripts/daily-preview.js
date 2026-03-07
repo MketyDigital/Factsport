@@ -12,7 +12,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); 
 
 // 🟢 BULLETPROOF H2H EXTRACTOR FOR AI
 function extractH2HStats(match) {
