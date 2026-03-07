@@ -17,7 +17,14 @@ const getValidGoals = (eventsArr: any[]) => {
     });
 };
 
-const parseTime = (t: any) => parseInt(String(t).replace(/[^0-9]/g, '')) || 0;
+// 🟢 THE MATH PARADOX FIX: Accurately weights stoppage time (e.g. 45'+3' becomes 4503, 48' becomes 4800)
+const parseTime = (t: any) => {
+    const str = String(t).replace(/[^0-9+]/g, ''); // Keep only numbers and '+'
+    const parts = str.split('+');
+    const base = parseInt(parts[0]) || 0;
+    const extra = parseInt(parts[1]) || 0;
+    return (base * 100) + extra; 
+};
 
 export async function POST(request: Request) {
     const authHeader = request.headers.get('Authorization');
@@ -60,10 +67,10 @@ export async function POST(request: Request) {
         let matchEvents = newState.match_events || [];
         let newGoals = getValidGoals(matchEvents);
 
-        // 🔥 FAIL-PROOF POLLING LOOP: Waits up to 25 seconds for ESPN's editor to write the rich text!
+        // 🔥 FAIL-PROOF POLLING LOOP
         if (newGoals.length < newTotal) {
             for (let i = 0; i < 5; i++) {
-                await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds per loop
+                await new Promise(resolve => setTimeout(resolve, 5000));
                 const { data: fresh } = await supabase.from('matches').select('match_events').eq('id', newState.id).single();
                 
                 if (fresh?.match_events) {
@@ -71,7 +78,7 @@ export async function POST(request: Request) {
                     if (freshGoals.length >= newTotal) {
                         matchEvents = fresh.match_events;
                         newGoals = freshGoals;
-                        break; // We got the rich text! Exit the waiting loop immediately.
+                        break; 
                     }
                 }
             }
@@ -79,8 +86,8 @@ export async function POST(request: Request) {
 
         let scorerText = "";
         
-        // Even if ESPN misses a goal entirely, grab the latest one we HAVE so we don't send a blank fallback
         if (newGoals.length > 0) {
+            // Updated sorting using the fixed parseTime function
             const sortedGoals = [...newGoals].sort((a, b) => parseTime(b.time || b.minute) - parseTime(a.time || a.minute));
             const latest = sortedGoals[0];
             const rich = latest.text || latest.description || "";
@@ -106,7 +113,7 @@ export async function POST(request: Request) {
         }
     }
     
-    // 📋 3. STARTING XI (The "Wait for 22" Lock)
+    // 📋 3. STARTING XI 
     else {
         const getValidNames = (arr: any[]) => (Array.isArray(arr) ? arr : []).map(p => p?.name || (typeof p === 'string' ? p : null)).filter(Boolean);
         
@@ -118,7 +125,6 @@ export async function POST(request: Request) {
         const oldWasIncomplete = oldValidH.length < 11 || oldValidA.length < 11;
         const newIsComplete = newValidH.length >= 11 && newValidA.length >= 11;
         
-        // ONLY fire if the database transitioned from incomplete to a PERFECT 11
         if (oldWasIncomplete && newIsComplete) {
             const hXI = newValidH.slice(0, 11).join(', ');
             const aXI = newValidA.slice(0, 11).join(', ');
@@ -130,7 +136,6 @@ export async function POST(request: Request) {
             const lineupBase64 = encodeURIComponent(Buffer.from(JSON.stringify(lineupOg)).toString('base64'));
             payload.xImageUrl = `${imageUrl}/api/og?data=${lineupBase64}&ext=.png`;
         } 
-        // If data is still loading from ESPN, silently wait for the next database update. No messy fallbacks!
         else if (oldWasIncomplete && !newIsComplete && (newValidH.length > 0 || newValidA.length > 0)) {
             return NextResponse.json({ message: "Lineups still incomplete. Waiting for 22 players." });
         }
