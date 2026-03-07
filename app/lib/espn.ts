@@ -1,6 +1,7 @@
 // app/lib/espn.ts
 
 export const ESPN_LEAGUES: Record<string, string> = {
+  // Main Leagues
   'Premier League': 'eng.1',
   'La Liga': 'esp.1',
   'Bundesliga': 'ger.1',
@@ -9,9 +10,16 @@ export const ESPN_LEAGUES: Record<string, string> = {
   'Champions League': 'uefa.champions',
   'Euros': 'uefa.euro',
   'World Cup': 'fifa.world',
-  'FA Cup': 'eng.fa_cup',
+  
+  // The New Major Cups
+  'Europa League': 'uefa.europa',
+  'Europa Conference League': 'uefa.conference',
+  'FA Cup': 'eng.fa',
   'Carabao Cup': 'eng.league_cup',
-  'Copa del Rey': 'esp.copa_del_rey'
+  'Copa del Rey': 'esp.copa_del_rey',
+  'Coppa Italia': 'ita.copa_italia',
+  'Coupe de France': 'fra.coupe_de_france',
+  'DFB-Pokal': 'ger.dfb_pokal'
 };
 
 export const normalizeName = (name: string) => {
