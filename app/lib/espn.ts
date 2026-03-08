@@ -9,7 +9,7 @@ export const ESPN_LEAGUES: Record<string, string> = {
   'Euros': 'uefa.euro',
   'World Cup': 'fifa.world',
   
-  // The New Major Cups
+  // Major Cups
   'Europa League': 'uefa.europa',
   'Europa Conference League': 'uefa.conference',
   'FA Cup': 'eng.fa',
@@ -43,14 +43,12 @@ export async function fetchEspnLive(leagueCode: string) {
         away_team: e.competitions[0].competitors.find((c:any)=>c.homeAway==='away').team.displayName,
         home_score: parseInt(e.competitions[0].competitors.find((c:any)=>c.homeAway==='home').score),
         away_score: parseInt(e.competitions[0].competitors.find((c:any)=>c.homeAway==='away').score),
-        
-        // Convert to Timestamp
         startTime: new Date(e.date).getTime() 
     }));
   } catch (err) { return []; }
 }
 
-// 2. Fetch Deep Details (Clean Facts Only - Zero Copyright)
+// 2. Fetch Deep Details (Clean Facts Only)
 export async function fetchEspnDetails(gameId: string) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${gameId}`;
   try {
@@ -60,7 +58,7 @@ export async function fetchEspnDetails(gameId: string) {
 
     const homeId = String(data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.id);
 
-    // 🟢 A. PARSE EVENTS (THE COMMENTARY SHREDDER)
+    // 🟢 A. PARSE EVENTS (THE CLEAN ROOM SHREDDER)
     let events: any[] = [];
 
     if (data.commentary && data.commentary.length > 0) {
@@ -68,7 +66,7 @@ export async function fetchEspnDetails(gameId: string) {
             .filter((c: any) => {
                 const t = (c.text || '').toLowerCase();
                 if (t.includes('attempt') && !t.includes('goal')) return false; 
-                return t.includes('goal') || t.includes('penalty') || t.includes('card') || t.includes('substitution') || t.includes('var ') || t.includes('disallowed');
+                return t.includes('goal') || t.includes('penalty') || t.includes('card') || t.includes('substitution') || t.includes('var ') || t.includes('overturned');
             })
             .map((c: any) => {
                 const text = c.text || '';
@@ -80,65 +78,72 @@ export async function fetchEspnDetails(gameId: string) {
                 let player = '';
 
                 try {
-                    // ❌ VAR OVERTURNS
-                    if ((lowerText.includes('var ') || lowerText.includes('video assistant referee')) && (lowerText.includes('overturned') || lowerText.includes('disallowed') || lowerText.includes('cancelled'))) {
-                        type = 'var_overturn'; actionName = 'VAR Decision';
-                        player = 'Overturned';
+                    // ❌ 1. TRAP VAR / DISALLOWED FIRST (Ignores the scoreline entirely)
+                    if (lowerText.includes('var decision') || lowerText.includes('overturned') || lowerText.includes('disallowed') || lowerText.includes('no goal')) {
+                        type = 'var_overturn'; 
+                        actionName = 'VAR Decision';
+                        player = 'Goal Disallowed';
                     }
-                    // ⚠️ PENALTY AWARDED (Near Goal)
-                    else if (lowerText.includes('penalty') && (lowerText.includes('awarded') || lowerText.includes('conceded'))) {
-                        type = 'penalty_awarded'; actionName = 'Penalty Awarded';
-                        player = text.split('.')[0].trim(); 
+                    
+                    // ⚠️ 2. PENALTY AWARDED
+                    else if (lowerText.includes('penalty conceded') || lowerText.includes('penalty awarded')) {
+                        type = 'penalty_awarded'; 
+                        actionName = 'Penalty Awarded';
+                        player = 'Referee Check';
                     }
-                    // ⚽ GOALS
-                    else if (lowerText.includes('goal') || (lowerText.includes('penalty') && (lowerText.includes('scored') || lowerText.includes('converts')))) {
+                    
+                    // ⚽ 3. GOALS
+                    else if (lowerText.includes('goal') || (lowerText.includes('penalty') && lowerText.includes('scored'))) {
                         type = 'goal'; actionName = 'Goal';
+                        
                         if (lowerText.includes('own goal')) {
                             actionName = 'Own Goal';
                             player = text.split(',')[0].replace(/Own Goal by /ig, '').trim();
                         } else {
-                            const parts = text.split(/\.\s+/);
-                            const actionSentence = parts.length > 1 ? parts[1] : parts[0];
-                            player = actionSentence.split('(')[0].trim();
-
+                            // Splits by sentence to avoid the "Team A 1, Team B 0" text.
+                            // Looks specifically for the sentence with the parentheses: "Martín Payero (Lecce)"
+                            const parts = text.split(/[\.!]\s+/);
+                            const playerPart = parts.find(p => p.includes('(') && p.includes(')'));
+                            
+                            if (playerPart) {
+                                player = playerPart.split('(')[0].trim();
+                            }
+                            
                             if (lowerText.includes('assisted by')) {
                                 const assistMatch = text.match(/Assisted by (.*?)(?: with|\.)/i);
-                                if (assistMatch) player = `${player} (Assist: ${assistMatch[1].trim()})`;
+                                if (assistMatch) player = `${player || 'Goal'} (Assist: ${assistMatch[1].trim()})`;
                             }
                         }
                     }
-                    // 🟥 RED CARDS
-                    else if (lowerText.includes('red card')) {
-                        type = 'red-card'; actionName = 'Red Card';
-                        player = text.split('(')[0].trim();
+                    
+                    // 🟨🟥 4. CARDS (Red & Yellow)
+                    else if (lowerText.includes('card')) {
+                        type = lowerText.includes('red') ? 'red-card' : 'card';
+                        actionName = lowerText.includes('red') ? 'Red Card' : 'Yellow Card';
+                        
+                        const parts = text.split(/[\.!]\s+/);
+                        const playerPart = parts.find(p => p.includes('(') && p.includes(')'));
+                        if (playerPart) player = playerPart.split('(')[0].trim();
                     }
-                    // 🟨 YELLOW CARDS
-                    else if (lowerText.includes('yellow card')) {
-                        type = 'card'; actionName = 'Yellow Card';
-                        player = text.split('(')[0].trim();
-                    }
-                    // 🔄 SUBSTITUTIONS
+                    
+                    // 🔄 5. SUBSTITUTIONS
                     else if (lowerText.includes('substitution')) {
                         type = 'sub'; actionName = 'Substitution';
-                        const parts = text.split(/\.\s+/);
-                        if (parts.length > 1) {
-                            const subParts = parts[1].split(/ replaces /i);
-                            if (subParts.length === 2) {
-                                const playerIn = subParts[0].trim();
-                                const playerOut = subParts[1].split(/ because|\./i)[0].trim();
-                                player = `${playerIn} (In) / ${playerOut} (Out)`;
-                            }
+                        const subMatch = text.match(/([^\.]+?)\s+replaces\s+([^\.]+?)(?:\s+because|\.|$)/i);
+                        if (subMatch) {
+                            player = `${subMatch[1].trim()} (In) / ${subMatch[2].trim()} (Out)`;
                         }
                     }
                 } catch (err) {}
 
-                // 🛡️ THE PROFESSIONAL FALLBACK
-                if (!player || player.length > 70 || player.toLowerCase().includes('substitution')) {
+                // 🛡️ THE IRONCLAD FALLBACK (If Regex misses, default to beautiful clean text)
+                if (!player || player.trim() === '' || player.length > 55 || player.toLowerCase().includes('unknown')) {
                     if (type === 'goal') player = 'Goal Confirmed';
+                    else if (type === 'var_overturn') player = 'Goal Disallowed';
                     else if (type === 'penalty_awarded') player = 'Penalty Check';
-                    else if (type === 'card') player = 'Yellow Card';
-                    else if (type === 'red-card') player = 'Red Card';
-                    else if (type === 'sub') player = 'Substitution';
+                    else if (type === 'card' || type === 'red-card') player = 'Booking';
+                    else if (type === 'sub') player = 'Tactical Change';
+                    else player = 'Match Update';
                 }
 
                 return {
@@ -146,7 +151,7 @@ export async function fetchEspnDetails(gameId: string) {
                     time: time,
                     type: type,
                     text: actionName,
-                    team: '', 
+                    team: '', // 🟢 Safely left blank to avoid the "Two Team Name" bug!
                     player: player
                 };
             });
