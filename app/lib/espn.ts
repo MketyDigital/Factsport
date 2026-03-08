@@ -101,9 +101,9 @@ export async function fetchEspnDetails(gameId: string) {
                             player = text.split(',')[0].replace(/Own Goal by /ig, '').trim();
                         } else {
                             // Splits by sentence to avoid the "Team A 1, Team B 0" text.
-                            // Looks specifically for the sentence with the parentheses: "Martín Payero (Lecce)"
                             const parts = text.split(/[\.!]\s+/);
-                            const playerPart = parts.find(p => p.includes('(') && p.includes(')'));
+                            // 🔥 FIXED: Explicitly typed `p: string` for TypeScript
+                            const playerPart = parts.find((p: string) => p.includes('(') && p.includes(')'));
                             
                             if (playerPart) {
                                 player = playerPart.split('(')[0].trim();
@@ -122,7 +122,8 @@ export async function fetchEspnDetails(gameId: string) {
                         actionName = lowerText.includes('red') ? 'Red Card' : 'Yellow Card';
                         
                         const parts = text.split(/[\.!]\s+/);
-                        const playerPart = parts.find(p => p.includes('(') && p.includes(')'));
+                        // 🔥 FIXED: Explicitly typed `p: string` for TypeScript
+                        const playerPart = parts.find((p: string) => p.includes('(') && p.includes(')'));
                         if (playerPart) player = playerPart.split('(')[0].trim();
                     }
                     
