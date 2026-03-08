@@ -1,5 +1,3 @@
-// app/lib/espn.ts
-
 export const ESPN_LEAGUES: Record<string, string> = {
   // Main Leagues
   'Premier League': 'eng.1',
@@ -46,15 +44,13 @@ export async function fetchEspnLive(leagueCode: string) {
         home_score: parseInt(e.competitions[0].competitors.find((c:any)=>c.homeAway==='home').score),
         away_score: parseInt(e.competitions[0].competitors.find((c:any)=>c.homeAway==='away').score),
         
-        // 🟢 THIS IS THE KEY FIX FOR TIME MATCHING
-        // ESPN returns UTC ISO string (e.g. "2024-05-12T14:00Z")
-        // We convert it to a Timestamp Number immediately.
+        // Convert to Timestamp
         startTime: new Date(e.date).getTime() 
     }));
   } catch (err) { return []; }
 }
 
-// 2. Fetch Deep Details (Uses Commentary)
+// 2. Fetch Deep Details (Clean Facts Only - Zero Copyright)
 export async function fetchEspnDetails(gameId: string) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${gameId}`;
   try {
@@ -64,55 +60,30 @@ export async function fetchEspnDetails(gameId: string) {
 
     const homeId = String(data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.id);
 
-    // 🟢 A. PARSE EVENTS FROM COMMENTARY
+    // 🟢 A. PARSE EVENTS (FACTS ONLY)
     let events: any[] = [];
+    const rawEvents = data.header?.competitions?.[0]?.details || [];
     
-    if (data.commentary) {
-        events = data.commentary.filter((c: any) => {
-            const text = (c.text || '').toLowerCase();
-            return text.includes('goal') || 
-                   text.includes('card') || 
-                   text.includes('substitution') || 
-                   text.includes('penalty') ||
-                   text.includes('var');
-        }).map((c: any) => {
-            const text = c.text || '';
-            const lowerText = text.toLowerCase();
-            let type = 'event';
+    events = rawEvents.map((e: any) => {
+        const typeText = String(e.type?.text || 'event').toLowerCase();
+        let type = 'event';
 
-            if (lowerText.includes('goal')) type = 'goal';
-            else if (lowerText.includes('red card')) type = 'red-card';
-            else if (lowerText.includes('yellow card')) type = 'card';
-            else if (lowerText.includes('substitution')) type = 'sub';
-            
-            return {
-                id: Math.random().toString(36).substr(2, 9),
-                time: c.time?.displayValue || "0'",
-                type: type,
-                text: text, 
-                team: '', 
-                player: '' 
-            };
-        });
+        if (typeText.includes('goal')) type = 'goal';
+        else if (typeText.includes('red card')) type = 'red-card';
+        else if (typeText.includes('yellow card')) type = 'card';
+        else if (typeText.includes('substitution')) type = 'sub';
         
-        // 🟢 NEWEST FIRST
-        events.reverse();
-    }
-
-    // Fallback if commentary is empty
-    if (events.length === 0) {
-        const rawEvents = data.header?.competitions?.[0]?.details || [];
-        events = rawEvents.map((e: any) => ({
-           id: Math.random().toString(36).substr(2, 9),
-           time: e.clock?.displayValue || "0'",
-           type: (e.type?.text || 'event').toLowerCase(),
-           text: e.shortText || e.text || 'Match Event',
-           team: e.team?.displayName || '',
-           player: e.participants?.[0]?.athlete?.displayName || '' 
-        }));
-        // Reverse fallback too
-        events.reverse();
-    }
+        return {
+            id: Math.random().toString(36).substr(2, 9),
+            time: e.clock?.displayValue || "0'",
+            type: type,
+            text: type === 'goal' ? 'Goal' : e.type?.text,
+            team: e.team?.displayName || '',
+            player: e.participants?.[0]?.athlete?.displayName || '' 
+        };
+    });
+    
+    events.reverse();
 
     // 🟢 B. PARSE STATS
     const boxscore = data.boxscore;
