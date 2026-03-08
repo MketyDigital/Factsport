@@ -35,13 +35,11 @@ async function runLiveUpdate(request: Request) {
         .not('espn_id', 'is', null)
         .gt('match_date', lookBack) 
         .lt('match_date', lookForward)
-        .order('updated_at', { ascending: true }) // 🔥 THE MISSING KEY: Forces it to grab stale/empty matches first!
+        .order('updated_at', { ascending: true }) // Grabs oldest/stale matches first
         .limit(15); 
 
       const activeMatches = dbMatches?.filter(m => {
           const isStartingSoonOrPlaying = ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE'].includes(m.status);
-          
-          // 🔥 PATIENT DATA FIXER: Will process finished matches if they have no events
           const needsFinalData = ['FT', 'FINISHED'].includes(m.status) && (!m.match_events || m.match_events.length === 0);
           
           return isStartingSoonOrPlaying || needsFinalData;
@@ -57,29 +55,38 @@ async function runLiveUpdate(request: Request) {
         const espnCode = ESPN_LEAGUES[leagueName as string];
         if (!espnCode) continue;
 
+        // Fetches TODAY'S scoreboard
         const espnMatches = await fetchEspnLive(espnCode);
         const leagueDbMatches = activeMatches.filter(m => m.league === leagueName);
 
         for (const dbMatch of leagueDbMatches) {
              const espnGame = espnMatches.find((e: any) => String(e.espn_id) === dbMatch.espn_id);
+             const isFinishedNeedingPatch = ['FT', 'FINISHED'].includes(dbMatch.status);
 
-             if (espnGame) {
+             // 🔥 THE BYPASS: Process if it's on today's live scoreboard OR if it's an old finished game needing a patch
+             if (espnGame || isFinishedNeedingPatch) {
                  const updateTask = (async () => {
-                     const richData = await fetchEspnDetails(espnGame.espn_id);
-                     
-                     let newStatus = dbMatch.status;
-                     if (espnGame.status === 'in') newStatus = 'LIVE';
-                     else if (espnGame.status === 'post') newStatus = 'FT'; 
-                     else if (espnGame.clock === 'HT') newStatus = 'HT';
+                     // Fetch the events directly using the saved ID (bypasses the daily scoreboard limit)
+                     const richData = await fetchEspnDetails(dbMatch.espn_id);
                      
                      const payload: any = {
-                         status: newStatus,
-                         home_score: espnGame.home_score,
-                         away_score: espnGame.away_score,
-                         displayClock: espnGame.clock,
-                         updated_at: new Date().toISOString() // This ensures the match moves to the back of the line after updating!
+                         updated_at: new Date().toISOString()
                      };
 
+                     // Only update live scores/clock if it's actually an active game on today's scoreboard
+                     if (espnGame) {
+                         let newStatus = dbMatch.status;
+                         if (espnGame.status === 'in') newStatus = 'LIVE';
+                         else if (espnGame.status === 'post') newStatus = 'FT'; 
+                         else if (espnGame.clock === 'HT') newStatus = 'HT';
+                         
+                         payload.status = newStatus;
+                         payload.home_score = espnGame.home_score;
+                         payload.away_score = espnGame.away_score;
+                         payload.displayClock = espnGame.clock;
+                     }
+
+                     // Always attach the Triple-Layer events if they exist
                      if (richData) {
                          payload.match_events = richData.events;
                          payload.stats = richData.stats;
@@ -93,7 +100,7 @@ async function runLiveUpdate(request: Request) {
 
                  syncTasks.push(updateTask);
                  updates++;
-                 logs.push(`⚡ Live Synced: ${dbMatch.home_team} vs ${dbMatch.away_team}`);
+                 logs.push(`⚡ Synced: ${dbMatch.home_team} vs ${dbMatch.away_team}`);
              }
         }
       }
