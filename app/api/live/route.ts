@@ -35,7 +35,8 @@ async function runLiveUpdate(request: Request) {
         .not('espn_id', 'is', null)
         .gt('match_date', lookBack) 
         .lt('match_date', lookForward)
-        .limit(15); // 🔥 Prevents Vercel server timeouts by batching the work
+        .order('updated_at', { ascending: true }) // 🔥 THE MISSING KEY: Forces it to grab stale/empty matches first!
+        .limit(15); 
 
       const activeMatches = dbMatches?.filter(m => {
           const isStartingSoonOrPlaying = ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE'].includes(m.status);
@@ -76,7 +77,7 @@ async function runLiveUpdate(request: Request) {
                          home_score: espnGame.home_score,
                          away_score: espnGame.away_score,
                          displayClock: espnGame.clock,
-                         updated_at: new Date().toISOString()
+                         updated_at: new Date().toISOString() // This ensures the match moves to the back of the line after updating!
                      };
 
                      if (richData) {
