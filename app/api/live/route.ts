@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const fetchCache = 'force-no-store';
 
-// 🟢 CHANGED: Using the official supabase-js client to bypass RLS
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { fetchEspnLive, fetchEspnDetails, ESPN_LEAGUES } from '@/app/lib/espn';
@@ -14,7 +13,6 @@ async function runLiveUpdate(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // 🟢 CHANGED: Initialized with the Service Role (Master) Key
   const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -28,7 +26,7 @@ async function runLiveUpdate(request: Request) {
       const now = Date.now();
       const lookForward = new Date(now + (2 * 60 * 60 * 1000)).toISOString();
       
-      // 🔥 TEMPORARY FIX: Looking back 5 days (5 * 24 hours) to catch the wiped matches
+      // 🔥 THE 5-DAY PATCH: Looks back to fix matches that got wiped
       const lookBack = new Date(now - (5 * 24 * 60 * 60 * 1000)).toISOString(); 
 
       const { data: dbMatches } = await supabase
@@ -40,7 +38,10 @@ async function runLiveUpdate(request: Request) {
 
       const activeMatches = dbMatches?.filter(m => {
           const isStartingSoonOrPlaying = ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE'].includes(m.status);
+          
+          // 🔥 PATIENT DATA FIXER: Will process finished matches if they have no events
           const needsFinalData = ['FT', 'FINISHED'].includes(m.status) && (!m.match_events || m.match_events.length === 0);
+          
           return isStartingSoonOrPlaying || needsFinalData;
       });
 

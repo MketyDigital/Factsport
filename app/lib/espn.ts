@@ -63,14 +63,12 @@ export async function fetchEspnDetails(gameId: string) {
     // 🟢 A. PARSE EVENTS (THE COMMENTARY SHREDDER)
     let events: any[] = [];
 
-    // We ONLY use commentary now, because it is the only reliable source of Truth from ESPN.
     if (data.commentary && data.commentary.length > 0) {
         events = data.commentary
             .filter((c: any) => {
                 const t = (c.text || '').toLowerCase();
-                // Filter out junk
                 if (t.includes('attempt') && !t.includes('goal')) return false; 
-                return t.includes('goal') || t.includes('penalty') || t.includes('card') || t.includes('substitution');
+                return t.includes('goal') || t.includes('penalty') || t.includes('card') || t.includes('substitution') || t.includes('var ') || t.includes('disallowed');
             })
             .map((c: any) => {
                 const text = c.text || '';
@@ -82,19 +80,27 @@ export async function fetchEspnDetails(gameId: string) {
                 let player = '';
 
                 try {
+                    // ❌ VAR OVERTURNS
+                    if ((lowerText.includes('var ') || lowerText.includes('video assistant referee')) && (lowerText.includes('overturned') || lowerText.includes('disallowed') || lowerText.includes('cancelled'))) {
+                        type = 'var_overturn'; actionName = 'VAR Decision';
+                        player = 'Overturned';
+                    }
+                    // ⚠️ PENALTY AWARDED (Near Goal)
+                    else if (lowerText.includes('penalty') && (lowerText.includes('awarded') || lowerText.includes('conceded'))) {
+                        type = 'penalty_awarded'; actionName = 'Penalty Awarded';
+                        player = text.split('.')[0].trim(); 
+                    }
                     // ⚽ GOALS
-                    if (lowerText.includes('goal') || lowerText.includes('penalty')) {
+                    else if (lowerText.includes('goal') || (lowerText.includes('penalty') && (lowerText.includes('scored') || lowerText.includes('converts')))) {
                         type = 'goal'; actionName = 'Goal';
                         if (lowerText.includes('own goal')) {
                             actionName = 'Own Goal';
                             player = text.split(',')[0].replace(/Own Goal by /ig, '').trim();
                         } else {
-                            // Standard Goal String Splitting
                             const parts = text.split(/\.\s+/);
                             const actionSentence = parts.length > 1 ? parts[1] : parts[0];
                             player = actionSentence.split('(')[0].trim();
 
-                            // Hunt for the Assist
                             if (lowerText.includes('assisted by')) {
                                 const assistMatch = text.match(/Assisted by (.*?)(?: with|\.)/i);
                                 if (assistMatch) player = `${player} (Assist: ${assistMatch[1].trim()})`;
@@ -127,9 +133,9 @@ export async function fetchEspnDetails(gameId: string) {
                 } catch (err) {}
 
                 // 🛡️ THE PROFESSIONAL FALLBACK
-                // If ESPN formats a sentence so weirdly that our slicer fails, we DO NOT send weird text.
-                if (!player || player.length > 55 || player.toLowerCase().includes('goal') || player.toLowerCase().includes('substitution')) {
+                if (!player || player.length > 70 || player.toLowerCase().includes('substitution')) {
                     if (type === 'goal') player = 'Goal Confirmed';
+                    else if (type === 'penalty_awarded') player = 'Penalty Check';
                     else if (type === 'card') player = 'Yellow Card';
                     else if (type === 'red-card') player = 'Red Card';
                     else if (type === 'sub') player = 'Substitution';
@@ -140,7 +146,7 @@ export async function fetchEspnDetails(gameId: string) {
                     time: time,
                     type: type,
                     text: actionName,
-                    team: '', // Safely left blank to avoid the "Two Team Name" issue you found!
+                    team: '', 
                     player: player
                 };
             });
