@@ -60,126 +60,90 @@ export async function fetchEspnDetails(gameId: string) {
 
     const homeId = String(data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.id);
 
-    // 🟢 A. PARSE EVENTS (THE HYBRID GUARANTEE ALGORITHM)
+    // 🟢 A. PARSE EVENTS (THE COMMENTARY SHREDDER)
     let events: any[] = [];
-    const rawDetails = data.header?.competitions?.[0]?.details || [];
 
-    // METHOD 1: The Structured Truth (Guarantees we never miss an event if ESPN provides Details)
-    if (rawDetails.length > 0) {
-        rawDetails.forEach((e: any) => {
-            const rawText = String(e.shortText || e.text || e.type?.text || '').toLowerCase();
-            let type = 'event';
-            let actionName = '';
-            
-            if (e.scoringPlay || rawText.includes('goal') || rawText.includes('penalty')) { type = 'goal'; actionName = 'Goal'; }
-            else if (e.redCard || rawText.includes('red card')) { type = 'red-card'; actionName = 'Red Card'; }
-            else if (e.yellowCard || rawText.includes('yellow')) { type = 'card'; actionName = 'Yellow Card'; }
-            else if (rawText.includes('sub') || rawText.includes('replaced')) { type = 'sub'; actionName = 'Substitution'; }
-            else return; // Skip useless events
+    // We ONLY use commentary now, because it is the only reliable source of Truth from ESPN.
+    if (data.commentary && data.commentary.length > 0) {
+        events = data.commentary
+            .filter((c: any) => {
+                const t = (c.text || '').toLowerCase();
+                // Filter out junk
+                if (t.includes('attempt') && !t.includes('goal')) return false; 
+                return t.includes('goal') || t.includes('penalty') || t.includes('card') || t.includes('substitution');
+            })
+            .map((c: any) => {
+                const text = c.text || '';
+                const lowerText = text.toLowerCase();
+                const time = c.time?.displayValue || "0'";
 
-            let player = e.participants?.[0]?.athlete?.displayName || '';
-            let team = e.team?.displayName || '';
-            const time = e.clock?.displayValue || "0'";
+                let type = 'event';
+                let actionName = 'Event';
+                let player = '';
 
-            // Format Substitutions beautifully
-            if (type === 'sub' && e.text && e.text.toLowerCase().includes('replaces')) {
-                const parts = e.text.split(/ replaces /i);
-                if (parts.length === 2) {
-                    player = `${parts[0].trim()} (In) / ${parts[1].replace('.', '').trim()} (Out)`;
-                }
-            }
+                try {
+                    // ⚽ GOALS
+                    if (lowerText.includes('goal') || lowerText.includes('penalty')) {
+                        type = 'goal'; actionName = 'Goal';
+                        if (lowerText.includes('own goal')) {
+                            actionName = 'Own Goal';
+                            player = text.split(',')[0].replace(/Own Goal by /ig, '').trim();
+                        } else {
+                            // Standard Goal String Splitting
+                            const parts = text.split(/\.\s+/);
+                            const actionSentence = parts.length > 1 ? parts[1] : parts[0];
+                            player = actionSentence.split('(')[0].trim();
 
-            // Hunt for Assists in the Commentary
-            if (type === 'goal' && data.commentary) {
-                const commMatch = data.commentary.find((c: any) => c.time?.displayValue === time && String(c.text).includes(player.split(' ')[0]));
-                if (commMatch) {
-                    const assistMatch = commMatch.text.match(/Assisted by ([a-zA-ZÀ-ÿ\-\'\s]{2,30})(?: with|\.|,)/i);
-                    if (assistMatch) player = `${player} (Assist: ${assistMatch[1].trim()})`;
-                }
-            }
-
-            // Professional Placeholder Fallback for Method 1
-            if (!player) {
-                if (type === 'goal') player = 'Goal (Details Pending)';
-                else if (type === 'card') player = 'Booking Confirmed';
-                else if (type === 'red-card') player = 'Red Card Issued';
-                else if (type === 'sub') player = 'Substitution Made';
-            }
-
-            events.push({
-                id: Math.random().toString(36).substr(2, 9),
-                time: time,
-                type: type,
-                text: actionName,
-                team: team,
-                player: player
-            });
-        });
-    } 
-    
-    // METHOD 2: The Commentary Shredder (With Professional Placeholders)
-    if (events.length === 0 && data.commentary) {
-        data.commentary.forEach((c: any) => {
-            const text = c.text || '';
-            const lowerText = text.toLowerCase();
-            const time = c.time?.displayValue || "0'";
-
-            if (lowerText.includes('attempt') && !lowerText.includes('goal')) return;
-            if (!lowerText.includes('goal') && !lowerText.includes('card') && !lowerText.includes('substitution') && !lowerText.includes('penalty')) return;
-
-            let type = 'event';
-            let actionName = 'Event';
-            let player = '';
-            let team = '';
-
-            try {
-                if (lowerText.includes('goal') || lowerText.includes('penalty')) {
-                    type = 'goal'; actionName = 'Goal';
-                    if (lowerText.includes('own goal')) actionName = 'Own Goal';
-                    
-                    const sentences = text.split('.');
-                    for (const sentence of sentences) {
-                        const ptMatch = sentence.match(/([a-zA-ZÀ-ÿ\-\'\s]{2,40})\s*\((.*?)\)/);
-                        if (ptMatch) { player = ptMatch[1].trim(); team = ptMatch[2].trim(); break; }
+                            // Hunt for the Assist
+                            if (lowerText.includes('assisted by')) {
+                                const assistMatch = text.match(/Assisted by (.*?)(?: with|\.)/i);
+                                if (assistMatch) player = `${player} (Assist: ${assistMatch[1].trim()})`;
+                            }
+                        }
                     }
-                    
-                    const assistMatch = text.match(/Assisted by ([a-zA-ZÀ-ÿ\-\'\s]{2,30})(?: with|\.|,)/i);
-                    if (assistMatch && player) player = `${player} (Assist: ${assistMatch[1].trim()})`;
-                }
-                else if (lowerText.includes('yellow card') || lowerText.includes('red card')) {
-                    type = lowerText.includes('red card') ? 'red-card' : 'card';
-                    actionName = type === 'red-card' ? 'Red Card' : 'Yellow Card';
-                    const ptMatch = text.match(/([a-zA-ZÀ-ÿ\-\'\s]{2,40})\s*\((.*?)\)/);
-                    if (ptMatch) { player = ptMatch[1].trim(); team = ptMatch[2].trim(); }
-                }
-                else if (lowerText.includes('substitution')) {
-                    type = 'sub'; actionName = 'Substitution';
-                    const subMatch = text.match(/Substitution,\s*(.*?)\.\s*(.*?)\s*replaces\s*(.*?)(?:[\.\,]|$)/i);
-                    if (subMatch) { team = subMatch[1].trim(); player = `${subMatch[2].trim()} (In) / ${subMatch[3].trim()} (Out)`; }
-                }
-            } catch (err) {} 
+                    // 🟥 RED CARDS
+                    else if (lowerText.includes('red card')) {
+                        type = 'red-card'; actionName = 'Red Card';
+                        player = text.split('(')[0].trim();
+                    }
+                    // 🟨 YELLOW CARDS
+                    else if (lowerText.includes('yellow card')) {
+                        type = 'card'; actionName = 'Yellow Card';
+                        player = text.split('(')[0].trim();
+                    }
+                    // 🔄 SUBSTITUTIONS
+                    else if (lowerText.includes('substitution')) {
+                        type = 'sub'; actionName = 'Substitution';
+                        const parts = text.split(/\.\s+/);
+                        if (parts.length > 1) {
+                            const subParts = parts[1].split(/ replaces /i);
+                            if (subParts.length === 2) {
+                                const playerIn = subParts[0].trim();
+                                const playerOut = subParts[1].split(/ because|\./i)[0].trim();
+                                player = `${playerIn} (In) / ${playerOut} (Out)`;
+                            }
+                        }
+                    }
+                } catch (err) {}
 
-            // 🛡️ THE PROFESSIONAL FALLBACK
-            if (player && player.length < 55 && !player.toLowerCase().includes('unknown')) {
-                events.push({ id: Math.random().toString(36).substr(2, 9), time: time, type: type, text: actionName, team: team, player: player });
-            } else {
-                // If the regex failed, we use the clean placeholder. NO messy text allowed.
-                let fallbackPlayer = 'Event Details Pending';
-                if (lowerText.includes('goal') || lowerText.includes('penalty')) { type = 'goal'; actionName = 'Goal'; fallbackPlayer = 'Goal (Details Pending)'; }
-                else if (lowerText.includes('red card')) { type = 'red-card'; actionName = 'Red Card'; fallbackPlayer = 'Red Card Issued'; }
-                else if (lowerText.includes('yellow card')) { type = 'card'; actionName = 'Yellow Card'; fallbackPlayer = 'Booking Confirmed'; }
-                else if (lowerText.includes('substitution')) { type = 'sub'; actionName = 'Substitution'; fallbackPlayer = 'Substitution Made'; }
+                // 🛡️ THE PROFESSIONAL FALLBACK
+                // If ESPN formats a sentence so weirdly that our slicer fails, we DO NOT send weird text.
+                if (!player || player.length > 55 || player.toLowerCase().includes('goal') || player.toLowerCase().includes('substitution')) {
+                    if (type === 'goal') player = 'Goal Confirmed';
+                    else if (type === 'card') player = 'Yellow Card';
+                    else if (type === 'red-card') player = 'Red Card';
+                    else if (type === 'sub') player = 'Substitution';
+                }
 
-                events.push({
+                return {
                     id: Math.random().toString(36).substr(2, 9),
                     time: time,
                     type: type,
                     text: actionName,
-                    team: '', 
-                    player: fallbackPlayer // Beautiful, professional UI fallback
-                });
-            }
-        });
+                    team: '', // Safely left blank to avoid the "Two Team Name" issue you found!
+                    player: player
+                };
+            });
     }
     
     events.reverse();
