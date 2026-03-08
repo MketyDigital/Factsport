@@ -27,7 +27,9 @@ async function runLiveUpdate(request: Request) {
   try {
       const now = Date.now();
       const lookForward = new Date(now + (2 * 60 * 60 * 1000)).toISOString();
-      const lookBack = new Date(now - (24 * 60 * 60 * 1000)).toISOString(); 
+      
+      // 🔥 TEMPORARY FIX: Looking back 5 days (5 * 24 hours) to catch the wiped matches
+      const lookBack = new Date(now - (5 * 24 * 60 * 60 * 1000)).toISOString(); 
 
       const { data: dbMatches } = await supabase
         .from('matches')

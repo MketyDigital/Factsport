@@ -81,22 +81,40 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
         {activeTab === 'events' && (
              <div className="space-y-4">
                  {(!events || events.length === 0) ? <div className="text-center py-8 opacity-50"><AlertCircle className="mx-auto mb-2 text-slate-300" size={24} /><p className="text-xs font-bold text-slate-500">No match events yet.</p></div> : 
-                     events.map((e: any, i: number) => (
-                        <div key={i} className="flex gap-4 items-start animate-in fade-in slide-in-from-left-2">
-                            <div className="w-10 text-right font-mono text-xs font-bold text-slate-400 pt-0.5">{e.time}</div>
-                            <div className="flex-1 pb-4 border-b border-slate-50 last:border-0">
-                                <p className="text-xs font-bold text-slate-800 flex items-start gap-2 leading-relaxed">
-                                    <span className="shrink-0 mt-0.5">
-                                        {e.type === 'goal' && '⚽'} 
-                                        {e.type === 'card' && '🟨'} 
-                                        {e.type === 'red-card' && '🟥'} 
-                                        {e.type === 'sub' && '🔄'}
-                                    </span>
-                                    <span>{e.text}</span>
-                                </p>
+                     events.map((e: any, i: number) => {
+                         // 🟢 FALLBACK LOGIC: Detects older paragraph-style data
+                         const isOldData = !e.player && e.text && e.text.length > 20;
+                         const playerName = e.player || "Unknown Player";
+                         const isGoal = e.type === 'goal';
+
+                         return (
+                            <div key={i} className="flex gap-4 items-start animate-in fade-in slide-in-from-left-2">
+                                <div className="w-10 text-right font-mono text-xs font-bold text-slate-400 pt-0.5">{e.time}</div>
+                                <div className="flex-1 pb-4 border-b border-slate-50 last:border-0">
+                                    <div className="text-xs text-slate-800 flex items-start gap-2 leading-relaxed">
+                                        <span className="shrink-0 mt-0.5">
+                                            {e.type === 'goal' && '⚽'} 
+                                            {e.type === 'card' && '🟨'} 
+                                            {e.type === 'red-card' && '🟥'} 
+                                            {e.type === 'sub' && '🔄'}
+                                        </span>
+                                        
+                                        {isOldData ? (
+                                            <span className="font-normal mt-0.5">{e.text}</span>
+                                        ) : (
+                                            <div className="flex flex-col mt-0.5">
+                                                <span className="font-bold text-slate-800">
+                                                    {playerName}
+                                                    {!isGoal && e.text && <span className="font-normal text-slate-500 ml-1">({e.text})</span>}
+                                                </span>
+                                                {e.team && <span className="text-slate-400 font-medium text-[10px] mt-0.5">{e.team}</span>}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                     ))
+                         );
+                     })
                  }
              </div>
         )}

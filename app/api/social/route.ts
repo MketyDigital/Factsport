@@ -9,11 +9,11 @@ const getValidGoals = (eventsArr: any[]) => {
     if (!Array.isArray(eventsArr)) return [];
     return eventsArr.filter((e: any) => {
         if (!e) return false;
-        const text = String(e.text || e.description || '').toLowerCase();
-        const type = String(e.type || e.detail || '').toLowerCase();
+        const text = String(e.text || '').toLowerCase();
+        const type = String(e.type || '').toLowerCase();
         
-        if (text.includes('attempt saved') || text.includes('missed') || text.includes('disallowed') || text.includes('cancelled') || text.includes('no goal')) return false;
-        return type === 'goal' || type === 'penalty' || text.includes('goal') || text.includes('⚽');
+        if (text.includes('disallowed') || text.includes('cancelled') || text.includes('no goal')) return false;
+        return type === 'goal' || type === 'penalty' || text === 'goal';
     });
 };
 
@@ -64,13 +64,13 @@ export async function POST(request: Request) {
         payload.fb1Message = `🚫 GOAL DISALLOWED!\n\nVAR decision: The previous goal has been overturned. The score returns to:\n\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
     }
     
-    // 🟢 2. GOAL / PENALTY ALERT (Triggered by Score OR new Text arriving)
+    // 🟢 2. GOAL / PENALTY ALERT 
     else if (newTotal > oldTotal || newGoalsList.length > oldGoalsList.length) {
 
-        // 🔥 THE "PATIENT CATCHER": If ESPN hasn't uploaded the text yet, safely abort and wait for the next 1-minute cron ping!
+        // 🔥 THE "PATIENT CATCHER"
         if (newGoalsList.length < newTotal) {
             console.log(`[Webhook] Score is ${newTotal}, but only ${newGoalsList.length} goal events found. Waiting for next cron ping.`);
-            return NextResponse.json({ message: "ESPN text lagging behind scoreboard. Waiting for next ping." });
+            return NextResponse.json({ message: "Facts data lagging behind scoreboard. Waiting for next ping." });
         }
 
         let statusText = ['IN_PLAY', 'LIVE', '1H', '2H'].includes(newState.status) ? '' : ` (${newState.status})`;
@@ -79,18 +79,11 @@ export async function POST(request: Request) {
         if (newGoalsList.length > 0) {
             const sortedGoals = [...newGoalsList].sort((a, b) => parseTime(b.time || b.minute) - parseTime(a.time || a.minute));
             const latest = sortedGoals[0];
-            const rich = latest.text || latest.description || "";
+            
+            const player = latest.player || latest.playerName || latest.name || "Unknown Player";
             const time = latest.time || latest.minute ? `${latest.time || latest.minute}' ` : '';
             
-            const dbScore = `${newState.home_score}-${newState.away_score}`;
-            const isStaleText = rich.includes('-') && !rich.includes(dbScore) && !rich.includes(`${newState.home_score}, ${newState.away_score}`);
-
-            if (rich && !isStaleText) {
-                scorerText = `\n${rich.includes(time.trim()) ? '' : time}${rich}\n`;
-            } else {
-                const player = latest.player || latest.playerName || latest.name;
-                if (player) scorerText = `\n🎯 ${player} (${time.trim()})\n`;
-            }
+            scorerText = `\n🎯 ${player} (${time.trim()})\n`;
         } 
         
         if (!scorerText.trim()) scorerText = `\n⚽ Goal confirmed! Tap the link below for full details and stats! 👇\n`;
