@@ -56,7 +56,6 @@ export async function fetchEspnDetails(gameId: string) {
     if (!res.ok) return null;
     const data = await res.json();
 
-    // Grab the official team names to inject later
     const homeCompetitor = data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home');
     const awayCompetitor = data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='away');
     const homeId = String(homeCompetitor.team.id);
@@ -118,23 +117,29 @@ export async function fetchEspnDetails(gameId: string) {
             if (p.name) rosterDict.push({ name: p.name, side, teamName });
         });
     });
-    // Sort by longest name first to avoid partial matches
     rosterDict.sort((a, b) => b.name.length - a.name.length);
 
     // 🟢 D. PARSE EVENTS (THE TRIPLE-LAYER SHREDDER)
     let events: any[] = [];
 
     if (data.commentary && data.commentary.length > 0) {
-        events = data.commentary
+        // We capture the raw array before filtering so we can look at all events
+        const rawEvents = data.commentary;
+
+        // Step 1: Filter out the absolute junk (missed shots that aren't important, corners, etc.)
+        events = rawEvents
             .filter((c: any) => {
                 const t = (c.text || '').toLowerCase();
-                if (t.includes('attempt') && !t.includes('goal')) return false; 
-                return t.includes('goal') || t.includes('penalty') || t.includes('card') || t.includes('substitution') || t.includes('var ') || t.includes('overturned');
+                const metaType = c.play?.type?.text?.toLowerCase() || '';
+                
+                // Keep goals, penalties, cards, subs, var, and attempts (so we can tag attempts as non-goals safely)
+                return t.includes('goal') || t.includes('penalty') || t.includes('card') || t.includes('substitution') || t.includes('var ') || t.includes('overturned') || t.includes('attempt') || metaType.includes('goal') || metaType.includes('card');
             })
             .map((c: any) => {
                 const text = c.text || '';
                 const lowerText = text.toLowerCase();
                 const time = c.time?.displayValue || "0'";
+                const metaType = c.play?.type?.text?.toLowerCase() || '';
 
                 let type = 'event';
                 let actionName = 'Event';
@@ -142,18 +147,37 @@ export async function fetchEspnDetails(gameId: string) {
                 let matchedPlayerName = '';
                 let matchedTeamName = '';
 
-                // --- 1. CLASSIFY THE EVENT TYPE ---
-                if (lowerText.includes('var decision') || lowerText.includes('overturned') || lowerText.includes('disallowed') || lowerText.includes('no goal')) {
+                // --- 1. THE TRIPLE-LOCK CLASSIFIER ---
+                
+                // A. Trap VAR / Overturns First
+                if (lowerText.includes('var decision') || lowerText.includes('overturned') || lowerText.includes('disallowed') || lowerText.includes('no goal') || metaType.includes('var')) {
                     type = 'var_overturn'; actionName = 'VAR Decision';
-                } else if (lowerText.includes('penalty conceded') || lowerText.includes('penalty awarded')) {
+                } 
+                // B. Trap Penalties Awarded/Missed
+                else if (lowerText.includes('penalty conceded') || lowerText.includes('penalty awarded')) {
                     type = 'penalty_awarded'; actionName = 'Penalty Awarded';
-                } else if (lowerText.includes('goal') || (lowerText.includes('penalty') && lowerText.includes('scored'))) {
+                } else if ((lowerText.includes('penalty') && (lowerText.includes('saved') || lowerText.includes('missed'))) || metaType === 'penalty missed' || metaType === 'penalty saved') {
+                    type = 'penalty_missed'; actionName = 'Penalty Missed';
+                } 
+                // C. Trap Fake Goals (Attempts/Saves/Woodwork) BEFORE checking for "Goal"
+                else if (lowerText.includes('attempt') || lowerText.includes('saved') || lowerText.includes('missed') || lowerText.includes('blocked') || lowerText.includes('post') || lowerText.includes('crossbar') || metaType.includes('shot') || metaType.includes('miss')) {
+                    type = 'attempt'; actionName = lowerText.includes('saved') ? 'Shot Saved' : 'Shot Missed';
+                } 
+                // D. The True Goal Verification (Metadata, Exclamation, Own Goal, or Scoreline Match)
+                else if (metaType === 'goal' || lowerText.includes('goal!') || lowerText.includes('own goal by') || (lowerText.includes('goal') && /\d+/.test(lowerText))) {
                     type = 'goal'; actionName = lowerText.includes('own goal') ? 'Own Goal' : 'Goal';
-                } else if (lowerText.includes('card')) {
+                } else if (lowerText.includes('penalty') && lowerText.includes('scored')) {
+                    type = 'goal'; actionName = 'Penalty Goal';
+                } 
+                // E. Cards & Subs
+                else if (lowerText.includes('card') || metaType.includes('card')) {
                     type = lowerText.includes('red') ? 'red-card' : 'card';
                     actionName = lowerText.includes('red') ? 'Red Card' : 'Yellow Card';
-                } else if (lowerText.includes('substitution')) {
+                } else if (lowerText.includes('substitution') || metaType.includes('substitution')) {
                     type = 'sub'; actionName = 'Substitution';
+                } else {
+                    // If it passed the initial filter but doesn't strictly match our types, discard it as an attempt
+                    type = 'attempt'; actionName = 'Match Event';
                 }
 
                 // --- LAYER 1: THE HIDDEN METADATA ---
@@ -162,7 +186,6 @@ export async function fetchEspnDetails(gameId: string) {
                     if (type === 'sub' && c.play.participants.length > 1) {
                         const p1 = c.play.participants[0]?.athlete?.displayName;
                         const p2 = c.play.participants[1]?.athlete?.displayName;
-                        // For subs via Layer 1, we still want to append the team if we can find it in the dictionary
                         const teamMatch = rosterDict.find(r => r.name === p1);
                         if (p1 && p2) {
                             player = teamMatch ? `${p1} (In) / ${p2} (Out) (${teamMatch.teamName})` : `${p1} (In) / ${p2} (Out)`;
@@ -173,7 +196,6 @@ export async function fetchEspnDetails(gameId: string) {
                 // --- LAYER 2: THE ROSTER DICTIONARY & TEAM NAME INJECTOR ---
                 if (!player) {
                     if (type === 'sub') {
-                        // Find all matched names, sort them by where they appear in the sentence (In comes before Out)
                         const matched = rosterDict
                             .filter(r => text.includes(r.name))
                             .sort((a, b) => text.indexOf(a.name) - text.indexOf(b.name));
@@ -184,7 +206,6 @@ export async function fetchEspnDetails(gameId: string) {
                             player = `${matched[0].name} (${matched[0].teamName})`;
                         }
                     } else {
-                        // For goals, cards, VAR, etc.
                         if (!matchedPlayerName) {
                             const match = rosterDict.find(r => text.includes(r.name));
                             if (match) {
@@ -192,12 +213,10 @@ export async function fetchEspnDetails(gameId: string) {
                                 matchedTeamName = match.teamName;
                             }
                         } else {
-                            // If Layer 1 found the name, use the dictionary to grab their team name!
                             const match = rosterDict.find(r => r.name === matchedPlayerName);
                             if (match) matchedTeamName = match.teamName;
                         }
 
-                        // 🔥 Inject the Team Name directly into the player string!
                         if (matchedPlayerName) {
                             player = matchedTeamName ? `${matchedPlayerName} (${matchedTeamName})` : matchedPlayerName;
                         }
@@ -209,13 +228,11 @@ export async function fetchEspnDetails(gameId: string) {
                     const assistIndex = lowerText.indexOf('assisted by');
                     const assistText = text.substring(assistIndex);
                     
-                    // Look for a dictionary name in the "Assisted by..." part of the sentence
                     const assistMatch = rosterDict.find(r => assistText.includes(r.name) && r.name !== matchedPlayerName);
                     
                     if (assistMatch) {
                         player = `${player || 'Goal'} (Assist: ${assistMatch.name})`;
                     } else {
-                        // Regex fallback just in case
                         const regMatch = text.match(/Assisted by (.*?)(?: with|\.)/i);
                         if (regMatch) player = `${player || 'Goal'} (Assist: ${regMatch[1].trim()})`;
                     }
@@ -226,6 +243,8 @@ export async function fetchEspnDetails(gameId: string) {
                     if (type === 'goal') player = 'Goal Confirmed';
                     else if (type === 'var_overturn') player = 'Goal Disallowed';
                     else if (type === 'penalty_awarded') player = 'Penalty Check';
+                    else if (type === 'penalty_missed') player = 'Penalty Missed';
+                    else if (type === 'attempt') player = 'Shot on Target';
                     else if (type === 'card' || type === 'red-card') player = 'Booking';
                     else if (type === 'sub') player = 'Tactical Change';
                     else player = 'Match Update';
@@ -236,7 +255,7 @@ export async function fetchEspnDetails(gameId: string) {
                     time: time,
                     type: type,
                     text: actionName,
-                    team: '', // 🟢 Safely left blank to avoid the "Two Team Name" bug!
+                    team: '', 
                     player: player
                 };
             });
