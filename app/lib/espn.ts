@@ -48,7 +48,7 @@ export async function fetchEspnLive(leagueCode: string) {
   } catch (err) { return []; }
 }
 
-// 2. Fetch Deep Details (Clean Facts Only)
+// 2. Fetch Deep Details (Clean Facts Only - Triple Layer Engine)
 export async function fetchEspnDetails(gameId: string) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${gameId}`;
   try {
@@ -56,9 +56,72 @@ export async function fetchEspnDetails(gameId: string) {
     if (!res.ok) return null;
     const data = await res.json();
 
-    const homeId = String(data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.id);
+    // Grab the official team names to inject later
+    const homeCompetitor = data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home');
+    const awayCompetitor = data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='away');
+    const homeId = String(homeCompetitor.team.id);
+    const homeTeamName = homeCompetitor.team.displayName;
+    const awayTeamName = awayCompetitor.team.displayName;
 
-    // 🟢 A. PARSE EVENTS (THE CLEAN ROOM SHREDDER)
+    // 🟢 A. PARSE STATS FIRST
+    const boxscore = data.boxscore;
+    const stats: any = { home: {}, away: {} };
+    if (boxscore?.teams) {
+       boxscore.teams.forEach((t: any) => {
+          const side = String(t.team.id) === homeId ? 'home' : 'away';
+          t.statistics.forEach((s: any) => {
+             if(s.name === 'possessionPct') stats[side].possession = s.displayValue;
+             if(s.name === 'shotsSummary') stats[side].shots = s.displayValue;
+             if(s.name === 'foulsCommitted') stats[side].fouls = s.displayValue;
+             if(s.name === 'wonCorners') stats[side].corners = s.displayValue;
+             if(s.name === 'saves') stats[side].saves = s.displayValue;
+          });
+       });
+    }
+
+    // 🟢 B. PARSE LINEUPS (To build our Dictionary)
+    const lineups: any = { home: [], away: [] };
+    let rosters = boxscore?.rosters;
+    if (!rosters && boxscore?.players) rosters = boxscore.players;
+    if (!rosters && data.rosters) rosters = data.rosters;
+
+    if (rosters) {
+       rosters.forEach((r: any) => {
+          const side = String(r.team.id) === homeId ? 'home' : 'away';
+          let athletes = r.athletes || r.roster || r.statistics?.[0]?.athletes || [];
+
+          lineups[side] = athletes.map((p: any) => ({
+             name: p.athlete.displayName,
+             number: p.jersey,
+             position: p.position?.abbreviation || 'P',
+             is_starter: p.starter
+          }));
+       });
+    } else if (boxscore?.teams) {
+        boxscore.teams.forEach((t: any) => {
+            const side = String(t.team.id) === homeId ? 'home' : 'away';
+            if (t.roster) {
+                lineups[side] = t.roster.map((p: any) => ({
+                    name: p.athlete.displayName,
+                    number: p.jersey,
+                    is_starter: p.starter
+                }));
+            }
+        });
+    }
+
+    // 🔥 C. BUILD THE ROSTER DICTIONARY (With Exact Team Names)
+    const rosterDict: { name: string, side: string, teamName: string }[] = [];
+    ['home', 'away'].forEach(side => {
+        const teamName = side === 'home' ? homeTeamName : awayTeamName;
+        lineups[side].forEach((p: any) => {
+            if (p.name) rosterDict.push({ name: p.name, side, teamName });
+        });
+    });
+    // Sort by longest name first to avoid partial matches
+    rosterDict.sort((a, b) => b.name.length - a.name.length);
+
+    // 🟢 D. PARSE EVENTS (THE TRIPLE-LAYER SHREDDER)
     let events: any[] = [];
 
     if (data.commentary && data.commentary.length > 0) {
@@ -76,69 +139,90 @@ export async function fetchEspnDetails(gameId: string) {
                 let type = 'event';
                 let actionName = 'Event';
                 let player = '';
+                let matchedPlayerName = '';
+                let matchedTeamName = '';
 
-                try {
-                    // ❌ 1. TRAP VAR / DISALLOWED FIRST (Ignores the scoreline entirely)
-                    if (lowerText.includes('var decision') || lowerText.includes('overturned') || lowerText.includes('disallowed') || lowerText.includes('no goal')) {
-                        type = 'var_overturn'; 
-                        actionName = 'VAR Decision';
-                        player = 'Goal Disallowed';
+                // --- 1. CLASSIFY THE EVENT TYPE ---
+                if (lowerText.includes('var decision') || lowerText.includes('overturned') || lowerText.includes('disallowed') || lowerText.includes('no goal')) {
+                    type = 'var_overturn'; actionName = 'VAR Decision';
+                } else if (lowerText.includes('penalty conceded') || lowerText.includes('penalty awarded')) {
+                    type = 'penalty_awarded'; actionName = 'Penalty Awarded';
+                } else if (lowerText.includes('goal') || (lowerText.includes('penalty') && lowerText.includes('scored'))) {
+                    type = 'goal'; actionName = lowerText.includes('own goal') ? 'Own Goal' : 'Goal';
+                } else if (lowerText.includes('card')) {
+                    type = lowerText.includes('red') ? 'red-card' : 'card';
+                    actionName = lowerText.includes('red') ? 'Red Card' : 'Yellow Card';
+                } else if (lowerText.includes('substitution')) {
+                    type = 'sub'; actionName = 'Substitution';
+                }
+
+                // --- LAYER 1: THE HIDDEN METADATA ---
+                if (c.play?.participants?.length > 0) {
+                    matchedPlayerName = c.play.participants[0]?.athlete?.displayName || '';
+                    if (type === 'sub' && c.play.participants.length > 1) {
+                        const p1 = c.play.participants[0]?.athlete?.displayName;
+                        const p2 = c.play.participants[1]?.athlete?.displayName;
+                        // For subs via Layer 1, we still want to append the team if we can find it in the dictionary
+                        const teamMatch = rosterDict.find(r => r.name === p1);
+                        if (p1 && p2) {
+                            player = teamMatch ? `${p1} (In) / ${p2} (Out) (${teamMatch.teamName})` : `${p1} (In) / ${p2} (Out)`;
+                        }
                     }
-                    
-                    // ⚠️ 2. PENALTY AWARDED
-                    else if (lowerText.includes('penalty conceded') || lowerText.includes('penalty awarded')) {
-                        type = 'penalty_awarded'; 
-                        actionName = 'Penalty Awarded';
-                        player = 'Referee Check';
-                    }
-                    
-                    // ⚽ 3. GOALS
-                    else if (lowerText.includes('goal') || (lowerText.includes('penalty') && lowerText.includes('scored'))) {
-                        type = 'goal'; actionName = 'Goal';
+                }
+
+                // --- LAYER 2: THE ROSTER DICTIONARY & TEAM NAME INJECTOR ---
+                if (!player) {
+                    if (type === 'sub') {
+                        // Find all matched names, sort them by where they appear in the sentence (In comes before Out)
+                        const matched = rosterDict
+                            .filter(r => text.includes(r.name))
+                            .sort((a, b) => text.indexOf(a.name) - text.indexOf(b.name));
                         
-                        if (lowerText.includes('own goal')) {
-                            actionName = 'Own Goal';
-                            player = text.split(',')[0].replace(/Own Goal by /ig, '').trim();
+                        if (matched.length >= 2) {
+                            player = `${matched[0].name} (In) / ${matched[1].name} (Out) (${matched[0].teamName})`;
+                        } else if (matched.length === 1) {
+                            player = `${matched[0].name} (${matched[0].teamName})`;
+                        }
+                    } else {
+                        // For goals, cards, VAR, etc.
+                        if (!matchedPlayerName) {
+                            const match = rosterDict.find(r => text.includes(r.name));
+                            if (match) {
+                                matchedPlayerName = match.name;
+                                matchedTeamName = match.teamName;
+                            }
                         } else {
-                            // Splits by sentence to avoid the "Team A 1, Team B 0" text.
-                            const parts = text.split(/[\.!]\s+/);
-                            // 🔥 FIXED: Explicitly typed `p: string` for TypeScript
-                            const playerPart = parts.find((p: string) => p.includes('(') && p.includes(')'));
-                            
-                            if (playerPart) {
-                                player = playerPart.split('(')[0].trim();
-                            }
-                            
-                            if (lowerText.includes('assisted by')) {
-                                const assistMatch = text.match(/Assisted by (.*?)(?: with|\.)/i);
-                                if (assistMatch) player = `${player || 'Goal'} (Assist: ${assistMatch[1].trim()})`;
-                            }
+                            // If Layer 1 found the name, use the dictionary to grab their team name!
+                            const match = rosterDict.find(r => r.name === matchedPlayerName);
+                            if (match) matchedTeamName = match.teamName;
                         }
-                    }
-                    
-                    // 🟨🟥 4. CARDS (Red & Yellow)
-                    else if (lowerText.includes('card')) {
-                        type = lowerText.includes('red') ? 'red-card' : 'card';
-                        actionName = lowerText.includes('red') ? 'Red Card' : 'Yellow Card';
-                        
-                        const parts = text.split(/[\.!]\s+/);
-                        // 🔥 FIXED: Explicitly typed `p: string` for TypeScript
-                        const playerPart = parts.find((p: string) => p.includes('(') && p.includes(')'));
-                        if (playerPart) player = playerPart.split('(')[0].trim();
-                    }
-                    
-                    // 🔄 5. SUBSTITUTIONS
-                    else if (lowerText.includes('substitution')) {
-                        type = 'sub'; actionName = 'Substitution';
-                        const subMatch = text.match(/([^\.]+?)\s+replaces\s+([^\.]+?)(?:\s+because|\.|$)/i);
-                        if (subMatch) {
-                            player = `${subMatch[1].trim()} (In) / ${subMatch[2].trim()} (Out)`;
-                        }
-                    }
-                } catch (err) {}
 
-                // 🛡️ THE IRONCLAD FALLBACK (If Regex misses, default to beautiful clean text)
-                if (!player || player.trim() === '' || player.length > 55 || player.toLowerCase().includes('unknown')) {
+                        // 🔥 Inject the Team Name directly into the player string!
+                        if (matchedPlayerName) {
+                            player = matchedTeamName ? `${matchedPlayerName} (${matchedTeamName})` : matchedPlayerName;
+                        }
+                    }
+                }
+
+                // --- ASSISTS FOR GOALS ---
+                if (type === 'goal' && lowerText.includes('assisted by')) {
+                    const assistIndex = lowerText.indexOf('assisted by');
+                    const assistText = text.substring(assistIndex);
+                    
+                    // Look for a dictionary name in the "Assisted by..." part of the sentence
+                    const assistMatch = rosterDict.find(r => assistText.includes(r.name) && r.name !== matchedPlayerName);
+                    
+                    if (assistMatch) {
+                        player = `${player || 'Goal'} (Assist: ${assistMatch.name})`;
+                    } else {
+                        // Regex fallback just in case
+                        const regMatch = text.match(/Assisted by (.*?)(?: with|\.)/i);
+                        if (regMatch) player = `${player || 'Goal'} (Assist: ${regMatch[1].trim()})`;
+                    }
+                }
+
+                // --- LAYER 3: THE CLEAN SHIELD (Final Fallback) ---
+                if (!player || player.trim() === '' || player.length > 85 || player.toLowerCase().includes('unknown')) {
                     if (type === 'goal') player = 'Goal Confirmed';
                     else if (type === 'var_overturn') player = 'Goal Disallowed';
                     else if (type === 'penalty_awarded') player = 'Penalty Check';
@@ -159,54 +243,6 @@ export async function fetchEspnDetails(gameId: string) {
     }
     
     events.reverse();
-
-    // 🟢 B. PARSE STATS
-    const boxscore = data.boxscore;
-    const stats: any = { home: {}, away: {} };
-    if (boxscore?.teams) {
-       boxscore.teams.forEach((t: any) => {
-          const side = String(t.team.id) === homeId ? 'home' : 'away';
-          t.statistics.forEach((s: any) => {
-             if(s.name === 'possessionPct') stats[side].possession = s.displayValue;
-             if(s.name === 'shotsSummary') stats[side].shots = s.displayValue;
-             if(s.name === 'foulsCommitted') stats[side].fouls = s.displayValue;
-             if(s.name === 'wonCorners') stats[side].corners = s.displayValue;
-             if(s.name === 'saves') stats[side].saves = s.displayValue;
-          });
-       });
-    }
-
-    // 🟢 C. PARSE LINEUPS
-    const lineups: any = { home: [], away: [] };
-    let rosters = boxscore?.rosters;
-    if (!rosters && boxscore?.players) rosters = boxscore.players;
-    if (!rosters && data.rosters) rosters = data.rosters;
-
-    if (rosters) {
-       rosters.forEach((r: any) => {
-          const side = String(r.team.id) === homeId ? 'home' : 'away';
-          let athletes = r.athletes || r.roster || r.statistics?.[0]?.athletes || [];
-
-          lineups[side] = athletes.map((p: any) => ({
-             name: p.athlete.displayName,
-             number: p.jersey,
-             position: p.position?.abbreviation || 'P',
-             is_starter: p.starter
-          }));
-       });
-    } 
-    else if (boxscore?.teams) {
-        boxscore.teams.forEach((t: any) => {
-            const side = String(t.team.id) === homeId ? 'home' : 'away';
-            if (t.roster) {
-                lineups[side] = t.roster.map((p: any) => ({
-                    name: p.athlete.displayName,
-                    number: p.jersey,
-                    is_starter: p.starter
-                }));
-            }
-        });
-    }
 
     return { events, stats, lineups };
 
