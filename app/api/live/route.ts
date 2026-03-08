@@ -55,8 +55,10 @@ async function runLiveUpdate(request: Request) {
           if (!m.match_events || m.match_events.length === 0) {
               validPatchMatches.push(m); // Needs fixing!
           } else {
-              // ALREADY FIXED! Bump the timestamp so it gets out of the way!
-              bumpTasks.push(supabase.from('matches').update({ updated_at: new Date().toISOString() }).eq('id', m.id));
+              // 🔥 FIXED: Wrapped in an async function so TypeScript knows it is a Promise!
+              bumpTasks.push(
+                  (async () => await supabase.from('matches').update({ updated_at: new Date().toISOString() }).eq('id', m.id))()
+              );
           }
       });
 
