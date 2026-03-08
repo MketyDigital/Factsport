@@ -60,24 +60,26 @@ export async function fetchEspnDetails(gameId: string) {
 
     const homeId = String(data.header.competitions[0].competitors.find((c:any)=>c.homeAway==='home').team.id);
 
-    // 🟢 A. PARSE EVENTS (FACTS ONLY)
+    // 🟢 A. PARSE EVENTS (FACTS ONLY - Upgraded to catch all hidden text)
     let events: any[] = [];
     const rawEvents = data.header?.competitions?.[0]?.details || [];
     
     events = rawEvents.map((e: any) => {
-        const typeText = String(e.type?.text || 'event').toLowerCase();
+        // Hunt down the action text wherever ESPN hides it
+        const actionText = String(e.shortText || e.text || e.type?.text || 'Event');
+        const typeText = actionText.toLowerCase();
+        
         let type = 'event';
-
-        if (typeText.includes('goal')) type = 'goal';
+        if (typeText.includes('goal') || typeText.includes('penalty')) type = 'goal';
         else if (typeText.includes('red card')) type = 'red-card';
-        else if (typeText.includes('yellow card')) type = 'card';
-        else if (typeText.includes('substitution')) type = 'sub';
+        else if (typeText.includes('yellow') || typeText.includes('card')) type = 'card';
+        else if (typeText.includes('sub') || typeText.includes('replaced')) type = 'sub';
         
         return {
             id: Math.random().toString(36).substr(2, 9),
             time: e.clock?.displayValue || "0'",
             type: type,
-            text: type === 'goal' ? 'Goal' : e.type?.text,
+            text: type === 'goal' ? 'Goal' : actionText, // Shows 'Goal' or the actual action like 'Yellow Card'
             team: e.team?.displayName || '',
             player: e.participants?.[0]?.athlete?.displayName || '' 
         };
