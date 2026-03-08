@@ -21,32 +21,51 @@ async function runLiveUpdate(request: Request) {
   let logs: string[] = [];
   let updates = 0;
   const syncTasks: Promise<any>[] = []; 
+  const bumpTasks: Promise<any>[] = []; // For clearing the traffic jam
 
   try {
       const now = Date.now();
       const lookForward = new Date(now + (2 * 60 * 60 * 1000)).toISOString();
-      
-      // 🔥 THE 5-DAY PATCH: Looks back to fix matches that got wiped
-      const lookBack = new Date(now - (5 * 24 * 60 * 60 * 1000)).toISOString(); 
+      const lookBackLive = new Date(now - (24 * 60 * 60 * 1000)).toISOString(); // 24 hours for live
+      const lookBackPatch = new Date(now - (5 * 24 * 60 * 60 * 1000)).toISOString(); // 5 days for historical
 
-      const { data: dbMatches } = await supabase
+      // 🏎️ 1. THE VIP LANE: Get Live & Upcoming Matches (Priority #1)
+      const { data: liveDbMatches } = await supabase
         .from('matches')
         .select('*')
         .not('espn_id', 'is', null)
-        .gt('match_date', lookBack) 
+        .gt('match_date', lookBackLive) 
         .lt('match_date', lookForward)
-        .order('updated_at', { ascending: true }) // Grabs oldest/stale matches first
-        .limit(15); 
+        .in('status', ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE']);
 
-      const activeMatches = dbMatches?.filter(m => {
-          const isStartingSoonOrPlaying = ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE'].includes(m.status);
-          const needsFinalData = ['FT', 'FINISHED'].includes(m.status) && (!m.match_events || m.match_events.length === 0);
-          
-          return isStartingSoonOrPlaying || needsFinalData;
+      // 🚜 2. THE MAINTENANCE LANE: Get Old Finished Matches
+      const { data: patchDbMatches } = await supabase
+        .from('matches')
+        .select('*')
+        .not('espn_id', 'is', null)
+        .gt('match_date', lookBackPatch) 
+        .lt('match_date', lookForward)
+        .in('status', ['FT', 'FINISHED'])
+        .order('updated_at', { ascending: true }) 
+        .limit(20); 
+
+      // Clear the traffic jam: Find which old matches actually need fixing
+      const validPatchMatches: any[] = [];
+      (patchDbMatches || []).forEach(m => {
+          if (!m.match_events || m.match_events.length === 0) {
+              validPatchMatches.push(m); // Needs fixing!
+          } else {
+              // ALREADY FIXED! Bump the timestamp so it gets out of the way!
+              bumpTasks.push(supabase.from('matches').update({ updated_at: new Date().toISOString() }).eq('id', m.id));
+          }
       });
 
+      // Combine Live matches with up to 5 empty historical matches
+      const activeMatches = [...(liveDbMatches || []), ...validPatchMatches.slice(0, 5)];
+
       if (!activeMatches || activeMatches.length === 0) {
-          return NextResponse.json({ message: "No active matches. Sleeping.", timestamp: now });
+          await Promise.all(bumpTasks); // Clear traffic even if no active matches
+          return NextResponse.json({ message: "No active matches. Traffic jam cleared. Sleeping.", timestamp: now });
       }
 
       const activeLeagues = Array.from(new Set(activeMatches.map(m => m.league)));
@@ -55,7 +74,6 @@ async function runLiveUpdate(request: Request) {
         const espnCode = ESPN_LEAGUES[leagueName as string];
         if (!espnCode) continue;
 
-        // Fetches TODAY'S scoreboard
         const espnMatches = await fetchEspnLive(espnCode);
         const leagueDbMatches = activeMatches.filter(m => m.league === leagueName);
 
@@ -63,17 +81,14 @@ async function runLiveUpdate(request: Request) {
              const espnGame = espnMatches.find((e: any) => String(e.espn_id) === dbMatch.espn_id);
              const isFinishedNeedingPatch = ['FT', 'FINISHED'].includes(dbMatch.status);
 
-             // 🔥 THE BYPASS: Process if it's on today's live scoreboard OR if it's an old finished game needing a patch
              if (espnGame || isFinishedNeedingPatch) {
                  const updateTask = (async () => {
-                     // Fetch the events directly using the saved ID (bypasses the daily scoreboard limit)
                      const richData = await fetchEspnDetails(dbMatch.espn_id);
                      
                      const payload: any = {
                          updated_at: new Date().toISOString()
                      };
 
-                     // Only update live scores/clock if it's actually an active game on today's scoreboard
                      if (espnGame) {
                          let newStatus = dbMatch.status;
                          if (espnGame.status === 'in') newStatus = 'LIVE';
@@ -86,7 +101,6 @@ async function runLiveUpdate(request: Request) {
                          payload.displayClock = espnGame.clock;
                      }
 
-                     // Always attach the Triple-Layer events if they exist
                      if (richData) {
                          payload.match_events = richData.events;
                          payload.stats = richData.stats;
@@ -105,7 +119,8 @@ async function runLiveUpdate(request: Request) {
         }
       }
       
-      await Promise.all(syncTasks);
+      // Execute all updates and traffic-clearing bumps at once
+      await Promise.all([...syncTasks, ...bumpTasks]);
       return NextResponse.json({ success: true, updates, logs, timestamp: now });
 
   } catch (error: any) {
