@@ -34,7 +34,8 @@ async function runLiveUpdate(request: Request) {
         .select('*')
         .not('espn_id', 'is', null)
         .gt('match_date', lookBack) 
-        .lt('match_date', lookForward);
+        .lt('match_date', lookForward)
+        .limit(15); // 🔥 Prevents Vercel server timeouts by batching the work
 
       const activeMatches = dbMatches?.filter(m => {
           const isStartingSoonOrPlaying = ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE'].includes(m.status);
