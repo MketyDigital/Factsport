@@ -4,24 +4,26 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { isBigTeamMatch, postToSocials, SocialPayload } from '@/app/lib/socialService';
 
-// 🟢 TRUTH FILTER: Kills bad data before it processes
+// 🟢 TRUTH FILTER
 const getValidGoals = (eventsArr: any[]) => {
     if (!Array.isArray(eventsArr)) return [];
     return eventsArr.filter((e: any) => {
         if (!e) return false;
-        const text = String(e.text || e.description || '').toLowerCase();
-        const type = String(e.type || e.detail || '').toLowerCase();
+        const text = String(e.text || '').toLowerCase();
+        const type = String(e.type || '').toLowerCase();
         
-        // ❌ THE BAN LIST
-        if (text.includes('attempt saved') || 
-            text.includes('missed') || 
-            text.includes('disallowed') || 
-            text.includes('cancelled') || 
-            text.includes('no goal')) return false;
-            
-        // ✅ THE ALLOW LIST
-        return type === 'goal' || type === 'penalty' || text.includes('goal') || text.includes('⚽');
+        if (text.includes('disallowed') || text.includes('cancelled') || text.includes('no goal')) return false;
+        return type === 'goal' || type === 'penalty' || text === 'goal';
     });
+};
+
+// 🟢 STOPPAGE TIME PARSER
+const parseTime = (t: any) => {
+    const str = String(t).replace(/[^0-9+]/g, ''); 
+    const parts = str.split('+');
+    const base = parseInt(parts[0]) || 0;
+    const extra = parseInt(parts[1]) || 0;
+    return (base * 100) + extra; 
 };
 
 export async function POST(request: Request) {
@@ -35,7 +37,6 @@ export async function POST(request: Request) {
     if (!newState) return NextResponse.json({ message: "No record found" });
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
-    // --- 🛡️ VIP & DAILY FALLBACK FILTER ---
     let isVIP = isBigTeamMatch(newState.home_team, newState.away_team);
     if (!isVIP) {
         const today = new Date().toISOString().split('T')[0];
@@ -55,54 +56,37 @@ export async function POST(request: Request) {
     const oldTotal = (oldState.home_score || 0) + (oldState.away_score || 0);
     const newTotal = (newState.home_score || 0) + (newState.away_score || 0);
 
-    // 🔴 1. VAR DISALLOWED LOGIC (Score decreased)
+    const oldGoalsList = getValidGoals(oldState.match_events || []);
+    const newGoalsList = getValidGoals(newState.match_events || []);
+
+    // 🔴 1. VAR DISALLOWED LOGIC
     if (newTotal < oldTotal) {
         payload.fb1Message = `🚫 GOAL DISALLOWED!\n\nVAR decision: The previous goal has been overturned. The score returns to:\n\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
     }
     
-    // 🟢 2. GOAL / PENALTY ALERT (Score increased)
-    else if (newTotal > oldTotal) {
-        let statusText = ['IN_PLAY', 'LIVE', '1H', '2H'].includes(newState.status) ? '' : ` (${newState.status})`;
-        let matchEvents = newState.match_events || [];
-        let newGoals = getValidGoals(matchEvents);
+    // 🟢 2. GOAL / PENALTY ALERT 
+    else if (newTotal > oldTotal || newGoalsList.length > oldGoalsList.length) {
 
-        // 🔥 PATIENCE PATTERN (4.5s)
-        if (newGoals.length < newTotal) {
-            await new Promise(resolve => setTimeout(resolve, 4500));
-            const { data: fresh } = await supabase.from('matches').select('match_events').eq('id', newState.id).single();
-            if (fresh?.match_events) { 
-                matchEvents = fresh.match_events; 
-                newGoals = getValidGoals(matchEvents); 
-            }
+        // 🔥 THE "PATIENT CATCHER"
+        if (newGoalsList.length < newTotal) {
+            console.log(`[Webhook] Score is ${newTotal}, but only ${newGoalsList.length} goal events found. Waiting for next cron ping.`);
+            return NextResponse.json({ message: "Facts data lagging behind scoreboard. Waiting for next ping." });
         }
 
+        let statusText = ['IN_PLAY', 'LIVE', '1H', '2H'].includes(newState.status) ? '' : ` (${newState.status})`;
         let scorerText = "";
         
-        // 🔥 IRON-CLAD TRUTH CHECK
-        if (newGoals.length === newTotal) {
-            // Sort by time descending
-            const sortedGoals = [...newGoals].sort((a, b) => (b.time || b.minute || 0) - (a.time || a.minute || 0));
+        if (newGoalsList.length > 0) {
+            const sortedGoals = [...newGoalsList].sort((a, b) => parseTime(b.time || b.minute) - parseTime(a.time || a.minute));
             const latest = sortedGoals[0];
-
-            const rich = latest.text || latest.description || "";
+            
+            const player = latest.player || latest.playerName || latest.name || "Unknown Player";
             const time = latest.time || latest.minute ? `${latest.time || latest.minute}' ` : '';
             
-            // Stale Text Blocker
-            const dbScore = `${newState.home_score}-${newState.away_score}`;
-            const isStaleText = rich.includes('-') && !rich.includes(dbScore) && !rich.includes(`${newState.home_score}, ${newState.away_score}`);
-
-            if (rich && !isStaleText) {
-                scorerText = `\n${rich.includes(time.trim()) ? '' : time}${rich}\n`;
-            } else {
-                const player = latest.player || latest.playerName || latest.name;
-                if (player) scorerText = `\n🎯 ${player} (${time.trim()})\n`;
-            }
+            scorerText = `\n🎯 ${player} (${time.trim()})\n`;
         } 
         
-        // Clean Fallback
-        if (!scorerText.trim()) {
-            scorerText = `\n⚽ Goal confirmed! Tap the link below for full details and stats! 👇\n`;
-        }
+        if (!scorerText.trim()) scorerText = `\n⚽ Goal confirmed! Tap the link below for full details and stats! 👇\n`;
 
         if (['PEN', 'PEN_SHOOT_OUT'].includes(newState.status)) {
             payload.fb1Message = `🥅 PENALTY SCORED!\n\nShootout Update: ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl} ⚽`;
@@ -111,14 +95,21 @@ export async function POST(request: Request) {
         }
     }
     
-    // 📋 3. STARTING XI (Wait-for-22 Lock + X Image)
+    // 📋 3. STARTING XI 
     else {
-        const oldLine = Array.isArray(oldState.lineups?.home) && oldState.lineups.home.length > 0;
-        const newLine = Array.isArray(newState.lineups?.home) && newState.lineups.home.length > 0 && Array.isArray(newState.lineups?.away) && newState.lineups.away.length > 0;
+        const getValidNames = (arr: any[]) => (Array.isArray(arr) ? arr : []).map(p => p?.name || (typeof p === 'string' ? p : null)).filter(Boolean);
         
-        if (!oldLine && newLine) {
-            const hXI = newState.lineups.home.slice(0, 11).join(', ');
-            const aXI = newState.lineups.away.slice(0, 11).join(', ');
+        const oldValidH = getValidNames(oldState.lineups?.home);
+        const oldValidA = getValidNames(oldState.lineups?.away);
+        const newValidH = getValidNames(newState.lineups?.home);
+        const newValidA = getValidNames(newState.lineups?.away);
+
+        const oldWasIncomplete = oldValidH.length < 11 || oldValidA.length < 11;
+        const newIsComplete = newValidH.length >= 11 && newValidA.length >= 11;
+        
+        if (oldWasIncomplete && newIsComplete) {
+            const hXI = newValidH.slice(0, 11).join(', ');
+            const aXI = newValidA.slice(0, 11).join(', ');
             
             payload.fb1Message = `📋 STARTING XI ANNOUNCED!\n\n${newState.home_team} vs ${newState.away_team}\n\nHome: ${hXI}\n\nAway: ${aXI}\n\n👇\n${matchUrl} ⚽`;
             payload.xMessage = `🚨 TEAM NEWS IS IN!\n\nA massive clash ahead: ${newState.home_team} vs ${newState.away_team}. Full lineups and bench here:`;
@@ -126,6 +117,9 @@ export async function POST(request: Request) {
             const lineupOg = { type: 'versus', label: 'STARTING XI', home: newState.home_team, away: newState.away_team, homeXI: hXI, awayXI: aXI };
             const lineupBase64 = encodeURIComponent(Buffer.from(JSON.stringify(lineupOg)).toString('base64'));
             payload.xImageUrl = `${imageUrl}/api/og?data=${lineupBase64}&ext=.png`;
+        } 
+        else if (oldWasIncomplete && !newIsComplete && (newValidH.length > 0 || newValidA.length > 0)) {
+            return NextResponse.json({ message: "Lineups still incomplete. Waiting for 22 players." });
         }
         
         // ⏱️ 4. MATCH STATUS UPDATES
