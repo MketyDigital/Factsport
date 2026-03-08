@@ -69,6 +69,27 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
   const homePlayers = getSortedLineup(lineups?.home);
   const awayPlayers = getSortedLineup(lineups?.away);
 
+  // 🔥 NEW: Dynamic Icon Mapper to handle all our new backend tags!
+  const getEventIcon = (type: string, text: string) => {
+    if (type === 'goal') {
+      if (text === 'Own Goal') return '🤦‍♂️';
+      if (text === 'Penalty Goal') return '🥅';
+      return '⚽';
+    }
+    if (type === 'var_overturn') return '❌';
+    if (type === 'penalty_awarded') return text === 'Penalty Conceded' ? '🛑' : '⚠️';
+    if (type === 'penalty_missed') return '❌';
+    if (type === 'red-card') return '🟥';
+    if (type === 'card') return '🟨';
+    if (type === 'sub') return '🔄';
+    if (type === 'attempt') {
+      if (text === 'Shot Saved') return '🧤';
+      if (text === 'Shot Missed') return '💨';
+      return '⏱️'; 
+    }
+    return '📌';
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="flex border-b border-slate-200">
@@ -93,10 +114,8 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
                                 <div className="flex-1 pb-4 border-b border-slate-50 last:border-0">
                                     <div className="text-xs text-slate-800 flex items-start gap-2 leading-relaxed">
                                         <span className="shrink-0 mt-0.5">
-                                            {e.type === 'goal' && '⚽'} 
-                                            {e.type === 'card' && '🟨'} 
-                                            {e.type === 'red-card' && '🟥'} 
-                                            {e.type === 'sub' && '🔄'}
+                                            {/* 🔥 Now dynamically pulls the perfect icon! */}
+                                            {getEventIcon(e.type, e.text)}
                                         </span>
                                         
                                         {isOldData ? (

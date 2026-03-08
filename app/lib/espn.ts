@@ -123,16 +123,12 @@ export async function fetchEspnDetails(gameId: string) {
     let events: any[] = [];
 
     if (data.commentary && data.commentary.length > 0) {
-        // We capture the raw array before filtering so we can look at all events
         const rawEvents = data.commentary;
 
-        // Step 1: Filter out the absolute junk (missed shots that aren't important, corners, etc.)
         events = rawEvents
             .filter((c: any) => {
                 const t = (c.text || '').toLowerCase();
                 const metaType = c.play?.type?.text?.toLowerCase() || '';
-                
-                // Keep goals, penalties, cards, subs, var, and attempts (so we can tag attempts as non-goals safely)
                 return t.includes('goal') || t.includes('penalty') || t.includes('card') || t.includes('substitution') || t.includes('var ') || t.includes('overturned') || t.includes('attempt') || metaType.includes('goal') || metaType.includes('card');
             })
             .map((c: any) => {
@@ -153,17 +149,21 @@ export async function fetchEspnDetails(gameId: string) {
                 if (lowerText.includes('var decision') || lowerText.includes('overturned') || lowerText.includes('disallowed') || lowerText.includes('no goal') || metaType.includes('var')) {
                     type = 'var_overturn'; actionName = 'VAR Decision';
                 } 
-                // B. Trap Penalties Awarded/Missed
-                else if (lowerText.includes('penalty conceded') || lowerText.includes('penalty awarded')) {
+                // B. Trap Penalties (Awarded, Conceded, Missed, and Checks)
+                else if (lowerText.includes('penalty conceded')) {
+                    type = 'penalty_awarded'; actionName = 'Penalty Conceded'; // 🔥 FIX: Clarifies Bruno caused the penalty!
+                } else if (lowerText.includes('penalty awarded')) {
                     type = 'penalty_awarded'; actionName = 'Penalty Awarded';
+                } else if (lowerText.includes('penalty') && (lowerText.includes('check') || lowerText.includes('var'))) {
+                    type = 'var_overturn'; actionName = 'VAR Penalty Check'; // 🔥 FIX: Stops the "Match Event" fallback
                 } else if ((lowerText.includes('penalty') && (lowerText.includes('saved') || lowerText.includes('missed'))) || metaType === 'penalty missed' || metaType === 'penalty saved') {
                     type = 'penalty_missed'; actionName = 'Penalty Missed';
                 } 
-                // C. Trap Fake Goals (Attempts/Saves/Woodwork) BEFORE checking for "Goal"
+                // C. Trap Fake Goals 
                 else if (lowerText.includes('attempt') || lowerText.includes('saved') || lowerText.includes('missed') || lowerText.includes('blocked') || lowerText.includes('post') || lowerText.includes('crossbar') || metaType.includes('shot') || metaType.includes('miss')) {
                     type = 'attempt'; actionName = lowerText.includes('saved') ? 'Shot Saved' : 'Shot Missed';
                 } 
-                // D. The True Goal Verification (Metadata, Exclamation, Own Goal, or Scoreline Match)
+                // D. The True Goal Verification 
                 else if (metaType === 'goal' || lowerText.includes('goal!') || lowerText.includes('own goal by') || (lowerText.includes('goal') && /\d+/.test(lowerText))) {
                     type = 'goal'; actionName = lowerText.includes('own goal') ? 'Own Goal' : 'Goal';
                 } else if (lowerText.includes('penalty') && lowerText.includes('scored')) {
@@ -176,8 +176,7 @@ export async function fetchEspnDetails(gameId: string) {
                 } else if (lowerText.includes('substitution') || metaType.includes('substitution')) {
                     type = 'sub'; actionName = 'Substitution';
                 } else {
-                    // If it passed the initial filter but doesn't strictly match our types, discard it as an attempt
-                    type = 'attempt'; actionName = 'Match Event';
+                    type = 'attempt'; actionName = 'Match Update';
                 }
 
                 // --- LAYER 1: THE HIDDEN METADATA ---
