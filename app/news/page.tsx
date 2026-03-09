@@ -83,7 +83,7 @@ export default async function NewsListingPage() {
                         <p className="font-bold text-sm text-slate-400 mt-1">Join the monthly leaderboard. Win Fantastic Rewards</p>
                     </div>
                 </div>
-                <Link href="/matches" className="w-full md:w-auto bg-yellow-500 hover:bg-yellow-400 text-black px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:-translate-y-1 transition-all shadow-[0_10px_20px_rgba(234,179,8,0.3)] flex items-center justify-center gap-2">
+                <Link href="/vip/upgrade" className="w-full md:w-auto bg-yellow-500 hover:bg-yellow-400 text-black px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:-translate-y-1 transition-all shadow-[0_10px_20px_rgba(234,179,8,0.3)] flex items-center justify-center gap-2">
                     Play Now <ArrowRight size={16}/>
                 </Link>
             </div>
