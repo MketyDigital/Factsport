@@ -3,9 +3,11 @@ export const revalidate = 3;
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
-import { Video, Mic, Calendar, ChevronLeft, Radio, Trophy, Activity, PlayCircle } from 'lucide-react';
+// 🔥 Added ArrowRight to imports for the banner
+import { Video, Mic, Calendar, ChevronLeft, Radio, Trophy, Activity, PlayCircle, ArrowRight } from 'lucide-react';
 import LiveScoreLabel from '@/app/components/LiveScoreLabel'; 
-import AutoRefresh from '@/app/components/AutoRefresh'; // 🔥 IMPORTED AUTO REFRESH
+import AutoRefresh from '@/app/components/AutoRefresh';
+import BettingPromo from '@/app/components/BettingPromo'; // 🔥 IMPORTED BETTING PROMO
 
 export default async function LiveMediaPage() {
   const supabase = createClient();
@@ -44,7 +46,13 @@ export default async function LiveMediaPage() {
           </div>
       </div>
 
-      <div className="p-4 space-y-8">
+      <div className="p-4 space-y-8 max-w-5xl mx-auto mt-4">
+        
+        {/* 🟢 COMPONENT 1: BETTING PROMO (Compact layout at the top) */}
+        <div className="max-w-2xl mx-auto">
+            <BettingPromo affiliateLink={null} />
+        </div>
+
         {coveredMatches.length === 0 && liveUncoveredMatches.length === 0 ? (
             <div className="text-center py-20 bg-white/5 rounded-3xl border border-white/10 p-6 backdrop-blur-sm">
                 <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10 shadow-inner">
@@ -90,11 +98,30 @@ export default async function LiveMediaPage() {
                 )}
             </>
         )}
+
+        {/* 🟢 COMPONENT 2: PREDICT & WIN BANNER (Slim layout at the bottom) */}
+        <div className="mt-10 max-w-3xl mx-auto bg-[#0a1428] rounded-2xl p-4 md:p-5 border border-yellow-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 opacity-10 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
+            <div className="flex items-center gap-4 relative z-10">
+                <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(234,179,8,0.4)]">
+                    <Trophy size={24} className="text-black fill-black" />
+                </div>
+                <div>
+                    <h3 className="font-black text-lg uppercase italic text-white leading-tight tracking-tighter">Predict & <span className="text-yellow-500">Win Prizes</span></h3>
+                    <p className="text-xs text-slate-400 font-bold mt-0.5">Join the leaderboard for fantastic rewards.</p>
+                </div>
+            </div>
+            <Link href="/vip/upgrade" className="relative z-10 w-full sm:w-auto shrink-0 bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition flex items-center justify-center gap-2 active:scale-95 shadow-md">
+                Play Now <ArrowRight size={14}/>
+            </Link>
+        </div>
+
       </div>
     </div>
   );
 }
 
+// THE UNTOUCHED MATCH CARD LOGIC
 function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean }) {
     return (
         <div className={`rounded-2xl shadow-xl overflow-hidden relative flex flex-col transition-all duration-500 border ${hasCoverage ? 'bg-slate-900 border-slate-700 hover:border-blue-500/50' : 'bg-white/5 border-white/10'}`}>
