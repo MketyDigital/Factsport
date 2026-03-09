@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget'; 
 import { getLeagueAssets } from '@/app/lib/league-assets';
 import MatchTime from '@/app/components/MatchTime';
+import TeamFormRing from '@/app/components/TeamFormRing'; // 🔥 NEW IMPORT
 
 export default function MatchHeaderClient({ matchId, initialData }: any) {
   const [data, setData] = useState(initialData);
@@ -12,7 +13,6 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
   useEffect(() => {
     const fetchHeaderData = async () => {
       if (document.visibilityState !== 'visible') return;
-
       try {
           const res = await fetch(`/api/match-data?id=${matchId}`);
           if (!res.ok) return;
@@ -59,8 +59,15 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
   const currentStatus = data?.status?.toUpperCase() || '';
   const isLive = ['LIVE', 'HT', 'IN_PLAY'].includes(currentStatus);
   const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'].includes(currentStatus);
-
   const leagueData = getLeagueAssets(initialData?.league);
+
+  // Parse matches array for the Form Rings
+  let parsedH2h = initialData?.h2h;
+  if (typeof parsedH2h === 'string') {
+      try { parsedH2h = JSON.parse(parsedH2h); } catch (e) { parsedH2h = {}; }
+  }
+  const h2hMatches = parsedH2h?.matches || [];
+  const refName = initialData?.referees?.[0]?.name || (typeof initialData?.referees?.[0] === 'string' ? initialData.referees[0] : null);
 
   return (
     <div className="relative z-10 px-4 mt-1 pb-6 pt-2 rounded-b-3xl overflow-hidden bg-slate-900 shadow-2xl">
@@ -74,19 +81,28 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
         </div>
 
         <div className="absolute inset-0 z-0 pointer-events-none">
-            <div className="absolute inset-0 bg-slate-900/40" />
+            <div className="absolute inset-0 bg-slate-900/60" />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />
         </div>
 
         <div className="relative z-10">
+            {/* 🔥 NEW: Pro Analyst Referee Badge */}
+            {refName && (
+                <div className="flex justify-center mb-2">
+                    <span className="bg-black/40 backdrop-blur border border-white/5 text-[8px] text-slate-300 px-2 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-widest">
+                        👨‍⚖️ Match Official: {refName}
+                    </span>
+                </div>
+            )}
+
             <div className="flex justify-center mb-6">
                 {isLive ? (
                     <div className="flex flex-col items-center">
-                        <span className="bg-red-600/90 backdrop-blur-sm text-white text-[10px] font-black px-4 py-1.5 rounded-full animate-pulse flex items-center gap-2 shadow-lg shadow-red-900/40 border border-white/10">
+                        <span className="bg-red-600/90 backdrop-blur-sm text-white text-[10px] font-black px-4 py-1.5 rounded-full animate-pulse flex items-center gap-2 shadow-[0_0_15px_rgba(220,38,38,0.5)] border border-white/10">
                             <span className="w-2 h-2 bg-white rounded-full"></span> 
                             {currentStatus === 'HT' ? 'HALF TIME' : 'LIVE'}
                         </span>
-                        {data?.displayClock && <span className="text-red-300 text-[10px] font-mono mt-1 font-bold">{data.displayClock}</span>}
+                        {data?.displayClock && <span className="text-red-300 text-[10px] font-mono mt-1 font-bold bg-black/30 px-2 rounded">{data.displayClock}</span>}
                     </div>
                 ) : (
                     <span className={`text-[10px] font-bold px-4 py-1.5 rounded-full border backdrop-blur-md shadow-lg flex items-center ${isFinished ? 'bg-slate-900/80 text-slate-300 border-slate-700' : 'bg-white/10 text-white border-white/20'}`}>
@@ -97,17 +113,19 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
 
             <div className="flex justify-between items-start">
                 <div className="flex flex-col items-center w-[35%] group">
-                    <div className="w-20 h-20 bg-white/10 p-4 rounded-2xl mb-3 flex items-center justify-center border border-white/10 shadow-2xl backdrop-blur-md transition-transform group-hover:scale-105">
-                        {initialData?.home_logo ? <img src={initialData.home_logo} className="w-full h-full object-contain drop-shadow-md" /> : <div className="font-black text-slate-500">H</div>}
+                    <div className="w-20 h-20 bg-gradient-to-b from-white/10 to-transparent p-4 rounded-2xl mb-2 flex items-center justify-center border border-white/10 shadow-2xl backdrop-blur-md transition-transform group-hover:scale-105">
+                        {initialData?.home_logo ? <img src={initialData.home_logo} className="w-full h-full object-contain drop-shadow-lg" /> : <div className="font-black text-slate-500">H</div>}
                     </div>
                     <h2 className="font-bold text-center text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md">{initialData?.home_team}</h2>
+                    {/* 🔥 NEW: Dynamic Form Ring */}
+                    <TeamFormRing teamName={initialData?.home_team} matches={h2hMatches} />
                 </div>
                 
                 <div className="flex flex-col items-center justify-center w-[30%] pt-4">
                     {currentStatus === 'SCHEDULED' || currentStatus === 'PRE' ? (
                          <div className="text-4xl font-black text-white/20">VS</div>
                     ) : (
-                        <div className="text-6xl font-black tracking-tighter text-white flex gap-1 drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]">
+                        <div className="text-6xl font-black tracking-tighter text-white flex gap-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
                             <span>{data?.home_score ?? 0}</span>
                             <span className="text-white/40">:</span>
                             <span>{data?.away_score ?? 0}</span>
@@ -116,10 +134,12 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                 </div>
 
                 <div className="flex flex-col items-center w-[35%] group">
-                    <div className="w-20 h-20 bg-white/10 p-4 rounded-2xl mb-3 flex items-center justify-center border border-white/10 shadow-2xl backdrop-blur-md transition-transform group-hover:scale-105">
-                        {initialData?.away_logo ? <img src={initialData.away_logo} className="w-full h-full object-contain drop-shadow-md" /> : <div className="font-black text-slate-500">A</div>}
+                    <div className="w-20 h-20 bg-gradient-to-b from-white/10 to-transparent p-4 rounded-2xl mb-2 flex items-center justify-center border border-white/10 shadow-2xl backdrop-blur-md transition-transform group-hover:scale-105">
+                        {initialData?.away_logo ? <img src={initialData.away_logo} className="w-full h-full object-contain drop-shadow-lg" /> : <div className="font-black text-slate-500">A</div>}
                     </div>
                     <h2 className="font-bold text-center text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md">{initialData?.away_team}</h2>
+                    {/* 🔥 NEW: Dynamic Form Ring */}
+                    <TeamFormRing teamName={initialData?.away_team} matches={h2hMatches} />
                 </div>
             </div>
         </div>
