@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic';
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
-import { CreditCard, Eye, ShieldAlert, LayoutDashboard, ArrowRight, Newspaper, Settings, Users, Activity } from 'lucide-react';
+// 🔥 FIX: Added 'Lock' to the import list below!
+import { CreditCard, Eye, ShieldAlert, LayoutDashboard, ArrowRight, Newspaper, Settings, Users, Activity, Lock } from 'lucide-react';
 import ApproveButton from '@/app/components/ApproveButton';
 import ResetMonthButton from './components/ResetMonthButton'; 
 import CleanupButton from './components/CleanupButton'; 
