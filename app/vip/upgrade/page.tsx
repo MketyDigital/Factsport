@@ -8,11 +8,9 @@ import { useRouter } from 'next/navigation';
 import { 
   Trophy, Check, Copy, CreditCard, Bitcoin, Loader2, ShieldCheck, 
   UploadCloud, AlertCircle, Gift, MessageCircle, Ticket, 
-  TrendingUp, Tv, ExternalLink, Mail, Send
+  TrendingUp, Tv, ExternalLink, Mail, Send, Lock
 } from 'lucide-react';
 import Link from 'next/link';
-
-// 🟢 NEW: Import the image compression tool
 import imageCompression from 'browser-image-compression';
 
 export default function VipUpgradePage() {
@@ -35,22 +33,19 @@ export default function VipUpgradePage() {
   const router = useRouter();
   const supabase = createClient();
 
-  // --- 🟢 DYNAMIC SETTINGS STATE ---
   const [gatewayDetails, setGatewayDetails] = useState({ link: "", price: "$5.00" });
   const [cryptoDetails, setCryptoDetails] = useState({ network: "USDT/Bitcoin (TRC20)", address: "TRVBw6ZzVnnzfSMSPkyGrRjVpqH9C7wcr2", price: "$5.00" });
   const [supportDetails, setSupportDetails] = useState({ telegram: "https://t.me/factsportlive", email: "support@factsport.com" });
 
-  // 1. SMART CHECK ON LOAD
   useEffect(() => {
     const initData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       
-      // Fetch dynamic payment & support settings
       const { data: settings } = await supabase.from('site_settings').select('*').eq('id', 1).single();
       if (settings) {
           setGatewayDetails({
               link: settings.gateway_link || "",
-              price: "$5.00" // Locked to dollar
+              price: "$5.00" 
           });
           setCryptoDetails({
               network: settings.crypto_network || "USDT/Bitcoin (TRC20)",
@@ -61,13 +56,11 @@ export default function VipUpgradePage() {
               setSupportDetails(prev => ({ ...prev, telegram: settings.telegram_support }));
           }
           
-          // Force crypto if gateway link is empty
           if (!settings.gateway_link) setPaymentMethod('crypto');
       }
 
       if (!session) return;
 
-      // Check Profile for VIP Status
       const { data: profile } = await supabase.from('profiles').select('is_vip, vip_expires_at').eq('id', session.user.id).single();
       const { data: pending } = await supabase.from('subscriptions').select('id').eq('user_id', session.user.id).eq('status', 'pending').single();
 
@@ -79,7 +72,6 @@ export default function VipUpgradePage() {
     initData();
   }, [supabase]);
 
-  // Helper: Copy Text
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(text);
@@ -90,7 +82,6 @@ export default function VipUpgradePage() {
     e.preventDefault();
     setUploadError(null);
 
-    // Security Check: Prevent submitting if gateway is selected but unavailable
     if (paymentMethod === 'gateway' && !gatewayDetails.link) return;
 
     if (hasPending) {
@@ -110,20 +101,17 @@ export default function VipUpgradePage() {
 
     if (file) {
         try {
-            // 🟢 NEW: Compress the image BEFORE uploading
             const options = {
-                maxSizeMB: 0.2,          // 200KB max size (small enough for storage, big enough to read text)
-                maxWidthOrHeight: 1200,  // Good resolution for a receipt
+                maxSizeMB: 0.2, 
+                maxWidthOrHeight: 1200, 
                 useWebWorker: true
             };
             
             const compressedFile = await imageCompression(file, options);
 
-            // Security Check: Sanitize file name before upload
             const fileExt = file.name.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '') || 'img';
             const fileName = `proof-${user.id}-${Date.now()}.${fileExt}`;
             
-            // Upload the COMPRESSED file instead of the raw file
             const { error: uploadErr } = await supabase.storage.from('payment_proofs').upload(fileName, compressedFile);
             if (uploadErr) { setUploadError(`Upload Failed: ${uploadErr.message}`); setLoading(false); return; }
             
@@ -157,177 +145,175 @@ export default function VipUpgradePage() {
     setLoading(false);
   };
 
-  // --- VIEW 1: ALREADY VIP ---
   if (!checkingStatus && isVip) {
     return (
-        <div className="min-h-screen bg-[#0a1428] flex items-center justify-center p-4">
-            <div className="bg-gradient-to-br from-yellow-600 to-yellow-800 border border-yellow-500 p-8 rounded-3xl text-center max-w-md w-full shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
-                <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6 backdrop-blur-sm">
-                    <Trophy size={40} className="text-white" />
+        <div className="min-h-screen bg-[#0a1428] flex items-center justify-center p-4 selection:bg-yellow-500">
+            <div className="bg-gradient-to-br from-yellow-500 to-yellow-700 border border-yellow-400 p-10 rounded-3xl text-center max-w-md w-full shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-20 rounded-full blur-3xl transform translate-x-20 -translate-y-20"></div>
+                <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6 backdrop-blur-md shadow-[0_0_30px_rgba(255,255,255,0.3)]">
+                    <Trophy size={48} className="text-white drop-shadow-md" />
                 </div>
-                <h1 className="text-3xl font-black text-white uppercase italic tracking-tighter mb-2">VIP Active</h1>
-                <p className="text-yellow-100 font-medium mb-6">
-                    You are already a member of the Winners Circle.
+                <h1 className="text-4xl font-black text-white uppercase tracking-tighter mb-2 drop-shadow-md">VIP Active</h1>
+                <p className="text-yellow-100 font-bold mb-8 text-sm">
+                    You are officially in the Winners Circle.
                 </p>
-                <div className="bg-black/20 rounded-xl p-4 mb-6">
-                    <p className="text-[10px] text-yellow-200 uppercase font-bold">Expires On</p>
-                    <p className="text-xl font-mono font-bold text-white">
-                        {vipExpiry ? new Date(vipExpiry).toLocaleDateString(undefined, { dateStyle: 'long' }) : 'Lifetime'}
+                <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-5 mb-8 border border-white/10 shadow-inner">
+                    <p className="text-[10px] text-yellow-300 uppercase font-black tracking-widest mb-1">Status Valid Until</p>
+                    <p className="text-2xl font-mono font-black text-white">
+                        {vipExpiry ? new Date(vipExpiry).toLocaleDateString(undefined, { dateStyle: 'long' }) : 'Lifetime Access'}
                     </p>
                 </div>
-                <Link href="/dashboard" className="block w-full bg-white text-yellow-800 font-black py-4 rounded-xl shadow-lg hover:bg-slate-100 transition">
-                    Go to Dashboard
+                <Link href="/dashboard" className="block w-full bg-white text-yellow-900 font-black uppercase tracking-widest py-4 rounded-xl shadow-xl hover:scale-105 transition-transform">
+                    Enter Dashboard
                 </Link>
             </div>
         </div>
     );
   }
 
-  // --- VIEW 2: SUCCESS MESSAGE ---
   if (success) {
     return (
-        <div className="min-h-screen bg-black flex items-center justify-center p-4">
-            <div className="bg-[#111] border border-yellow-500/30 p-8 rounded-2xl text-center max-w-md w-full">
-                <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-4 text-black shadow-[0_0_20px_rgba(234,179,8,0.5)]">
-                    <Check size={32} strokeWidth={3} />
+        <div className="min-h-screen bg-[#0a1428] flex items-center justify-center p-4">
+            <div className="bg-[#0f1c3a] border border-green-500/30 p-10 rounded-3xl text-center max-w-md w-full shadow-2xl relative overflow-hidden">
+                <div className="absolute inset-0 bg-green-500/5"></div>
+                <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 text-white shadow-[0_0_30px_rgba(34,197,94,0.4)] relative z-10">
+                    <Check size={40} strokeWidth={3} />
                 </div>
-                <h2 className="text-2xl font-black text-white mb-2">Request Submitted</h2>
-                <p className="text-slate-400 text-sm mb-6">Verification in progress. Check back soon.</p>
-                <button onClick={() => router.push('/dashboard')} className="w-full bg-slate-800 text-white font-bold py-3.5 rounded-xl">Back to Dashboard</button>
+                <h2 className="text-3xl font-black text-white mb-3 relative z-10 tracking-tight">Request Received</h2>
+                <p className="text-slate-400 text-sm mb-8 font-medium relative z-10">Your proof of payment is being verified by our team. Approval usually takes less than 30 minutes.</p>
+                <button onClick={() => router.push('/dashboard')} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest py-4 rounded-xl shadow-lg transition active:scale-95 relative z-10">
+                    Return to Dashboard
+                </button>
             </div>
         </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0a1428] pb-24 font-sans text-white">
+    <div className="min-h-screen bg-[#0a1428] pb-24 font-sans text-white selection:bg-yellow-500">
        
-       {/* HEADER */}
-       <div className="relative overflow-hidden bg-black pb-12 pt-10 px-6 rounded-b-[3rem] shadow-2xl border-b border-yellow-900/30">
-            <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
+       <div className="relative overflow-hidden bg-black pb-16 pt-12 px-6 rounded-b-[3rem] shadow-2xl border-b border-yellow-500/30">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-yellow-500 rounded-full blur-[100px] opacity-20 pointer-events-none"></div>
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+            
             <div className="flex flex-col items-center text-center relative z-10">
-                <div className="bg-yellow-500 text-black text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider mb-4 animate-pulse">Premium Access</div>
-                <h1 className="text-3xl font-black uppercase italic tracking-tighter text-white">Predict & Win</h1>
-                <p className="text-slate-400 text-sm mt-2 max-w-xs">Join the Winners Circle. Get exclusive access and win real prizes.</p>
+                <div className="bg-yellow-500 text-black text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest mb-6 shadow-[0_0_15px_rgba(234,179,8,0.5)] flex items-center gap-1.5">
+                    <Lock size={12}/> Premium Access
+                </div>
+                <h1 className="text-4xl md:text-5xl font-black uppercase italic tracking-tighter text-white drop-shadow-lg">Join The <span className="text-yellow-500">Winners Circle</span></h1>
+                <p className="text-slate-300 text-sm md:text-base mt-4 max-w-md font-medium leading-relaxed">Unlock guaranteed slips, pro-level AI analysis, and compete for millions in monthly cash prizes.</p>
             </div>
        </div>
 
-      <div className="max-w-md mx-auto px-4 -mt-6 relative z-10 space-y-6">
+      <div className="max-w-xl mx-auto px-4 -mt-8 relative z-20 space-y-6">
         
-        {/* --- BENEFITS GRID --- */}
-        <div className="grid grid-cols-2 gap-3">
-             <div className="bg-[#1A1A1A] border border-white/5 p-4 rounded-xl flex flex-col items-center text-center">
-                 <div className="w-8 h-8 bg-yellow-500/10 rounded-full flex items-center justify-center mb-2"><Trophy size={16} className="text-yellow-500"/></div>
-                 <h3 className="text-xs font-bold text-white mb-1">Monthly Cash Prizes</h3>
-                 <p className="text-[9px] text-slate-400 leading-tight">Top the leaderboard to win real cash rewards.</p>
+        {/* PREMIUM BENEFITS GRID */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+             <div className="bg-[#0f1c3a] border border-white/5 p-4 md:p-5 rounded-2xl flex flex-col items-center text-center shadow-lg group hover:border-yellow-500/30 transition-colors">
+                 <div className="w-10 h-10 bg-yellow-500/10 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><Trophy size={18} className="text-yellow-500"/></div>
+                 <h3 className="text-xs font-black text-white mb-1 tracking-wide">Cash Prizes</h3>
+                 <p className="text-[9px] text-slate-400 font-medium">Top the leaderboard for real rewards.</p>
              </div>
-             <div className="bg-[#1A1A1A] border border-white/5 p-4 rounded-xl flex flex-col items-center text-center">
-                 <div className="w-8 h-8 bg-blue-500/10 rounded-full flex items-center justify-center mb-2"><Gift size={16} className="text-blue-500"/></div>
-                 <h3 className="text-xs font-bold text-white mb-1">Win Sport Items</h3>
-                 <p className="text-[9px] text-slate-400 leading-tight">Exclusive jerseys and official merchandise.</p>
+             <div className="bg-[#0f1c3a] border border-white/5 p-4 md:p-5 rounded-2xl flex flex-col items-center text-center shadow-lg group hover:border-blue-500/30 transition-colors">
+                 <div className="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><MessageCircle size={18} className="text-blue-500"/></div>
+                 <h3 className="text-xs font-black text-white mb-1 tracking-wide">VIP Telegram</h3>
+                 <p className="text-[9px] text-slate-400 font-medium">Private community of winners.</p>
              </div>
-             <div className="bg-[#1A1A1A] border border-white/5 p-4 rounded-xl flex flex-col items-center text-center">
-                 <div className="w-8 h-8 bg-green-500/10 rounded-full flex items-center justify-center mb-2"><MessageCircle size={16} className="text-green-500"/></div>
-                 <h3 className="text-xs font-bold text-white mb-1">VIP Telegram</h3>
-                 <p className="text-[9px] text-slate-400 leading-tight">Join our private community of winners.</p>
+             <div className="bg-[#0f1c3a] border border-white/5 p-4 md:p-5 rounded-2xl flex flex-col items-center text-center shadow-lg group hover:border-purple-500/30 transition-colors">
+                 <div className="w-10 h-10 bg-purple-500/10 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><Ticket size={18} className="text-purple-500"/></div>
+                 <h3 className="text-xs font-black text-white mb-1 tracking-wide">Accurate Slips</h3>
+                 <p className="text-[9px] text-slate-400 font-medium">High-odds accumulators daily.</p>
              </div>
-             <div className="bg-[#1A1A1A] border border-white/5 p-4 rounded-xl flex flex-col items-center text-center">
-                 <div className="w-8 h-8 bg-purple-500/10 rounded-full flex items-center justify-center mb-2"><Ticket size={16} className="text-purple-500"/></div>
-                 <h3 className="text-xs font-bold text-white mb-1">Accurate Codes</h3>
-                 <p className="text-[9px] text-slate-400 leading-tight">Daily high-odds slips sent to you directly.</p>
+             <div className="bg-[#0f1c3a] border border-white/5 p-4 md:p-5 rounded-2xl flex flex-col items-center text-center shadow-lg group hover:border-red-500/30 transition-colors">
+                 <div className="w-10 h-10 bg-red-500/10 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><TrendingUp size={18} className="text-red-500"/></div>
+                 <h3 className="text-xs font-black text-white mb-1 tracking-wide">Pro Analysis</h3>
+                 <p className="text-[9px] text-slate-400 font-medium">AI-driven betting insights.</p>
              </div>
-             <div className="bg-[#1A1A1A] border border-white/5 p-4 rounded-xl flex flex-col items-center text-center">
-                 <div className="w-8 h-8 bg-red-500/10 rounded-full flex items-center justify-center mb-2"><TrendingUp size={16} className="text-red-500"/></div>
-                 <h3 className="text-xs font-bold text-white mb-1">Premium Analysis</h3>
-                 <p className="text-[9px] text-slate-400 leading-tight">Deep stats and insights on top matches.</p>
-             </div>
-             <div className="bg-[#1A1A1A] border border-white/5 p-4 rounded-xl flex flex-col items-center text-center">
-                 <div className="w-8 h-8 bg-orange-500/10 rounded-full flex items-center justify-center mb-2"><Tv size={16} className="text-orange-500"/></div>
-                 <h3 className="text-xs font-bold text-white mb-1">Live Match Watch</h3>
-                 <p className="text-[9px] text-slate-400 leading-tight">Stream premium matches inside the app.</p>
+             <div className="bg-[#0f1c3a] border border-white/5 p-4 md:p-5 rounded-2xl flex flex-col items-center text-center shadow-lg group hover:border-emerald-500/30 transition-colors md:col-span-2">
+                 <div className="w-10 h-10 bg-emerald-500/10 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><Gift size={18} className="text-emerald-500"/></div>
+                 <h3 className="text-xs font-black text-white mb-1 tracking-wide">Official Merchandise</h3>
+                 <p className="text-[9px] text-slate-400 font-medium">Win authentic jerseys and gear.</p>
              </div>
         </div>
 
-        {/* --- PENDING WARNING (Anti-Spam) --- */}
         {hasPending && (
-            <div className="bg-yellow-500/10 border border-yellow-500/50 p-6 rounded-2xl text-center backdrop-blur-md">
-                <Loader2 size={32} className="text-yellow-500 mx-auto mb-3 animate-spin" />
-                <h3 className="font-black text-yellow-500 text-lg uppercase">Verification in Progress</h3>
-                <p className="text-xs text-slate-300 mt-2 mb-4">
+            <div className="bg-yellow-500/10 border border-yellow-500/50 p-8 rounded-3xl text-center backdrop-blur-md shadow-xl">
+                <Loader2 size={40} className="text-yellow-500 mx-auto mb-4 animate-spin" />
+                <h3 className="font-black text-yellow-500 text-xl uppercase tracking-tighter">Verification in Progress</h3>
+                <p className="text-sm text-slate-300 mt-2 mb-6 font-medium">
                     You already have a request submitted. Please allow up to 30 minutes for admin approval.
                 </p>
-                <Link href="/dashboard" className="inline-block bg-yellow-500 text-black font-bold text-xs px-6 py-2 rounded-full">
+                <Link href="/dashboard" className="inline-block bg-yellow-500 text-black font-black uppercase tracking-widest text-[10px] px-8 py-3 rounded-xl shadow-lg hover:bg-yellow-400 transition">
                     Return to Dashboard
                 </Link>
             </div>
         )}
 
-        {/* --- FORM (Only show if NO pending request) --- */}
         {!hasPending && (
-            <>
-                {/* --- PAYMENT METHOD TOGGLE --- */}
-                <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => setPaymentMethod('gateway')} className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition active:scale-95 ${paymentMethod === 'gateway' ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-[#111] border-white/10 text-slate-400'}`}>
-                        <CreditCard size={24} /><span className="text-[10px] font-black uppercase tracking-wide">Card / Bank</span>
+            <div className="bg-[#0f1c3a] border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+                <h2 className="text-lg font-black uppercase tracking-widest text-center mb-6 flex items-center justify-center gap-2">
+                    <CreditCard className="text-blue-500"/> Select Payment
+                </h2>
+                
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                    <button onClick={() => setPaymentMethod('gateway')} className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all active:scale-95 ${paymentMethod === 'gateway' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'bg-black/20 border-white/5 text-slate-400 hover:border-white/20'}`}>
+                        <CreditCard size={28} /><span className="text-[10px] font-black uppercase tracking-widest">Card / Bank</span>
                     </button>
-                    <button onClick={() => setPaymentMethod('crypto')} className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition active:scale-95 ${paymentMethod === 'crypto' ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-[#111] border-white/10 text-slate-400'}`}>
-                        <Bitcoin size={24} /><span className="text-[10px] font-black uppercase tracking-wide">Crypto</span>
+                    <button onClick={() => setPaymentMethod('crypto')} className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all active:scale-95 ${paymentMethod === 'crypto' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'bg-black/20 border-white/5 text-slate-400 hover:border-white/20'}`}>
+                        <Bitcoin size={28} /><span className="text-[10px] font-black uppercase tracking-widest">Crypto</span>
                     </button>
                 </div>
 
-                {/* --- PAYMENT DETAILS CARD --- */}
-                <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                <div className="bg-black/40 border border-white/5 rounded-2xl p-6 shadow-inner relative overflow-hidden mb-8">
                       <div className="absolute -right-10 -top-10 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none"></div>
                       
                       <div className="text-center mb-6">
-                        <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Amount to Pay</span>
-                        <h2 className="text-3xl font-black text-white mt-1">{paymentMethod === 'gateway' ? gatewayDetails.price : cryptoDetails.price}</h2>
+                        <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest block mb-1">VIP Monthly Pass</span>
+                        <h2 className="text-4xl font-black text-white">{paymentMethod === 'gateway' ? gatewayDetails.price : cryptoDetails.price}</h2>
                       </div>
 
                       <div className="space-y-4">
                         {paymentMethod === 'gateway' ? (
                             gatewayDetails.link ? (
                                 <div className="text-center">
-                                    <p className="text-xs text-slate-300 mb-4">
-                                        Click the button below to pay securely via our global payment partner. 
-                                        <strong> Save your receipt after payment.</strong>
+                                    <p className="text-xs text-slate-300 mb-5 leading-relaxed font-medium">
+                                        Click below to pay securely via our global payment partner. 
+                                        <strong className="text-white block mt-1">Save your receipt screenshot after payment!</strong>
                                     </p>
                                     <a 
                                         href={gatewayDetails.link} 
                                         target="_blank" 
                                         rel="noopener noreferrer" 
-                                        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-black px-6 py-3 rounded-xl shadow-lg transition active:scale-95"
+                                        className="w-full inline-flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest px-6 py-4 rounded-xl shadow-lg transition active:scale-95"
                                     >
                                         Proceed to Payment <ExternalLink size={16} />
                                     </a>
                                 </div>
                             ) : (
-                                /* 🔴 NOT AVAILABLE MESSAGE */
                                 <div className="bg-red-500/10 border border-red-500/20 p-5 rounded-xl text-center">
                                     <AlertCircle className="text-red-500 mx-auto mb-2" size={28} />
-                                    <h4 className="text-sm font-black text-red-400 uppercase tracking-wider mb-1">Gateway Unavailable</h4>
-                                    <p className="text-[10px] text-red-200/70 font-medium">
-                                        Card payments are currently offline. Please select the <strong>Crypto</strong> option above to complete your upgrade securely.
+                                    <h4 className="text-sm font-black text-red-400 uppercase tracking-wider mb-1">Gateway Offline</h4>
+                                    <p className="text-[10px] text-red-200/70 font-medium leading-relaxed">
+                                        Card payments are currently unavailable. Please select the <strong>Crypto</strong> option above to complete your upgrade.
                                     </p>
                                 </div>
                             )
                         ) : (
                             <>
-                                <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-lg mb-4">
-                                     <p className="text-[10px] text-yellow-200 text-center font-bold">
-                                        ⚠️ Please ensure you send ONLY <br/> <span className="text-yellow-500">{cryptoDetails.network}</span>
+                                <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-xl mb-4 text-center">
+                                     <p className="text-[10px] text-yellow-200 font-bold uppercase tracking-widest">
+                                        ⚠️ Send ONLY <span className="text-yellow-500 font-black">{cryptoDetails.network}</span>
                                      </p>
                                 </div>
                                 <div>
-                                    <span className="text-xs text-slate-400 mb-1 block">Wallet Address ({cryptoDetails.network})</span>
+                                    <span className="text-[10px] font-bold text-slate-400 mb-1.5 block uppercase tracking-widest">Wallet Address</span>
                                     <div className="flex gap-2">
-                                        <div className="flex-1 bg-black border border-white/20 rounded-lg p-3 font-mono text-xs text-slate-300 break-all flex items-center">
+                                        <div className="flex-1 bg-black border border-white/10 rounded-xl p-3.5 font-mono text-xs text-white break-all flex items-center shadow-inner">
                                             {cryptoDetails.address}
                                         </div>
                                         <button 
                                             onClick={() => handleCopy(cryptoDetails.address)}
-                                            className="bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg transition h-full"
+                                            className="bg-white/10 hover:bg-white/20 text-white p-3.5 rounded-xl transition shadow-md shrink-0 flex items-center justify-center w-14"
                                         >
                                             {copied === cryptoDetails.address ? <Check size={20} className="text-green-500"/> : <Copy size={20}/>}
                                         </button>
@@ -338,23 +324,28 @@ export default function VipUpgradePage() {
                       </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-xl">
-                    <h3 className="text-sm font-bold text-white mb-5 flex items-center gap-2"><ShieldCheck className="text-green-500" size={18} /> Confirm Payment</h3>
-                    {uploadError && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold rounded-lg text-center">{uploadError}</div>}
+                <form onSubmit={handleSubmit} className="border-t border-white/10 pt-8">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-white mb-5 flex items-center gap-2">
+                        <ShieldCheck className="text-green-500" size={20} /> Verify Payment
+                    </h3>
+                    
+                    {uploadError && <div className="mb-5 p-4 bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold rounded-xl text-center shadow-sm">{uploadError}</div>}
                     
                     <div className="space-y-5">
                         <input 
                             type="text" 
                             disabled={paymentMethod === 'gateway' && !gatewayDetails.link}
-                            placeholder="Enter Transaction ID or Receipt Ref" 
-                            className="w-full bg-black border border-white/20 rounded-xl py-3.5 px-4 text-white text-sm focus:border-yellow-500 outline-none transition disabled:opacity-50" 
+                            placeholder="Enter Transaction ID or Ref..." 
+                            className="w-full bg-black/50 border border-white/10 rounded-xl py-4 px-5 text-white text-sm font-mono focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 outline-none transition disabled:opacity-50" 
                             value={ref} 
                             onChange={(e) => setRef(e.target.value)} 
                         />
                         
-                        <label className={`flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-white/20 rounded-xl transition group ${paymentMethod === 'gateway' && !gatewayDetails.link ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-yellow-500/50 hover:bg-white/5'}`}>
-                            <UploadCloud className={`transition ${paymentMethod === 'gateway' && !gatewayDetails.link ? 'text-slate-600' : 'text-slate-500 group-hover:text-yellow-500'}`} size={24} />
-                            <span className="text-[10px] text-slate-400 mt-2 font-medium">{file ? file.name : "Tap to Upload Screenshot (Required)"}</span>
+                        <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-xl transition group ${paymentMethod === 'gateway' && !gatewayDetails.link ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-yellow-500 hover:bg-white/5 bg-black/20'}`}>
+                            <UploadCloud className={`transition mb-2 ${paymentMethod === 'gateway' && !gatewayDetails.link ? 'text-slate-600' : 'text-slate-400 group-hover:text-yellow-500 group-hover:-translate-y-1'}`} size={32} />
+                            <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest bg-black/50 px-3 py-1 rounded-full">
+                                {file ? file.name : "Upload Screenshot (Required)"}
+                            </span>
                             <input 
                                 type="file" 
                                 className="hidden" 
@@ -367,24 +358,23 @@ export default function VipUpgradePage() {
                         <button 
                             type="submit" 
                             disabled={loading || (paymentMethod === 'gateway' && !gatewayDetails.link)} 
-                            className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black uppercase py-4 rounded-xl shadow-lg mt-2 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black font-black uppercase tracking-widest py-4 md:py-5 rounded-xl shadow-[0_10px_20px_rgba(234,179,8,0.3)] mt-4 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2"
                         >
-                            {loading ? <Loader2 className="animate-spin mx-auto" size={20} /> : "Submit Proof"}
+                            {loading ? <Loader2 className="animate-spin" size={20} /> : <><ShieldCheck size={20}/> Submit Verification</>}
                         </button>
                     </div>
                 </form>
-            </>
+            </div>
         )}
 
-        {/* --- CUSTOMER SUPPORT FOOTER --- */}
-        <div className="mt-8 border-t border-white/10 pt-8 pb-4 text-center">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Need Help With Payment?</h4>
+        <div className="mt-8 text-center pb-8">
+            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Need Help With Payment?</h4>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <a href={`mailto:${supportDetails.email}`} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2.5 rounded-lg text-xs font-bold transition">
-                    <Mail size={14} className="text-blue-400" /> {supportDetails.email}
+                <a href={`mailto:${supportDetails.email}`} className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/5 px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition w-full sm:w-auto shadow-sm">
+                    <Mail size={14} className="text-blue-400" /> Support Email
                 </a>
-                <a href={supportDetails.telegram} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 px-4 py-2.5 rounded-lg text-xs font-bold text-blue-400 transition">
-                    <Send size={14} /> Chat on Telegram
+                <a href={supportDetails.telegram} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 bg-[#229ED9]/10 hover:bg-[#229ED9]/20 border border-[#229ED9]/30 px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#229ED9] transition w-full sm:w-auto shadow-sm">
+                    <Send size={14} /> Telegram Chat
                 </a>
             </div>
         </div>
