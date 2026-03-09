@@ -14,7 +14,7 @@ import StatsLineupsTabs from '@/app/components/StatsLineupsTabs';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 import HeadToHeadStats from '@/app/components/HeadToHeadStats'; 
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
-import ProBettingSlipLock from '@/app/components/ProBettingSlipLock'; // 🔥 NEW VIP TEASER
+import ProBettingSlipLock from '@/app/components/ProBettingSlipLock'; // 🔥 NEW UNIFIED VIP TEASER
 
 import { getExternalData } from '@/app/lib/matchService';
 
@@ -35,9 +35,28 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const resolvedParams = await params;
   if (!resolvedParams?.id) return notFound();
 
+  const supabase = createClient();
+
+  // 1. FETCH MATCH DATA
   const dbData = await getSupabaseData(resolvedParams.id);
   if (!dbData) return notFound();
 
+  // 2. CHECK VIP STATUS SECURELY
+  let isUserVIP = false;
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) {
+      const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_vip')
+          .eq('id', session.user.id)
+          .single();
+      
+      if (profile?.is_vip) {
+          isUserVIP = true;
+      }
+  }
+
+  // 3. FETCH EXTERNAL API DATA
   const rawData = await getExternalData(dbData);
   const data = rawData || {};
   
@@ -51,7 +70,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       
-      {/* 1. MATCH HEADER (Scoreboard, Live Status, Form Rings) */}
+      {/* MATCH HEADER */}
       {hasWidget ? (
           <div className="bg-[#0a1428] text-white p-4 shadow-md flex items-center justify-between sticky top-0 z-40">
               <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
@@ -93,7 +112,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
       <div className="max-w-4xl mx-auto px-4 mt-6 relative z-20 space-y-6">
         
-        {/* 2. MATCH INFO STRIP (Venue, Ref, Stage) */}
+        {/* MATCH INFO STRIP */}
         {(data?.venue || data?.stage || data?.group || (dbData?.referees && dbData?.referees?.length > 0)) && (
             <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex flex-wrap gap-3 items-center justify-center text-[10px] font-bold text-slate-500">
                 {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 shadow-sm"><Trophy size={12} className="text-yellow-500"/> {data.stage.replace(/_/g, ' ')}</span>}
@@ -108,7 +127,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
              </div>
         )}
 
-        {/* 3. MEDIA PLAYERS (Video / Audio) */}
+        {/* MEDIA PLAYERS */}
         {activeVideoUrl && (
             <div className="rounded-2xl overflow-hidden shadow-2xl border border-slate-200 relative bg-black">
                 <div className="absolute top-3 left-3 z-30 pointer-events-none">
@@ -147,15 +166,15 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
              )}
         </div>
 
-        {/* 4. THE PROOF: Head-to-Head Statistics */}
+        {/* HEAD-TO-HEAD STATS */}
         <HeadToHeadStats dbData={dbData} />
 
-        {/* 5. THE TEASE: VIP Pro Betting Slip Lock 🔥 */}
+        {/* 🔥 NEW: THE UNIFIED VIP PAYWALL (Passes the user's status to the component) */}
         {!hasWidget && (
-            <ProBettingSlipLock homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
+            <ProBettingSlipLock isVIP={isUserVIP} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
         )}
 
-        {/* 6. THE ENGAGEMENT: User Prediction Board */}
+        {/* PREDICTION BOARD */}
         <div className="bg-white rounded-2xl shadow-xl p-5 border border-slate-200 overflow-hidden relative">
            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -mr-10 -mt-10 opacity-50 pointer-events-none"></div>
            <h3 className="text-sm font-black uppercase tracking-tighter text-slate-800 flex items-center gap-1.5 mb-5 relative z-10">
@@ -166,7 +185,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
            </div>
         </div>
 
-        {/* 7. MONETIZATION: Direct Affiliate Block */}
+        {/* AFFILIATE BLOCK */}
         {!hasWidget && (
             <div className="bg-[#1A1A1A] rounded-2xl p-4 shadow-2xl border border-slate-800 flex items-center justify-between relative overflow-hidden group hover:border-blue-500/30 transition-colors">
                 <div className="absolute top-0 right-0 bg-blue-600 w-24 h-full blur-[50px] opacity-20 group-hover:opacity-40 transition-opacity"></div>
@@ -187,14 +206,14 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
       </div>
 
-      {/* 8. DEEP DATA: Live Timeline, Stats, and Lineups */}
+      {/* LINEUPS & EVENTS */}
       {!hasWidget && (
           <div className="max-w-4xl mx-auto px-4 mt-8 space-y-6">
               <StatsLineupsTabs matchId={dbData.id} initialData={data} />
           </div>
       )}
 
-      {/* 9. FOOTER: Free Tips Banner */}
+      {/* FOOTER */}
       <div className="max-w-4xl mx-auto px-4 mt-6">
         <FreeTipsBanner />
       </div>

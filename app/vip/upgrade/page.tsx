@@ -201,7 +201,7 @@ export default function VipUpgradePage() {
                     <Lock size={12}/> Premium Access
                 </div>
                 <h1 className="text-4xl md:text-5xl font-black uppercase italic tracking-tighter text-white drop-shadow-lg">Join The <span className="text-yellow-500">Winners Circle</span></h1>
-                <p className="text-slate-300 text-sm md:text-base mt-4 max-w-md font-medium leading-relaxed">Unlock guaranteed slips, pro-level AI analysis, and compete for millions in monthly cash prizes.</p>
+                <p className="text-slate-300 text-sm md:text-base mt-4 max-w-md font-medium leading-relaxed">Unlock Accurate betting slips, pro-level AI analysis, and compete for Fantastic monthly Prices in Our Predict & Win Game.</p>
             </div>
        </div>
 
@@ -212,7 +212,7 @@ export default function VipUpgradePage() {
              <div className="bg-[#0f1c3a] border border-white/5 p-4 md:p-5 rounded-2xl flex flex-col items-center text-center shadow-lg group hover:border-yellow-500/30 transition-colors">
                  <div className="w-10 h-10 bg-yellow-500/10 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><Trophy size={18} className="text-yellow-500"/></div>
                  <h3 className="text-xs font-black text-white mb-1 tracking-wide">Cash Prizes</h3>
-                 <p className="text-[9px] text-slate-400 font-medium">Top the leaderboard for real rewards.</p>
+                 <p className="text-[9px] text-slate-400 font-medium">All registered Users can predict but only VIPs can Top the leaderboard for real monthly rewards.</p>
              </div>
              <div className="bg-[#0f1c3a] border border-white/5 p-4 md:p-5 rounded-2xl flex flex-col items-center text-center shadow-lg group hover:border-blue-500/30 transition-colors">
                  <div className="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><MessageCircle size={18} className="text-blue-500"/></div>
@@ -232,7 +232,7 @@ export default function VipUpgradePage() {
              <div className="bg-[#0f1c3a] border border-white/5 p-4 md:p-5 rounded-2xl flex flex-col items-center text-center shadow-lg group hover:border-emerald-500/30 transition-colors md:col-span-2">
                  <div className="w-10 h-10 bg-emerald-500/10 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><Gift size={18} className="text-emerald-500"/></div>
                  <h3 className="text-xs font-black text-white mb-1 tracking-wide">Official Merchandise</h3>
-                 <p className="text-[9px] text-slate-400 font-medium">Win authentic jerseys and gear.</p>
+                 <p className="text-[9px] text-slate-400 font-medium">Win authentic jerseys, gear, trips & game box.</p>
              </div>
         </div>
 
