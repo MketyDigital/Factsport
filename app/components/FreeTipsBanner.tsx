@@ -2,33 +2,63 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Copy, CheckCircle, ExternalLink, Lock, Zap } from 'lucide-react';
-import { createClient } from '@/app/lib/supabase/client';
+import { createClient } from '@/app/lib/supabase/client'; 
 
 export default function FreeTipsBanner() {
   const [copied1x, setCopied1x] = useState(false);
   const [copiedMel, setCopiedMel] = useState(false);
 
-  const [promo, setPromo] = useState({
-      code1x: "FACTSPORT",
+  // 🟢 CONSTANT: Registration Promo (Never changes, protects your affiliate tracking)
+  const PROMO_CODE = "FACTSPORT";
+
+  // 🟢 DYNAMIC LINKS (Fetched from Admin Panel)
+  const [globalLinks, setGlobalLinks] = useState({
       link1x: "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599",
-      codeMel: "FACTSPORT",
       linkMel: "https://refpa54566.com/L?tag=d_1181253m_45415c_&site=1181253&ad=45415"
   });
 
+  // 🟢 DAILY BOOKING CODES (Fetched from Admin Panel)
+  const [bookingCodes, setBookingCodes] = useState({
+      code1x: "A8J92",
+      codeMel: "7X2MM"
+  });
+
   useEffect(() => {
-      const fetchSettings = async () => {
+      const fetchData = async () => {
           const supabase = createClient();
-          const { data } = await supabase.from('site_settings').select('*').eq('id', 1).single();
-          if (data) {
-              setPromo({
-                  code1x: data.code_1xbet || promo.code1x,
-                  link1x: data.link_1xbet || promo.link1x,
-                  codeMel: data.code_melbet || promo.codeMel,
-                  linkMel: data.link_melbet || promo.linkMel
+          
+          // 1. Fetch Global Settings (Links AND Daily Slip Codes)
+          const { data: settings } = await supabase.from('site_settings').select('*').eq('id', 1).single();
+          if (settings) {
+              setGlobalLinks({
+                  link1x: settings.link_1xbet || globalLinks.link1x,
+                  linkMel: settings.link_melbet || globalLinks.linkMel
               });
+              
+              // Map the Admin Panel codes directly to the Betting Slips!
+              setBookingCodes(prev => ({
+                  code1x: settings.code_1xbet || prev.code1x,
+                  codeMel: settings.code_melbet || prev.codeMel
+              }));
+          }
+
+          // 2. Fallback: If Admin 1xBet code is empty, try to find the newest match with a code
+          if (!settings?.code_1xbet) {
+              const { data: latestMatch } = await supabase
+                .from('matches')
+                .select('booking_code')
+                .not('booking_code', 'is', null)
+                .neq('booking_code', '')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+              if (latestMatch?.booking_code) {
+                  setBookingCodes(prev => ({ ...prev, code1x: latestMatch.booking_code }));
+              }
           }
       };
-      fetchSettings();
+      fetchData();
   }, []);
 
   const copyToClipboard = (code: string, type: '1x' | 'mel') => {
@@ -48,7 +78,7 @@ export default function FreeTipsBanner() {
             <Zap className="text-yellow-400 fill-yellow-400" size={14} /> Daily Free Booking Codes
         </h3>
         <p className="text-slate-400 text-[10px] mt-1 max-w-sm mx-auto leading-tight">
-          Register with Our Promo code <span className="text-white font-black bg-white/10 px-1.5 py-0.5 rounded ml-0.5 shadow-sm border border-white/5">FACTSPORT</span> on any of our partner site to use.
+          Register with promo code <span className="text-white font-black bg-white/10 px-1.5 py-0.5 rounded ml-0.5 shadow-sm border border-white/5">{PROMO_CODE}</span> to use these slips.
         </p>
       </div>
 
@@ -66,11 +96,11 @@ export default function FreeTipsBanner() {
              </div>
              
              <div className="flex gap-1.5">
-                <button onClick={() => copyToClipboard(promo.code1x, '1x')} className="flex-1 bg-black/40 hover:bg-black/60 border border-white/10 rounded-md h-8 flex items-center justify-between px-2 transition active:scale-95 shadow-inner">
-                    <span className="font-mono font-black text-white text-xs tracking-wider">{promo.code1x}</span>
+                <button onClick={() => copyToClipboard(bookingCodes.code1x, '1x')} className="flex-1 bg-black/40 hover:bg-black/60 border border-white/10 rounded-md h-8 flex items-center justify-between px-2 transition active:scale-95 shadow-inner">
+                    <span className="font-mono font-black text-white text-xs tracking-wider">{bookingCodes.code1x}</span>
                     {copied1x ? <CheckCircle size={12} className="text-green-500"/> : <Copy size={12} className="text-slate-500"/>}
                 </button>
-                <a href={promo.link1x} target="_blank" rel="noopener noreferrer" className="bg-blue-600 hover:bg-blue-500 text-white h-8 w-8 rounded-md flex items-center justify-center transition shadow-lg">
+                <a href={globalLinks.link1x} target="_blank" rel="noopener noreferrer" className="bg-blue-600 hover:bg-blue-500 text-white h-8 w-8 rounded-md flex items-center justify-center transition shadow-lg shrink-0">
                     <ExternalLink size={12}/>
                 </a>
              </div>
@@ -87,11 +117,11 @@ export default function FreeTipsBanner() {
              </div>
              
              <div className="flex gap-1.5">
-                <button onClick={() => copyToClipboard(promo.codeMel, 'mel')} className="flex-1 bg-black/40 hover:bg-black/60 border border-white/10 rounded-md h-8 flex items-center justify-between px-2 transition active:scale-95 shadow-inner">
-                    <span className="font-mono font-black text-white text-xs tracking-wider">{promo.codeMel}</span>
+                <button onClick={() => copyToClipboard(bookingCodes.codeMel, 'mel')} className="flex-1 bg-black/40 hover:bg-black/60 border border-white/10 rounded-md h-8 flex items-center justify-between px-2 transition active:scale-95 shadow-inner">
+                    <span className="font-mono font-black text-white text-xs tracking-wider">{bookingCodes.codeMel}</span>
                     {copiedMel ? <CheckCircle size={12} className="text-green-500"/> : <Copy size={12} className="text-slate-500"/>}
                 </button>
-                <a href={promo.linkMel} target="_blank" rel="noopener noreferrer" className="bg-yellow-500 hover:bg-yellow-400 text-black h-8 w-8 rounded-md flex items-center justify-center transition shadow-lg">
+                <a href={globalLinks.linkMel} target="_blank" rel="noopener noreferrer" className="bg-yellow-500 hover:bg-yellow-400 text-black h-8 w-8 rounded-md flex items-center justify-center transition shadow-lg shrink-0">
                     <ExternalLink size={12}/>
                 </a>
              </div>
