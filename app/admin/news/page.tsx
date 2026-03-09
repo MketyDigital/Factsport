@@ -3,9 +3,10 @@ export const runtime = 'edge';
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
-import { Loader2, Plus, Trash2, Star, Activity, Shield, Bot, Pencil, X, Save, Search, Tag } from 'lucide-react';
+import { Loader2, Plus, Trash2, Star, Activity, Shield, Bot, Pencil, X, Save, Search, Tag, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const CATEGORIES = ['Football', 'Transfers', 'Sports Update', 'Champions League', 'Euros', 'World Cup', 'AFCON', 'Copa America'];
+const ITEMS_PER_PAGE = 10;
 
 export default function AdminNewsPage() {
   const [news, setNews] = useState<any[]>([]);
@@ -14,7 +15,11 @@ export default function AdminNewsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState(''); 
   
-  // Form State (Now includes category)
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Form State
   const [formData, setFormData] = useState({ 
     title: '', 
     body: '', 
@@ -23,17 +28,22 @@ export default function AdminNewsPage() {
     team2Logo: '', 
     isBreaking: false, 
     isHeadline: false,
-    category: 'Football' // Default
+    category: 'Football'
   });
   
   const supabase = createClient();
 
+  // Reset to page 1 when searching
   useEffect(() => { 
-      const timer = setTimeout(() => {
-          fetchNews(); 
-      }, 500);
+      setCurrentPage(1);
+      const timer = setTimeout(() => fetchNews(1), 500);
       return () => clearTimeout(timer);
   }, [search]);
+
+  // Fetch when page changes
+  useEffect(() => {
+      fetchNews(currentPage);
+  }, [currentPage]);
 
   // 🪄 AUTO-SUGGEST LOGOS
   useEffect(() => {
@@ -74,11 +84,20 @@ export default function AdminNewsPage() {
     return () => clearTimeout(timeoutId);
   }, [formData.title, editingId]);
 
-  const fetchNews = async () => {
-    let query = supabase.from('news').select('*').order('created_at', { ascending: false }).limit(50);
+  const fetchNews = async (page: number) => {
+    setLoading(true);
+    const from = (page - 1) * ITEMS_PER_PAGE;
+    const to = from + ITEMS_PER_PAGE - 1;
+
+    let query = supabase.from('news').select('*', { count: 'exact' });
     if (search) query = query.ilike('title', `%${search}%`);
-    const { data } = await query;
+    
+    query = query.order('created_at', { ascending: false }).range(from, to);
+    
+    const { data, count } = await query;
     setNews(data || []);
+    if (count !== null) setTotalPages(Math.ceil(count / ITEMS_PER_PAGE) || 1);
+    setLoading(false);
   };
 
   const runAutoBot = async () => {
@@ -89,7 +108,7 @@ export default function AdminNewsPage() {
         const json = await res.json();
         if (json.success) {
             alert(`✅ Success: ${json.message}`);
-            fetchNews();
+            fetchNews(currentPage);
         } else {
             alert(`❌ Error: ${json.error || json.message}`);
         }
@@ -134,7 +153,7 @@ export default function AdminNewsPage() {
         is_breaking: formData.isBreaking, 
         is_headline: formData.isHeadline, 
         slug: slug,
-        category: formData.category // 🟢 Saved to DB
+        category: formData.category
     };
 
     if (editingId) {
@@ -145,21 +164,21 @@ export default function AdminNewsPage() {
     }
     
     setFormData({ title: '', body: '', imageUrl: '', team1Logo: '', team2Logo: '', isBreaking: false, isHeadline: false, category: 'Football' });
-    fetchNews();
+    fetchNews(currentPage);
     setLoading(false);
   };
 
   const deleteNews = async (id: string) => {
     if(confirm("Delete article?")) { 
         await supabase.from('news').delete().eq('id', id); 
-        fetchNews(); 
+        fetchNews(currentPage); 
     }
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-20 p-4 md:p-8 font-sans">
+    <div className="space-y-6 max-w-5xl mx-auto pb-24 p-4 md:p-8 font-sans">
       
-      {/* 🟢 HEADER & SEARCH BAR */}
+      {/* HEADER & SEARCH BAR */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-6">
           <h1 className="text-3xl font-black text-slate-800 tracking-tight">Newsroom</h1>
           
@@ -192,7 +211,6 @@ export default function AdminNewsPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
             <input type="text" placeholder="Headline" className="w-full text-xl font-bold border-b-2 border-slate-100 pb-2 outline-none bg-transparent" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} required />
             
-            {/* 🟢 NEW: CATEGORY SELECTOR */}
             <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
                 <Tag size={16} className="text-slate-400 shrink-0"/>
                 <select 
@@ -270,6 +288,27 @@ export default function AdminNewsPage() {
             </div>
         )}
       </div>
+
+      {/* 🟢 PAGINATION CONTROLS */}
+      {totalPages > 1 && (
+          <div className="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mt-6">
+              <button 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className={`px-4 py-2 flex items-center gap-2 rounded-xl text-xs font-black uppercase tracking-widest ${currentPage === 1 ? 'pointer-events-none opacity-30 bg-slate-100 text-slate-400' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition'}`}
+              >
+                  <ChevronLeft size={14}/> Prev
+              </button>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Page {currentPage} of {totalPages}</span>
+              <button 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`px-4 py-2 flex items-center gap-2 rounded-xl text-xs font-black uppercase tracking-widest ${currentPage === totalPages ? 'pointer-events-none opacity-30 bg-slate-100 text-slate-400' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition'}`}
+              >
+                  Next <ChevronRight size={14}/>
+              </button>
+          </div>
+      )}
     </div>
   );
 }
