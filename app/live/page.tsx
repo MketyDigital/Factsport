@@ -42,7 +42,7 @@ export default async function LiveMediaPage() {
             <h1 className="font-black text-lg leading-none italic uppercase flex items-center gap-2 tracking-tight">
                 <Radio className="text-red-500 animate-pulse"/> Live Center
             </h1>
-            <p className="text-[10px] text-slate-400 font-bold tracking-widest mt-0.5">WATCH ALONGS & LIVE SCORES</p>
+            <p className="text-[10px] text-slate-400 font-bold tracking-widest mt-0.5">VIDEO|AUDIO COVERAGE & LIVE SCORES</p>
           </div>
       </div>
 
@@ -72,7 +72,7 @@ export default async function LiveMediaPage() {
                     
                     {coveredMatches.length === 0 ? (
                         <div className="bg-white/5 border border-white/10 border-dashed rounded-2xl p-6 text-center">
-                             <p className="text-xs font-bold text-slate-400">No watchalongs scheduled currently.</p>
+                             <p className="text-xs font-bold text-slate-400">No Live Coverage scheduled currently.</p>
                         </div>
                     ) : (
                         <div className="space-y-4">
