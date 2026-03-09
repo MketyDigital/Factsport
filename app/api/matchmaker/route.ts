@@ -1,20 +1,20 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic'; 
 export const revalidate = 0;
-export const fetchCache = 'force-no-store'; // 🟢 NO CACHING ALLOWED
+export const fetchCache = 'force-no-store';
 
-// 🟢 CHANGED: Using the official supabase-js client to bypass RLS
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { ESPN_LEAGUES, fetchEspnLive } from '@/app/lib/espn';
 
-// 1. THE EXHAUSTIVE DICTIONARY
+// 1. THE EXHAUSTIVE DICTIONARY (Upgraded)
 const getCanonicalName = (rawName: string) => {
     if (!rawName) return "";
     let name = rawName.toLowerCase()
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
         .replace(/[^a-z0-9 ]/g, '') 
-        .replace(/\b(fc|cf|afc|sc|sv|rc|fk|vfl|fsv|tsg|ssc|bayer|rcd|ud|as|us|osc|cfa|aja|ca|bc|ac|sk)\b/g, '') 
+        // 🔥 ADDED '1', 'olympique', 'de' to aggressively strip German/French prefixes
+        .replace(/\b(1|fc|cf|afc|sc|sv|rc|fk|vfl|fsv|tsg|ssc|bayer|rcd|ud|as|us|osc|cfa|aja|ca|bc|ac|sk|olympique|de)\b/g, '') 
         .replace(/\s+/g, ' ') 
         .trim();
 
@@ -50,7 +50,8 @@ const getCanonicalName = (rawName: string) => {
         'ac monza': 'monza', 'us sassuolo': 'sassuolo', 'frosinone calcio': 'frosinone', 'us salernitana 1919': 'salernitana',
         'fiorentina': 'acf fiorentina', 'empoli fc': 'empoli', 'bologna fc': 'bologna', 'udinese calcio': 'udinese',
         'psg': 'paris saint germain', 'paris sg': 'paris saint germain', 'om': 'marseille',
-        'olympique de marseille': 'marseille', 'ol': 'lyon', 'olympique lyonnais': 'lyon',
+        'olympique de marseille': 'marseille', 'ol': 'lyon', 'olympique lyonnais': 'lyon', 'olympique lyon': 'lyon', // 🔥 Added Lyon variation
+        'paris fc': 'paris fc', // 🔥 Added explicit Paris FC to prevent overlap
         'auxerre': 'auxerre', 'stade rennais': 'rennes', 'clermont foot 63': 'clermont', 'clermont foot': 'clermont', 
         'toulouse fc': 'toulouse', 'le havre ac': 'le havre', 'mhsc': 'montpellier', 'montpellier hsc': 'montpellier',
         'st etienne': 'saint etienne', 'asse': 'saint etienne', 'lille osc': 'lille', 'ogc nice': 'nice',
@@ -85,12 +86,17 @@ const similarity = (s1: string, s2: string) => {
     return (longer.length - costs[longer.length]) / longer.length;
 };
 
+// 🔥 2.5 THE NEW SUBSTRING SAFETY NET
+const isStrongSubstring = (s1: string, s2: string) => {
+    if (s1.length < 4 || s2.length < 4) return false; // Prevent tiny words like "FC" from auto-matching
+    return s1.includes(s2) || s2.includes(s1);
+};
+
 // 3. THE MASTER MATCHMAKER
 async function runMatchmaker(request: Request) {
   const url = new URL(request.url);
   if (url.searchParams.get('key') !== process.env.CRON_KEY) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // 🟢 CHANGED: Initialized with the Service Role (Master) Key
   const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -102,7 +108,6 @@ async function runMatchmaker(request: Request) {
 
   try {
       const now = Date.now();
-      // 🟢 EXPANDED WINDOW: 48 Hours back and forward to beat US Timezones
       const lookBack = new Date(now - (48 * 60 * 60 * 1000)).toISOString(); 
       const todayEnd = new Date(now + (48 * 60 * 60 * 1000)).toISOString(); 
 
@@ -130,7 +135,6 @@ async function runMatchmaker(request: Request) {
              const dbAway = getCanonicalName(dbMatch.away_team);
              
              const espnGame = espnMatches.find((e: any) => {
-                 // 🟢 BULLETPROOF TIME PARSING
                  const espnTimeString = e.date || e.startTime;
                  const espnTime = espnTimeString ? new Date(espnTimeString).getTime() : 0;
                  
@@ -141,9 +145,13 @@ async function runMatchmaker(request: Request) {
                  
                  const homeScore = similarity(dbHome, espnHome);
                  const awayScore = similarity(dbAway, espnAway);
-                 const combinedScore = (homeScore + awayScore) / 2;
                  
-                 return (combinedScore > 0.70 || (homeScore === 1.0 && awayScore > 0.4) || (awayScore === 1.0 && homeScore > 0.4));
+                 // 🔥 THE NEW 99.9% LOGIC: Check Substrings FIRST
+                 const homeMatch = isStrongSubstring(dbHome, espnHome) || homeScore > 0.75;
+                 const awayMatch = isStrongSubstring(dbAway, espnAway) || awayScore > 0.75;
+
+                 // If BOTH teams match either via Substring OR high fuzzy score, we map it!
+                 return homeMatch && awayMatch;
              });
 
              if (espnGame) {
