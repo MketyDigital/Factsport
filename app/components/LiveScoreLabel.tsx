@@ -23,7 +23,6 @@ export default function LiveScoreLabel({
   useEffect(() => {
     const fetchLiveScore = async () => {
       if (document.visibilityState !== 'visible') return;
-
       try {
           const res = await fetch(`/api/match-data?id=${matchId}`);
           if (!res.ok) return;
@@ -66,22 +65,22 @@ export default function LiveScoreLabel({
   if (variant === 'badge') {
       const isLive = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT'].includes(data.status);
       if (isLive) {
-          return <span className="bg-red-600 text-white text-[9px] font-black px-2 py-1 rounded animate-pulse shadow-sm">LIVE</span>;
+          return <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded animate-pulse shadow-sm tracking-widest border border-red-500">LIVE</span>;
       }
-      return <span className="bg-slate-200 text-slate-500 text-[9px] font-bold px-2 py-1 rounded shadow-inner">UPCOMING</span>;
+      return <span className="bg-slate-100 text-slate-500 text-[9px] font-bold px-2 py-0.5 rounded shadow-inner uppercase tracking-widest border border-slate-200">UPCOMING</span>;
   }
 
   if (variant === 'large') {
       return (
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-center mb-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
               <div className="text-center w-1/3">
-                  <div className="text-2xl font-black">{data.home ?? 0}</div>
-                  <div className="text-xs font-bold text-slate-600 line-clamp-1">{homeTeam}</div>
+                  <div className="text-3xl font-black text-slate-800 tracking-tighter">{data.home ?? 0}</div>
+                  <div className="text-[10px] font-black uppercase text-slate-500 line-clamp-1 mt-1">{homeTeam}</div>
               </div>
-              <div className="text-slate-200 font-black text-lg">VS</div>
+              <div className="text-slate-300 font-black text-lg italic">VS</div>
               <div className="text-center w-1/3">
-                  <div className="text-2xl font-black">{data.away ?? 0}</div>
-                  <div className="text-xs font-bold text-slate-600 line-clamp-1">{awayTeam}</div>
+                  <div className="text-3xl font-black text-slate-800 tracking-tighter">{data.away ?? 0}</div>
+                  <div className="text-[10px] font-black uppercase text-slate-500 line-clamp-1 mt-1">{awayTeam}</div>
               </div>
           </div>
       );
@@ -89,18 +88,19 @@ export default function LiveScoreLabel({
 
   if (['LIVE', 'IN_PLAY', 'HT'].includes(data.status)) {
     return (
-        <div className="flex flex-col items-center">
-            <span className={`font-bold text-[10px] ${data.status === 'HT' ? 'text-yellow-600 bg-yellow-50 px-1 rounded' : 'text-red-600 animate-pulse'}`}>
-                {data.status === 'HT' ? 'HT' : ''} {data.home} - {data.away}
+        <div className="flex flex-col items-center justify-center">
+            <span className={`font-black text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${data.status === 'HT' ? 'text-amber-600 bg-amber-50 border border-amber-200' : 'text-red-600 bg-red-50 border border-red-100 animate-pulse'}`}>
+                {data.status === 'HT' ? <span className="text-[8px] mr-1">HT</span> : null} 
+                {data.home} - {data.away}
             </span>
-            {data.clock && <span className="text-[8px] text-red-400 font-mono leading-none mt-0.5">{data.clock}</span>}
+            {data.clock && <span className="text-[9px] text-red-500 font-bold mt-1">{data.clock}</span>}
         </div>
     );
   }
   
   if (['FT', 'FINISHED', 'ABD'].includes(data.status)) {
-     return <span className="text-slate-900 font-bold text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">{data.home} - {data.away}</span>;
+     return <span className="text-slate-700 font-black text-[11px] bg-slate-100 border border-slate-200 px-2 py-0.5 rounded shadow-sm">{data.home} - {data.away}</span>;
   }
   
-  return <span className="text-slate-400 text-[9px] font-mono">{userTime}</span>;
+  return <span className="text-slate-500 text-[10px] font-bold bg-white border border-slate-100 px-2 py-0.5 rounded shadow-sm">{userTime}</span>;
 }

@@ -4,14 +4,19 @@ export const revalidate = 3;
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon, MapPin, Trophy, Grid, History } from 'lucide-react';
+import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon, MapPin, Trophy, Grid } from 'lucide-react';
+
+// 🔥 ALL MODULAR COMPONENTS IMPORTED
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
 import MatchHeaderClient from '@/app/components/MatchHeaderClient'; 
 import StatsLineupsTabs from '@/app/components/StatsLineupsTabs'; 
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
-import { getExternalData } from '@/app/lib/matchService';
+import HeadToHeadStats from '@/app/components/HeadToHeadStats'; 
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
+import ProBettingSlipLock from '@/app/components/ProBettingSlipLock'; // 🔥 NEW VIP TEASER
+
+import { getExternalData } from '@/app/lib/matchService';
 
 const sanitizeUrl = (url: string | null | undefined) => {
     if (!url) return null;
@@ -43,83 +48,10 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   
   const hasWidget = !!dbData.widget_id; 
 
-  // 🟢 BULLETPROOF H2H EXTRACTION & EMERGENCY RECALCULATOR
-  let parsedH2h = dbData?.h2h;
-  if (typeof parsedH2h === 'string') {
-      try { parsedH2h = JSON.parse(parsedH2h); } catch (e) { parsedH2h = {}; }
-  }
-
-  const h2hObj = parsedH2h?.aggregates || parsedH2h || {};
-  const matchesArray = parsedH2h?.matches || [];
-
-  let h2hTotal = h2hObj.numberOfMatches ?? h2hObj.played ?? h2hObj.count ?? 0;
-
-  const homeData = typeof h2hObj.homeTeam === 'object' ? h2hObj.homeTeam : {};
-  const awayData = typeof h2hObj.awayTeam === 'object' ? h2hObj.awayTeam : {};
-
-  // Hunts for the data no matter how corrupted the API structure is
-  let h2hHomeWins = Number(homeData.wins ?? h2hObj.homeWins ?? h2hObj.home_wins ?? 0);
-  let h2hDraws = Number(homeData.draws ?? h2hObj.draws ?? 0);
-  let h2hAwayWins = Number(awayData.wins ?? homeData.losses ?? h2hObj.awayWins ?? h2hObj.away_wins ?? 0);
-
-  // 🛡️ RECALCULATOR: If the API's aggregate is missing or 0, calculate mathematically!
-  if (matchesArray.length > 0) {
-      let calcHomeWins = 0, calcDraws = 0, calcAwayWins = 0;
-      let validMatchesCount = 0;
-      
-      const currentHomeId = homeData?.id;
-      const currentAwayId = awayData?.id;
-      
-      matchesArray.forEach((m: any) => {
-          // Prevent counting future games as 0-0 draws
-          if (m.status !== 'FINISHED' && m.status !== 'AWARDED') return;
-
-          let hScore = m.score?.fullTime?.home ?? m.score?.regularTime?.home;
-          let aScore = m.score?.fullTime?.away ?? m.score?.regularTime?.away;
-          
-          if (typeof hScore === 'number' && typeof aScore === 'number') {
-              validMatchesCount++;
-              
-              // Rely on IDs instead of names whenever possible
-              let isHome = false;
-              if (currentHomeId && m.homeTeam?.id) {
-                  isHome = (m.homeTeam.id === currentHomeId);
-              } else if (currentAwayId && m.homeTeam?.id) {
-                  isHome = (m.homeTeam.id !== currentAwayId);
-              } else {
-                  const matchHomeName = (m.homeTeam?.shortName || m.homeTeam?.name || '').toLowerCase();
-                  const dbHomeName = (dbData.home_team || '').toLowerCase();
-                  isHome = matchHomeName.includes(dbHomeName) || dbHomeName.includes(matchHomeName);
-              }
-
-              if (hScore === aScore) {
-                  calcDraws++;
-              } else if (hScore > aScore) {
-                  isHome ? calcHomeWins++ : calcAwayWins++;
-              } else {
-                  isHome ? calcAwayWins++ : calcHomeWins++;
-              }
-          }
-      });
-
-      // Override if the recalculator found valid finished matches
-      if (validMatchesCount > 0 && (h2hHomeWins + h2hAwayWins + h2hDraws === 0 || validMatchesCount === matchesArray.length)) {
-          h2hHomeWins = calcHomeWins;
-          h2hAwayWins = calcAwayWins;
-          h2hDraws = calcDraws;
-          h2hTotal = validMatchesCount; 
-      }
-  }
-
-  // Prevents division by zero for the visual bar
-  const barTotal = (h2hHomeWins + h2hDraws + h2hAwayWins) || 1;
-  const homePct = (h2hHomeWins / barTotal) * 100;
-  const drawPct = (h2hDraws / barTotal) * 100;
-  const awayPct = (h2hAwayWins / barTotal) * 100;
-
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       
+      {/* 1. MATCH HEADER (Scoreboard, Live Status, Form Rings) */}
       {hasWidget ? (
           <div className="bg-[#0a1428] text-white p-4 shadow-md flex items-center justify-between sticky top-0 z-40">
               <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
@@ -129,11 +61,11 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
               <div className="w-9"></div>
           </div>
       ) : (
-          <div className="relative bg-[#0a1428] text-white pb-6 rounded-b-[2rem] overflow-hidden shadow-2xl">
+          <div className="relative bg-[#0a1428] text-white pb-6 rounded-b-[2.5rem] overflow-hidden shadow-2xl border-b border-blue-900/30">
             {dbData.home_stadium ? (
                  <>
                     <div className="absolute top-0 left-0 w-full h-full">
-                        <img src={sanitizeUrl(dbData.home_stadium) || undefined} className="w-full h-full object-cover opacity-30 blur-sm scale-110" />
+                        <img src={sanitizeUrl(dbData.home_stadium) || undefined} className="w-full h-full object-cover opacity-30 blur-sm scale-110 mix-blend-overlay" />
                     </div>
                     <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-[#0a1428]/90 via-[#0a1428]/70 to-[#0a1428]"></div>
                  </>
@@ -142,14 +74,14 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             )}
 
             <div className="relative z-10 p-4 flex items-center justify-between">
-              <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md border border-white/10">
+              <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md border border-white/10 shadow-lg active:scale-95">
                 <ChevronLeft size={24} />
               </Link>
               
               {dbData.league_banner ? (
-                  <img src={sanitizeUrl(dbData.league_banner) || undefined} className="h-6 object-contain opacity-80" alt={dbData.league} />
+                  <img src={sanitizeUrl(dbData.league_banner) || undefined} className="h-6 object-contain opacity-90 drop-shadow-md" alt={dbData.league} />
               ) : (
-                  <span className="text-xs font-bold tracking-widest opacity-70 uppercase">{dbData.league}</span>
+                  <span className="text-[10px] font-black tracking-widest opacity-80 uppercase bg-black/40 px-3 py-1 rounded-full border border-white/10">{dbData.league}</span>
               )}
               
               <div className="w-10"></div>
@@ -159,19 +91,14 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           </div>
       )}
 
-      <div className="mx-4 mt-4 relative z-20 space-y-4">
+      <div className="max-w-4xl mx-auto px-4 mt-6 relative z-20 space-y-6">
         
+        {/* 2. MATCH INFO STRIP (Venue, Ref, Stage) */}
         {(data?.venue || data?.stage || data?.group || (dbData?.referees && dbData?.referees?.length > 0)) && (
-            <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 flex flex-wrap gap-4 items-center justify-center text-[10px] font-bold text-slate-500">
-                {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded"><Trophy size={12} className="text-amber-500"/> {data.stage.replace(/_/g, ' ')}</span>}
-                {data?.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded"><Grid size={12} className="text-blue-500"/> {data.group.replace(/_/g, ' ')}</span>}
-                {data?.venue && <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded"><MapPin size={12} className="text-red-500"/> {data.venue}</span>}
-                {dbData?.referees && dbData?.referees?.length > 0 && (
-                    <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded">
-                        <span className="w-3 h-3 bg-slate-800 rounded-sm inline-block border border-white shrink-0"></span> 
-                        Ref: {typeof dbData.referees[0] === 'object' ? dbData.referees[0].name : dbData.referees[0]}
-                    </span>
-                )}
+            <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex flex-wrap gap-3 items-center justify-center text-[10px] font-bold text-slate-500">
+                {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 shadow-sm"><Trophy size={12} className="text-yellow-500"/> {data.stage.replace(/_/g, ' ')}</span>}
+                {data?.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 shadow-sm"><Grid size={12} className="text-blue-500"/> {data.group.replace(/_/g, ' ')}</span>}
+                {data?.venue && <span className="flex items-center gap-1 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 shadow-sm"><MapPin size={12} className="text-red-500"/> {data.venue}</span>}
             </div>
         )}
 
@@ -181,25 +108,17 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
              </div>
         )}
 
-        {dbData.home_jersey && (
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 flex items-center justify-center gap-6">
-                 <div className="text-center">
-                     <p className="text-[9px] font-bold text-slate-400 uppercase mb-2">Home Kit</p>
-                     <img src={sanitizeUrl(dbData.home_jersey) || undefined} className="h-16 object-contain drop-shadow-md" />
-                 </div>
-            </div>
-        )}
-
+        {/* 3. MEDIA PLAYERS (Video / Audio) */}
         {activeVideoUrl && (
-            <div className="rounded-xl overflow-hidden shadow-2xl border border-white/20 relative">
+            <div className="rounded-2xl overflow-hidden shadow-2xl border border-slate-200 relative bg-black">
                 <div className="absolute top-3 left-3 z-30 pointer-events-none">
                     {isLiveStream ? (
-                        <div className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded flex items-center gap-1 animate-pulse shadow-md">
-                            <Radio size={10} /> LIVE WATCHALONG
+                        <div className="bg-red-600 text-white text-[9px] font-black px-3 py-1 rounded-md flex items-center gap-1.5 animate-pulse shadow-lg border border-red-500 tracking-widest">
+                            <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE WATCHALONG
                         </div>
                     ) : (
-                        <div className="bg-black/60 backdrop-blur text-white text-[9px] font-bold px-2 py-0.5 rounded border border-white/10 flex items-center gap-1">
-                            <PlayCircle size={10} /> HIGHLIGHTS
+                        <div className="bg-black/60 backdrop-blur-md text-white text-[9px] font-black px-3 py-1 rounded-md border border-white/20 flex items-center gap-1.5 shadow-lg tracking-widest">
+                            <PlayCircle size={12} className="text-red-500"/> OFFICIAL HIGHLIGHTS
                         </div>
                     )}
                 </div>
@@ -207,105 +126,76 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             </div>
         )}
 
-        <div className="bg-[#0f172a] rounded-xl p-3 border border-slate-800 shadow-xl flex items-center justify-between">
-             <div className="flex items-center gap-3">
-                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${dbData.audio_url ? 'bg-red-600 animate-pulse' : 'bg-slate-800'}`}>
-                    <Mic className="text-white" size={20} />
+        <div className="bg-[#0f172a] rounded-2xl p-4 border border-slate-800 shadow-xl flex items-center justify-between group hover:border-blue-500/50 transition-colors">
+             <div className="flex items-center gap-4">
+                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner ${dbData.audio_url ? 'bg-red-600/20 border border-red-500/30 text-red-500 animate-pulse' : 'bg-white/5 border border-white/5 text-slate-500'}`}>
+                    <Mic size={20} />
                  </div>
                  <div>
-                    <h3 className="text-white font-bold text-xs">Live Audio Commentary</h3>
-                    <p className="text-slate-400 text-[10px]">{dbData.audio_url ? "Radio is currently LIVE" : "Tune in when match starts"}</p>
+                    <h3 className="text-white font-black text-sm tracking-tight">Live Audio Commentary</h3>
+                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">{dbData.audio_url ? "Radio is currently LIVE" : "Tune in at kickoff"}</p>
                  </div>
              </div>
-             {dbData.audio_url ? <Link href={sanitizeUrl(dbData.audio_url) || '#'} target="_blank" rel="noopener noreferrer" className="bg-white text-black hover:bg-slate-200 text-[10px] font-black px-4 py-2 rounded-full shadow-lg transition transform active:scale-95 flex items-center gap-1">LISTEN NOW <ExternalLink size={10} /></Link> : <button disabled className="bg-slate-700 text-slate-400 text-[10px] font-bold px-3 py-1.5 rounded-full cursor-not-allowed border border-white/5">OFF AIR</button>}
+             {dbData.audio_url ? (
+                <Link href={sanitizeUrl(dbData.audio_url) || '#'} target="_blank" rel="noopener noreferrer" className="bg-white text-black hover:bg-slate-200 text-[10px] font-black px-5 py-2.5 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1 uppercase tracking-widest">
+                    Listen <ExternalLink size={12} />
+                </Link>
+             ) : (
+                <button disabled className="bg-slate-800 text-slate-500 text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl cursor-not-allowed border border-white/5">
+                    Off Air
+                </button>
+             )}
         </div>
 
-        {/* 🟢 UPGRADED H2H UI (Global Standard Premium Layout) */}
-        {h2hTotal > 0 && (
-            <div className="bg-white rounded-2xl shadow-xl p-5 border border-slate-100 overflow-hidden">
-                <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-[11px] font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
-                        <History size={14} className="text-blue-600" /> Head-to-Head
-                    </h3>
-                    <span className="text-[9px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded-md tracking-widest">
-                        LAST {h2hTotal} MATCHES
-                    </span>
-                </div>
-                
-                <div className="flex items-center justify-between mb-6">
-                     {/* Home Stat */}
-                     <div className="flex flex-col items-center flex-1">
-                         {dbData.home_logo && <img src={sanitizeUrl(dbData.home_logo) || undefined} className="w-9 h-9 object-contain mb-2 drop-shadow-sm" alt="Home" />}
-                         <span className="text-3xl font-black text-slate-800 leading-none">{h2hHomeWins}</span>
-                         <span className="text-[9px] font-bold text-slate-400 uppercase mt-1 text-center line-clamp-1 w-full px-1">{dbData.home_team}</span>
-                     </div>
-                     
-                     {/* Draw Stat */}
-                     <div className="flex flex-col items-center flex-1 border-x border-slate-100 px-2">
-                         <div className="w-9 h-9 flex items-center justify-center mb-2">
-                             <span className="text-slate-200 font-black text-xl italic">VS</span>
-                         </div>
-                         <span className="text-xl font-black text-slate-400 leading-none">{h2hDraws}</span>
-                         <span className="text-[9px] font-bold text-slate-400 uppercase mt-1">Draws</span>
-                     </div>
+        {/* 4. THE PROOF: Head-to-Head Statistics */}
+        <HeadToHeadStats dbData={dbData} />
 
-                     {/* Away Stat */}
-                     <div className="flex flex-col items-center flex-1">
-                         {dbData.away_logo && <img src={sanitizeUrl(dbData.away_logo) || undefined} className="w-9 h-9 object-contain mb-2 drop-shadow-sm" alt="Away" />}
-                         <span className="text-3xl font-black text-slate-800 leading-none">{h2hAwayWins}</span>
-                         <span className="text-[9px] font-bold text-slate-400 uppercase mt-1 text-center line-clamp-1 w-full px-1">{dbData.away_team}</span>
-                     </div>
-                </div>
-
-                {/* Visual Data Bar with Percentages */}
-                <div className="relative pt-2">
-                    <div className="flex mb-1.5 items-center justify-between text-[10px] font-black">
-                        <span className="text-blue-600">{homePct.toFixed(0)}%</span>
-                        <span className="text-slate-400">{drawPct.toFixed(0)}%</span>
-                        <span className="text-red-500">{awayPct.toFixed(0)}%</span>
-                    </div>
-                    <div className="flex w-full h-3 rounded-full overflow-hidden shadow-inner bg-slate-100">
-                        <div style={{ width: `${homePct}%` }} className="bg-blue-600 transition-all duration-1000 ease-out relative">
-                            <div className="absolute inset-0 bg-white/20 w-full h-full"></div>
-                        </div>
-                        <div style={{ width: `${drawPct}%` }} className="bg-slate-300 transition-all duration-1000 ease-out"></div>
-                        <div style={{ width: `${awayPct}%` }} className="bg-red-500 transition-all duration-1000 ease-out relative">
-                            <div className="absolute inset-0 bg-white/20 w-full h-full"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        {/* 5. THE TEASE: VIP Pro Betting Slip Lock 🔥 */}
+        {!hasWidget && (
+            <ProBettingSlipLock homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
         )}
 
-        <div className="bg-white rounded-xl shadow-lg p-5 border border-slate-100">
-           <h3 className="text-xs font-black uppercase text-slate-800 flex items-center gap-1 mb-4"><Zap size={14} className="text-blue-600 fill-blue-600" /> Predict & Win Points</h3>
-           <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
+        {/* 6. THE ENGAGEMENT: User Prediction Board */}
+        <div className="bg-white rounded-2xl shadow-xl p-5 border border-slate-200 overflow-hidden relative">
+           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -mr-10 -mt-10 opacity-50 pointer-events-none"></div>
+           <h3 className="text-sm font-black uppercase tracking-tighter text-slate-800 flex items-center gap-1.5 mb-5 relative z-10">
+               <Zap size={16} className="text-yellow-500 fill-yellow-500 drop-shadow-sm" /> Predict & Win Points
+           </h3>
+           <div className="relative z-10">
+               <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
+           </div>
         </div>
 
+        {/* 7. MONETIZATION: Direct Affiliate Block */}
         {!hasWidget && (
-            <div className="bg-[#1A1A1A] rounded-xl p-3 shadow-lg border border-white/5 flex items-center justify-between relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-blue-600 w-16 h-full blur-[40px] opacity-20"></div>
-                <div className="flex items-center gap-3 relative z-10">
-                    <div className="bg-blue-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded">1X</div>
+            <div className="bg-[#1A1A1A] rounded-2xl p-4 shadow-2xl border border-slate-800 flex items-center justify-between relative overflow-hidden group hover:border-blue-500/30 transition-colors">
+                <div className="absolute top-0 right-0 bg-blue-600 w-24 h-full blur-[50px] opacity-20 group-hover:opacity-40 transition-opacity"></div>
+                <div className="flex items-center gap-4 relative z-10">
+                    <div className="w-12 h-12 bg-blue-600 text-white text-xs font-black rounded-xl flex items-center justify-center shadow-lg italic">1X</div>
                     <div>
-                        <div className="text-white font-bold text-xs">1xBet Official</div>
-                        <div className="text-[9px] text-slate-400">Code: <span className="text-white font-bold tracking-wider">{dbData.booking_code || "FACTSPORT"}</span></div>
+                        <div className="text-white font-black text-sm tracking-tight mb-0.5">1xBet Official Partner</div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                            Code: <span className="text-yellow-400 font-black bg-yellow-400/10 px-1.5 py-0.5 rounded border border-yellow-400/20">{dbData.booking_code || "FACTSPORT"}</span>
+                        </div>
                     </div>
                 </div>
-                <a href={sanitizeUrl(dbData.affiliate_link) || "#"} target="_blank" rel="noopener noreferrer" className="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase px-4 py-2 rounded-lg shadow-lg text-[10px] flex items-center gap-1 active:scale-95 transition">
-                    Bet <LinkIcon size={10} />
+                <a href={sanitizeUrl(dbData.affiliate_link) || "#"} target="_blank" rel="noopener noreferrer" className="relative z-10 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest px-5 py-3 rounded-xl shadow-[0_4px_15px_rgba(37,99,235,0.4)] text-[10px] flex items-center gap-1.5 active:scale-95 transition">
+                    Bet Now <LinkIcon size={12} />
                 </a>
             </div>
         )}
+
       </div>
 
+      {/* 8. DEEP DATA: Live Timeline, Stats, and Lineups */}
       {!hasWidget && (
-          <div className="px-4 mt-8 space-y-6">
+          <div className="max-w-4xl mx-auto px-4 mt-8 space-y-6">
               <StatsLineupsTabs matchId={dbData.id} initialData={data} />
           </div>
       )}
 
-      <div className="px-4 mt-6">
+      {/* 9. FOOTER: Free Tips Banner */}
+      <div className="max-w-4xl mx-auto px-4 mt-6">
         <FreeTipsBanner />
       </div>
     </div>

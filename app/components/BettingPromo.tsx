@@ -6,7 +6,7 @@ import { createClient } from '@/app/lib/supabase/client';
 export default function BettingPromo({ affiliateLink }: { affiliateLink: string | null }) {
   const [copied, setCopied] = useState(false);
   
-  // 🟢 DYNAMIC SETTINGS STATE
+  // 🟢 Safe defaults in case DB is slow or empty
   const [promo, setPromo] = useState({
       code1x: "FACTSPORT",
       link1x: "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599",
@@ -30,10 +30,9 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
       fetchSettings();
   }, []);
 
-  // LOGIC: If admin set a link, it's Melbet. If null, it's 1xBet.
   const isOverride = !!affiliateLink;
   const targetLink = affiliateLink || promo.link1x;
-  const targetCode = isOverride ? promo.codeMel : promo.code1x; // Uses specific code
+  const targetCode = isOverride ? promo.codeMel : promo.code1x; 
 
   const copyCode = () => {
       navigator.clipboard.writeText(targetCode);
@@ -52,18 +51,17 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
                     <h3 className="font-black text-xl italic tracking-tighter">MELBET</h3>
                     <p className="text-[10px] font-bold opacity-80">300% Bonus • Best Odds</p>
                 </div>
-                <span className="bg-black text-yellow-500 text-[9px] font-black px-2 py-1 rounded">SPECIAL</span>
+                <span className="bg-black text-yellow-500 text-[9px] font-black px-2 py-1 rounded shadow-md">SPECIAL</span>
             </div>
             
             <div className="flex gap-2 relative z-10">
-                <button onClick={copyCode} className="flex-1 bg-black/10 hover:bg-black/20 border border-black/5 rounded-lg px-3 py-2 flex items-center justify-between transition active:scale-95">
+                <button onClick={copyCode} className="flex-1 bg-black/10 hover:bg-black/20 border border-black/10 rounded-lg px-3 py-2 flex items-center justify-between transition active:scale-95 shadow-sm">
                     <div className="text-left">
                         <span className="text-[8px] font-bold block opacity-60 uppercase">Code</span>
                         <span className="text-xs font-mono font-black tracking-wider">{targetCode}</span>
                     </div>
                     {copied ? <CheckCircle size={16} className="text-black"/> : <Copy size={16} className="text-black opacity-50"/>}
                 </button>
-                {/* 🛡️ SECURITY ADDED */}
                 <a href={targetLink} target="_blank" rel="noopener noreferrer" className="bg-black text-white px-5 py-2 rounded-lg font-black text-xs flex items-center gap-2 hover:scale-105 transition shadow-lg">
                     BET <ExternalLink size={12}/>
                 </a>
@@ -75,7 +73,7 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
   // 🔵 1XBET DESIGN (Default)
   return (
     <div className="bg-[#1A1A1A] rounded-xl p-4 shadow-xl border border-slate-800 flex flex-col gap-3 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-20 h-full bg-gradient-to-l from-blue-600/20 to-transparent"></div>
+        <div className="absolute top-0 right-0 w-24 h-full bg-gradient-to-l from-blue-600/20 to-transparent"></div>
         
         <div className="flex justify-between items-center relative z-10">
              <div className="flex items-center gap-3">
@@ -88,7 +86,7 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
         </div>
 
         <div className="flex gap-2 relative z-10">
-             <button onClick={copyCode} className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-3 py-2 flex-1 flex items-center justify-between transition active:scale-95">
+             <button onClick={copyCode} className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-3 py-2 flex-1 flex items-center justify-between transition active:scale-95 shadow-sm">
                 <div className="text-left">
                     <span className="text-[8px] text-slate-400 block uppercase font-bold">Promo Code</span>
                     <span className="text-xs text-white font-mono font-black tracking-wider">{targetCode}</span>
@@ -96,7 +94,6 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
                 {copied ? <CheckCircle size={16} className="text-green-500"/> : <Copy size={16} className="text-slate-500"/>}
              </button>
 
-             {/* 🛡️ SECURITY ADDED */}
              <a href={targetLink} target="_blank" rel="noopener noreferrer" className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-black px-6 py-2 rounded-lg shadow-lg flex items-center gap-1 transition">
                 BET <ExternalLink size={12} />
              </a>
