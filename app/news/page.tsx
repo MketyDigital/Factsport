@@ -28,7 +28,7 @@ export default async function NewsListingPage() {
              <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter flex items-center gap-3">
                  <Newspaper className="text-blue-500" size={36} /> The Newsroom
              </h1>
-             <p className="text-slate-400 font-medium tracking-wide mt-2 text-sm max-w-md">Breaking stories, tactical analysis, and the latest from the world of football.</p>
+             <p className="text-slate-400 font-medium tracking-wide mt-2 text-sm max-w-md">Breaking stories, tactical Football analysis, and the latest from the world of Sport.</p>
         </div>
       </div>
 
@@ -79,8 +79,8 @@ export default async function NewsListingPage() {
                         <Trophy size={28} className="text-black fill-black"/>
                     </div>
                     <div>
-                        <h3 className="font-black text-2xl uppercase italic tracking-tighter text-white">Predict & <span className="text-yellow-500">Win Millions</span></h3>
-                        <p className="font-bold text-sm text-slate-400 mt-1">Join the monthly leaderboard. Win up to ₦500,000!</p>
+                        <h3 className="font-black text-2xl uppercase italic tracking-tighter text-white">Predict & <span className="text-yellow-500">Win Prices </span></h3>
+                        <p className="font-bold text-sm text-slate-400 mt-1">Join the monthly leaderboard. Win Fantastic Rewards</p>
                     </div>
                 </div>
                 <Link href="/matches" className="w-full md:w-auto bg-yellow-500 hover:bg-yellow-400 text-black px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:-translate-y-1 transition-all shadow-[0_10px_20px_rgba(234,179,8,0.3)] flex items-center justify-center gap-2">
