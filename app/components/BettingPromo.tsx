@@ -6,11 +6,12 @@ import { createClient } from '@/app/lib/supabase/client';
 export default function BettingPromo({ affiliateLink }: { affiliateLink: string | null }) {
   const [copied, setCopied] = useState(false);
   
-  // 🟢 Safe defaults in case DB is slow or empty
-  const [promo, setPromo] = useState({
-      code1x: "FACTSPORT",
+  // 🟢 CONSTANT: Affiliate Promo Code is permanently locked
+  const PROMO_CODE = "FACTSPORT";
+
+  // 🟢 DYNAMIC: Affiliate Links are still fetched from the database
+  const [links, setLinks] = useState({
       link1x: "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599",
-      codeMel: "FACTSPORT",
       linkMel: "https://refpa54566.com/L?tag=d_1181253m_45415c_&site=1181253&ad=45415"
   });
 
@@ -19,11 +20,9 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
           const supabase = createClient();
           const { data } = await supabase.from('site_settings').select('*').eq('id', 1).single();
           if (data) {
-              setPromo({
-                  code1x: data.code_1xbet || promo.code1x,
-                  link1x: data.link_1xbet || promo.link1x,
-                  codeMel: data.code_melbet || promo.codeMel,
-                  linkMel: data.link_melbet || promo.linkMel
+              setLinks({
+                  link1x: data.link_1xbet || links.link1x,
+                  linkMel: data.link_melbet || links.linkMel
               });
           }
       };
@@ -31,11 +30,10 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
   }, []);
 
   const isOverride = !!affiliateLink;
-  const targetLink = affiliateLink || promo.link1x;
-  const targetCode = isOverride ? promo.codeMel : promo.code1x; 
+  const targetLink = affiliateLink || links.link1x;
 
   const copyCode = () => {
-      navigator.clipboard.writeText(targetCode);
+      navigator.clipboard.writeText(PROMO_CODE);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
   };
@@ -58,7 +56,7 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
                 <button onClick={copyCode} className="flex-1 bg-black/10 hover:bg-black/20 border border-black/10 rounded-lg px-3 py-2 flex items-center justify-between transition active:scale-95 shadow-sm">
                     <div className="text-left">
                         <span className="text-[8px] font-bold block opacity-60 uppercase">Code</span>
-                        <span className="text-xs font-mono font-black tracking-wider">{targetCode}</span>
+                        <span className="text-xs font-mono font-black tracking-wider">{PROMO_CODE}</span>
                     </div>
                     {copied ? <CheckCircle size={16} className="text-black"/> : <Copy size={16} className="text-black opacity-50"/>}
                 </button>
@@ -89,7 +87,7 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
              <button onClick={copyCode} className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-3 py-2 flex-1 flex items-center justify-between transition active:scale-95 shadow-sm">
                 <div className="text-left">
                     <span className="text-[8px] text-slate-400 block uppercase font-bold">Promo Code</span>
-                    <span className="text-xs text-white font-mono font-black tracking-wider">{targetCode}</span>
+                    <span className="text-xs text-white font-mono font-black tracking-wider">{PROMO_CODE}</span>
                 </div>
                 {copied ? <CheckCircle size={16} className="text-green-500"/> : <Copy size={16} className="text-slate-500"/>}
              </button>
