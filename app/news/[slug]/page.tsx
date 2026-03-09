@@ -4,7 +4,8 @@ export const revalidate = 300;
 import { createClient } from '@/app/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronLeft, Calendar, Clock, ArrowRight, Trophy, Flame } from 'lucide-react';
+// 🔥 FIX: Added Zap and ChevronRight to the import list below!
+import { ChevronLeft, Calendar, Clock, ArrowRight, Trophy, Flame, Zap, ChevronRight } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
 import ShareButton from '@/app/components/ShareButton';
 import MarkdownRenderer from '@/app/components/MarkdownRenderer'; 
