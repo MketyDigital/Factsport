@@ -134,7 +134,7 @@ export default async function HighlightsPage() {
                         </div>
                     </div>
                     <Link href="/vip/upgrade" className="relative z-10 w-full sm:w-auto shrink-0 bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition flex items-center justify-center gap-2 active:scale-95 shadow-md">
-                        Play Now <ArrowRight size={14}/>
+                        Join Now <ArrowRight size={14}/>
                     </Link>
                 </div>
             </>
