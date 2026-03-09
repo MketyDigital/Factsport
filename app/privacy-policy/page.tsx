@@ -46,7 +46,7 @@ export default function PrivacyPage() {
                 <h3 className="font-bold text-xl text-slate-900 mb-3">3. Third-Party Services</h3>
                 <p>We rely on trusted third-party providers:</p>
                 <ul className="list-disc pl-5 space-y-2">
-                    <li><strong>Third-Party Database:</strong> Used for secure database storage.</li>
+                    <li><strong>Database:</strong> Used for secure storage.</li>
                     <li><strong>Google Auth:</strong> Used for secure sign-in.</li>
                     <li><strong>YouTube API:</strong> Used to display video content. We do not store your YouTube viewing history.</li>
                 </ul>

@@ -46,7 +46,6 @@ async function generateDailyPreview() {
         leagues[m.league].push(m);
     });
 
-    // 🟢 PRE-BUILT EXACT LINKS
     let briefingData = "";
     for (const [league, games] of Object.entries(leagues)) {
         briefingData += `\n${league}:\n`;
@@ -56,6 +55,7 @@ async function generateDailyPreview() {
         });
     }
 
+    // 🟢 UPGRADED PROMPT: Forces detailed Facebook summary
     const prompt = `
         You are a top-tier European football journalist writing for 'FactSport'.
         Write a deep, engaging "Daily Briefing" article previewing today's football action.
@@ -67,12 +67,12 @@ async function generateDailyPreview() {
 
         STRICT FACTUAL GUIDELINES:
         1. TIME AWARENESS: It is currently 2026. 
-        2. ZERO HALLUCINATIONS: Do NOT invent or name any specific players or managers. You do not have that data. Focus on the clubs, their current form, and the importance of the fixture.
+        2. ZERO HALLUCINATIONS: Do NOT invent or name any specific players or managers. Focus on the clubs, their current form, and the importance of the fixture.
         3. EXACT MATCH LINKS: When you mention a match, you MUST copy and paste the "EXACT LINK TO USE" provided in the schedule above. Do not try to write the URL yourself.
         4. Headline: Punchy and narrative-driven. Under 10 words. Do not use asterisks (*).
         5. Tone: Insightful, opinionated, and highly engaging. 
-        6. Length: 400-500 words. Plain text only.
-        7. FACEBOOK SUMMARY: At the very end of your entire response, skip a line and write the exact text "FB_POST:" followed by a short, punchy 2-3 sentence Facebook post summarizing your article. Mention the specific big matches you discussed. Do not use hashtags.
+        6. Length: 400-600 words. Plain text only.
+        7. FACEBOOK SUMMARY: At the very end of your entire response, skip a line and write the exact text "FB_POST:" followed by a comprehensive, exciting Facebook post. You MUST mention EVERY specific match listed in the schedule above so fans know exactly what is playing today. Make it highly engaging and use emojis. Do not use hashtags.
     `;
 
     try {
@@ -81,7 +81,7 @@ async function generateDailyPreview() {
 
         const splitText = text.split('FB_POST:');
         const articleContent = splitText[0].trim();
-        const generatedFbText = splitText.length > 1 ? splitText[1].trim() : "🚨 MATCHDAY IS HERE! The stakes are massive across Europe today. Who are you backing to secure all 3 points? 🤔 Drop your predictions in the comments and tap below for our full tactical preview! 👇";
+        const generatedFbText = splitText.length > 1 ? splitText[1].trim() : "🚨 MATCHDAY IS HERE! Massive stakes across Europe today. Drop your predictions in the comments and tap below for our full tactical preview! 👇";
 
         const lines = articleContent.split('\n').filter(line => line.trim() !== '');
         const headline = lines[0].replace(/^#+\s*/, '').replace(/[\*"]/g, ''); 
@@ -90,8 +90,10 @@ async function generateDailyPreview() {
         const giants = ['Arsenal','Chelsea','Liverpool','Man City','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG'];
         let featureMatch = matches.find(g => giants.some(t => g.home_team.includes(t) || g.away_team.includes(t))) || matches[0];
 
+        // 🟢 ADDED CATEGORY
         const { error } = await supabase.from('news').insert([{
             title: headline, slug: reportSlug, body: body,
+            category: 'Football', // Ensures it shows up correctly on the frontend
             image_url: null, team_1_logo: featureMatch ? featureMatch.home_logo : null, 
             team_2_logo: featureMatch ? featureMatch.away_logo : null,
             is_breaking: false, is_headline: false  
