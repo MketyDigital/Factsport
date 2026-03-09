@@ -81,7 +81,10 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                     <span className="text-xs font-black uppercase tracking-widest text-slate-400">Share Story</span>
                     <ShareButton title={article.title} slug={article.slug} />
                 </div>
-
+                {/* 🟢 COMPONENT 1: BETTING PROMO (Compact layout at the top) */}
+        <div className="max-w-2xl mx-auto">
+            <BettingPromo affiliateLink={null} />
+        </div>
                 {/* IN-ARTICLE PREDICT BANNER */}
                 <div className="mt-10 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-2xl p-8 text-black relative overflow-hidden group shadow-2xl border border-yellow-300">
                     <div className="absolute top-0 right-0 w-48 h-48 bg-white opacity-30 rounded-full blur-3xl transform translate-x-10 -translate-y-10 group-hover:scale-150 transition-transform duration-700"></div>
