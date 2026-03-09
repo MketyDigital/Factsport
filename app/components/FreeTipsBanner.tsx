@@ -48,7 +48,7 @@ export default function FreeTipsBanner() {
             <Zap className="text-yellow-400 fill-yellow-400" size={14} /> Daily Free Booking Codes
         </h3>
         <p className="text-slate-400 text-[10px] mt-1 max-w-sm mx-auto leading-tight">
-          Register with code <span className="text-white font-black bg-white/10 px-1.5 py-0.5 rounded ml-0.5 shadow-sm border border-white/5">{promo.code1x}</span> to use.
+          Register with Our Promo code <span className="text-white font-black bg-white/10 px-1.5 py-0.5 rounded ml-0.5 shadow-sm border border-white/5">FACTSPORT</span> on any of our partner site to use.
         </p>
       </div>
 
