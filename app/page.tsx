@@ -3,14 +3,18 @@ export const revalidate = 3;
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
-import { Zap, Activity, ArrowRight, PlayCircle, Video, ExternalLink, Youtube, Newspaper, Radio, TrendingUp, Calendar, BarChart2, Award, Trophy } from "lucide-react";
+import { ArrowRight, Youtube, Newspaper, TrendingUp, Calendar, Award, Trophy } from "lucide-react";
+
+// 🔥 ALL MODULAR COMPONENTS IMPORTED
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
-import NewsArtwork from '@/app/components/NewsArtwork';
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 import MatchTime from '@/app/components/MatchTime';
+import NewsTicker from '@/app/components/NewsTicker'; 
+import LatestNewsList from '@/app/components/LatestNewsList'; 
+import HighlightsSlider from '@/app/components/HighlightsSlider'; 
+import HeroMatchCards from '@/app/components/HeroMatchCards'; 
 
-// 🟢 CONFIG: Your Default 1xBet Link
 const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599"; 
 
 export const metadata = {
@@ -28,7 +32,6 @@ const formatDateLabel = (dateString: string) => {
     return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 };
 
-// Helper: Group matches by Date for display
 const groupByDate = (matchList: any[]) => {
     const groups: { [date: string]: any[] } = {};
     matchList.forEach(m => {
@@ -40,26 +43,20 @@ const groupByDate = (matchList: any[]) => {
     return groups;
 };
 
-// 🟢 HELPER: Sort Matches (Live -> Upcoming by Time)
 const sortMatches = (matches: any[]) => {
   return matches.sort((a, b) => {
-    // 1. STATUS PRIORITY: LIVE/HT is always first
     const liveStatus = ['LIVE', 'HT', 'IN_PLAY'];
     const isLiveA = liveStatus.includes(a.status);
     const isLiveB = liveStatus.includes(b.status);
 
-    if (isLiveA && !isLiveB) return -1; // A comes first
-    if (!isLiveA && isLiveB) return 1;  // B comes first
+    if (isLiveA && !isLiveB) return -1; 
+    if (!isLiveA && isLiveB) return 1;  
 
-    // 2. IF BOTH LIVE: Sort by ID (Just to keep stable)
     if (isLiveA && isLiveB) return a.id - b.id;
-
-    // 3. IF NEITHER LIVE: Sort by Date (Soonest first)
     return new Date(a.match_date).getTime() - new Date(b.match_date).getTime();
   });
 };
 
-// 🟢 SMART MIXER: Ensures variety of leagues
 const getDiverseMatches = (allMatches: any[], limit: number) => {
     const live = allMatches.filter(m => ['LIVE', 'HT', 'IN_PLAY'].includes(m.status));
     const scheduled = allMatches.filter(m => !['LIVE', 'HT', 'IN_PLAY'].includes(m.status));
@@ -83,7 +80,6 @@ const getDiverseMatches = (allMatches: any[], limit: number) => {
             }
         }
     }
-    // Apply final sort to the mixed result
     return sortMatches([...live, ...mixedScheduled].slice(0, limit));
 };
 
@@ -92,7 +88,6 @@ async function getHomepageData(leagueFilter: string | undefined) {
     
   let matchQuery = supabase.from('matches').select('*');
 
-  // 🟢 LOGIC 1: LEAGUE FILTER
   if (leagueFilter) {
       const startDate = new Date(); startDate.setDate(startDate.getDate() - 1); 
       const endDate = new Date(); endDate.setDate(endDate.getDate() + 3); 
@@ -102,7 +97,6 @@ async function getHomepageData(leagueFilter: string | undefined) {
         .ilike('league', `%${leagueFilter}%`)
         .order('match_date', { ascending: true });
   } 
-  // 🟢 LOGIC 2: "FOR YOU"
   else {
       const todayStart = new Date(); todayStart.setHours(0,0,0,0);
       const tomorrowEnd = new Date(); 
@@ -116,11 +110,9 @@ async function getHomepageData(leagueFilter: string | undefined) {
         .limit(50); 
   }
 
-  // Fetch Data
   const [matchesRes, newsRes, highlightsRes, featuredRes] = await Promise.all([
     matchQuery,
     supabase.from('news').select('*').order('created_at', { ascending: false }).limit(20),
-    // 🟢 UPDATED: Excludes both TRUE nulls and empty strings to guarantee instant disappearance on removal
     supabase.from('matches')
       .select('*')
       .not('video_url', 'is', null)
@@ -132,14 +124,12 @@ async function getHomepageData(leagueFilter: string | undefined) {
 
   let matches = matchesRes.data || [];
 
-  // Apply Mixer if no filter
   if (!leagueFilter && matches.length > 0) {
       matches = getDiverseMatches(matches, 20);
   } else {
       matches = sortMatches(matches);
   }
 
-  // Fallback
   if (matches.length === 0 && !leagueFilter) {
       const { data: finishedMatches } = await supabase.from('matches').select('*')
         .in('status', ['FT', 'FINISHED', 'ABD']) 
@@ -162,37 +152,26 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
     
   const { matches, news, highlights, featuredMatches } = await getHomepageData(selectedLeague);
 
-  // 🟢 UPDATED TICKER LOGIC: Fetches top 15 news globally
   const rawTicker = news.slice(0, 15);
   const tickerNews = [...rawTicker, ...rawTicker, ...rawTicker, ...rawTicker]; 
-  
-  // 🟢 UPDATED HEADLINES LOGIC: Strictly uses Admin 'is_headline' marker
   const finalHeadlines = news.filter(n => n.is_headline).slice(0, 3);
-  
-  // 🟢 UPDATED LATEST NEWS LOGIC: Show anything not in the finalHeadlines
   const latestNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id)).slice(0, 5);
 
-  // 🟢 SMART HERO LOGIC: Max 3 Matches, Disappears After Match Day
   let heroMatches: any[] = [];
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // 1. Admin Override (Limit to 3, strictly today or future)
   if (featuredMatches.length > 0) {
       heroMatches = featuredMatches.filter(m => m.match_date.split('T')[0] >= todayStr).slice(0, 3);
   } 
   
-  // 2. Automated Targeting (If no admin match is available for today/future)
   if (heroMatches.length === 0) {
       const bigLeagues = ['Premier League', 'Champions League', 'World Cup', 'La Liga', 'Serie A'];
-      
-      // Get dates that have upcoming/current matches (>= today)
       const validMatches = matches.filter(m => m.match_date.split('T')[0] >= todayStr);
       const upcomingDates = Array.from(new Set(validMatches.map((m: any) => m.match_date.split('T')[0]))).sort();
       
       if (upcomingDates.length > 0) {
-          const targetDate = upcomingDates[0]; // This locks onto today, or next available day
+          const targetDate = upcomingDates[0]; 
           const targetMatches = validMatches.filter(m => m.match_date.startsWith(targetDate));
-          
           const bigMatchCandidates = targetMatches.filter(m => bigLeagues.includes(m.league));
           
           if (bigMatchCandidates.length > 0) {
@@ -203,94 +182,27 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       }
   }
 
-  // Filter display matches (remove duplicates if hero is shown)
   const displayMatches = matches.filter(m => !heroMatches.some(h => h.id === m.id));
   const groupedMatches = groupByDate(displayMatches);
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-0 overflow-x-hidden">
       
-      {/* 🟢 CSS UPDATED: Changed from 60s to 180s to significantly reduce scroll speed for readabillity */}
-      <style>{`
-        @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-        .animate-scroll { display: flex; width: max-content; animation: scroll 180s linear infinite; }
-        .ticker-item { white-space: nowrap; display: flex; align-items: center; }
-      `}</style>
-
       {/* 1. TICKER */}
-      {tickerNews.length > 0 && (
-        <div className="bg-yellow-400 text-black text-[10px] font-black h-9 overflow-hidden relative flex items-center shadow-md z-40 border-b border-yellow-500">
-            <div className="absolute left-0 h-full bg-yellow-500 px-3 flex items-center z-20 shadow-[4px_0_10px_rgba(0,0,0,0.1)] border-r border-yellow-600 whitespace-nowrap">
-                <Activity size={12} className="mr-1 animate-pulse text-red-600" /> FACTSPORT
-            </div>
-            <div className="w-full overflow-hidden flex pl-24"> 
-                <div className="animate-scroll flex items-center">
-                    {tickerNews.map((n, i) => ( 
-                        <div key={`${n.id}-${i}`} className="ticker-item flex items-center mx-6">
-                            <Link href={`/news/${n.slug}`} className="uppercase tracking-wide hover:underline hover:text-red-700 transition">
-                                {/* 🟢 Displays the siren ONLY if Admin marked it as Breaking */}
-                                {n.is_breaking && "🚨 "} {n.title}
-                            </Link>
-                            <span className="text-yellow-700/50 ml-6">•</span>
-                        </div> 
-                    ))}
-                </div>
-            </div>
-        </div>
-      )}
+      <NewsTicker tickerNews={tickerNews} />
 
       {/* 2. AUTO-SLIDER */}
       {finalHeadlines.length > 0 && <div className="mt-4 px-4"><HeadlinesSlider headlines={finalHeadlines} /></div>}
 
-      {/* 3. HIGHLIGHTS (Latest 5 Matches) */}
-      {highlights.length > 0 && (
-        <div className="mt-4 px-4">
-             <div className="flex justify-between items-center mb-3">
-                <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2"><PlayCircle size={14} className="text-red-600" /> Highlights</h3>
-                <Link href="/highlights" className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded hover:bg-blue-100 transition">View All</Link>
-            </div>
-            <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 scrollbar-hide">
-                {highlights.map((item: any) => (
-                    <Link href={`/match/${item.id}`} key={item.id} className="snap-center shrink-0 w-[180px] group">
-                        <div className="relative aspect-video bg-black rounded-xl overflow-hidden shadow-md border border-slate-100 mb-2">
-                            <div className="absolute inset-0 bg-[#0a1428] flex items-center justify-center gap-4 opacity-80 group-hover:opacity-60 transition">
-                                <div className="w-8 h-8 flex items-center justify-center">{item.home_logo ? <img src={item.home_logo} className="w-full h-full object-contain"/> : <span className="text-white text-[10px]">{item.home_team.substring(0,3)}</span>}</div>
-                                <span className="text-slate-500 font-bold">VS</span>
-                                <div className="w-8 h-8 flex items-center justify-center">{item.away_logo ? <img src={item.away_logo} className="w-full h-full object-contain"/> : <span className="text-white text-[10px]">{item.away_team.substring(0,3)}</span>}</div>
-                            </div>
-                            <div className="absolute inset-0 flex items-center justify-center"><PlayCircle className="text-white drop-shadow-lg group-hover:scale-110 transition" size={32} /></div>
-                        </div>
-                        <h4 className="text-[10px] font-bold text-slate-800 leading-tight truncate">{item.home_team} <span className="text-slate-400">vs</span> {item.away_team}</h4>
-                    </Link>
-                ))}
-            </div>
-        </div>
-      )}
+      {/* 3. HIGHLIGHTS (MODULAR) */}
+      <HighlightsSlider highlights={highlights} />
 
-      {/* 4. LATEST NEWS */}
-      <div className="px-4 mb-4 mt-6">
-        <div className="flex justify-between items-center mb-2">
-            <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">Latest News</h3>
-            <Link href="/news" className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded hover:bg-blue-100 transition">View All</Link>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm divide-y divide-slate-50">
-            {latestNews.length > 0 ? latestNews.map((item) => (
-                <Link href={`/news/${item.slug || '#'}`} key={item.id} className="flex gap-3 items-center p-3 active:bg-slate-50 transition group">
-                    <div className="w-14 h-14 bg-slate-100 rounded-lg shrink-0 overflow-hidden relative">
-                        <NewsArtwork image={item.image_url} team1Logo={item.team_1_logo} team2Logo={item.team_2_logo} title={item.title} className="w-full h-full group-hover:scale-110 transition duration-500" />
-                    </div>
-                    <div>
-                        <h4 className="text-xs font-bold leading-tight line-clamp-2 text-slate-800 group-hover:text-blue-600 transition">{item.title}</h4>
-                        <span className="text-[9px] text-slate-400 mt-1 block font-medium">{new Date(item.created_at).toLocaleDateString()}</span>
-                    </div>
-                </Link>
-            )) : <div className="text-center text-[10px] text-slate-400 py-4">No recent updates</div>}
-        </div>
-      </div>
+      {/* 4. LATEST NEWS (MODULAR) */}
+      <LatestNewsList latestNews={latestNews} />
 
       {/* 5. MATCH CENTER */}
-      <section className="mt-6">
-         <div className="px-4 flex justify-between items-center mb-2">
+      <section className="mt-8">
+         <div className="px-4 flex justify-between items-center mb-3">
             <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2"><TrendingUp className="text-red-500" size={14}/> Match Center</h3>
             <Link href="/matches" className="text-[10px] font-black bg-[#0a1428] text-white px-4 py-2 rounded-lg flex items-center gap-1 shadow-md active:scale-95 transition hover:bg-slate-900">
                 All Fixtures <ArrowRight size={10} />
@@ -300,14 +212,13 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         {/* League Tabs */}
         <div className="bg-white border-y border-slate-200 sticky top-0 z-30 overflow-x-auto scrollbar-hide py-2 shadow-sm mb-4">
             <div className="flex px-4 space-x-2 min-w-max">
-            <Link href="/" scroll={false} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all ${!selectedLeague ? 'bg-[#0a1428] text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200'}`}>For You</Link>
+            <Link href="/" scroll={false} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all ${!selectedLeague ? 'bg-[#0a1428] text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}`}>For You</Link>
             {['Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Champions League'].map((league) => (
-                <Link key={league} href={`/?league=${league}`} scroll={false} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all ${selectedLeague === league ? 'bg-[#0a1428] text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200'}`}>{league === 'Premier League' ? 'EPL' : league}</Link>
+                <Link key={league} href={`/?league=${league}`} scroll={false} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all ${selectedLeague === league ? 'bg-[#0a1428] text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}`}>{league === 'Premier League' ? 'EPL' : league}</Link>
             ))}
             </div>
         </div>
 
-        {/* 🟢 LEAGUE BANNER DISPLAY (If League Selected) */}
         {selectedLeague && matches.length > 0 && matches[0].league_banner && (
             <div className="px-4 mb-4">
                 <div className="rounded-xl overflow-hidden shadow-sm border border-slate-200 bg-white">
@@ -316,156 +227,76 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             </div>
         )}
 
-        {/* 🟢 UPDATED: RICH HERO SECTION (Smaller & with Top Match Label) */}
-        {!selectedLeague && heroMatches.length > 0 && (
-         <div className="px-4 mb-4 flex gap-2 overflow-x-auto">
-             {heroMatches.map((match) => (
-                <Link key={match.id} href={`/match/${match.id}`} className={`block relative z-10 ${heroMatches.length > 1 ? 'w-[85%]' : 'w-full'} shrink-0`}>
-                    {/* Notice the reduced padding: p-3 instead of p-4, and rounded-xl */}
-                    <div className="bg-[#0a1428] rounded-xl p-3 shadow-xl border border-white/10 relative overflow-hidden group hover:scale-[1.01] transition-transform">
-                        
-                        {/* 🟢 NEW: TOP MATCH OF THE DAY LABEL */}
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-yellow-500 text-black text-[8px] font-black px-3 py-0.5 rounded-b-md z-20 uppercase tracking-widest shadow-md whitespace-nowrap">
-                            Top Match of the Day
-                        </div>
-
-                        {/* RICH BACKGROUND LAYER */}
-                        {match.home_fanart || match.home_stadium ? (
-                            <>
-                                <img src={match.home_fanart || match.home_stadium} className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-overlay" />
-                                <div className="absolute inset-0 bg-gradient-to-t from-[#0a1428] via-[#0a1428]/50 to-transparent"></div>
-                            </>
-                        ) : (
-                            <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-blue-900 opacity-80"></div>
-                        )}
-
-                        <div className="relative z-10">
-                            {['LIVE','HT','IN_PLAY'].includes(match.status) && (
-                                <div className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-bl-lg animate-pulse flex items-center gap-1 shadow-lg">
-                                    <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE
-                                </div>
-                            )}
-                            {(match.livestream_url || match.audio_url) && (
-                                <div className="absolute top-0 left-0 bg-black/40 backdrop-blur-md text-white text-[8px] font-bold px-2 py-0.5 rounded-br-lg border border-white/10 flex items-center gap-1">
-                                     {match.livestream_url ? <Video size={8} /> : <Radio size={8} />}
-                                     {match.livestream_url ? 'WATCH' : 'AUDIO'}
-                                </div>
-                            )}
-                            
-                            {/* Reduced top margin mt-6, smaller logos w-10, smaller score text-xl */}
-                            <div className="flex justify-between items-center mt-6">
-                                <div className="flex flex-col items-center w-[30%]">
-                                    {match.home_logo ? <img src={match.home_logo} className="w-10 h-10 object-contain mb-1.5 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-1.5 flex items-center justify-center text-[10px]">H</div>}
-                                    <span className="text-[10px] font-bold text-center leading-tight text-white line-clamp-1 drop-shadow-md">{match.home_team}</span>
-                                </div>
-                                <div className="flex flex-col items-center w-[40%]">
-                                    <div className="text-xl font-black tabular-nums tracking-widest bg-black/40 px-2 py-1 rounded-lg backdrop-blur-md border border-white/10 shadow-inner text-white whitespace-nowrap">
-                                        {match.status === 'SCHEDULED' || match.status === 'PRE' ? <span className="text-sm">VS</span> : `${match.home_score}-${match.away_score}`}
-                                    </div>
-                                    <span className="text-[8px] font-medium text-blue-200 mt-1 uppercase tracking-wider text-center drop-shadow-md">
-                                        {match.status === 'SCHEDULED' || match.status === 'PRE' 
-                                            ? <MatchTime date={match.match_date} />
-                                            : (match.status === 'HT' ? 'HT' : match.status)
-                                        }
-                                    </span>
-                                </div>
-                                <div className="flex flex-col items-center w-[30%]">
-                                    {match.away_logo ? <img src={match.away_logo} className="w-10 h-10 object-contain mb-1.5 drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)]"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-1.5 flex items-center justify-center text-[10px]">A</div>}
-                                    <span className="text-[10px] font-bold text-center leading-tight text-white line-clamp-1 drop-shadow-md">{match.away_team}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </Link>
-             ))}
-         </div>
-        )}
+        {/* HERO MATCH CARDS (MODULAR) */}
+        {!selectedLeague && <HeroMatchCards heroMatches={heroMatches} />}
         
-        {/* MATCH LIST */}
-        <div className="px-4 py-0 space-y-3">
+        {/* FULL MATCH LIST */}
+        <div className="px-4 py-0 space-y-4 mt-2">
              <FreeTipsBanner />
 
              {Object.keys(groupedMatches).length > 0 ? (
                  Object.keys(groupedMatches).map((dateKey) => (
-                    <div key={dateKey}>
-                        <div className="flex items-center gap-2 mb-3 mt-4 px-1">
+                    <div key={dateKey} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-4">
+                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex items-center gap-2">
                             <Calendar size={12} className="text-slate-400"/>
-                            <span className="text-xs font-black text-slate-500 uppercase tracking-wider">{dateKey}</span>
-                            <div className="h-px bg-slate-200 flex-1"></div>
+                            <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">{dateKey}</span>
                         </div>
 
-                        {groupedMatches[dateKey].map((match) => {
-                            const isLive = ['LIVE', 'HT', 'IN_PLAY'].includes(match.status);
-                            const isScheduled = match.status === 'SCHEDULED' || match.status === 'PRE';
-                            const isFinished = ['FT', 'FINISHED', 'ABD'].includes(match.status);
+                        <div className="divide-y divide-slate-50">
+                            {groupedMatches[dateKey].map((match) => {
+                                const isLive = ['LIVE', 'HT', 'IN_PLAY'].includes(match.status);
+                                const isScheduled = match.status === 'SCHEDULED' || match.status === 'PRE';
+                                const isFinished = ['FT', 'FINISHED', 'ABD'].includes(match.status);
+                                const stageText = match.match_group ? match.match_group.replace(/_/g, ' ') : (match.stage && match.stage !== 'REGULAR_SEASON' ? match.stage.replace(/_/g, ' ') : null);
 
-                            const stageText = match.match_group ? match.match_group.replace(/_/g, ' ') : (match.stage && match.stage !== 'REGULAR_SEASON' ? match.stage.replace(/_/g, ' ') : null);
-
-                            return (
-                                <div key={match.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-3 hover:shadow-md transition">
-                                    <div className="bg-slate-50 px-3 py-1.5 flex justify-between items-center border-b border-slate-100">
-                                         <div className="flex items-center gap-2">
-                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider max-w-[100px] truncate">{match.league}</span>
+                                return (
+                                    <div key={match.id} className="hover:bg-slate-50/80 transition block">
+                                        <Link href={`/match/${match.id}`} className="block p-4">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider">{match.league}</span>
+                                                    {stageText && (
+                                                        <>
+                                                            <span className="text-[8px] text-slate-300">•</span>
+                                                            <span className="text-[8px] font-black text-blue-500 uppercase tracking-wider bg-blue-50 px-1.5 py-0.5 rounded">{stageText}</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
                                             
-                                            {stageText && (
-                                                <>
-                                                    <span className="text-[9px] font-bold text-slate-300">•</span>
-                                                    <span className="text-[9px] font-bold text-blue-500 uppercase tracking-wider">{stageText}</span>
-                                                </>
-                                            )}
-                                            
-                                            <span className="text-[9px] font-bold text-slate-300">•</span>
-                                            <span className="text-[9px] font-bold text-slate-500">{formatDateLabel(match.match_date)}</span>
-                                         </div>
-                                         {match.livestream_url && <span className="flex items-center gap-1 text-[8px] font-black text-red-600 animate-pulse bg-red-50 px-1.5 py-0.5 rounded border border-red-100"><Video size={8}/> LIVE</span>}
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex-1 flex flex-col gap-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-6 h-6 flex items-center justify-center shrink-0">{match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain" /> : <div className="w-5 h-5 bg-slate-200 rounded-full"></div>}</div>
+                                                        <span className={`text-xs font-black uppercase tracking-tight truncate max-w-[120px] sm:max-w-none ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-600'}`}>
+                                                            {match.home_team}
+                                                        </span>
+                                                        {!isScheduled && <span className={`ml-auto font-black text-sm ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-400'}`}>{match.home_score}</span>}
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-6 h-6 flex items-center justify-center shrink-0">{match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain" /> : <div className="w-5 h-5 bg-slate-200 rounded-full"></div>}</div>
+                                                        <span className={`text-xs font-black uppercase tracking-tight truncate max-w-[120px] sm:max-w-none ${isFinished && match.away_score > match.home_score ? 'text-slate-900' : 'text-slate-600'}`}>
+                                                            {match.away_team}
+                                                        </span>
+                                                        {!isScheduled && <span className={`ml-auto font-black text-sm ${isFinished && match.away_score > match.home_score ? 'text-slate-900' : 'text-slate-400'}`}>{match.away_score}</span>}
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="flex flex-col items-end justify-center pl-4 border-l border-slate-100 ml-4 w-16 shrink-0">
+                                                    <LiveScoreLabel matchId={match.id} initialStatus={match.status} variant="badge" matchDate={match.match_date} />
+                                                    {isScheduled && <span className="text-[10px] font-bold text-slate-500 mt-1"><MatchTime date={match.match_date} /></span>}
+                                                </div>
+                                            </div>
+                                        </Link>
                                     </div>
-                                    
-                                    <Link href={`/match/${match.id}`}>
-                                        <div className="p-4 flex justify-between items-center active:bg-slate-50 transition">
-                                            <div className="flex-1 flex items-center gap-3 overflow-hidden">
-                                                <div className="w-8 h-8 flex items-center justify-center shrink-0">{match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}</div>
-                                                <span className="text-xs font-bold text-slate-800 truncate">{match.home_team}</span>
-                                            </div>
-                                            <div className="px-4 min-w-[80px] flex justify-center border-x border-slate-50">
-                                                <LiveScoreLabel matchId={match.id} initialStatus={match.status} homeScore={match.home_score} awayScore={match.away_score} matchDate={match.match_date} />
-                                            </div>
-                                            <div className="flex-1 flex items-center gap-3 flex-row-reverse text-right overflow-hidden">
-                                                <div className="w-8 h-8 flex items-center justify-center shrink-0">{match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain" /> : <div className="w-6 h-6 bg-slate-200 rounded-full"></div>}</div>
-                                                <span className="text-xs font-bold text-slate-800 truncate">{match.away_team}</span>
-                                            </div>
-                                        </div>
-                                    </Link>
-
-                                    {/* BUTTON LOGIC */}
-                                    <div className="px-3 py-2 border-t border-slate-100 bg-slate-50/50">
-                                        {isScheduled && (
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <Link href={`/match/${match.id}`} className="flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:border-blue-200 rounded-lg py-2 shadow-sm text-[10px] font-bold text-slate-700 active:scale-95 transition hover:bg-blue-50">
-                                                    <Zap size={12} className="text-blue-500" /> Predict
-                                                </Link>
-                                                <a href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition hover:bg-green-200">
-                                                    <ExternalLink size={12} /> Bet Now
-                                                </a>
-                                            </div>
-                                        )}
-                                        {isLive && (
-                                            <a href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-1.5 bg-green-100 text-green-700 border border-green-200 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition hover:bg-green-200">
-                                                <ExternalLink size={12} /> Bet Now
-                                            </a>
-                                        )}
-                                        {isFinished && (
-                                            <Link href={`/match/${match.id}`} className="w-full flex items-center justify-center gap-1.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg py-2 shadow-sm text-[10px] font-bold active:scale-95 transition hover:bg-blue-100">
-                                                <BarChart2 size={12} /> View Stats
-                                            </Link>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
                     </div>
                  ))
              ) : (
-                <div className="text-center py-10 opacity-50 bg-white rounded-xl border border-dashed border-slate-300">
+                <div className="text-center py-12 opacity-50 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
+                   <Calendar size={24} className="mx-auto mb-2 text-slate-400"/>
                    <p className="text-xs font-bold text-slate-500">No matches found.</p>
                 </div>
              )}
