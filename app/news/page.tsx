@@ -4,7 +4,7 @@ export const revalidate = 300;
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 // 🔥 FIX: Added Radio and BarChart2 to the import list below!
-import { Calendar, ChevronRight, Zap, Trophy, Youtube, Newspaper, ArrowRight, Flame, Radio, BarChart2, ArrowRight } from 'lucide-react';
+import { Calendar, ChevronRight, Zap, Trophy, Youtube, Newspaper, ArrowRight, Flame, Radio, BarChart2 } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
 import BettingPromo from '@/app/components/BettingPromo';
 
