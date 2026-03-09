@@ -1,10 +1,11 @@
 export const runtime = 'edge';
-export const revalidate = 5; 
+export const revalidate = 3; 
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
-import { Video, Mic, Calendar, ChevronLeft, Radio, Trophy, ArrowRight, Activity } from 'lucide-react';
+import { Video, Mic, Calendar, ChevronLeft, Radio, Trophy, Activity, PlayCircle } from 'lucide-react';
 import LiveScoreLabel from '@/app/components/LiveScoreLabel'; 
+import AutoRefresh from '@/app/components/AutoRefresh'; // 🔥 IMPORTED AUTO REFRESH
 
 export default async function LiveMediaPage() {
   const supabase = createClient();
@@ -28,40 +29,42 @@ export default async function LiveMediaPage() {
     : "a later date";
 
   return (
-    <div className="min-h-screen bg-[#F0F2F5] pb-20 font-sans text-slate-900">
+    <div className="min-h-screen bg-[#0a1428] pb-20 font-sans text-white selection:bg-red-500">
       
-      <div className="bg-red-600 text-white p-4 sticky top-0 z-50 shadow-md flex items-center gap-4">
-          <Link href="/" className="p-1 rounded-full hover:bg-white/10 transition"><ChevronLeft /></Link>
+      {/* 🔥 INVISIBLE AUTO REFRESH COMPONENT (Fires every 60s) */}
+      <AutoRefresh interval={60000} />
+      
+      <div className="bg-[#0f1c3a] border-b border-white/10 text-white p-4 sticky top-0 z-50 shadow-2xl flex items-center gap-4 backdrop-blur-lg">
+          <Link href="/" className="p-1.5 bg-white/5 rounded-full hover:bg-white/10 transition border border-white/5"><ChevronLeft size={20} /></Link>
           <div>
-            <h1 className="font-black text-lg leading-none italic uppercase flex items-center gap-2">
-                <Radio className="animate-pulse"/> Live Center
+            <h1 className="font-black text-lg leading-none italic uppercase flex items-center gap-2 tracking-tight">
+                <Radio className="text-red-500 animate-pulse"/> Live Center
             </h1>
-            <p className="text-[10px] text-red-100 font-medium">Watch Alongs & Live Scores</p>
+            <p className="text-[10px] text-slate-400 font-bold tracking-widest mt-0.5">WATCH ALONGS & LIVE SCORES</p>
           </div>
       </div>
 
       <div className="p-4 space-y-8">
         {coveredMatches.length === 0 && liveUncoveredMatches.length === 0 ? (
-            <div className="text-center py-20 opacity-60 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-                <Calendar className="w-12 h-12 mx-auto mb-3 text-slate-400" />
-                <p className="font-black text-slate-700 text-sm mb-1">No live matches available right now.</p>
-                <p className="text-xs font-bold text-slate-500">
-                    Come back on <span className="text-red-600">{nextDateText}</span> for the nearest live action.
+            <div className="text-center py-20 bg-white/5 rounded-3xl border border-white/10 p-6 backdrop-blur-sm">
+                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10 shadow-inner">
+                    <Calendar className="w-8 h-8 text-slate-400" />
+                </div>
+                <p className="font-black text-white text-lg mb-2">No Live Action Right Now</p>
+                <p className="text-xs font-bold text-slate-400">
+                    Come back on <span className="text-red-500">{nextDateText}</span> for the next broadcast.
                 </p>
             </div>
         ) : (
             <>
                 <div>
-                    <h2 className="text-xs font-black uppercase text-slate-500 mb-3 flex items-center gap-2 pl-1">
-                        <Video size={14}/> Live Coverage
+                    <h2 className="text-xs font-black uppercase text-slate-400 mb-4 flex items-center gap-2 pl-1 tracking-widest">
+                        <Video size={14} className="text-blue-500"/> Featured Coverage
                     </h2>
                     
                     {coveredMatches.length === 0 ? (
-                        <div className="bg-white/50 border border-slate-200 border-dashed rounded-xl p-6 text-center">
-                             <p className="text-xs font-bold text-slate-500">No live coverage available for now.</p>
-                             {liveUncoveredMatches.length > 0 && (
-                                 <p className="text-[10px] text-slate-400 mt-1">Check out the live scores happening below.</p>
-                             )}
+                        <div className="bg-white/5 border border-white/10 border-dashed rounded-2xl p-6 text-center">
+                             <p className="text-xs font-bold text-slate-400">No watchalongs scheduled currently.</p>
                         </div>
                     ) : (
                         <div className="space-y-4">
@@ -74,11 +77,11 @@ export default async function LiveMediaPage() {
 
                 {liveUncoveredMatches.length > 0 && (
                     <div>
-                        <div className="flex items-center gap-2 mb-3 pl-1 mt-6 border-t border-slate-200 pt-6">
-                            <Activity size={14} className="text-slate-400"/>
-                            <h2 className="text-xs font-black uppercase text-slate-500">Live Scores</h2>
+                        <div className="flex items-center gap-2 mb-4 pl-1 mt-8 border-t border-white/10 pt-8">
+                            <Activity size={14} className="text-red-500 animate-pulse"/>
+                            <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">Other Live Scores</h2>
                         </div>
-                        <div className="space-y-4 opacity-90">
+                        <div className="space-y-4 opacity-95">
                             {liveUncoveredMatches.map(match => (
                                 <MatchCard key={match.id} match={match} hasCoverage={false} />
                             ))}
@@ -94,13 +97,16 @@ export default async function LiveMediaPage() {
 
 function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean }) {
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative flex flex-col transition-all duration-300">
-            <div className={`flex justify-between items-center px-4 py-2 border-b border-slate-100 ${hasCoverage ? 'bg-slate-50' : 'bg-slate-50/50'}`}>
-                 <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 uppercase tracking-wider line-clamp-1">
-                     <Trophy size={12} className="text-slate-400"/>
+        <div className={`rounded-2xl shadow-xl overflow-hidden relative flex flex-col transition-all duration-500 border ${hasCoverage ? 'bg-slate-900 border-slate-700 hover:border-blue-500/50' : 'bg-white/5 border-white/10'}`}>
+            
+            {hasCoverage && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-purple-500 to-red-600"></div>}
+
+            <div className={`flex justify-between items-center px-4 py-2.5 border-b ${hasCoverage ? 'bg-slate-800/50 border-slate-700/50' : 'bg-black/20 border-white/5'}`}>
+                 <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest line-clamp-1">
+                     <Trophy size={10} className={hasCoverage ? "text-yellow-500" : "text-slate-500"}/>
                      {match.league || 'Competition'}
                  </div>
-                 <div className="shrink-0">
+                 <div className="shrink-0 drop-shadow-md">
                      <LiveScoreLabel 
                         matchId={match.id} 
                         initialStatus={match.status} 
@@ -109,7 +115,7 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
                  </div>
             </div>
 
-            <Link href={`/match/${match.id}`} className="block p-5 flex-1 hover:bg-slate-50/50 transition-colors">
+            <Link href={`/match/${match.id}`} className="block p-5 flex-1 hover:bg-white/5 transition-colors group">
                 
                 <LiveScoreLabel 
                     matchId={match.id} 
@@ -122,23 +128,19 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
                 />
 
                 {hasCoverage && (match.livestream_url || match.audio_url) && (
-                    <div className="flex gap-2 mb-4">
+                    <div className="flex gap-3 mb-2 mt-4">
                         {match.livestream_url && (
-                            <div className="flex-1 bg-red-50 text-red-600 border border-red-100 py-2 rounded-lg flex items-center justify-center gap-2 text-[10px] font-black">
-                                <Video size={12}/> WATCH ALONG
+                            <div className="flex-1 bg-red-600/20 text-red-500 border border-red-500/30 py-2.5 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black group-hover:bg-red-600 group-hover:text-white transition-all shadow-inner">
+                                <PlayCircle size={14}/> WATCH ALONG
                             </div>
                         )}
                         {match.audio_url && (
-                            <div className="flex-1 bg-blue-50 text-blue-600 border border-blue-100 py-2 rounded-lg flex items-center justify-center gap-2 text-[10px] font-black">
-                                <Mic size={12}/> RADIO
+                            <div className="flex-1 bg-blue-600/20 text-blue-400 border border-blue-500/30 py-2.5 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black group-hover:bg-blue-600 group-hover:text-white transition-all shadow-inner">
+                                <Mic size={14}/> LIVE RADIO
                             </div>
                         )}
                     </div>
                 )}
-                
-                <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide pt-2 border-t border-slate-50">
-                    Match Center <ArrowRight size={12} />
-                </div>
             </Link>
         </div>
     );

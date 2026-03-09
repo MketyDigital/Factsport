@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
-import { Loader2, Lock, CheckCircle, Trophy, XCircle } from 'lucide-react';
+import { Loader2, Lock, CheckCircle, Trophy, XCircle, Target, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam }: any) {
@@ -15,7 +15,7 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
   const supabase = createClient();
   const router = useRouter();
 
-  // 🔒 VISUAL LOCK: Updates when component renders
+  // 🔒 VISUAL LOCK
   const isLocked = new Date() > new Date(matchDate);
 
   useEffect(() => { fetchPrediction(); }, []);
@@ -36,7 +36,7 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
 
   const handleSubmit = async () => {
     if (!outcome || scoreHome === '' || scoreAway === '') { 
-        alert("Select Winner & Score"); 
+        alert("Please select a Winner and predict the exact Correct Score."); 
         return; 
     }
 
@@ -60,13 +60,12 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
         predicted_home_score: parseInt(scoreHome), 
         predicted_away_score: parseInt(scoreAway),
         status: 'PENDING',
-        // 🟢 FIX: Provide a default so the DB trigger doesn't panic
         is_eligible_for_prize: false 
     });
 
     if (error) {
         if (error.code === '23505') { 
-            alert("Already predicted!"); 
+            alert("Prediction already locked in!"); 
             fetchPrediction(); 
         }
         else alert("Error: " + error.message);
@@ -82,38 +81,41 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
     const isFinalized = status === 'WON' || status === 'LOST';
 
     return (
-        <div className="bg-slate-100 rounded-xl p-6 text-center border border-slate-200">
-            <Lock className="mx-auto text-slate-400 mb-2" size={24} />
-            <h3 className="text-slate-500 font-bold uppercase text-xs">Prediction Closed</h3>
-            <p className="text-[10px] text-slate-400">Match has started.</p>
+        <div className="bg-[#f8f9fa] rounded-2xl p-6 md:p-8 text-center border border-slate-200 shadow-inner relative overflow-hidden">
+            <div className="absolute -left-10 -top-10 w-32 h-32 bg-slate-200 rounded-full blur-[40px] opacity-50"></div>
+            
+            <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-md border border-slate-100 relative z-10">
+                <Lock className="text-slate-400" size={24} />
+            </div>
+            <h3 className="text-slate-800 font-black uppercase tracking-widest text-sm relative z-10">Market Closed</h3>
+            <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase mt-1 relative z-10">Kickoff has passed.</p>
             
             {existingPred && (
-                <div className="mt-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Your Prediction</p>
+                <div className="mt-6 bg-white p-5 rounded-2xl shadow-[0_5px_15px_rgba(0,0,0,0.05)] border border-slate-100 relative z-10">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4 bg-slate-50 inline-block px-3 py-1 rounded-full">Your Locked Prediction</p>
                     
-                    <div className="flex justify-center items-center gap-4 mb-3">
-                         <div className="text-center">
-                            <div className="text-[10px] uppercase text-slate-400">Winner</div>
-                            <div className="font-black text-slate-800 text-sm uppercase">{existingPred.predicted_outcome}</div>
+                    <div className="flex justify-center items-center gap-6 mb-5">
+                         <div className="text-center flex-1">
+                            <div className="text-[9px] uppercase font-bold text-slate-400 tracking-widest mb-1">Match Winner</div>
+                            <div className="font-black text-slate-800 text-sm uppercase bg-slate-50 py-2 rounded-lg border border-slate-100">{existingPred.predicted_outcome}</div>
                          </div>
-                         <div className="h-8 w-px bg-slate-100"></div>
-                         <div className="text-center">
-                            <div className="text-[10px] uppercase text-slate-400">Score</div>
-                            <div className="font-black text-slate-800 text-sm">{existingPred.predicted_home_score} - {existingPred.predicted_away_score}</div>
+                         <div className="text-center flex-1">
+                            <div className="text-[9px] uppercase font-bold text-slate-400 tracking-widest mb-1">Exact Score</div>
+                            <div className="font-black text-slate-800 text-sm bg-slate-50 py-2 rounded-lg border border-slate-100">{existingPred.predicted_home_score} - {existingPred.predicted_away_score}</div>
                          </div>
                     </div>
 
                     {isFinalized ? (
-                        <div className={`text-xs font-black px-3 py-2 rounded-lg inline-flex items-center gap-2 ${existingPred.points_awarded > 0 ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                        <div className={`w-full text-xs font-black uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 ${existingPred.points_awarded > 0 ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-500 border border-red-100'}`}>
                            {existingPred.points_awarded > 0 ? (
-                               <><Trophy size={14} /> WON +{existingPred.points_awarded} PTS</>
+                               <><Trophy size={16} className="text-green-500"/> BOOM! +{existingPred.points_awarded} POINTS</>
                            ) : (
-                               <><XCircle size={14} /> LOST</>
+                               <><XCircle size={16} /> SLIP BUSTED</>
                            )}
                         </div>
                     ) : (
-                        <div className="text-[10px] font-bold bg-yellow-50 text-yellow-600 px-2 py-1 rounded border border-yellow-100 inline-block">
-                            PENDING RESULT...
+                        <div className="w-full text-[10px] font-black uppercase tracking-widest bg-yellow-50 text-yellow-600 py-3 rounded-xl border border-yellow-200 flex items-center justify-center gap-2">
+                            <Loader2 size={14} className="animate-spin" /> PENDING SETTLEMENT
                         </div>
                     )}
                 </div>
@@ -125,22 +127,24 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
   // --- RENDER: ALREADY PREDICTED (OPEN) ---
   if (existingPred) {
     return (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-green-400 rounded-full blur-[50px] opacity-20"></div>
-            <CheckCircle className="mx-auto text-green-600 mb-2 relative z-10" size={32} />
-            <h3 className="text-green-800 font-bold uppercase text-sm relative z-10">Prediction Locked In</h3>
-            <p className="text-[10px] text-green-600 mb-4 relative z-10">Good luck! Edit not allowed.</p>
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-6 md:p-8 text-center relative overflow-hidden shadow-sm">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-green-400 rounded-full blur-[60px] opacity-10 pointer-events-none"></div>
             
-            <div className="flex justify-center gap-6 mt-3 bg-white/80 backdrop-blur-sm p-3 rounded-lg shadow-sm border border-green-100 relative z-10">
-                <div>
-                    <p className="text-[9px] text-slate-400 uppercase font-bold">Winner</p>
+            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-[0_5px_15px_rgba(34,197,94,0.2)] relative z-10">
+                <CheckCircle className="text-green-500" size={32} />
+            </div>
+            <h3 className="text-green-800 font-black uppercase tracking-tighter text-2xl relative z-10 mb-1">Slip Locked</h3>
+            <p className="text-xs text-green-600 font-bold relative z-10 mb-6">Your prediction is secure. Good luck!</p>
+            
+            <div className="flex justify-center gap-4 bg-white/60 backdrop-blur-md p-4 rounded-xl shadow-sm border border-green-100 relative z-10">
+                <div className="flex-1 bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
+                    <p className="text-[9px] text-slate-400 uppercase font-black tracking-widest mb-1">Winner</p>
                     <p className="font-black text-slate-800 uppercase text-sm">
                         {existingPred.predicted_outcome === 'home' ? 'Home' : existingPred.predicted_outcome === 'away' ? 'Away' : 'Draw'}
                     </p>
                 </div>
-                <div className="w-px bg-slate-200"></div>
-                <div>
-                    <p className="text-[9px] text-slate-400 uppercase font-bold">Score</p>
+                <div className="flex-1 bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
+                    <p className="text-[9px] text-slate-400 uppercase font-black tracking-widest mb-1">Correct Score</p>
                     <p className="font-black text-slate-800 text-sm">
                         {existingPred.predicted_home_score} - {existingPred.predicted_away_score}
                     </p>
@@ -150,33 +154,75 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
     );
   }
 
-  // --- RENDER: FORM ---
+  // --- RENDER: NEW PREDICTION FORM ---
   return (
-    <div className="space-y-6">
-        <div>
-            <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3 flex items-center gap-2"><span className="bg-blue-600 text-white px-1.5 py-0.5 rounded">3 Pts</span> Match Winner</h4>
-            <div className="grid grid-cols-3 gap-2">
-                <button onClick={() => setOutcome('home')} className={`py-3 rounded-xl font-bold text-xs border transition ${outcome === 'home' ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' : 'bg-white hover:bg-slate-50 border-slate-200'}`}>{homeTeam}</button>
-                <button onClick={() => setOutcome('draw')} className={`py-3 rounded-xl font-bold text-xs border transition ${outcome === 'draw' ? 'bg-slate-600 text-white border-slate-600 shadow-md transform scale-105' : 'bg-white hover:bg-slate-50 border-slate-200'}`}>Draw</button>
-                <button onClick={() => setOutcome('away')} className={`py-3 rounded-xl font-bold text-xs border transition ${outcome === 'away' ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' : 'bg-white hover:bg-slate-50 border-slate-200'}`}>{awayTeam}</button>
+    <div className="space-y-8 relative z-10">
+        
+        {/* MARKET 1: WINNER */}
+        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <div className="flex items-center justify-between mb-4">
+                <h4 className="text-xs font-black uppercase text-slate-800 tracking-widest flex items-center gap-2">
+                    <Target size={14} className="text-blue-500"/> Match Winner
+                </h4>
+                <span className="bg-blue-100 text-blue-700 font-black text-[9px] px-2 py-1 rounded shadow-sm border border-blue-200">3 POINTS</span>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-3">
+                <button onClick={() => setOutcome('home')} className={`py-4 rounded-xl font-black text-xs uppercase tracking-tight border-2 transition-all duration-300 ${outcome === 'home' ? 'bg-blue-600 text-white border-blue-600 shadow-[0_5px_15px_rgba(37,99,235,0.4)] transform scale-105' : 'bg-white text-slate-600 hover:bg-slate-100 border-slate-200 hover:border-slate-300'}`}>
+                    <span className="block truncate px-1">{homeTeam}</span>
+                </button>
+                <button onClick={() => setOutcome('draw')} className={`py-4 rounded-xl font-black text-xs uppercase tracking-widest border-2 transition-all duration-300 ${outcome === 'draw' ? 'bg-slate-800 text-white border-slate-800 shadow-[0_5px_15px_rgba(30,41,59,0.4)] transform scale-105' : 'bg-white text-slate-600 hover:bg-slate-100 border-slate-200 hover:border-slate-300'}`}>
+                    Draw
+                </button>
+                <button onClick={() => setOutcome('away')} className={`py-4 rounded-xl font-black text-xs uppercase tracking-tight border-2 transition-all duration-300 ${outcome === 'away' ? 'bg-blue-600 text-white border-blue-600 shadow-[0_5px_15px_rgba(37,99,235,0.4)] transform scale-105' : 'bg-white text-slate-600 hover:bg-slate-100 border-slate-200 hover:border-slate-300'}`}>
+                    <span className="block truncate px-1">{awayTeam}</span>
+                </button>
             </div>
         </div>
-        <div>
-            <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3 flex items-center gap-2"><span className="bg-yellow-500 text-black px-1.5 py-0.5 rounded">10 Pts</span> Correct Score</h4>
-            <div className="flex items-center justify-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <div className="text-center">
-                    <label className="text-[9px] font-bold text-slate-400 block mb-1">{homeTeam}</label>
-                    <input type="number" min="0" className="w-16 h-12 text-center text-2xl font-black border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition" value={scoreHome} onChange={(e) => setScoreHome(e.target.value)} />
+
+        {/* MARKET 2: CORRECT SCORE */}
+        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <div className="flex items-center justify-between mb-4">
+                <h4 className="text-xs font-black uppercase text-slate-800 tracking-widest flex items-center gap-2">
+                    <TrendingUp size={14} className="text-yellow-500"/> Correct Score
+                </h4>
+                <span className="bg-yellow-100 text-yellow-700 font-black text-[9px] px-2 py-1 rounded shadow-sm border border-yellow-300">10 POINTS</span>
+            </div>
+
+            <div className="flex items-center justify-between bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <div className="text-center w-[40%]">
+                    <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-tight truncate">{homeTeam}</label>
+                    <input 
+                        type="number" min="0" max="20"
+                        className="w-full h-14 text-center text-3xl font-black border-2 border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors shadow-inner" 
+                        value={scoreHome} 
+                        onChange={(e) => setScoreHome(e.target.value)} 
+                        placeholder="-"
+                    />
                 </div>
-                <span className="text-xl font-black text-slate-300">-</span>
-                <div className="text-center">
-                    <label className="text-[9px] font-bold text-slate-400 block mb-1">{awayTeam}</label>
-                    <input type="number" min="0" className="w-16 h-12 text-center text-2xl font-black border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition" value={scoreAway} onChange={(e) => setScoreAway(e.target.value)} />
+                <div className="w-[20%] flex justify-center">
+                    <span className="text-2xl font-black text-slate-300 italic pt-4">VS</span>
+                </div>
+                <div className="text-center w-[40%]">
+                    <label className="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-tight truncate">{awayTeam}</label>
+                    <input 
+                        type="number" min="0" max="20"
+                        className="w-full h-14 text-center text-3xl font-black border-2 border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors shadow-inner" 
+                        value={scoreAway} 
+                        onChange={(e) => setScoreAway(e.target.value)} 
+                        placeholder="-"
+                    />
                 </div>
             </div>
         </div>
-        <button onClick={handleSubmit} disabled={loading} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black uppercase py-4 rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
-            {loading ? <Loader2 className="animate-spin" /> : "Submit Prediction"}
+
+        {/* SUBMIT BUTTON */}
+        <button 
+            onClick={handleSubmit} 
+            disabled={loading} 
+            className="w-full bg-[#0a1428] hover:bg-blue-900 text-white font-black uppercase tracking-widest py-5 rounded-2xl shadow-[0_10px_20px_rgba(10,20,40,0.3)] transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100 border border-slate-800"
+        >
+            {loading ? <Loader2 className="animate-spin" size={20} /> : <><CheckCircle size={20}/> Lock In Prediction</>}
         </button>
     </div>
   );
