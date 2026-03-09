@@ -38,10 +38,18 @@ export default function AuditManager() {
 
     const handleApprove = async (draft: any) => {
         if (!confirm(`Approve this winner and award them: ${draft.prize_amount}?`)) return;
+        
+        // 1. Approve the Draft
         await supabase.from('monthly_winners').update({ 
             is_approved: true, 
             prize_amount: draft.prize_amount 
         }).eq('id', draft.id);
+
+        // 2. 🔥 LINK THE SYSTEMS: Give the user the permanent Golden Badge in their Profile!
+        await supabase.from('profiles').update({ 
+            is_winner: true 
+        }).eq('id', draft.user_id);
+
         fetchDrafts();
     };
 

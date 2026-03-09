@@ -5,8 +5,10 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
 import { 
   Search, Plus, Save, Trash2, Calculator, 
-  Calendar, Star, Eye, Terminal, CheckCircle 
+  Calendar, Star, Eye, Terminal, CheckCircle, ChevronLeft, ChevronRight, Image as ImageIcon, Link as LinkIcon
 } from 'lucide-react';
+
+const ITEMS_PER_PAGE = 10;
 
 export default function AdminMatchesPage() {
   const supabase = createClient();
@@ -17,26 +19,59 @@ export default function AdminMatchesPage() {
   const [search, setSearch] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
+  
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  // 🟢 UPGRADED: New Match Template includes Rich Data
+  // 🟢 UPGRADED: Full Match Template
   const [newMatch, setNewMatch] = useState({
-    home_team: '', away_team: '', league: 'Premier League', match_date: '', home_logo: '', away_logo: '',
-    venue: '', stage: '', match_group: ''
+    home_team: '', away_team: '', league: 'Premier League', match_date: '', 
+    home_logo: '', away_logo: '', venue: '', stage: '', match_group: '', api_id: ''
   });
 
+  // Reset to page 1 when searching
   useEffect(() => { 
-      const timer = setTimeout(() => {
-          fetchMatches(); 
-      }, 500);
+      setCurrentPage(1);
+      const timer = setTimeout(() => fetchMatches(1), 500);
       return () => clearTimeout(timer);
   }, [search]);
 
-  const fetchMatches = async () => {
+  // Fetch when page changes
+  useEffect(() => {
+      fetchMatches(currentPage);
+  }, [currentPage]);
+
+  const fetchMatches = async (page: number) => {
     setLoading(true);
-    let query = supabase.from('matches').select('*').order('match_date', { ascending: false }).limit(50);
-    if (search) query = query.or(`home_team.ilike.%${search}%,away_team.ilike.%${search}%`);
-    const { data } = await query;
+    
+    const from = (page - 1) * ITEMS_PER_PAGE;
+    const to = from + ITEMS_PER_PAGE - 1;
+
+    let query = supabase.from('matches').select('*', { count: 'exact' });
+
+    // 🧠 SMARTER SEARCH: Handles "Chelsea vs Arsenal" or "Premier League"
+    if (search) {
+        const cleanSearch = search.replace(/ vs | v | - /gi, ' ').trim();
+        const terms = cleanSearch.split(' ').filter(Boolean);
+        
+        // Search across Home Team, Away Team, and League
+        let orString = `home_team.ilike.%${search}%,away_team.ilike.%${search}%,league.ilike.%${search}%`;
+        
+        // If they typed multiple words (like "Chelsea Arsenal"), try to match them individually
+        if (terms.length > 1) {
+            orString += `,home_team.ilike.%${terms[0]}%,away_team.ilike.%${terms[1]}%`;
+        }
+        
+        query = query.or(orString);
+    }
+
+    query = query.order('match_date', { ascending: false }).range(from, to);
+    
+    const { data, count } = await query;
     if (data) setMatches(data);
+    if (count !== null) setTotalPages(Math.ceil(count / ITEMS_PER_PAGE) || 1);
+    
     setLoading(false);
   };
 
@@ -51,14 +86,15 @@ export default function AdminMatchesPage() {
         match_date: isoDate, 
         status: 'SCHEDULED', 
         is_featured: false,
-        points_distributed: false
+        points_distributed: false,
+        api_id: newMatch.api_id ? parseInt(newMatch.api_id) : null
     }]);
 
     if (error) alert("Error: " + error.message);
     else { 
         setIsCreating(false); 
-        setNewMatch({ home_team: '', away_team: '', league: 'Premier League', match_date: '', home_logo: '', away_logo: '', venue: '', stage: '', match_group: '' }); 
-        fetchMatches(); 
+        setNewMatch({ home_team: '', away_team: '', league: 'Premier League', match_date: '', home_logo: '', away_logo: '', venue: '', stage: '', match_group: '', api_id: '' }); 
+        fetchMatches(currentPage); 
     }
     setLoading(false);
   };
@@ -68,7 +104,6 @@ export default function AdminMatchesPage() {
   };
 
   const saveMatch = async (match: any) => {
-    // 🛡️ SECURITY: Basic URL validation before saving to DB
     const sanitize = (url: string) => url?.trim().toLowerCase().startsWith('javascript:') ? '' : url;
 
     setSavingId(match.id);
@@ -87,7 +122,6 @@ export default function AdminMatchesPage() {
         is_featured_video: match.is_featured_video,
         points_distributed: match.points_distributed,
         displayClock: match.displayClock,
-        // 🟢 SAVING RICH DATA
         venue: match.venue,
         stage: match.stage,
         match_group: match.match_group 
@@ -116,11 +150,11 @@ export default function AdminMatchesPage() {
   const deleteMatch = async (id: string) => {
     if (!confirm("Delete match?")) return;
     await supabase.from('matches').delete().eq('id', id);
-    fetchMatches();
+    fetchMatches(currentPage);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900 pb-24">
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -132,11 +166,11 @@ export default function AdminMatchesPage() {
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-            <div className="relative w-full sm:w-64">
+            <div className="relative w-full sm:w-72">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input 
                     type="text" 
-                    placeholder="Search teams..." 
+                    placeholder="Search teams, leagues, or 'A vs B'..." 
                     className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:border-blue-500 outline-none shadow-sm"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -148,48 +182,64 @@ export default function AdminMatchesPage() {
         </div>
       </div>
 
-      {/* CREATE FORM */}
+      {/* FULL CREATE FORM */}
       {isCreating && (
         <div className="bg-white p-6 rounded-2xl shadow-xl border border-blue-100 mb-8 animate-in fade-in slide-in-from-top-4">
             <h2 className="text-sm font-black uppercase text-blue-600 mb-4 flex items-center gap-2"><Calendar size={16}/> New Match Details</h2>
+            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <input type="text" placeholder="Home Team" className="border p-3 rounded-xl font-bold" value={newMatch.home_team} onChange={e => setNewMatch({...newMatch, home_team: e.target.value})} />
-                <input type="text" placeholder="Away Team" className="border p-3 rounded-xl font-bold" value={newMatch.away_team} onChange={e => setNewMatch({...newMatch, away_team: e.target.value})} />
+                <input type="text" placeholder="Home Team" className="border p-3 rounded-xl font-bold bg-slate-50" value={newMatch.home_team} onChange={e => setNewMatch({...newMatch, home_team: e.target.value})} />
+                <input type="text" placeholder="Away Team" className="border p-3 rounded-xl font-bold bg-slate-50" value={newMatch.away_team} onChange={e => setNewMatch({...newMatch, away_team: e.target.value})} />
                 
                 <div className="flex flex-col">
                     <label className="text-[10px] font-bold text-slate-400 mb-1">Date & Time (Local)</label>
-                    <input type="datetime-local" className="border p-3 rounded-xl" value={newMatch.match_date} onChange={e => setNewMatch({...newMatch, match_date: e.target.value})} />
+                    <input type="datetime-local" className="border p-3 rounded-xl bg-slate-50" value={newMatch.match_date} onChange={e => setNewMatch({...newMatch, match_date: e.target.value})} />
                 </div>
                 
                 <div className="relative flex flex-col">
                     <label className="text-[10px] font-bold text-slate-400 mb-1">League</label>
-                    <input list="leagues" type="text" placeholder="Select League" className="border p-3 rounded-xl w-full bg-white" value={newMatch.league} onChange={e => setNewMatch({...newMatch, league: e.target.value})} />
+                    <input list="leagues" type="text" placeholder="Select League" className="border p-3 rounded-xl w-full bg-slate-50" value={newMatch.league} onChange={e => setNewMatch({...newMatch, league: e.target.value})} />
                     <datalist id="leagues">
                         <option value="Premier League"/><option value="La Liga"/><option value="Champions League"/><option value="Serie A"/>
                         <option value="Bundesliga"/><option value="Ligue 1"/><option value="Europa League"/><option value="FA Cup"/>
                     </datalist>
                 </div>
 
-                {/* 🟢 NEW: Rich Data Inputs */}
+                <div className="flex flex-col">
+                    <label className="text-[10px] font-bold text-slate-400 mb-1 flex items-center gap-1"><ImageIcon size={10}/> Home Logo URL</label>
+                    <input type="text" placeholder="https://..." className="border p-3 rounded-xl text-sm bg-slate-50" value={newMatch.home_logo} onChange={e => setNewMatch({...newMatch, home_logo: e.target.value})} />
+                </div>
+
+                <div className="flex flex-col">
+                    <label className="text-[10px] font-bold text-slate-400 mb-1 flex items-center gap-1"><ImageIcon size={10}/> Away Logo URL</label>
+                    <input type="text" placeholder="https://..." className="border p-3 rounded-xl text-sm bg-slate-50" value={newMatch.away_logo} onChange={e => setNewMatch({...newMatch, away_logo: e.target.value})} />
+                </div>
+
                 <div className="flex flex-col">
                     <label className="text-[10px] font-bold text-slate-400 mb-1">Venue / Stadium</label>
-                    <input type="text" placeholder="e.g. Anfield" className="border p-3 rounded-xl text-sm" value={newMatch.venue} onChange={e => setNewMatch({...newMatch, venue: e.target.value})} />
+                    <input type="text" placeholder="e.g. Anfield" className="border p-3 rounded-xl text-sm bg-slate-50" value={newMatch.venue} onChange={e => setNewMatch({...newMatch, venue: e.target.value})} />
                 </div>
+
                 <div className="flex gap-2">
                      <div className="flex flex-col w-1/2">
                         <label className="text-[10px] font-bold text-slate-400 mb-1">Stage</label>
-                        <input type="text" placeholder="e.g. Final" className="border p-3 rounded-xl text-sm" value={newMatch.stage} onChange={e => setNewMatch({...newMatch, stage: e.target.value})} />
+                        <input type="text" placeholder="e.g. Final" className="border p-3 rounded-xl text-sm bg-slate-50" value={newMatch.stage} onChange={e => setNewMatch({...newMatch, stage: e.target.value})} />
                     </div>
                     <div className="flex flex-col w-1/2">
                         <label className="text-[10px] font-bold text-slate-400 mb-1">Group</label>
-                        <input type="text" placeholder="e.g. Group A" className="border p-3 rounded-xl text-sm" value={newMatch.match_group} onChange={e => setNewMatch({...newMatch, match_group: e.target.value})} />
+                        <input type="text" placeholder="e.g. Group A" className="border p-3 rounded-xl text-sm bg-slate-50" value={newMatch.match_group} onChange={e => setNewMatch({...newMatch, match_group: e.target.value})} />
                     </div>
                 </div>
 
+                <div className="flex flex-col">
+                    <label className="text-[10px] font-bold text-slate-400 mb-1 flex items-center gap-1"><LinkIcon size={10}/> API ID (Optional Sync)</label>
+                    <input type="text" placeholder="e.g. 4328" className="border p-3 rounded-xl text-sm bg-slate-50" value={newMatch.api_id} onChange={e => setNewMatch({...newMatch, api_id: e.target.value})} />
+                </div>
+
             </div>
-            <div className="flex justify-end mt-4">
-                <button onClick={handleCreate} disabled={loading} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold">
-                    {loading ? 'Creating...' : 'Create Match'}
+            <div className="flex justify-end mt-4 pt-4 border-t border-slate-100">
+                <button onClick={handleCreate} disabled={loading} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:scale-105 transition">
+                    {loading ? 'Creating...' : 'Create Complete Match'}
                 </button>
             </div>
         </div>
@@ -225,7 +275,7 @@ export default function AdminMatchesPage() {
                         </div>
                     </div>
 
-                    {/* 🟢 NEW: Editable Rich Data Fields */}
+                    {/* Editable Rich Data Fields */}
                     <div className="space-y-2 mb-4 border-t pt-3">
                          <div className="flex items-center gap-2">
                              <label className="text-[10px] font-bold text-slate-400 w-12">Venue</label>
@@ -293,9 +343,8 @@ export default function AdminMatchesPage() {
                 {/* 3. RIGHT: Live Media & Settlement */}
                 <div className="p-5 lg:w-1/3 bg-slate-50/30 flex flex-col justify-between">
                     <div>
-                         <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3 flex items-center gap-1"><Eye size={12} className="text-red-500" /> Media</h4>
+                         <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3 flex items-center gap-1"><Eye size={12} className="text-red-500" /> Media Links</h4>
                          <div className="space-y-2 mb-3">
-                            {/* 🟢 RESTORED: Both Livestream and Highlights inputs */}
                             <input type="text" placeholder="🔴 Pre/Live Stream URL" className="w-full border border-red-100 rounded-lg py-2 px-3 text-[10px]" value={match.livestream_url || ''} onChange={(e) => handleUpdateChange(match.id, 'livestream_url', e.target.value)}/>
                             <input type="text" placeholder="📼 Post-Match Highlights URL" className="w-full border border-slate-200 rounded-lg py-2 px-3 text-[10px]" value={match.video_url || ''} onChange={(e) => handleUpdateChange(match.id, 'video_url', e.target.value)}/>
                             <input type="text" placeholder="🎙️ Audio Commentary URL" className="w-full border border-blue-100 rounded-lg py-2 px-3 text-[10px]" value={match.audio_url || ''} onChange={(e) => handleUpdateChange(match.id, 'audio_url', e.target.value)}/>
@@ -313,9 +362,7 @@ export default function AdminMatchesPage() {
                                 <Calculator size={16} /> DISTRIBUTE POINTS
                              </button>
                          )}
-                         <p className="text-[9px] text-center text-slate-400 mt-2">
-                            Action is irreversible.
-                         </p>
+                         <p className="text-[9px] text-center text-slate-400 mt-2">Action is irreversible.</p>
                     </div>
                 </div>
 
@@ -327,6 +374,27 @@ export default function AdminMatchesPage() {
             </div>
         )}
       </div>
+
+      {/* 🟢 PAGINATION CONTROLS */}
+      {totalPages > 1 && (
+          <div className="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mt-8">
+              <button 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className={`px-4 py-2 flex items-center gap-2 rounded-xl text-xs font-black uppercase tracking-widest ${currentPage === 1 ? 'pointer-events-none opacity-30 bg-slate-100 text-slate-400' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition'}`}
+              >
+                  <ChevronLeft size={14}/> Prev
+              </button>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Page {currentPage} of {totalPages}</span>
+              <button 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`px-4 py-2 flex items-center gap-2 rounded-xl text-xs font-black uppercase tracking-widest ${currentPage === totalPages ? 'pointer-events-none opacity-30 bg-slate-100 text-slate-400' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition'}`}
+              >
+                  Next <ChevronRight size={14}/>
+              </button>
+          </div>
+      )}
     </div>
   );
 }

@@ -3,14 +3,30 @@ export const runtime = 'edge';
 import { createClient } from '@/app/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, Newspaper, LogOut, Ticket, Menu } from 'lucide-react';
+// 🔥 Added "Users" to the lucide-react imports for the new menu item
+import { LayoutDashboard, Newspaper, LogOut, Ticket, Menu, Users } from 'lucide-react';
+
+// 🔴 THE MASTER LIST (Lowercased for strict matching)
+const ADMIN_EMAILS = [
+    'mkposcosunday@gmail.com', 
+    'factsportlive@gmail.com', 
+    'fact@factsport.com'
+];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) redirect('/login');
+  // 1. Check if logged in at all
+  if (!user || !user.email) redirect('/login');
 
+  // 2. 🔴 THE MASTER LOCK: Check if their email is exactly on the VIP Admin List
+  if (!ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+      console.warn(`SECURITY ALERT: Blocked access to Admin UI by ${user.email}`);
+      redirect('/'); // Kick them back to the homepage
+  }
+
+  // 3. Database Role Check (Double Security)
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
@@ -32,6 +48,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin" className="flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl text-sm font-bold transition"><LayoutDashboard size={18} /> Overview</Link>
             <Link href="/admin/news" className="flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl text-sm font-bold transition"><Newspaper size={18} /> News Editor</Link>
             <Link href="/admin/matches" className="flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl text-sm font-bold transition"><Ticket size={18} /> Match Manager</Link>
+            {/* 🟢 NEW: User Directory Link */}
+            <Link href="/admin/users" className="flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl text-sm font-bold transition"><Users size={18} /> User Directory</Link>
         </nav>
         <div className="p-4 border-t border-white/10">
             <Link href="/" className="flex items-center gap-2 text-slate-400 text-xs font-bold hover:text-white"><LogOut size={14} /> Exit Admin</Link>
@@ -45,15 +63,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/" className="bg-white/10 p-2 rounded-full"><LogOut size={16}/></Link>
         </div>
         {/* Mobile Links Row */}
-        <div className="flex justify-between gap-2 overflow-x-auto">
+        <div className="flex justify-between gap-2 overflow-x-auto scrollbar-hide pb-1">
             <Link href="/admin" className="flex-1 bg-white/5 py-2 px-3 rounded-lg text-[10px] font-bold text-center border border-white/10 whitespace-nowrap">Dashboard</Link>
             <Link href="/admin/news" className="flex-1 bg-white/5 py-2 px-3 rounded-lg text-[10px] font-bold text-center border border-white/10 whitespace-nowrap">News</Link>
             <Link href="/admin/matches" className="flex-1 bg-white/5 py-2 px-3 rounded-lg text-[10px] font-bold text-center border border-white/10 whitespace-nowrap">Matches</Link>
+            {/* 🟢 NEW: User Directory Mobile Link */}
+            <Link href="/admin/users" className="flex-1 bg-white/5 py-2 px-3 rounded-lg text-[10px] font-bold text-center border border-white/10 whitespace-nowrap">Users</Link>
         </div>
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-64 p-4 md:p-8 mt-24 md:mt-0">
+      <main className="flex-1 md:ml-64 p-4 md:p-8 mt-28 md:mt-0">
         {children}
       </main>
     </div>
