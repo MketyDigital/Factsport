@@ -3,16 +3,18 @@ export const runtime = 'edge';
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
-import { Loader2, Plus, Trash2, Star, Activity, Shield, Bot, Pencil, X, Save, Search } from 'lucide-react';
+import { Loader2, Plus, Trash2, Star, Activity, Shield, Bot, Pencil, X, Save, Search, Tag } from 'lucide-react';
+
+const CATEGORIES = ['Football', 'Transfers', 'Sports Update', 'Champions League', 'Euros', 'World Cup', 'AFCON', 'Copa America'];
 
 export default function AdminNewsPage() {
   const [news, setNews] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [botLoading, setBotLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [search, setSearch] = useState(''); // 🟢 NEW: Search state
+  const [search, setSearch] = useState(''); 
   
-  // Form State
+  // Form State (Now includes category)
   const [formData, setFormData] = useState({ 
     title: '', 
     body: '', 
@@ -20,12 +22,12 @@ export default function AdminNewsPage() {
     team1Logo: '', 
     team2Logo: '', 
     isBreaking: false, 
-    isHeadline: false 
+    isHeadline: false,
+    category: 'Football' // Default
   });
   
   const supabase = createClient();
 
-  // 🟢 NEW: Smart Search Effect
   useEffect(() => { 
       const timer = setTimeout(() => {
           fetchNews(); 
@@ -72,7 +74,6 @@ export default function AdminNewsPage() {
     return () => clearTimeout(timeoutId);
   }, [formData.title, editingId]);
 
-  // 🟢 UPDATED: Fetch respects the search query
   const fetchNews = async () => {
     let query = supabase.from('news').select('*').order('created_at', { ascending: false }).limit(50);
     if (search) query = query.ilike('title', `%${search}%`);
@@ -107,14 +108,15 @@ export default function AdminNewsPage() {
         team1Logo: item.team_1_logo || '',
         team2Logo: item.team_2_logo || '',
         isBreaking: item.is_breaking,
-        isHeadline: item.is_headline
+        isHeadline: item.is_headline,
+        category: item.category || 'Football'
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
-    setFormData({ title: '', body: '', imageUrl: '', team1Logo: '', team2Logo: '', isBreaking: false, isHeadline: false });
+    setFormData({ title: '', body: '', imageUrl: '', team1Logo: '', team2Logo: '', isBreaking: false, isHeadline: false, category: 'Football' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -131,7 +133,8 @@ export default function AdminNewsPage() {
         team_2_logo: formData.team2Logo || null,
         is_breaking: formData.isBreaking, 
         is_headline: formData.isHeadline, 
-        slug: slug
+        slug: slug,
+        category: formData.category // 🟢 Saved to DB
     };
 
     if (editingId) {
@@ -141,7 +144,7 @@ export default function AdminNewsPage() {
         await supabase.from('news').insert(payload);
     }
     
-    setFormData({ title: '', body: '', imageUrl: '', team1Logo: '', team2Logo: '', isBreaking: false, isHeadline: false });
+    setFormData({ title: '', body: '', imageUrl: '', team1Logo: '', team2Logo: '', isBreaking: false, isHeadline: false, category: 'Football' });
     fetchNews();
     setLoading(false);
   };
@@ -154,7 +157,7 @@ export default function AdminNewsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-20 p-4 md:p-8">
+    <div className="space-y-6 max-w-5xl mx-auto pb-20 p-4 md:p-8 font-sans">
       
       {/* 🟢 HEADER & SEARCH BAR */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-6">
@@ -189,6 +192,20 @@ export default function AdminNewsPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
             <input type="text" placeholder="Headline" className="w-full text-xl font-bold border-b-2 border-slate-100 pb-2 outline-none bg-transparent" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} required />
             
+            {/* 🟢 NEW: CATEGORY SELECTOR */}
+            <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <Tag size={16} className="text-slate-400 shrink-0"/>
+                <select 
+                    className="bg-transparent text-sm font-bold text-slate-700 outline-none w-full cursor-pointer"
+                    value={formData.category}
+                    onChange={(e) => setFormData({...formData, category: e.target.value})}
+                >
+                    {CATEGORIES.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                </select>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
                  <div className="flex items-center gap-3">
                      <div className="w-10 h-10 bg-white rounded-lg border flex items-center justify-center shrink-0">{formData.team1Logo ? <img src={formData.team1Logo} className="w-6 h-6 object-contain" /> : <Shield size={16} className="text-slate-300"/>}</div>
@@ -206,7 +223,6 @@ export default function AdminNewsPage() {
                 <label className={`flex gap-2 items-center px-4 py-2 rounded-lg border cursor-pointer ${formData.isBreaking ? 'bg-red-50 text-red-700 font-bold' : 'bg-white'}`}><input type="checkbox" className="hidden" checked={formData.isBreaking} onChange={(e) => setFormData({...formData, isBreaking: e.target.checked})} /><Activity size={16}/> Ticker</label>
             </div>
 
-            {/* 🟢 UPGRADED TEXTAREA: Explains how to use Links and Images */}
             <div className="flex flex-col gap-1">
                 <div className="flex justify-between items-center text-xs font-bold text-slate-500 mb-1">
                     <span>Article Content</span>
@@ -235,8 +251,11 @@ export default function AdminNewsPage() {
                         {item.image_url ? <img src={item.image_url} className="w-full h-full object-cover" /> : <div className="flex -space-x-2">{item.team_1_logo && <img src={item.team_1_logo} className="w-6 h-6 object-contain z-10" />}{item.team_2_logo && <img src={item.team_2_logo} className="w-6 h-6 object-contain z-0" />}</div>}
                     </div>
                     <div>
+                        <div className="flex items-center gap-2 mb-1">
+                            {item.category && <span className="bg-slate-100 text-slate-500 text-[8px] font-black px-1.5 py-0.5 rounded uppercase">{item.category}</span>}
+                            <span className="text-[9px] text-slate-400">{new Date(item.created_at).toLocaleDateString()}</span>
+                        </div>
                         <h4 className="font-bold text-sm line-clamp-1">{item.title}</h4>
-                        <span className="text-[10px] text-slate-400">{new Date(item.created_at).toLocaleDateString()}</span>
                     </div>
                 </div>
                 <div className="flex gap-2">
