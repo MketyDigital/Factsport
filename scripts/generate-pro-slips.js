@@ -27,7 +27,6 @@ const ESPN_LEAGUES = {
 
 const cleanName = (name) => name.toLowerCase().replace(/ fc| cf| united| city| real| atletico| athletic/g, '').trim();
 
-// 🟢 STEP 1: Find ESPN ID if your matchmaker missed it
 async function getEspnIdForMatch(leagueName, dateString, homeTeam, awayTeam) {
     const espnCode = ESPN_LEAGUES[leagueName];
     if (!espnCode) return null;
@@ -55,7 +54,6 @@ async function getEspnIdForMatch(leagueName, dateString, homeTeam, awayTeam) {
     } catch (e) { return null; }
 }
 
-// 🟢 STEP 2: Fetch ESPN Data & TRANSLATE IT
 async function fetchRichEspnContext(espnId, currentHomeTeam) {
     if (!espnId) return { textContext: null, translatedH2H: null };
     try {
@@ -67,14 +65,12 @@ async function fetchRichEspnContext(espnId, currentHomeTeam) {
         let textContext = "";
         let translatedH2H = null;
 
-        // Extract Form for AI
         if (data.form && data.form.length >= 2) {
             const team1Form = data.form[0].events.map(e => e.teamResult).join('-');
             const team2Form = data.form[1].events.map(e => e.teamResult).join('-');
             textContext += `\n[Recent Form] ${data.form[0].team.displayName}: ${team1Form} | ${data.form[1].team.displayName}: ${team2Form}`;
         }
 
-        // 🎭 THE TRANSLATOR: Convert ESPN H2H to Football-Data Format!
         if (data.headToHead && data.headToHead.games) {
             let homeWins = 0, awayWins = 0, draws = 0, totalGoals = 0;
             let mappedMatches = [];
@@ -90,7 +86,6 @@ async function fetchRichEspnContext(espnId, currentHomeTeam) {
                 else if (hScore > aScore) isHistoricalHomeCurrentHome ? homeWins++ : awayWins++;
                 else isHistoricalHomeCurrentHome ? awayWins++ : homeWins++;
 
-                // Map to Football-Data format for the frontend!
                 mappedMatches.push({
                     utcDate: g.date,
                     homeTeam: { name: g.homeTeam.displayName },
@@ -103,7 +98,6 @@ async function fetchRichEspnContext(espnId, currentHomeTeam) {
             
             textContext += `\n[Last Meetings] ${h2hStr}`;
 
-            // Create the exact JSON shape your frontend HeadToHeadStats.tsx expects!
             translatedH2H = {
                 aggregates: {
                     numberOfMatches: data.headToHead.games.length,
@@ -122,21 +116,37 @@ async function fetchRichEspnContext(espnId, currentHomeTeam) {
 }
 
 async function runProSlipEngine() {
-    console.log("🧠 Starting Automated AI Pro Slip Generation & H2H Translator...");
+    console.log("🧠 Starting Automated AI Pro Slip Generation...");
 
     const now = new Date();
+    // Look a little bit into the past just in case timezones are weird
+    const twoHoursAgo = new Date(now.getTime() - (2 * 60 * 60 * 1000)).toISOString();
     const in48Hours = new Date(now.getTime() + (48 * 60 * 60 * 1000)).toISOString();
-    const nowStr = now.toISOString();
 
-    const { data: matches, error } = await supabase
+    // Fetch ALL active/scheduled matches
+    const { data: allMatches, error } = await supabase
         .from('matches')
         .select('*')
-        .gte('match_date', nowStr)
+        .gte('match_date', twoHoursAgo)
         .lte('match_date', in48Hours)
-        .is('pro_analysis', null) 
-        .neq('status', 'FT');
+        .neq('status', 'FT')
+        .neq('status', 'FINISHED');
 
-    if (error || !matches || matches.length === 0) {
+    if (error || !allMatches) {
+        console.error("❌ DB Error:", error?.message);
+        return;
+    }
+
+    // 🔥 JS FILTER: Safely check if pro_analysis is truly empty
+    const matches = allMatches.filter(m => {
+        if (!m.pro_analysis) return true;
+        // If it's an empty string or empty JSON object, it needs analysis!
+        if (typeof m.pro_analysis === 'object' && Object.keys(m.pro_analysis).length === 0) return true;
+        if (typeof m.pro_analysis === 'string' && m.pro_analysis.trim() === '') return true;
+        return false; 
+    });
+
+    if (matches.length === 0) {
         console.log("💤 No matches need AI analysis right now.");
         return;
     }
@@ -157,7 +167,6 @@ async function runProSlipEngine() {
                 console.log(`   ⚠️ No ESPN data found. Using AI tactical fallback.`);
             }
 
-            // PROMPT GEMINI (RAG)
             const prompt = `
                 You are an elite football tactical analyst in 2026. Provide a highly accurate "Pro Betting Slip" for:
                 ${match.home_team} vs ${match.away_team} (${match.league}).
@@ -183,10 +192,9 @@ async function runProSlipEngine() {
             text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
             const analysisData = JSON.parse(text);
 
-            // 🔥 SAVE TO SUPABASE (Updates BOTH pro_analysis AND overrides h2h if ESPN gave us better data!)
             const updatePayload = { pro_analysis: analysisData };
             if (translatedH2H) {
-                updatePayload.h2h = translatedH2H; // OVERWRITES Football-Data API!
+                updatePayload.h2h = translatedH2H; 
                 console.log(`   🔄 Translated and Overwrote H2H data with ESPN stats!`);
             }
 
