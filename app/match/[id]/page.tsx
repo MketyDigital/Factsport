@@ -112,14 +112,14 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
       <div className="max-w-4xl mx-auto px-4 mt-6 relative z-20 space-y-6">
         
-        {/* 🟢 MATCH INFO STRIP (Upgraded with ESPN Predictor) */}
-        {(data?.venue || data?.stage || data?.group || data?.referees?.length > 0 || data?.predictor) && (
+        {/* 🟢 MATCH INFO STRIP (Upgraded with ESPN Predictor & Safely Typed) */}
+        {(data?.venue || data?.stage || data?.group || (data?.referees && data.referees.length > 0) || data?.predictor) && (
             <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex flex-wrap gap-3 items-center justify-center text-[10px] font-bold text-slate-500">
                 {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 shadow-sm"><Trophy size={12} className="text-yellow-500"/> {data.stage.replace(/_/g, ' ')}</span>}
                 {data?.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 shadow-sm"><Grid size={12} className="text-blue-500"/> {data.group.replace(/_/g, ' ')}</span>}
                 {data?.venue && <span className="flex items-center gap-1 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 shadow-sm"><MapPin size={12} className="text-red-500"/> {data.venue}</span>}
                 {/* AI Win Predictor Badge */}
-                {data?.predictor && <span className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-lg border border-blue-100 shadow-sm"><Percent size={12}/> Win Prob: {parseFloat(data.predictor.home).toFixed(0)}% | {parseFloat(data.predictor.away).toFixed(0)}%</span>}
+                {data?.predictor && <span className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-lg border border-blue-100 shadow-sm"><Percent size={12}/> Win Prob: {parseFloat(String(data.predictor.home)).toFixed(0)}% | {parseFloat(String(data.predictor.away)).toFixed(0)}%</span>}
             </div>
         )}
 
