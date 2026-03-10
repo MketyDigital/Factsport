@@ -66,7 +66,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       
-      {/* MATCH HEADER (Untouched size as requested) */}
+      {/* MATCH HEADER */}
       {hasWidget ? (
           <div className="bg-[#0a1428] text-white p-4 shadow-md flex items-center justify-between sticky top-0 z-40">
               <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
@@ -119,16 +119,15 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           </div>
       )}
 
-      {/* 🔥 TIGHTER SPACING ON MOBILE (space-y-3 instead of space-y-6) */}
       <div className="max-w-4xl mx-auto px-4 mt-2 relative z-20 space-y-3 md:space-y-6">
         
-        {/* MATCH INFO STRIP - Compacted */}
+        {/* MATCH INFO STRIP */}
         {(data?.venue || data?.stage || data?.group || (data?.referees && data.referees.length > 0) || data?.predictor) && (
             <div className="bg-white rounded-xl p-2 md:p-3 shadow-sm border border-slate-100 flex flex-wrap gap-2 items-center justify-center text-[9px] md:text-[10px] font-bold text-slate-500">
-                {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 md:px-2.5 md:py-1.5 rounded-lg border border-slate-100 shadow-sm"><Trophy size={10} md:size={12} className="text-yellow-500"/> {data.stage.replace(/_/g, ' ')}</span>}
-                {data?.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 md:px-2.5 md:py-1.5 rounded-lg border border-slate-100 shadow-sm"><Grid size={10} md:size={12} className="text-blue-500"/> {data.group.replace(/_/g, ' ')}</span>}
-                {data?.venue && <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 md:px-2.5 md:py-1.5 rounded-lg border border-slate-100 shadow-sm"><MapPin size={10} md:size={12} className="text-red-500"/> {data.venue}</span>}
-                {data?.predictor && <span className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2 py-1 md:px-2.5 md:py-1.5 rounded-lg border border-blue-100 shadow-sm"><Percent size={10} md:size={12}/> Win Prob: {parseFloat(String(data.predictor.home)).toFixed(0)}% | {parseFloat(String(data.predictor.away)).toFixed(0)}%</span>}
+                {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 md:px-2.5 md:py-1.5 rounded-lg border border-slate-100 shadow-sm"><Trophy className="w-2.5 h-2.5 md:w-3 md:h-3 text-yellow-500"/> {data.stage.replace(/_/g, ' ')}</span>}
+                {data?.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 md:px-2.5 md:py-1.5 rounded-lg border border-slate-100 shadow-sm"><Grid className="w-2.5 h-2.5 md:w-3 md:h-3 text-blue-500"/> {data.group.replace(/_/g, ' ')}</span>}
+                {data?.venue && <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 md:px-2.5 md:py-1.5 rounded-lg border border-slate-100 shadow-sm"><MapPin className="w-2.5 h-2.5 md:w-3 md:h-3 text-red-500"/> {data.venue}</span>}
+                {data?.predictor && <span className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2 py-1 md:px-2.5 md:py-1.5 rounded-lg border border-blue-100 shadow-sm"><Percent className="w-2.5 h-2.5 md:w-3 md:h-3 text-blue-600"/> Win Prob: {parseFloat(String(data.predictor.home)).toFixed(0)}% | {parseFloat(String(data.predictor.away)).toFixed(0)}%</span>}
             </div>
         )}
 
@@ -138,7 +137,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
              </div>
         )}
 
-        {/* MEDIA SECTION (Video & Audio) - Compacted */}
+        {/* MEDIA SECTION */}
         <div id="media" className="scroll-mt-6 space-y-3 md:space-y-6">
             {activeVideoUrl && (
                 <div className="rounded-xl overflow-hidden shadow-xl border border-slate-200 relative bg-black">
@@ -160,7 +159,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             <div className="bg-[#0f172a] rounded-xl p-3 md:p-4 border border-slate-800 shadow-xl flex items-center justify-between group hover:border-blue-500/50 transition-colors">
                  <div className="flex items-center gap-3 md:gap-4">
                      <div className={`w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center shadow-inner ${dbData.audio_url ? 'bg-red-600/20 border border-red-500/30 text-red-500 animate-pulse' : 'bg-white/5 border border-white/5 text-slate-500'}`}>
-                        <Mic size={18} md:size={20} />
+                        <Mic className="w-[18px] h-[18px] md:w-5 md:h-5" />
                      </div>
                      <div>
                         <h3 className="text-white font-black text-xs md:text-sm tracking-tight">Audio Commentary</h3>
@@ -169,7 +168,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                  </div>
                  {dbData.audio_url ? (
                     <Link href={sanitizeUrl(dbData.audio_url) || '#'} target="_blank" rel="noopener noreferrer" className="bg-white text-black hover:bg-slate-200 text-[9px] md:text-[10px] font-black px-3 py-2 md:px-5 md:py-2.5 rounded-lg shadow-lg transition active:scale-95 flex items-center gap-1 uppercase tracking-widest">
-                        Listen <ExternalLink size={10} md:size={12} />
+                        Listen <ExternalLink className="w-2.5 h-2.5 md:w-3 md:h-3" />
                     </Link>
                  ) : (
                     <button disabled className="bg-slate-800 text-slate-500 text-[9px] md:text-[10px] font-black uppercase tracking-widest px-3 py-2 md:px-4 md:py-2 rounded-lg cursor-not-allowed border border-white/5">
@@ -197,18 +196,18 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             </div>
         )}
 
-        {/* PREDICTION BOARD - Compacted */}
+        {/* PREDICTION BOARD */}
         <div id="predictions" className="scroll-mt-6 bg-white rounded-xl shadow-xl p-3 md:p-5 border border-slate-200 overflow-hidden relative">
            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-8 -mt-8 opacity-50 pointer-events-none"></div>
            <h3 className="text-xs md:text-sm font-black uppercase tracking-tighter text-slate-800 flex items-center gap-1.5 mb-3 md:mb-5 relative z-10">
-               <Zap size={14} md:size={16} className="text-yellow-500 fill-yellow-500 drop-shadow-sm" /> Predict & Win Points
+               <Zap className="w-3.5 h-3.5 md:w-4 md:h-4 text-yellow-500 fill-yellow-500 drop-shadow-sm" /> Predict & Win Points
            </h3>
            <div className="relative z-10">
                <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
            </div>
         </div>
 
-        {/* AFFILIATE BLOCK - Compacted */}
+        {/* AFFILIATE BLOCK */}
         {!hasWidget && (
             <div className="bg-[#1A1A1A] rounded-xl p-3 md:p-4 shadow-2xl border border-slate-800 flex items-center justify-between relative overflow-hidden group hover:border-blue-500/30 transition-colors">
                 <div className="absolute top-0 right-0 bg-blue-600 w-20 h-full blur-[40px] opacity-20 group-hover:opacity-40 transition-opacity"></div>
@@ -222,14 +221,14 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                     </div>
                 </div>
                 <a href={sanitizeUrl(dbData.affiliate_link) || "#"} target="_blank" rel="noopener noreferrer" className="relative z-10 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest px-3 py-2 md:px-5 md:py-3 rounded-lg shadow-[0_4px_15px_rgba(37,99,235,0.4)] text-[9px] md:text-[10px] flex items-center gap-1 active:scale-95 transition">
-                    Bet <span className="hidden sm:inline">Now</span> <LinkIcon size={10} md:size={12} />
+                    Bet <span className="hidden sm:inline">Now</span> <LinkIcon className="w-2.5 h-2.5 md:w-3 md:h-3" />
                 </a>
             </div>
         )}
 
       </div>
 
-      {/* MATCH CENTER (LINEUPS & EVENTS) - Untouched size */}
+      {/* MATCH CENTER (LINEUPS & EVENTS) */}
       {!hasWidget && (
           <div id="match-center" className="scroll-mt-6 max-w-4xl mx-auto px-4 mt-4 md:mt-8 space-y-6">
               <StatsLineupsTabs matchId={dbData.id} initialData={data} />
