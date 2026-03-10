@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 🔥 ADDED THIS: Makes the Quick Nav buttons slide smoothly instead of teleporting */
+html {
+  scroll-behavior: smooth;
+}
+
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 245, 245, 245;
