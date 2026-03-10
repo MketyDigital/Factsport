@@ -1,23 +1,12 @@
 export const ESPN_LEAGUES: Record<string, string> = {
   // Main Leagues
-  'Premier League': 'eng.1',
-  'La Liga': 'esp.1',
-  'Bundesliga': 'ger.1',
-  'Serie A': 'ita.1',
-  'Ligue 1': 'fra.1',
-  'Champions League': 'uefa.champions',
-  'Euros': 'uefa.euro',
-  'World Cup': 'fifa.world',
-  
+  'Premier League': 'eng.1', 'La Liga': 'esp.1', 'Bundesliga': 'ger.1',
+  'Serie A': 'ita.1', 'Ligue 1': 'fra.1', 'Champions League': 'uefa.champions',
+  'Euros': 'uefa.euro', 'World Cup': 'fifa.world',
   // Major Cups
-  'Europa League': 'uefa.europa',
-  'Europa Conference League': 'uefa.conference',
-  'FA Cup': 'eng.fa',
-  'Carabao Cup': 'eng.league_cup',
-  'Copa del Rey': 'esp.copa_del_rey',
-  'Coppa Italia': 'ita.copa_italia',
-  'Coupe de France': 'fra.coupe_de_france',
-  'DFB-Pokal': 'ger.dfb_pokal'
+  'Europa League': 'uefa.europa', 'Europa Conference League': 'uefa.conference',
+  'FA Cup': 'eng.fa', 'Carabao Cup': 'eng.league_cup', 'Copa del Rey': 'esp.copa_del_rey',
+  'Coppa Italia': 'ita.copa_italia', 'Coupe de France': 'fra.coupe_de_france', 'DFB-Pokal': 'ger.dfb_pokal'
 };
 
 export const normalizeName = (name: string) => {
@@ -48,7 +37,7 @@ export async function fetchEspnLive(leagueCode: string) {
   } catch (err) { return []; }
 }
 
-// 2. Fetch Deep Details (Clean Facts Only - Triple Layer Engine)
+// 2. Fetch Deep Details (Clean Facts Only - Triple Layer Engine + Rich Data)
 export async function fetchEspnDetails(gameId: string) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${gameId}`;
   try {
@@ -62,7 +51,20 @@ export async function fetchEspnDetails(gameId: string) {
     const homeTeamName = homeCompetitor.team.displayName;
     const awayTeamName = awayCompetitor.team.displayName;
 
-    // 🟢 A. PARSE STATS FIRST
+    // 🟢 1. NEW: EXTRACT VENUE & REFEREES & PREDICTOR
+    const venue = data.gameInfo?.venue?.fullName || null;
+    const referees = data.gameInfo?.officials?.map((o: any) => o.displayName || o.fullName) || [];
+    
+    let predictor = null;
+    if (data.predictor) {
+        predictor = {
+            home: data.predictor.homeTeam?.gameProjection || 0,
+            away: data.predictor.awayTeam?.gameProjection || 0,
+            draw: data.predictor.draw?.gameProjection || 0
+        };
+    }
+
+    // 🟢 2. PARSE STATS
     const boxscore = data.boxscore;
     const stats: any = { home: {}, away: {} };
     if (boxscore?.teams) {
@@ -78,8 +80,8 @@ export async function fetchEspnDetails(gameId: string) {
        });
     }
 
-    // 🟢 B. PARSE LINEUPS (To build our Dictionary)
-    const lineups: any = { home: [], away: [] };
+    // 🟢 3. PARSE LINEUPS & FORMATIONS
+    const lineups: any = { home: [], away: [], formations: { home: null, away: null } };
     let rosters = boxscore?.rosters;
     if (!rosters && boxscore?.players) rosters = boxscore.players;
     if (!rosters && data.rosters) rosters = data.rosters;
@@ -87,8 +89,10 @@ export async function fetchEspnDetails(gameId: string) {
     if (rosters) {
        rosters.forEach((r: any) => {
           const side = String(r.team.id) === homeId ? 'home' : 'away';
-          let athletes = r.athletes || r.roster || r.statistics?.[0]?.athletes || [];
+          
+          if (r.formation) lineups.formations[side] = r.formation; // 🔥 FORMATION SAVED
 
+          let athletes = r.athletes || r.roster || r.statistics?.[0]?.athletes || [];
           lineups[side] = athletes.map((p: any) => ({
              name: p.athlete.displayName,
              number: p.jersey,
@@ -109,7 +113,7 @@ export async function fetchEspnDetails(gameId: string) {
         });
     }
 
-    // 🔥 C. BUILD THE ROSTER DICTIONARY (With Exact Team Names)
+    // 🔥 C. BUILD THE ROSTER DICTIONARY
     const rosterDict: { name: string, side: string, teamName: string }[] = [];
     ['home', 'away'].forEach(side => {
         const teamName = side === 'home' ? homeTeamName : awayTeamName;
@@ -121,10 +125,8 @@ export async function fetchEspnDetails(gameId: string) {
 
     // 🟢 D. PARSE EVENTS (THE TRIPLE-LAYER SHREDDER)
     let events: any[] = [];
-
     if (data.commentary && data.commentary.length > 0) {
         const rawEvents = data.commentary;
-
         events = rawEvents
             .filter((c: any) => {
                 const t = (c.text || '').toLowerCase();
@@ -144,32 +146,26 @@ export async function fetchEspnDetails(gameId: string) {
                 let matchedTeamName = '';
 
                 // --- 1. THE TRIPLE-LOCK CLASSIFIER ---
-                
-                // A. Trap VAR / Overturns First
                 if (lowerText.includes('var decision') || lowerText.includes('overturned') || lowerText.includes('disallowed') || lowerText.includes('no goal') || metaType.includes('var')) {
                     type = 'var_overturn'; actionName = 'VAR Decision';
                 } 
-                // B. Trap Penalties (Awarded, Conceded, Missed, and Checks)
                 else if (lowerText.includes('penalty conceded')) {
-                    type = 'penalty_awarded'; actionName = 'Penalty Conceded'; // 🔥 FIX: Clarifies Bruno caused the penalty!
+                    type = 'penalty_awarded'; actionName = 'Penalty Conceded'; 
                 } else if (lowerText.includes('penalty awarded')) {
                     type = 'penalty_awarded'; actionName = 'Penalty Awarded';
                 } else if (lowerText.includes('penalty') && (lowerText.includes('check') || lowerText.includes('var'))) {
-                    type = 'var_overturn'; actionName = 'VAR Penalty Check'; // 🔥 FIX: Stops the "Match Event" fallback
+                    type = 'var_overturn'; actionName = 'VAR Penalty Check'; 
                 } else if ((lowerText.includes('penalty') && (lowerText.includes('saved') || lowerText.includes('missed'))) || metaType === 'penalty missed' || metaType === 'penalty saved') {
                     type = 'penalty_missed'; actionName = 'Penalty Missed';
                 } 
-                // C. Trap Fake Goals 
                 else if (lowerText.includes('attempt') || lowerText.includes('saved') || lowerText.includes('missed') || lowerText.includes('blocked') || lowerText.includes('post') || lowerText.includes('crossbar') || metaType.includes('shot') || metaType.includes('miss')) {
                     type = 'attempt'; actionName = lowerText.includes('saved') ? 'Shot Saved' : 'Shot Missed';
                 } 
-                // D. The True Goal Verification 
                 else if (metaType === 'goal' || lowerText.includes('goal!') || lowerText.includes('own goal by') || (lowerText.includes('goal') && /\d+/.test(lowerText))) {
                     type = 'goal'; actionName = lowerText.includes('own goal') ? 'Own Goal' : 'Goal';
                 } else if (lowerText.includes('penalty') && lowerText.includes('scored')) {
                     type = 'goal'; actionName = 'Penalty Goal';
                 } 
-                // E. Cards & Subs
                 else if (lowerText.includes('card') || metaType.includes('card')) {
                     type = lowerText.includes('red') ? 'red-card' : 'card';
                     actionName = lowerText.includes('red') ? 'Red Card' : 'Yellow Card';
@@ -262,7 +258,14 @@ export async function fetchEspnDetails(gameId: string) {
     
     events.reverse();
 
-    return { events, stats, lineups };
+    return { 
+        events, 
+        stats, 
+        lineups, 
+        venue,        // 🔥 Passed to frontend!
+        referees,     // 🔥 Passed to frontend!
+        predictor     // 🔥 Passed to frontend!
+    };
 
   } catch (err) { return null; }
 }

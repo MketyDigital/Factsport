@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget'; 
 import { getLeagueAssets } from '@/app/lib/league-assets';
 import MatchTime from '@/app/components/MatchTime';
-import TeamFormRing from '@/app/components/TeamFormRing'; // 🔥 NEW IMPORT
+import TeamFormRing from '@/app/components/TeamFormRing'; 
 
 export default function MatchHeaderClient({ matchId, initialData }: any) {
   const [data, setData] = useState(initialData);
@@ -61,13 +61,17 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
   const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'].includes(currentStatus);
   const leagueData = getLeagueAssets(initialData?.league);
 
-  // Parse matches array for the Form Rings
   let parsedH2h = initialData?.h2h;
   if (typeof parsedH2h === 'string') {
       try { parsedH2h = JSON.parse(parsedH2h); } catch (e) { parsedH2h = {}; }
   }
   const h2hMatches = parsedH2h?.matches || [];
-  const refName = initialData?.referees?.[0]?.name || (typeof initialData?.referees?.[0] === 'string' ? initialData.referees[0] : null);
+  
+  // 🟢 Safe Referee extraction
+  let refName = null;
+  if (initialData?.referees && initialData.referees.length > 0) {
+      refName = typeof initialData.referees[0] === 'string' ? initialData.referees[0] : initialData.referees[0].name;
+  }
 
   return (
     <div className="relative z-10 px-4 mt-1 pb-6 pt-2 rounded-b-3xl overflow-hidden bg-slate-900 shadow-2xl">
@@ -86,7 +90,6 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
         </div>
 
         <div className="relative z-10">
-            {/* 🔥 NEW: Pro Analyst Referee Badge */}
             {refName && (
                 <div className="flex justify-center mb-2">
                     <span className="bg-black/40 backdrop-blur border border-white/5 text-[8px] text-slate-300 px-2 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-widest">
@@ -116,9 +119,8 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                     <div className="w-20 h-20 bg-gradient-to-b from-white/10 to-transparent p-4 rounded-2xl mb-2 flex items-center justify-center border border-white/10 shadow-2xl backdrop-blur-md transition-transform group-hover:scale-105">
                         {initialData?.home_logo ? <img src={initialData.home_logo} className="w-full h-full object-contain drop-shadow-lg" /> : <div className="font-black text-slate-500">H</div>}
                     </div>
-                    <h2 className="font-bold text-center text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md">{initialData?.home_team}</h2>
-                    {/* 🔥 NEW: Dynamic Form Ring */}
-                    <TeamFormRing teamName={initialData?.home_team} matches={h2hMatches} />
+                    <h2 className="font-bold text-center text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md">{initialData?.home_team || initialData?.home?.name}</h2>
+                    <TeamFormRing teamName={initialData?.home_team || initialData?.home?.name} matches={h2hMatches} />
                 </div>
                 
                 <div className="flex flex-col items-center justify-center w-[30%] pt-4">
@@ -137,9 +139,8 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                     <div className="w-20 h-20 bg-gradient-to-b from-white/10 to-transparent p-4 rounded-2xl mb-2 flex items-center justify-center border border-white/10 shadow-2xl backdrop-blur-md transition-transform group-hover:scale-105">
                         {initialData?.away_logo ? <img src={initialData.away_logo} className="w-full h-full object-contain drop-shadow-lg" /> : <div className="font-black text-slate-500">A</div>}
                     </div>
-                    <h2 className="font-bold text-center text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md">{initialData?.away_team}</h2>
-                    {/* 🔥 NEW: Dynamic Form Ring */}
-                    <TeamFormRing teamName={initialData?.away_team} matches={h2hMatches} />
+                    <h2 className="font-bold text-center text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md">{initialData?.away_team || initialData?.away?.name}</h2>
+                    <TeamFormRing teamName={initialData?.away_team || initialData?.away?.name} matches={h2hMatches} />
                 </div>
             </div>
         </div>
