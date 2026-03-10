@@ -4,7 +4,7 @@ export const revalidate = 3;
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon, MapPin, Trophy, Grid, Percent } from 'lucide-react';
+import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon, MapPin, Trophy, Grid, Percent, BarChart2, BrainCircuit, History, Play } from 'lucide-react';
 
 // 🔥 ALL MODULAR COMPONENTS IMPORTED
 import FactSportPlayer from '@/app/components/FactSportPlayer';
@@ -37,11 +37,9 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
   const supabase = createClient();
 
-  // 1. FETCH MATCH DATA
   const dbData = await getSupabaseData(resolvedParams.id);
   if (!dbData) return notFound();
 
-  // 2. CHECK VIP STATUS SECURELY
   let isUserVIP = false;
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.user) {
@@ -56,7 +54,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       }
   }
 
-  // 3. FETCH EXTERNAL API DATA (Now includes ESPN Rich Data!)
   const rawData = await getExternalData(dbData);
   const data = rawData || {};
   
@@ -64,13 +61,12 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const isFinished = ['FT', 'FINISHED', 'AWARDED', 'AET', 'PEN'].includes(currentStatus);
   const activeVideoUrl = sanitizeUrl(isFinished ? dbData.video_url : dbData.livestream_url);
   const isLiveStream = !isFinished && !!dbData.livestream_url;
-  
   const hasWidget = !!dbData.widget_id; 
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       
-      {/* MATCH HEADER */}
+      {/* MATCH HEADER (Untouched size as requested) */}
       {hasWidget ? (
           <div className="bg-[#0a1428] text-white p-4 shadow-md flex items-center justify-between sticky top-0 z-40">
               <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
@@ -110,113 +106,132 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           </div>
       )}
 
-      <div className="max-w-4xl mx-auto px-4 mt-6 relative z-20 space-y-6">
+      {/* QUICK NAVIGATION MENU */}
+      {!hasWidget && (
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide py-2 md:py-3 px-4 max-w-4xl mx-auto relative z-20 snap-x">
+             <a href="#match-center" className="snap-start shrink-0 bg-blue-600 text-white px-3 md:px-4 py-1.5 md:py-2 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-md flex items-center gap-1.5 active:scale-95 transition"><BarChart2 size={12}/> Match Center</a>
+             <a href="#pro-analysis" className="snap-start shrink-0 bg-slate-900 text-yellow-500 px-3 md:px-4 py-1.5 md:py-2 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-md flex items-center gap-1.5 active:scale-95 transition"><BrainCircuit size={12}/> Pro Slip</a>
+             <a href="#h2h" className="snap-start shrink-0 bg-white text-slate-700 border border-slate-200 px-3 md:px-4 py-1.5 md:py-2 rounded-full text-[9px] md:text-[10px] font-bold shadow-sm flex items-center gap-1.5 hover:bg-slate-50 active:scale-95 transition"><History size={12}/> H2H</a>
+             <a href="#predictions" className="snap-start shrink-0 bg-white text-slate-700 border border-slate-200 px-3 md:px-4 py-1.5 md:py-2 rounded-full text-[9px] md:text-[10px] font-bold shadow-sm flex items-center gap-1.5 hover:bg-slate-50 active:scale-95 transition"><Trophy size={12}/> Predict</a>
+             {(activeVideoUrl || dbData.audio_url) && (
+                 <a href="#media" className="snap-start shrink-0 bg-white text-slate-700 border border-slate-200 px-3 md:px-4 py-1.5 md:py-2 rounded-full text-[9px] md:text-[10px] font-bold shadow-sm flex items-center gap-1.5 hover:bg-slate-50 active:scale-95 transition"><Play size={12}/> Media</a>
+             )}
+          </div>
+      )}
+
+      {/* 🔥 TIGHTER SPACING ON MOBILE (space-y-3 instead of space-y-6) */}
+      <div className="max-w-4xl mx-auto px-4 mt-2 relative z-20 space-y-3 md:space-y-6">
         
-        {/* 🟢 MATCH INFO STRIP (Upgraded with ESPN Predictor & Safely Typed) */}
+        {/* MATCH INFO STRIP - Compacted */}
         {(data?.venue || data?.stage || data?.group || (data?.referees && data.referees.length > 0) || data?.predictor) && (
-            <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex flex-wrap gap-3 items-center justify-center text-[10px] font-bold text-slate-500">
-                {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 shadow-sm"><Trophy size={12} className="text-yellow-500"/> {data.stage.replace(/_/g, ' ')}</span>}
-                {data?.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 shadow-sm"><Grid size={12} className="text-blue-500"/> {data.group.replace(/_/g, ' ')}</span>}
-                {data?.venue && <span className="flex items-center gap-1 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 shadow-sm"><MapPin size={12} className="text-red-500"/> {data.venue}</span>}
-                {/* AI Win Predictor Badge */}
-                {data?.predictor && <span className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-lg border border-blue-100 shadow-sm"><Percent size={12}/> Win Prob: {parseFloat(String(data.predictor.home)).toFixed(0)}% | {parseFloat(String(data.predictor.away)).toFixed(0)}%</span>}
+            <div className="bg-white rounded-xl p-2 md:p-3 shadow-sm border border-slate-100 flex flex-wrap gap-2 items-center justify-center text-[9px] md:text-[10px] font-bold text-slate-500">
+                {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 md:px-2.5 md:py-1.5 rounded-lg border border-slate-100 shadow-sm"><Trophy size={10} md:size={12} className="text-yellow-500"/> {data.stage.replace(/_/g, ' ')}</span>}
+                {data?.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 md:px-2.5 md:py-1.5 rounded-lg border border-slate-100 shadow-sm"><Grid size={10} md:size={12} className="text-blue-500"/> {data.group.replace(/_/g, ' ')}</span>}
+                {data?.venue && <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 md:px-2.5 md:py-1.5 rounded-lg border border-slate-100 shadow-sm"><MapPin size={10} md:size={12} className="text-red-500"/> {data.venue}</span>}
+                {data?.predictor && <span className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2 py-1 md:px-2.5 md:py-1.5 rounded-lg border border-blue-100 shadow-sm"><Percent size={10} md:size={12}/> Win Prob: {parseFloat(String(data.predictor.home)).toFixed(0)}% | {parseFloat(String(data.predictor.away)).toFixed(0)}%</span>}
             </div>
         )}
 
         {hasWidget && (
-             <div className="-mt-2">
+             <div className="-mt-1 md:-mt-2">
                  <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={sanitizeUrl(dbData.affiliate_link) || undefined} />
              </div>
         )}
 
-        {/* MEDIA PLAYERS */}
-        {activeVideoUrl && (
-            <div className="rounded-2xl overflow-hidden shadow-2xl border border-slate-200 relative bg-black">
-                <div className="absolute top-3 left-3 z-30 pointer-events-none">
-                    {isLiveStream ? (
-                        <div className="bg-red-600 text-white text-[9px] font-black px-3 py-1 rounded-md flex items-center gap-1.5 animate-pulse shadow-lg border border-red-500 tracking-widest">
-                            <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE WATCHALONG
-                        </div>
-                    ) : (
-                        <div className="bg-black/60 backdrop-blur-md text-white text-[9px] font-black px-3 py-1 rounded-md border border-white/20 flex items-center gap-1.5 shadow-lg tracking-widest">
-                            <PlayCircle size={12} className="text-red-500"/> OFFICIAL HIGHLIGHTS
-                        </div>
-                    )}
+        {/* MEDIA SECTION (Video & Audio) - Compacted */}
+        <div id="media" className="scroll-mt-6 space-y-3 md:space-y-6">
+            {activeVideoUrl && (
+                <div className="rounded-xl overflow-hidden shadow-xl border border-slate-200 relative bg-black">
+                    <div className="absolute top-2 left-2 z-30 pointer-events-none">
+                        {isLiveStream ? (
+                            <div className="bg-red-600 text-white text-[8px] md:text-[9px] font-black px-2 py-1 rounded-md flex items-center gap-1 animate-pulse shadow-lg border border-red-500 tracking-widest">
+                                <span className="w-1 h-1 bg-white rounded-full"></span> LIVE
+                            </div>
+                        ) : (
+                            <div className="bg-black/60 backdrop-blur-md text-white text-[8px] md:text-[9px] font-black px-2 py-1 rounded-md border border-white/20 flex items-center gap-1 shadow-lg tracking-widest">
+                                <PlayCircle size={10} className="text-red-500"/> HIGHLIGHTS
+                            </div>
+                        )}
+                    </div>
+                    <FactSportPlayer videoUrl={activeVideoUrl} />
                 </div>
-                <FactSportPlayer videoUrl={activeVideoUrl} />
-            </div>
-        )}
+            )}
 
-        <div className="bg-[#0f172a] rounded-2xl p-4 border border-slate-800 shadow-xl flex items-center justify-between group hover:border-blue-500/50 transition-colors">
-             <div className="flex items-center gap-4">
-                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner ${dbData.audio_url ? 'bg-red-600/20 border border-red-500/30 text-red-500 animate-pulse' : 'bg-white/5 border border-white/5 text-slate-500'}`}>
-                    <Mic size={20} />
+            <div className="bg-[#0f172a] rounded-xl p-3 md:p-4 border border-slate-800 shadow-xl flex items-center justify-between group hover:border-blue-500/50 transition-colors">
+                 <div className="flex items-center gap-3 md:gap-4">
+                     <div className={`w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center shadow-inner ${dbData.audio_url ? 'bg-red-600/20 border border-red-500/30 text-red-500 animate-pulse' : 'bg-white/5 border border-white/5 text-slate-500'}`}>
+                        <Mic size={18} md:size={20} />
+                     </div>
+                     <div>
+                        <h3 className="text-white font-black text-xs md:text-sm tracking-tight">Audio Commentary</h3>
+                        <p className="text-slate-400 text-[8px] md:text-[10px] font-bold uppercase tracking-widest mt-0.5 md:mt-1">{dbData.audio_url ? "Radio is LIVE" : "Tune in at kickoff"}</p>
+                     </div>
                  </div>
-                 <div>
-                    <h3 className="text-white font-black text-sm tracking-tight">Live Audio Commentary</h3>
-                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">{dbData.audio_url ? "Radio is currently LIVE" : "Tune in at kickoff"}</p>
-                 </div>
-             </div>
-             {dbData.audio_url ? (
-                <Link href={sanitizeUrl(dbData.audio_url) || '#'} target="_blank" rel="noopener noreferrer" className="bg-white text-black hover:bg-slate-200 text-[10px] font-black px-5 py-2.5 rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1 uppercase tracking-widest">
-                    Listen <ExternalLink size={12} />
-                </Link>
-             ) : (
-                <button disabled className="bg-slate-800 text-slate-500 text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl cursor-not-allowed border border-white/5">
-                    Off Air
-                </button>
-             )}
+                 {dbData.audio_url ? (
+                    <Link href={sanitizeUrl(dbData.audio_url) || '#'} target="_blank" rel="noopener noreferrer" className="bg-white text-black hover:bg-slate-200 text-[9px] md:text-[10px] font-black px-3 py-2 md:px-5 md:py-2.5 rounded-lg shadow-lg transition active:scale-95 flex items-center gap-1 uppercase tracking-widest">
+                        Listen <ExternalLink size={10} md:size={12} />
+                    </Link>
+                 ) : (
+                    <button disabled className="bg-slate-800 text-slate-500 text-[9px] md:text-[10px] font-black uppercase tracking-widest px-3 py-2 md:px-4 md:py-2 rounded-lg cursor-not-allowed border border-white/5">
+                        Off Air
+                    </button>
+                 )}
+            </div>
         </div>
 
         {/* HEAD-TO-HEAD STATS */}
-        <HeadToHeadStats dbData={data} />
+        <div id="h2h" className="scroll-mt-6">
+            <HeadToHeadStats dbData={data} />
+        </div>
 
         {/* THE UNIFIED VIP PAYWALL */}
         {!hasWidget && (
-            <ProBettingSlipLock 
-                isVIP={isUserVIP} 
-                homeTeam={dbData.home_team} 
-                awayTeam={dbData.away_team} 
-                status={dbData.status} 
-                proAnalysis={dbData.pro_analysis} 
-            />
+            <div id="pro-analysis" className="scroll-mt-6">
+                <ProBettingSlipLock 
+                    isVIP={isUserVIP} 
+                    homeTeam={dbData.home_team} 
+                    awayTeam={dbData.away_team} 
+                    status={dbData.status} 
+                    proAnalysis={dbData.pro_analysis} 
+                />
+            </div>
         )}
 
-        {/* PREDICTION BOARD */}
-        <div className="bg-white rounded-2xl shadow-xl p-5 border border-slate-200 overflow-hidden relative">
-           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full -mr-10 -mt-10 opacity-50 pointer-events-none"></div>
-           <h3 className="text-sm font-black uppercase tracking-tighter text-slate-800 flex items-center gap-1.5 mb-5 relative z-10">
-               <Zap size={16} className="text-yellow-500 fill-yellow-500 drop-shadow-sm" /> Predict & Win Points
+        {/* PREDICTION BOARD - Compacted */}
+        <div id="predictions" className="scroll-mt-6 bg-white rounded-xl shadow-xl p-3 md:p-5 border border-slate-200 overflow-hidden relative">
+           <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-8 -mt-8 opacity-50 pointer-events-none"></div>
+           <h3 className="text-xs md:text-sm font-black uppercase tracking-tighter text-slate-800 flex items-center gap-1.5 mb-3 md:mb-5 relative z-10">
+               <Zap size={14} md:size={16} className="text-yellow-500 fill-yellow-500 drop-shadow-sm" /> Predict & Win Points
            </h3>
            <div className="relative z-10">
                <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
            </div>
         </div>
 
-        {/* AFFILIATE BLOCK */}
+        {/* AFFILIATE BLOCK - Compacted */}
         {!hasWidget && (
-            <div className="bg-[#1A1A1A] rounded-2xl p-4 shadow-2xl border border-slate-800 flex items-center justify-between relative overflow-hidden group hover:border-blue-500/30 transition-colors">
-                <div className="absolute top-0 right-0 bg-blue-600 w-24 h-full blur-[50px] opacity-20 group-hover:opacity-40 transition-opacity"></div>
-                <div className="flex items-center gap-4 relative z-10">
-                    <div className="w-12 h-12 bg-blue-600 text-white text-xs font-black rounded-xl flex items-center justify-center shadow-lg italic">1X</div>
+            <div className="bg-[#1A1A1A] rounded-xl p-3 md:p-4 shadow-2xl border border-slate-800 flex items-center justify-between relative overflow-hidden group hover:border-blue-500/30 transition-colors">
+                <div className="absolute top-0 right-0 bg-blue-600 w-20 h-full blur-[40px] opacity-20 group-hover:opacity-40 transition-opacity"></div>
+                <div className="flex items-center gap-3 md:gap-4 relative z-10">
+                    <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-600 text-white text-[10px] md:text-xs font-black rounded-lg flex items-center justify-center shadow-lg italic">1X</div>
                     <div>
-                        <div className="text-white font-black text-sm tracking-tight mb-0.5">1xBet Official Partner</div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                            Code: <span className="text-yellow-400 font-black bg-yellow-400/10 px-1.5 py-0.5 rounded border border-yellow-400/20">{dbData.booking_code || "FACTSPORT"}</span>
+                        <div className="text-white font-black text-xs md:text-sm tracking-tight mb-0.5">1xBet Official Partner</div>
+                        <div className="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                            Code: <span className="text-yellow-400 font-black bg-yellow-400/10 px-1 py-0.5 rounded border border-yellow-400/20">{dbData.booking_code || "FACTSPORT"}</span>
                         </div>
                     </div>
                 </div>
-                <a href={sanitizeUrl(dbData.affiliate_link) || "#"} target="_blank" rel="noopener noreferrer" className="relative z-10 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest px-5 py-3 rounded-xl shadow-[0_4px_15px_rgba(37,99,235,0.4)] text-[10px] flex items-center gap-1.5 active:scale-95 transition">
-                    Bet Now <LinkIcon size={12} />
+                <a href={sanitizeUrl(dbData.affiliate_link) || "#"} target="_blank" rel="noopener noreferrer" className="relative z-10 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest px-3 py-2 md:px-5 md:py-3 rounded-lg shadow-[0_4px_15px_rgba(37,99,235,0.4)] text-[9px] md:text-[10px] flex items-center gap-1 active:scale-95 transition">
+                    Bet <span className="hidden sm:inline">Now</span> <LinkIcon size={10} md:size={12} />
                 </a>
             </div>
         )}
 
       </div>
 
-      {/* LINEUPS & EVENTS */}
+      {/* MATCH CENTER (LINEUPS & EVENTS) - Untouched size */}
       {!hasWidget && (
-          <div className="max-w-4xl mx-auto px-4 mt-8 space-y-6">
+          <div id="match-center" className="scroll-mt-6 max-w-4xl mx-auto px-4 mt-4 md:mt-8 space-y-6">
               <StatsLineupsTabs matchId={dbData.id} initialData={data} />
           </div>
       )}

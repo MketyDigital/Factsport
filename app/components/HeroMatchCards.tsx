@@ -10,12 +10,11 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
         <div className="px-4 mb-5 flex gap-3 overflow-x-auto pb-4 scrollbar-hide snap-x">
              {heroMatches.map((match) => {
                 
-                // 🔥 DYNAMIC WIDTH LOGIC: Scales perfectly based on how many matches there are
                 const widthClass = heroMatches.length === 1 
                     ? 'w-full' 
                     : heroMatches.length === 2 
-                        ? 'w-[48%] md:w-[48%]' // Fits exactly 2 cards perfectly
-                        : 'w-[42%] md:w-[30%]'; // Fits 2.5 cards so the 3rd one peeks out
+                        ? 'w-[48%] md:w-[48%]' 
+                        : 'w-[42%] md:w-[30%]';
 
                 return (
                     <Link 
@@ -52,24 +51,29 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                                 )}
                                 
                                 <div className="flex justify-between items-center mt-5 md:mt-6">
-                                    <div className="flex flex-col items-center w-[33%]">
+                                    {/* HOME TEAM - Given 28% width */}
+                                    <div className="flex flex-col items-center w-[28%]">
                                         {match.home_logo ? <img src={match.home_logo} className="w-7 h-7 md:w-12 md:h-12 object-contain mb-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"/> : <div className="w-7 h-7 bg-white/10 rounded-full mb-1.5 flex items-center justify-center text-[9px] font-bold text-white">H</div>}
                                         <span className="text-[8px] md:text-[10px] font-bold text-center leading-tight text-white line-clamp-1 drop-shadow-md w-full px-0.5">{match.home_team}</span>
                                     </div>
                                     
-                                    <div className="flex flex-col items-center w-[34%] px-1">
-                                        <div className="text-sm md:text-2xl font-black tabular-nums tracking-widest bg-black/50 px-2 py-0.5 md:px-3 md:py-1 rounded-lg md:rounded-xl backdrop-blur-md border border-white/10 shadow-inner text-white whitespace-nowrap">
-                                            {match.status === 'SCHEDULED' || match.status === 'PRE' ? <span className="text-[10px] md:text-sm opacity-60">VS</span> : `${match.home_score}-${match.away_score}`}
+                                    {/* SCORE & TIME - Given 44% width to ensure it never cuts off */}
+                                    <div className="flex flex-col items-center justify-center w-[44%] px-0.5">
+                                        <div className="text-xs md:text-2xl font-black tabular-nums tracking-wider bg-black/50 px-1.5 py-0.5 md:px-3 md:py-1 rounded-md md:rounded-xl backdrop-blur-md border border-white/10 shadow-inner text-white whitespace-nowrap flex items-center justify-center min-w-[30px]">
+                                            {match.status === 'SCHEDULED' || match.status === 'PRE' ? <span className="text-[9px] md:text-sm opacity-60">VS</span> : `${match.home_score}-${match.away_score}`}
                                         </div>
-                                        <span className="text-[7px] md:text-[9px] font-black text-blue-300 mt-1.5 uppercase tracking-widest text-center drop-shadow-md bg-blue-900/30 px-1 py-0.5 rounded whitespace-nowrap w-full truncate">
-                                            {match.status === 'SCHEDULED' || match.status === 'PRE' 
-                                                ? <MatchTime date={match.match_date} />
-                                                : (match.status === 'HT' ? 'HT' : match.status)
-                                            }
-                                        </span>
+                                        <div className="mt-1 w-full flex justify-center">
+                                            <span className="text-[6px] md:text-[9px] font-black text-blue-300 uppercase tracking-normal md:tracking-widest text-center drop-shadow-md bg-blue-900/30 px-1 py-0.5 rounded whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
+                                                {match.status === 'SCHEDULED' || match.status === 'PRE' 
+                                                    ? <MatchTime date={match.match_date} />
+                                                    : (match.status === 'HT' ? 'HT' : match.status)
+                                                }
+                                            </span>
+                                        </div>
                                     </div>
 
-                                    <div className="flex flex-col items-center w-[33%]">
+                                    {/* AWAY TEAM - Given 28% width */}
+                                    <div className="flex flex-col items-center w-[28%]">
                                         {match.away_logo ? <img src={match.away_logo} className="w-7 h-7 md:w-12 md:h-12 object-contain mb-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"/> : <div className="w-7 h-7 bg-white/10 rounded-full mb-1.5 flex items-center justify-center text-[9px] font-bold text-white">A</div>}
                                         <span className="text-[8px] md:text-[10px] font-bold text-center leading-tight text-white line-clamp-1 drop-shadow-md w-full px-0.5">{match.away_team}</span>
                                     </div>
