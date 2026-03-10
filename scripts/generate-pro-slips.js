@@ -12,6 +12,8 @@ if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+
+// 🔥 REVERTED back to 2.5-flash to guarantee it works for your API key
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -83,7 +85,6 @@ async function getEspnIdForMatch(leagueName, dateString, homeTeam, awayTeam) {
     return null;
 }
 
-// 🔥 DEEP RESEARCH FIX: Switched to site.web.api.espn.com which is their richer internal endpoint
 async function fetchRichEspnContext(espnId, currentHomeTeam) {
     if (!espnId) return { textContext: null, translatedH2H: null };
     try {
@@ -145,6 +146,31 @@ async function fetchRichEspnContext(espnId, currentHomeTeam) {
     }
 }
 
+// 🔥 SMART QUOTA CHECKER
+async function generateWithRetry(prompt, maxRetries = 3) {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const result = await model.generateContent(prompt);
+            return result.response.text().trim();
+        } catch (error) {
+            if (error.message.includes('PerDay')) {
+                // If it's the hard daily limit, stop immediately to prevent Action crashes.
+                console.log(`   🛑 Google AI Daily Quota Reached (20/day). Will resume tomorrow.`);
+                return null; 
+            } else if (error.message.includes('429') || error.message.includes('503')) {
+                if (i < maxRetries - 1) {
+                    console.log(`   ⏳ Google AI is busy (Speed Limit). Waiting 30 seconds before retry ${i + 1}/${maxRetries}...`);
+                    await delay(30000); 
+                } else {
+                    throw error; 
+                }
+            } else {
+                throw error; 
+            }
+        }
+    }
+}
+
 async function runProSlipEngine() {
     console.log("🧠 Starting Automated AI Pro Slip Generation...");
 
@@ -180,14 +206,12 @@ async function runProSlipEngine() {
         console.log(`\n⏳ Analyzing: ${match.home_team} vs ${match.away_team}...`);
         
         try {
-            // 🔥 PRIORITIZE DB ID (Exactly what you asked for!)
             const espnId = match.espn_id || await getEspnIdForMatch(match.league, match.match_date, match.home_team, match.away_team);
             
             const { textContext, translatedH2H } = await fetchRichEspnContext(espnId, match.home_team);
 
             let promptContext = textContext;
             
-            // 🟢 THE SMART MULTI-TIER FALLBACK LOGIC
             if (promptContext) {
                 console.log(`   📡 Successfully pulled ESPN Form & H2H!`);
             } else if (match.h2h && match.h2h.aggregates) {
@@ -228,8 +252,13 @@ async function runProSlipEngine() {
                 }
             `;
 
-            const result = await model.generateContent(prompt);
-            let text = result.response.text().trim();
+            let text = await generateWithRetry(prompt);
+            
+            // If the quota was hit, text is null. Break the loop completely.
+            if (!text) {
+                break; 
+            }
+            
             text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
             const analysisData = JSON.parse(text);
 
