@@ -160,25 +160,35 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   let heroMatches: any[] = [];
   const todayStr = new Date().toISOString().split('T')[0];
 
+  // 1. Try to find up to 3 matches manually set by the Admin
   if (featuredMatches.length > 0) {
       heroMatches = featuredMatches.filter(m => m.match_date.split('T')[0] >= todayStr).slice(0, 3);
   } 
   
+  // 2. SMART FALLBACK: If Admin didn't set any, hunt for up to 3 global giant teams!
   if (heroMatches.length === 0) {
-      const bigLeagues = ['Premier League', 'Champions League', 'World Cup', 'La Liga', 'Serie A'];
+      const bigTeams = [
+          'Arsenal', 'Chelsea', 'Liverpool', 'Man City', 'Manchester City', 'Man United', 'Manchester United', 'Tottenham',
+          'Real Madrid', 'Barcelona', 'Atletico', 
+          'Bayern', 'Dortmund', 'Leverkusen',
+          'Juventus', 'Inter', 'AC Milan', 'Napoli', 
+          'PSG', 'Paris Saint Germain'
+      ];
+
       const validMatches = matches.filter(m => m.match_date.split('T')[0] >= todayStr);
-      const upcomingDates = Array.from(new Set(validMatches.map((m: any) => m.match_date.split('T')[0]))).sort();
-      
-      if (upcomingDates.length > 0) {
-          const targetDate = upcomingDates[0]; 
-          const targetMatches = validMatches.filter(m => m.match_date.startsWith(targetDate));
-          const bigMatchCandidates = targetMatches.filter(m => bigLeagues.includes(m.league));
-          
-          if (bigMatchCandidates.length > 0) {
-              heroMatches = bigMatchCandidates.slice(0, 3);
-          } else {
-              heroMatches = targetMatches.slice(0, 3);
-          }
+
+      const bigMatches = validMatches.filter(m => {
+          return bigTeams.some(giant => 
+              (m.home_team && m.home_team.toLowerCase().includes(giant.toLowerCase())) || 
+              (m.away_team && m.away_team.toLowerCase().includes(giant.toLowerCase()))
+          );
+      });
+
+      if (bigMatches.length > 0) {
+          heroMatches = bigMatches.slice(0, 3);
+      } else {
+          // Absolute worst-case scenario: just show the next 3 upcoming matches
+          heroMatches = validMatches.slice(0, 3);
       }
   }
 

@@ -1,5 +1,5 @@
 import { createClient } from '@/app/lib/supabase/client';
-import { fetchEspnDetails } from '@/app/lib/espn'; // 🔥 IMPORT THE ESPN FETCHER
+import { fetchEspnDetails } from '@/app/lib/espn';
 
 // 🟢 CONFIG
 const API_KEY = process.env.FOOTBALL_DATA_KEY!;
@@ -11,7 +11,6 @@ const LEAGUE_MAP: Record<string, string> = {
   'Euros': 'EC', 'World Cup': 'WC', 'Europa League': 'EL', 
 };
 
-// --- HELPER: Normalize Status ---
 const normalizeStatus = (status: string) => {
   const map: Record<string, string> = {
     'IN_PLAY': 'LIVE', 'PAUSED': 'HT', 'HALFTIME': 'HT',
@@ -21,7 +20,6 @@ const normalizeStatus = (status: string) => {
   return map[status] || status;
 };
 
-// --- HELPER: Transform API Data to DB Schema ---
 const transformMatch = (m: any, leagueName: string) => ({
     api_id: m.id, 
     league: leagueName,
@@ -43,7 +41,6 @@ const transformMatch = (m: any, leagueName: string) => ({
     h2h: m.h2h || null
 });
 
-// --- FUNCTION 1: SYNC SCHEDULE (Called by GitHub Action) ---
 export async function getLeagueMatches(leagueId: string, leagueName: string, dateFrom: string, dateTo: string) {
   const code = LEAGUE_MAP[leagueName] || leagueId; 
   if (!code) return { matches: [], error: 'Invalid League Code' };
@@ -67,7 +64,6 @@ export async function getLeagueMatches(leagueId: string, leagueName: string, dat
   }
 }
 
-// --- FUNCTION 2: FRONTEND DATA ADAPTER (Crucial for Display) ---
 export interface UnifiedMatchData {
   status: string;
   displayClock: string;
@@ -85,18 +81,26 @@ export interface UnifiedMatchData {
   stage?: string | null;
   group?: string | null;
   h2h?: any;
-  // 🟢 TS FIX: explicitly allow null so Vercel doesn't crash
   predictor?: { home: number, away: number, draw: number } | null; 
+
+  // 🔥 RESTORED DB FLAT KEYS FOR HEADER UI
+  id?: string;
+  home_team?: string;
+  away_team?: string;
+  home_logo?: string;
+  away_logo?: string;
+  home_score?: number;
+  away_score?: number;
+  match_date?: string;
+  league?: string;
 }
 
 export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
-  // 🔥 FETCH LIVE ESPN DATA IF ESPN_ID EXISTS
   let espnLive = null;
   if (dbData.espn_id) {
       espnLive = await fetchEspnDetails(dbData.espn_id);
   }
 
-  // 🟢 PRIORITIZE LIVE ESPN DATA OVER DATABASE DEFAULTS
   const lineups = espnLive?.lineups || dbData.lineups || { home: [], away: [], formations: { home: null, away: null } };
   const stats = espnLive?.stats || dbData.stats || { home: {}, away: {} };
   const events = espnLive?.events || dbData.match_events || [];
@@ -105,10 +109,8 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
   const hasStats = Object.keys(stats.home || {}).length > 0;
   const hasEvents = events.length > 0;
   const hasH2h = !!dbData.h2h;
-  
   const hasRichData = !!dbData.widget_id || hasLineups || hasStats || hasEvents || hasH2h;
 
-  // 🟢 TS FIX: Safely parse predictor data strictly into numbers
   let finalPredictor = null;
   const rawPredictor = espnLive?.predictor || dbData.predictor;
   if (rawPredictor) {
@@ -120,6 +122,8 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
   }
 
   return {
+    ...dbData, // 🔥 MAGIC FIX: Spreads all DB keys so the Header Logos and Time never break!
+    
     status: dbData.status === 'SCHEDULED' ? 'PRE' : dbData.status,
     displayClock: dbData.displayClock || (dbData.status === 'LIVE' ? 'Live' : (dbData.status === 'HT' ? 'HT' : '')),
     home: { name: dbData.home_team, logo: dbData.home_logo, score: dbData.home_score ?? 0, id: 'home' },
@@ -135,7 +139,7 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
     
     venue: espnLive?.venue || dbData.venue || null,
     referees: espnLive?.referees || dbData.referees || [],
-    predictor: finalPredictor, // 🔥 Safely passed as strict numbers!
+    predictor: finalPredictor, 
     
     stage: dbData.stage || null,
     group: dbData.match_group || null,
