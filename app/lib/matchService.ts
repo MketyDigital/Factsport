@@ -1,32 +1,22 @@
 import { createClient } from '@/app/lib/supabase/client';
+import { fetchEspnDetails } from '@/app/lib/espn'; // 🔥 IMPORT THE ESPN FETCHER
 
 // 🟢 CONFIG
 const API_KEY = process.env.FOOTBALL_DATA_KEY!;
 const BASE_URL = 'https://api.football-data.org/v4';
 
 const LEAGUE_MAP: Record<string, string> = {
-  'Premier League': 'PL',
-  'La Liga': 'PD',
-  'Bundesliga': 'BL1',
-  'Serie A': 'SA',
-  'Ligue 1': 'FL1',
-  'Champions League': 'CL',
-  'Euros': 'EC',
-  'World Cup': 'WC',
-  'Europa League': 'EL', // 🟢 Added Europa League
+  'Premier League': 'PL', 'La Liga': 'PD', 'Bundesliga': 'BL1',
+  'Serie A': 'SA', 'Ligue 1': 'FL1', 'Champions League': 'CL',
+  'Euros': 'EC', 'World Cup': 'WC', 'Europa League': 'EL', 
 };
 
 // --- HELPER: Normalize Status ---
 const normalizeStatus = (status: string) => {
   const map: Record<string, string> = {
-    'IN_PLAY': 'LIVE',
-    'PAUSED': 'HT',
-    'HALFTIME': 'HT',
-    'FINISHED': 'FT',
-    'AWARDED': 'FT',
-    'TIMED': 'SCHEDULED',
-    'SCHEDULED': 'SCHEDULED',
-    'POSTPONED': 'POSTPONED'
+    'IN_PLAY': 'LIVE', 'PAUSED': 'HT', 'HALFTIME': 'HT',
+    'FINISHED': 'FT', 'AWARDED': 'FT', 'TIMED': 'SCHEDULED',
+    'SCHEDULED': 'SCHEDULED', 'POSTPONED': 'POSTPONED'
   };
   return map[status] || status;
 };
@@ -46,7 +36,6 @@ const transformMatch = (m: any, leagueName: string) => ({
     updated_at: new Date().toISOString(),
     match_events: [],
     
-    // 🟢 Pass through rich data fields 
     venue: m.venue || null,
     referees: m.referees || [],
     stage: m.stage || null,
@@ -62,11 +51,7 @@ export async function getLeagueMatches(leagueId: string, leagueName: string, dat
   const url = `${BASE_URL}/competitions/${code}/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`;
   
   try {
-    const res = await fetch(url, {
-      headers: { 'X-Auth-Token': API_KEY },
-      cache: 'no-store'
-    });
-    
+    const res = await fetch(url, { headers: { 'X-Auth-Token': API_KEY }, cache: 'no-store' });
     if (!res.ok) {
         const errorText = await res.text();
         return { matches: [], error: `Status ${res.status}: ${errorText}` };
@@ -77,7 +62,6 @@ export async function getLeagueMatches(leagueId: string, leagueName: string, dat
         matches: (data.matches || []).map((m: any) => transformMatch(m, leagueName)),
         error: null 
     };
-
   } catch (e: any) {
     return { matches: [], error: e.message };
   }
@@ -92,55 +76,69 @@ export interface UnifiedMatchData {
   goals: any[];
   commentary: any[];
   stats: any;
-  lineups: { home: any[]; away: any[]; };
+  lineups: { home: any[]; away: any[]; formations?: { home: string, away: string } };
   hasExternalData: boolean;
   widget_id?: string;
   
-  // 🟢 New Rich Data Interfaces
-  venue?: string;
+  venue?: string | null;
   referees?: any[];
-  stage?: string;
-  group?: string;
+  stage?: string | null;
+  group?: string | null;
   h2h?: any;
+  // 🟢 TS FIX: explicitly allow null so Vercel doesn't crash
+  predictor?: { home: number, away: number, draw: number } | null; 
 }
 
 export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
-  // 🟢 LOGIC: Check if Rich Data exists in the DB columns
-  const hasLineups = dbData.lineups && (dbData.lineups.home?.length > 0 || dbData.lineups.away?.length > 0);
-  const hasStats = dbData.stats && (Object.keys(dbData.stats.home || {}).length > 0);
-  const hasEvents = dbData.match_events && dbData.match_events.length > 0;
+  // 🔥 FETCH LIVE ESPN DATA IF ESPN_ID EXISTS
+  let espnLive = null;
+  if (dbData.espn_id) {
+      espnLive = await fetchEspnDetails(dbData.espn_id);
+  }
+
+  // 🟢 PRIORITIZE LIVE ESPN DATA OVER DATABASE DEFAULTS
+  const lineups = espnLive?.lineups || dbData.lineups || { home: [], away: [], formations: { home: null, away: null } };
+  const stats = espnLive?.stats || dbData.stats || { home: {}, away: {} };
+  const events = espnLive?.events || dbData.match_events || [];
+  
+  const hasLineups = lineups.home?.length > 0 || lineups.away?.length > 0;
+  const hasStats = Object.keys(stats.home || {}).length > 0;
+  const hasEvents = events.length > 0;
   const hasH2h = !!dbData.h2h;
   
-  // "External Data" now means: Has Widget OR Has ANY Rich Data (Lineups, Stats, Events, H2H)
   const hasRichData = !!dbData.widget_id || hasLineups || hasStats || hasEvents || hasH2h;
+
+  // 🟢 TS FIX: Safely parse predictor data strictly into numbers
+  let finalPredictor = null;
+  const rawPredictor = espnLive?.predictor || dbData.predictor;
+  if (rawPredictor) {
+      finalPredictor = {
+          home: Number(rawPredictor.home) || 0,
+          away: Number(rawPredictor.away) || 0,
+          draw: Number(rawPredictor.draw) || 0
+      };
+  }
 
   return {
     status: dbData.status === 'SCHEDULED' ? 'PRE' : dbData.status,
     displayClock: dbData.displayClock || (dbData.status === 'LIVE' ? 'Live' : (dbData.status === 'HT' ? 'HT' : '')),
-    home: { 
-      name: dbData.home_team, 
-      logo: dbData.home_logo, 
-      score: dbData.home_score ?? 0, 
-      id: 'home' 
-    },
-    away: { 
-      name: dbData.away_team, 
-      logo: dbData.away_logo, 
-      score: dbData.away_score ?? 0, 
-      id: 'away' 
-    },
-    goals: dbData.match_events || [], 
+    home: { name: dbData.home_team, logo: dbData.home_logo, score: dbData.home_score ?? 0, id: 'home' },
+    away: { name: dbData.away_team, logo: dbData.away_logo, score: dbData.away_score ?? 0, id: 'away' },
+    
+    goals: events, 
     commentary: [], 
-    stats: dbData.stats || { home: {}, away: {} },
-    lineups: dbData.lineups || { home: [], away: [] },
+    stats: stats,  
+    lineups: lineups, 
+    
     hasExternalData: hasRichData, 
     widget_id: dbData.widget_id,
     
-    // 🟢 Safely attach the new fields
-    venue: dbData.venue || null,
-    referees: dbData.referees || [],
+    venue: espnLive?.venue || dbData.venue || null,
+    referees: espnLive?.referees || dbData.referees || [],
+    predictor: finalPredictor, // 🔥 Safely passed as strict numbers!
+    
     stage: dbData.stage || null,
-    group: dbData.match_group || null, // Map back from safe DB naming
+    group: dbData.match_group || null,
     h2h: dbData.h2h || null
   };
 }
