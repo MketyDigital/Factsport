@@ -46,7 +46,6 @@ async function runLiveUpdate(request: Request) {
           const isFinishedButBroken = ['FT', 'FINISHED'].includes(m.status) && (!m.match_events || m.match_events.length === 0);
           
           return isLiveOrUpcoming || isFinishedButBroken;
-          // Notice: If it's FT and HAS events, it returns false and is completely ignored!
       });
 
       if (activeMatches.length === 0) {
@@ -86,11 +85,16 @@ async function runLiveUpdate(request: Request) {
                          payload.displayClock = espnGame.clock;
                      }
 
-                     // Inject the pristine data
+                     // 🟢 INJECT THE PRISTINE DATA (Now includes Venue, Referees, and Predictor!)
                      if (richData) {
                          payload.match_events = richData.events;
                          payload.stats = richData.stats;
                          payload.lineups = richData.lineups;
+                         
+                         // Overwrite empty DB data with rich ESPN data
+                         if (richData.venue) payload.venue = richData.venue;
+                         if (richData.referees && richData.referees.length > 0) payload.referees = richData.referees;
+                         if (richData.predictor) payload.predictor = richData.predictor;
                      }
 
                      const { error } = await supabase.from('matches').update(payload).eq('id', dbMatch.id);
