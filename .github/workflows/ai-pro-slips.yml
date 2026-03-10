@@ -2,8 +2,8 @@ name: Generate AI Pro Slips
 
 on:
   schedule:
-    # Runs every 12 hours (at 02:00 and 14:00 UTC) to catch newly mapped matches
-    - cron: '0 2,14 * * *'
+    # Runs every 12 hours (at 02:00 and 12:00 UTC) to catch newly mapped matches
+    - cron: '0 2,12 * * *'
   workflow_dispatch: # This line adds a button in GitHub so you can trigger it manually!
 
 jobs:
