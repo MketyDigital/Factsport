@@ -252,7 +252,7 @@ async function runProSlipEngine() {
             console.error(`   🔥 Error processing match:`, err.message);
         }
         
-        await delay(5000); 
+        await delay(8000); 
     }
     
     console.log("\n🏁 Automated AI Pro Slip Generation Complete!");
