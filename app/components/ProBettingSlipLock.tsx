@@ -46,7 +46,7 @@ export default function ProBettingSlipLock({ isVIP, homeTeam, awayTeam, status =
                     </h3>
                 </div>
                 <div className="flex items-center gap-1 bg-green-500/20 text-green-400 px-1.5 py-0.5 md:px-2 md:py-1 rounded text-[8px] md:text-[9px] font-bold border border-green-500/30 shadow-inner">
-                    <ShieldCheck size={10} md:size={12} /> 92% Edge
+                    <ShieldCheck className="w-2.5 h-2.5 md:w-3 md:h-3" /> 92% Edge
                 </div>
             </div>
 
@@ -99,7 +99,7 @@ export default function ProBettingSlipLock({ isVIP, homeTeam, awayTeam, status =
                 {/* VIP PAYWALL OVERLAY */}
                 {!isVIP && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[4px] z-10 p-3">
-                        <div className="w-10 h-10 md:w-14 md:h-14 bg-yellow-500 rounded-full flex items-center justify-center shadow-[0_10px_20px_rgba(234,179,8,0.4)] mb-2 md:mb-4 animate-bounce"><Lock className="text-black" size={18} md:size={24}/></div>
+                        <div className="w-10 h-10 md:w-14 md:h-14 bg-yellow-500 rounded-full flex items-center justify-center shadow-[0_10px_20px_rgba(234,179,8,0.4)] mb-2 md:mb-4 animate-bounce"><Lock className="w-[18px] h-[18px] md:w-6 md:h-6 text-black" /></div>
                         <h4 className="font-black text-slate-900 uppercase tracking-tighter text-sm md:text-xl mb-1 md:mb-2 text-center">Pro Analysis Locked</h4>
                         <p className="text-[9px] md:text-xs text-slate-700 font-bold mb-3 md:mb-6 text-center max-w-[260px] leading-tight">Unlock the primary bet, safe builder, and tactical data.</p>
                         <div className="flex flex-row gap-2 w-full max-w-sm">
