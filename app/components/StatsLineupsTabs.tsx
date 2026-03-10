@@ -143,7 +143,7 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
                     <StatRow label="Corners" home={stats?.home?.corners || '0'} away={stats?.away?.corners || '0'} />
                     <StatRow label="Fouls" home={stats?.home?.fouls || '0'} away={stats?.away?.fouls || '0'} />
                     <StatRow label="Saves" home={stats?.home?.saves || '0'} away={stats?.away?.saves || '0'} />
-                <//>}
+                </>}
             </div>
         )}
         {activeTab === 'lineups' && (
@@ -153,7 +153,6 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
                         <div>
                             <div className="bg-slate-100 py-1 px-2 rounded mb-2 text-center flex flex-col items-center">
                                 <h4 className="text-[10px] font-black uppercase text-slate-500">Home</h4>
-                                {/* 🟢 Safe Formations Display */}
                                 {lineups.formations?.home && <span className="text-[8px] font-bold text-blue-500 bg-white px-1 mt-0.5 rounded shadow-sm">{lineups.formations.home}</span>}
                             </div>
                             <ul className="space-y-1">
@@ -163,7 +162,6 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
                         <div>
                             <div className="bg-slate-100 py-1 px-2 rounded mb-2 text-center flex flex-col items-center">
                                 <h4 className="text-[10px] font-black uppercase text-slate-500">Away</h4>
-                                {/* 🟢 Safe Formations Display */}
                                 {lineups.formations?.away && <span className="text-[8px] font-bold text-red-500 bg-white px-1 mt-0.5 rounded shadow-sm">{lineups.formations.away}</span>}
                             </div>
                             <ul className="space-y-1">
