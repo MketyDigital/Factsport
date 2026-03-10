@@ -25,33 +25,66 @@ const ESPN_LEAGUES = {
     'Coppa Italia': 'ita.copa_italia', 'Coupe de France': 'fra.coupe_de_france', 'DFB-Pokal': 'ger.dfb_pokal'
 };
 
-const cleanName = (name) => name.toLowerCase().replace(/ fc| cf| united| city| real| atletico| athletic/g, '').trim();
+// 🔥 UPGRADE: Your brilliant Alias Matcher
+const getCanonicalName = (rawName) => {
+    if (!rawName) return "";
+    let name = rawName.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
+        .replace(/[^a-z0-9 ]/g, '') 
+        .replace(/\b(1|fc|cf|afc|sc|sv|rc|fk|vfl|fsv|tsg|ssc|bayer|rcd|ud|as|us|osc|cfa|aja|ca|bc|ac|sk|olympique|de)\b/g, '') 
+        .replace(/\s+/g, ' ') 
+        .trim();
+
+    const aliases = {
+        'manchester utd': 'manchester united', 'man utd': 'manchester united', 'man city': 'manchester city',
+        'spurs': 'tottenham hotspur', 'tottenham': 'tottenham hotspur', 'wolves': 'wolverhampton wanderers',
+        'atleti': 'atletico madrid', 'athletic': 'athletic club', 'barca': 'barcelona', 'barça': 'barcelona',
+        'bayern': 'bayern munich', 'bvb': 'borussia dortmund', 'dortmund': 'borussia dortmund',
+        'juve': 'juventus', 'inter': 'inter milan', 'milan': 'ac milan', 'roma': 'as roma',
+        'psg': 'paris saint germain', 'om': 'marseille', 'ol': 'lyon'
+    };
+    return aliases[name] || name;
+};
+
+// 🔥 UPGRADE: Fuzzy Substring Matcher
+const isStrongMatch = (dbName, espnName) => {
+    const s1 = getCanonicalName(dbName);
+    const s2 = getCanonicalName(espnName);
+    if (s1.length < 4 || s2.length < 4) return s1 === s2;
+    return s1.includes(s2) || s2.includes(s1);
+};
 
 async function getEspnIdForMatch(leagueName, dateString, homeTeam, awayTeam) {
     const espnCode = ESPN_LEAGUES[leagueName];
     if (!espnCode) return null;
 
-    const dateParam = new Date(dateString).toISOString().split('T')[0].replace(/-/g, '');
-    const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${espnCode}/scoreboard?dates=${dateParam}`;
+    // 🔥 UPGRADE: Search a 3-day window to beat Timezone bugs!
+    const matchDate = new Date(dateString);
+    const datesToTry = [
+        matchDate.toISOString().split('T')[0].replace(/-/g, ''), // Today
+        new Date(matchDate.getTime() + 86400000).toISOString().split('T')[0].replace(/-/g, ''), // Tomorrow
+        new Date(matchDate.getTime() - 86400000).toISOString().split('T')[0].replace(/-/g, '')  // Yesterday
+    ];
 
-    try {
-        const res = await fetch(url);
-        if (!res.ok) return null;
-        const data = await res.json();
-        if (!data.events) return null;
+    for (const dateParam of datesToTry) {
+        const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${espnCode}/scoreboard?dates=${dateParam}`;
+        try {
+            const res = await fetch(url);
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (!data.events) continue;
 
-        const cleanHome = cleanName(homeTeam);
-        const cleanAway = cleanName(awayTeam);
+            const matchedEvent = data.events.find(e => {
+                const espnHome = e.competitions[0].competitors.find(c => c.homeAway === 'home').team.displayName;
+                const espnAway = e.competitions[0].competitors.find(c => c.homeAway === 'away').team.displayName;
+                
+                return isStrongMatch(homeTeam, espnHome) || isStrongMatch(awayTeam, espnAway);
+            });
 
-        const matchedEvent = data.events.find(e => {
-            const espnHome = cleanName(e.competitions[0].competitors.find(c => c.homeAway === 'home').team.displayName);
-            const espnAway = cleanName(e.competitions[0].competitors.find(c => c.homeAway === 'away').team.displayName);
-            return (espnHome.includes(cleanHome) || cleanHome.includes(espnHome)) || 
-                   (espnAway.includes(cleanAway) || cleanAway.includes(espnAway));
-        });
-
-        return matchedEvent ? matchedEvent.id : null;
-    } catch (e) { return null; }
+            if (matchedEvent) return matchedEvent.id;
+        } catch (e) { continue; }
+    }
+    return null;
 }
 
 async function fetchRichEspnContext(espnId, currentHomeTeam) {
@@ -80,7 +113,7 @@ async function fetchRichEspnContext(espnId, currentHomeTeam) {
                 const aScore = parseInt(g.awayTeam.score);
                 totalGoals += (hScore + aScore);
 
-                const isHistoricalHomeCurrentHome = cleanName(g.homeTeam.displayName).includes(cleanName(currentHomeTeam));
+                const isHistoricalHomeCurrentHome = isStrongMatch(currentHomeTeam, g.homeTeam.displayName);
 
                 if (hScore === aScore) draws++;
                 else if (hScore > aScore) isHistoricalHomeCurrentHome ? homeWins++ : awayWins++;
@@ -119,11 +152,9 @@ async function runProSlipEngine() {
     console.log("🧠 Starting Automated AI Pro Slip Generation...");
 
     const now = new Date();
-    // Look a little bit into the past just in case timezones are weird
     const twoHoursAgo = new Date(now.getTime() - (2 * 60 * 60 * 1000)).toISOString();
     const in48Hours = new Date(now.getTime() + (48 * 60 * 60 * 1000)).toISOString();
 
-    // Fetch ALL active/scheduled matches
     const { data: allMatches, error } = await supabase
         .from('matches')
         .select('*')
@@ -132,15 +163,10 @@ async function runProSlipEngine() {
         .neq('status', 'FT')
         .neq('status', 'FINISHED');
 
-    if (error || !allMatches) {
-        console.error("❌ DB Error:", error?.message);
-        return;
-    }
+    if (error || !allMatches) return;
 
-    // 🔥 JS FILTER: Safely check if pro_analysis is truly empty
     const matches = allMatches.filter(m => {
         if (!m.pro_analysis) return true;
-        // If it's an empty string or empty JSON object, it needs analysis!
         if (typeof m.pro_analysis === 'object' && Object.keys(m.pro_analysis).length === 0) return true;
         if (typeof m.pro_analysis === 'string' && m.pro_analysis.trim() === '') return true;
         return false; 
@@ -164,7 +190,9 @@ async function runProSlipEngine() {
             let promptContext = textContext;
             if (!promptContext) {
                 promptContext = "No historical form data available. Base prediction purely on tactical profiles.";
-                console.log(`   ⚠️ No ESPN data found. Using AI tactical fallback.`);
+                console.log(`   ⚠️ No ESPN data found for ID ${espnId}. Using AI tactical fallback.`);
+            } else {
+                console.log(`   📡 Successfully pulled ESPN Form & H2H!`);
             }
 
             const prompt = `
@@ -193,7 +221,9 @@ async function runProSlipEngine() {
             const analysisData = JSON.parse(text);
 
             const updatePayload = { pro_analysis: analysisData };
-            if (translatedH2H) {
+            
+            // 🔥 ONLY OVERWRITE H2H IF ESPN ACTUALLY HAS BETTER DATA
+            if (translatedH2H && translatedH2H.matches.length > 0) {
                 updatePayload.h2h = translatedH2H; 
                 console.log(`   🔄 Translated and Overwrote H2H data with ESPN stats!`);
             }
@@ -210,7 +240,8 @@ async function runProSlipEngine() {
             console.error(`   🔥 Error processing match:`, err.message);
         }
         
-        await delay(3000); 
+        // Increased delay to 5 seconds to prevent Gemini 503 Errors!
+        await delay(5000); 
     }
     
     console.log("\n🏁 Automated AI Pro Slip Generation Complete!");
