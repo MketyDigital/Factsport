@@ -80,12 +80,13 @@ export interface UnifiedMatchData {
   hasExternalData: boolean;
   widget_id?: string;
   
-  venue?: string;
+  venue?: string | null;
   referees?: any[];
-  stage?: string;
-  group?: string;
+  stage?: string | null;
+  group?: string | null;
   h2h?: any;
-  predictor?: { home: number, away: number, draw: number }; 
+  // 🟢 TS FIX: explicitly allow null so Vercel doesn't crash
+  predictor?: { home: number, away: number, draw: number } | null; 
 }
 
 export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
@@ -105,8 +106,18 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
   const hasEvents = events.length > 0;
   const hasH2h = !!dbData.h2h;
   
-  // "External Data" means: Has Widget OR Has ANY Rich Data
   const hasRichData = !!dbData.widget_id || hasLineups || hasStats || hasEvents || hasH2h;
+
+  // 🟢 TS FIX: Safely parse predictor data strictly into numbers
+  let finalPredictor = null;
+  const rawPredictor = espnLive?.predictor || dbData.predictor;
+  if (rawPredictor) {
+      finalPredictor = {
+          home: Number(rawPredictor.home) || 0,
+          away: Number(rawPredictor.away) || 0,
+          draw: Number(rawPredictor.draw) || 0
+      };
+  }
 
   return {
     status: dbData.status === 'SCHEDULED' ? 'PRE' : dbData.status,
@@ -114,18 +125,17 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
     home: { name: dbData.home_team, logo: dbData.home_logo, score: dbData.home_score ?? 0, id: 'home' },
     away: { name: dbData.away_team, logo: dbData.away_logo, score: dbData.away_score ?? 0, id: 'away' },
     
-    goals: events, // Overwritten by ESPN live events if available
+    goals: events, 
     commentary: [], 
-    stats: stats,  // Overwritten by ESPN live stats if available
-    lineups: lineups, // Overwritten by ESPN live lineups if available
+    stats: stats,  
+    lineups: lineups, 
     
     hasExternalData: hasRichData, 
     widget_id: dbData.widget_id,
     
-    // 🟢 SAFE MERGE: Use ESPN if available, otherwise fallback to DB
     venue: espnLive?.venue || dbData.venue || null,
     referees: espnLive?.referees || dbData.referees || [],
-    predictor: espnLive?.predictor || null,
+    predictor: finalPredictor, // 🔥 Safely passed as strict numbers!
     
     stage: dbData.stage || null,
     group: dbData.match_group || null,
