@@ -4,7 +4,7 @@ export const revalidate = 3;
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon, MapPin, Trophy, Grid } from 'lucide-react';
+import { ChevronLeft, Zap, ExternalLink, Mic, Radio, PlayCircle, Link as LinkIcon, MapPin, Trophy, Grid, Percent } from 'lucide-react';
 
 // 🔥 ALL MODULAR COMPONENTS IMPORTED
 import FactSportPlayer from '@/app/components/FactSportPlayer';
@@ -14,7 +14,7 @@ import StatsLineupsTabs from '@/app/components/StatsLineupsTabs';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 import HeadToHeadStats from '@/app/components/HeadToHeadStats'; 
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
-import ProBettingSlipLock from '@/app/components/ProBettingSlipLock'; // 🔥 NEW UNIFIED VIP TEASER
+import ProBettingSlipLock from '@/app/components/ProBettingSlipLock'; 
 
 import { getExternalData } from '@/app/lib/matchService';
 
@@ -56,7 +56,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       }
   }
 
-  // 3. FETCH EXTERNAL API DATA
+  // 3. FETCH EXTERNAL API DATA (Now includes ESPN Rich Data!)
   const rawData = await getExternalData(dbData);
   const data = rawData || {};
   
@@ -106,18 +106,20 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
               <div className="w-10"></div>
             </div>
             
-            <MatchHeaderClient matchId={dbData.id} initialData={dbData} />
+            <MatchHeaderClient matchId={dbData.id} initialData={data} />
           </div>
       )}
 
       <div className="max-w-4xl mx-auto px-4 mt-6 relative z-20 space-y-6">
         
-        {/* MATCH INFO STRIP */}
-        {(data?.venue || data?.stage || data?.group || (dbData?.referees && dbData?.referees?.length > 0)) && (
+        {/* 🟢 MATCH INFO STRIP (Upgraded with ESPN Predictor) */}
+        {(data?.venue || data?.stage || data?.group || data?.referees?.length > 0 || data?.predictor) && (
             <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex flex-wrap gap-3 items-center justify-center text-[10px] font-bold text-slate-500">
                 {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 shadow-sm"><Trophy size={12} className="text-yellow-500"/> {data.stage.replace(/_/g, ' ')}</span>}
                 {data?.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 shadow-sm"><Grid size={12} className="text-blue-500"/> {data.group.replace(/_/g, ' ')}</span>}
                 {data?.venue && <span className="flex items-center gap-1 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 shadow-sm"><MapPin size={12} className="text-red-500"/> {data.venue}</span>}
+                {/* AI Win Predictor Badge */}
+                {data?.predictor && <span className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-lg border border-blue-100 shadow-sm"><Percent size={12}/> Win Prob: {parseFloat(data.predictor.home).toFixed(0)}% | {parseFloat(data.predictor.away).toFixed(0)}%</span>}
             </div>
         )}
 
@@ -167,11 +169,17 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
         </div>
 
         {/* HEAD-TO-HEAD STATS */}
-        <HeadToHeadStats dbData={dbData} />
+        <HeadToHeadStats dbData={data} />
 
-        {/* 🔥 NEW: THE UNIFIED VIP PAYWALL (Passes the user's status to the component) */}
+        {/* THE UNIFIED VIP PAYWALL */}
         {!hasWidget && (
-            <ProBettingSlipLock isVIP={isUserVIP} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
+            <ProBettingSlipLock 
+                isVIP={isUserVIP} 
+                homeTeam={dbData.home_team} 
+                awayTeam={dbData.away_team} 
+                status={dbData.status} 
+                proAnalysis={dbData.pro_analysis} 
+            />
         )}
 
         {/* PREDICTION BOARD */}
