@@ -2,7 +2,6 @@
 import Link from 'next/link';
 import { Lock, Sparkles, Send, ShieldCheck, BrainCircuit, ExternalLink, Target, Shield } from 'lucide-react';
 
-// 🟢 TS FIX: We add status and proAnalysis to the accepted props!
 interface ProBettingSlipProps {
     isVIP: boolean;
     homeTeam: string;
@@ -13,7 +12,14 @@ interface ProBettingSlipProps {
 
 export default function ProBettingSlipLock({ isVIP, homeTeam, awayTeam, status = 'SCHEDULED', proAnalysis }: ProBettingSlipProps) {
     
-    // 🟢 The fallback "Magic Trick" engine (Just in case the DB analysis hasn't generated yet)
+    const isFinished = ['FT', 'FINISHED', 'AET', 'PEN'].includes(status?.toUpperCase() || '');
+
+    // 🔥 NEW: If the match is finished and never got real AI data, just hide the component completely!
+    if (!proAnalysis && isFinished) {
+        return null; 
+    }
+
+    // The fallback math engine (Only shows on upcoming games if AI hasn't run yet)
     const generateFallbackData = () => {
         const hash = (homeTeam.charCodeAt(0) || 0) + (awayTeam.charCodeAt(awayTeam.length - 1) || 0) + homeTeam.length;
         const isHomeFav = hash % 2 === 0;
@@ -29,10 +35,7 @@ export default function ProBettingSlipLock({ isVIP, homeTeam, awayTeam, status =
         };
     };
 
-    // 🟢 Use REAL Database AI if it exists, otherwise use the math fallback!
     const aiData = proAnalysis || generateFallbackData();
-    
-    const isFinished = ['FT', 'FINISHED', 'AET', 'PEN'].includes(status?.toUpperCase() || '');
 
     return (
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden my-6">
@@ -91,7 +94,6 @@ export default function ProBettingSlipLock({ isVIP, homeTeam, awayTeam, status =
                     </div>
                 </div>
 
-                {/* VIP PAYWALL OVERLAY */}
                 {!isVIP && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[4px] z-10 p-4">
                         <div className="w-14 h-14 bg-yellow-500 rounded-full flex items-center justify-center shadow-[0_10px_20px_rgba(234,179,8,0.4)] mb-4 animate-bounce"><Lock className="text-black" size={24}/></div>
