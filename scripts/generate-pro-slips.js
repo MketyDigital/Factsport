@@ -25,7 +25,6 @@ const ESPN_LEAGUES = {
     'Coppa Italia': 'ita.copa_italia', 'Coupe de France': 'fra.coupe_de_france', 'DFB-Pokal': 'ger.dfb_pokal'
 };
 
-// 🔥 UPGRADE: Your brilliant Alias Matcher
 const getCanonicalName = (rawName) => {
     if (!rawName) return "";
     let name = rawName.toLowerCase()
@@ -46,7 +45,6 @@ const getCanonicalName = (rawName) => {
     return aliases[name] || name;
 };
 
-// 🔥 UPGRADE: Fuzzy Substring Matcher
 const isStrongMatch = (dbName, espnName) => {
     const s1 = getCanonicalName(dbName);
     const s2 = getCanonicalName(espnName);
@@ -58,12 +56,11 @@ async function getEspnIdForMatch(leagueName, dateString, homeTeam, awayTeam) {
     const espnCode = ESPN_LEAGUES[leagueName];
     if (!espnCode) return null;
 
-    // 🔥 UPGRADE: Search a 3-day window to beat Timezone bugs!
     const matchDate = new Date(dateString);
     const datesToTry = [
-        matchDate.toISOString().split('T')[0].replace(/-/g, ''), // Today
-        new Date(matchDate.getTime() + 86400000).toISOString().split('T')[0].replace(/-/g, ''), // Tomorrow
-        new Date(matchDate.getTime() - 86400000).toISOString().split('T')[0].replace(/-/g, '')  // Yesterday
+        matchDate.toISOString().split('T')[0].replace(/-/g, ''), 
+        new Date(matchDate.getTime() + 86400000).toISOString().split('T')[0].replace(/-/g, ''), 
+        new Date(matchDate.getTime() - 86400000).toISOString().split('T')[0].replace(/-/g, '')  
     ];
 
     for (const dateParam of datesToTry) {
@@ -77,7 +74,6 @@ async function getEspnIdForMatch(leagueName, dateString, homeTeam, awayTeam) {
             const matchedEvent = data.events.find(e => {
                 const espnHome = e.competitions[0].competitors.find(c => c.homeAway === 'home').team.displayName;
                 const espnAway = e.competitions[0].competitors.find(c => c.homeAway === 'away').team.displayName;
-                
                 return isStrongMatch(homeTeam, espnHome) || isStrongMatch(awayTeam, espnAway);
             });
 
@@ -87,10 +83,11 @@ async function getEspnIdForMatch(leagueName, dateString, homeTeam, awayTeam) {
     return null;
 }
 
+// 🔥 DEEP RESEARCH FIX: Switched to site.web.api.espn.com which is their richer internal endpoint
 async function fetchRichEspnContext(espnId, currentHomeTeam) {
     if (!espnId) return { textContext: null, translatedH2H: null };
     try {
-        const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${espnId}`;
+        const url = `https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${espnId}`;
         const res = await fetch(url);
         if (!res.ok) return { textContext: null, translatedH2H: null };
         const data = await res.json();
@@ -104,7 +101,7 @@ async function fetchRichEspnContext(espnId, currentHomeTeam) {
             textContext += `\n[Recent Form] ${data.form[0].team.displayName}: ${team1Form} | ${data.form[1].team.displayName}: ${team2Form}`;
         }
 
-        if (data.headToHead && data.headToHead.games) {
+        if (data.headToHead && data.headToHead.games && data.headToHead.games.length > 0) {
             let homeWins = 0, awayWins = 0, draws = 0, totalGoals = 0;
             let mappedMatches = [];
 
@@ -142,7 +139,7 @@ async function fetchRichEspnContext(espnId, currentHomeTeam) {
             };
         }
 
-        return { textContext: textContext.trim(), translatedH2H };
+        return { textContext: textContext.trim() || null, translatedH2H };
     } catch (e) {
         return { textContext: null, translatedH2H: null };
     }
@@ -183,16 +180,32 @@ async function runProSlipEngine() {
         console.log(`\n⏳ Analyzing: ${match.home_team} vs ${match.away_team}...`);
         
         try {
+            // 🔥 PRIORITIZE DB ID (Exactly what you asked for!)
             const espnId = match.espn_id || await getEspnIdForMatch(match.league, match.match_date, match.home_team, match.away_team);
             
             const { textContext, translatedH2H } = await fetchRichEspnContext(espnId, match.home_team);
 
             let promptContext = textContext;
-            if (!promptContext) {
-                promptContext = "No historical form data available. Base prediction purely on tactical profiles.";
-                console.log(`   ⚠️ No ESPN data found for ID ${espnId}. Using AI tactical fallback.`);
-            } else {
+            
+            // 🟢 THE SMART MULTI-TIER FALLBACK LOGIC
+            if (promptContext) {
                 console.log(`   📡 Successfully pulled ESPN Form & H2H!`);
+            } else if (match.h2h && match.h2h.aggregates) {
+                console.log(`   🗄️ ESPN shallow. Falling back to Football-Data API H2H from DB!`);
+                const agg = match.h2h.aggregates;
+                promptContext = `[Historical H2H] Matches Played: ${agg.numberOfMatches}. ${match.home_team} Wins: ${agg.homeTeam?.wins || 0}. ${match.away_team} Wins: ${agg.awayTeam?.wins || 0}. Draws: ${agg.homeTeam?.draws || 0}. Total Goals: ${agg.totalGoals}.`;
+                
+                if (match.h2h.matches && match.h2h.matches.length > 0) {
+                    const recentStrs = match.h2h.matches.slice(0, 4).map(m => {
+                        const hs = m.score?.fullTime?.home ?? '?';
+                        const as = m.score?.fullTime?.away ?? '?';
+                        return `${m.homeTeam?.name || 'Home'} ${hs}-${as} ${m.awayTeam?.name || 'Away'}`;
+                    });
+                    promptContext += `\n[Recent Meetings] ${recentStrs.join(', ')}`;
+                }
+            } else {
+                promptContext = "No historical form or H2H data available. Base prediction purely on current season tactical profiles, manager tendencies, and squad quality.";
+                console.log(`   ⚠️ No data found anywhere. Using pure AI tactical fallback.`);
             }
 
             const prompt = `
@@ -203,7 +216,7 @@ async function runProSlipEngine() {
                 ${promptContext}
 
                 STRICT INSTRUCTIONS:
-                1. Base your betting rationale heavily on the "Recent Form" and "Last Meetings" provided above.
+                1. Base your betting rationale heavily on the Data Context provided above.
                 2. NO HALLUCINATIONS. Do not invent exact recent scorelines or player injuries.
                 3. Return ONLY a valid JSON object. No markdown. No text outside the JSON.
                 {
@@ -211,7 +224,7 @@ async function runProSlipEngine() {
                     "odds": "Decimal odds between 1.60 and 2.80",
                     "safe": "Safe accumulator bet (e.g., ${match.home_team} Draw No Bet)",
                     "safeOdds": "Decimal odds between 1.20 and 1.50",
-                    "rationale": "A 40-50 word technical explanation of why this bet has value based specifically on the Form/H2H data provided and general tactical matchups."
+                    "rationale": "A 40-50 word technical explanation of why this bet has value based specifically on the Data Context provided and general tactical matchups."
                 }
             `;
 
@@ -222,10 +235,9 @@ async function runProSlipEngine() {
 
             const updatePayload = { pro_analysis: analysisData };
             
-            // 🔥 ONLY OVERWRITE H2H IF ESPN ACTUALLY HAS BETTER DATA
-            if (translatedH2H && translatedH2H.matches.length > 0) {
+            if (translatedH2H && translatedH2H.matches && translatedH2H.matches.length > 0) {
                 updatePayload.h2h = translatedH2H; 
-                console.log(`   🔄 Translated and Overwrote H2H data with ESPN stats!`);
+                console.log(`   🔄 Overwrote DB H2H data with richer ESPN stats!`);
             }
 
             const { error: updateErr } = await supabase
@@ -240,7 +252,6 @@ async function runProSlipEngine() {
             console.error(`   🔥 Error processing match:`, err.message);
         }
         
-        // Increased delay to 5 seconds to prevent Gemini 503 Errors!
         await delay(5000); 
     }
     
