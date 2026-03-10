@@ -9,7 +9,16 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
     return (
         <div className="px-4 mb-5 flex gap-3 overflow-x-auto pb-4 scrollbar-hide snap-x">
              {heroMatches.map((match) => (
-                <Link key={match.id} href={`/match/${match.id}`} className={`block relative z-10 snap-center ${heroMatches.length > 1 ? 'w-[85%]' : 'w-full'} shrink-0`}>
+                <Link 
+                    key={match.id} 
+                    href={`/match/${match.id}`} 
+                    // 🔥 NEW: Dynamically scales width based on how many matches there are
+                    className={`block relative z-10 snap-center shrink-0 ${
+                        heroMatches.length === 1 
+                            ? 'w-full' 
+                            : 'w-[75%] sm:w-[48%] lg:w-[32%]'
+                    }`}
+                >
                     <div className="bg-[#0a1428] rounded-2xl p-4 shadow-xl border border-slate-700 relative overflow-hidden group hover:shadow-2xl transition-all duration-300">
                         
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-yellow-500 text-black text-[8px] font-black px-4 py-0.5 rounded-b-md z-20 uppercase tracking-widest shadow-md whitespace-nowrap">
@@ -40,14 +49,14 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                             
                             <div className="flex justify-between items-center mt-6">
                                 <div className="flex flex-col items-center w-[30%]">
-                                    {match.home_logo ? <img src={match.home_logo} className="w-12 h-12 object-contain mb-2 drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)]"/> : <div className="w-12 h-12 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px] text-white">H</div>}
+                                    {match.home_logo ? <img src={match.home_logo} className="w-10 h-10 md:w-12 md:h-12 object-contain mb-2 drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)]"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px] text-white">H</div>}
                                     <span className="text-[10px] font-bold text-center leading-tight text-white line-clamp-1 drop-shadow-md w-full px-1">{match.home_team}</span>
                                 </div>
                                 <div className="flex flex-col items-center w-[40%]">
-                                    <div className="text-2xl font-black tabular-nums tracking-widest bg-black/50 px-3 py-1 rounded-xl backdrop-blur-md border border-white/10 shadow-inner text-white whitespace-nowrap">
+                                    <div className="text-xl md:text-2xl font-black tabular-nums tracking-widest bg-black/50 px-3 py-1 rounded-xl backdrop-blur-md border border-white/10 shadow-inner text-white whitespace-nowrap">
                                         {match.status === 'SCHEDULED' || match.status === 'PRE' ? <span className="text-sm opacity-60">VS</span> : `${match.home_score}-${match.away_score}`}
                                     </div>
-                                    <span className="text-[9px] font-black text-blue-300 mt-2 uppercase tracking-widest text-center drop-shadow-md bg-blue-900/30 px-2 py-0.5 rounded">
+                                    <span className="text-[8px] md:text-[9px] font-black text-blue-300 mt-2 uppercase tracking-widest text-center drop-shadow-md bg-blue-900/30 px-2 py-0.5 rounded">
                                         {match.status === 'SCHEDULED' || match.status === 'PRE' 
                                             ? <MatchTime date={match.match_date} />
                                             : (match.status === 'HT' ? 'HALF TIME' : match.status)
@@ -55,7 +64,7 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                                     </span>
                                 </div>
                                 <div className="flex flex-col items-center w-[30%]">
-                                    {match.away_logo ? <img src={match.away_logo} className="w-12 h-12 object-contain mb-2 drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)]"/> : <div className="w-12 h-12 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px] text-white">A</div>}
+                                    {match.away_logo ? <img src={match.away_logo} className="w-10 h-10 md:w-12 md:h-12 object-contain mb-2 drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)]"/> : <div className="w-10 h-10 bg-white/10 rounded-full mb-2 flex items-center justify-center text-[10px] text-white">A</div>}
                                     <span className="text-[10px] font-bold text-center leading-tight text-white line-clamp-1 drop-shadow-md w-full px-1">{match.away_team}</span>
                                 </div>
                             </div>
