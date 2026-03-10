@@ -1,13 +1,13 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { BarChart2, Users, List, AlertCircle } from 'lucide-react';
+import { BarChart2, Users, List, AlertCircle, Shield } from 'lucide-react';
 
 export default function StatsLineupsTabs({ matchId, initialData }: { matchId: string, initialData: any }) {
   const [activeTab, setActiveTab] = useState('events');
 
   const [liveData, setLiveData] = useState({
       stats: initialData?.stats || { home: {}, away: {} },
-      lineups: initialData?.lineups || { home: [], away: [] },
+      lineups: initialData?.lineups || { home: [], away: [], formations: { home: null, away: null } },
       events: initialData?.goals || initialData?.match_events || [] 
   });
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -69,7 +69,6 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
   const homePlayers = getSortedLineup(lineups?.home);
   const awayPlayers = getSortedLineup(lineups?.away);
 
-  // 🔥 NEW: Dynamic Icon Mapper to handle all our new backend tags!
   const getEventIcon = (type: string, text: string) => {
     if (type === 'goal') {
       if (text === 'Own Goal') return '🤦‍♂️';
@@ -103,7 +102,6 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
              <div className="space-y-4">
                  {(!events || events.length === 0) ? <div className="text-center py-8 opacity-50"><AlertCircle className="mx-auto mb-2 text-slate-300" size={24} /><p className="text-xs font-bold text-slate-500">No match events yet.</p></div> : 
                      events.map((e: any, i: number) => {
-                         // 🟢 FALLBACK LOGIC: Detects older paragraph-style data
                          const isOldData = !e.player && e.text && e.text.length > 20;
                          const playerName = e.player || "Unknown Player";
                          const isGoal = e.type === 'goal';
@@ -114,7 +112,6 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
                                 <div className="flex-1 pb-4 border-b border-slate-50 last:border-0">
                                     <div className="text-xs text-slate-800 flex items-start gap-2 leading-relaxed">
                                         <span className="shrink-0 mt-0.5">
-                                            {/* 🔥 Now dynamically pulls the perfect icon! */}
                                             {getEventIcon(e.type, e.text)}
                                         </span>
                                         
@@ -153,8 +150,24 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
             <>
                 {!hasLineups ? <div className="text-center py-10 opacity-50 bg-slate-50 rounded-xl border border-dashed border-slate-300"><Users className="mx-auto mb-2 text-slate-400" size={24} /><p className="text-xs font-bold text-slate-500">Waiting for team sheets...</p></div> : 
                     <div className="grid grid-cols-2 gap-4">
-                        <div><div className="bg-slate-100 py-1 px-2 rounded mb-2 text-center"><h4 className="text-[10px] font-black uppercase text-slate-500">Home</h4></div><ul className="space-y-1">{homePlayers.map((p:any, i:number) => <li key={i} className={`text-xs flex gap-2 py-1 border-b border-slate-50 ${!p.is_starter && i>10 ? 'opacity-50' : 'text-slate-800'}`}><span className="font-mono text-slate-400 w-5 text-right font-bold">{p.number}</span> <span className={p.is_starter?'font-bold':''}>{p.name}</span></li>)}</ul></div>
-                        <div><div className="bg-slate-100 py-1 px-2 rounded mb-2 text-center"><h4 className="text-[10px] font-black uppercase text-slate-500">Away</h4></div><ul className="space-y-1">{awayPlayers.map((p:any, i:number) => <li key={i} className={`text-xs flex gap-2 py-1 border-b border-slate-50 ${!p.is_starter && i>10 ? 'opacity-50' : 'text-slate-800'}`}><span className="font-mono text-slate-400 w-5 text-right font-bold">{p.number}</span> <span className={p.is_starter?'font-bold':''}>{p.name}</span></li>)}</ul></div>
+                        <div>
+                            <div className="bg-slate-100 py-1 px-2 rounded mb-2 text-center flex flex-col items-center">
+                                <h4 className="text-[10px] font-black uppercase text-slate-500">Home</h4>
+                                {lineups.formations?.home && <span className="text-[8px] font-bold text-blue-500 bg-white px-1 mt-0.5 rounded shadow-sm">{lineups.formations.home}</span>}
+                            </div>
+                            <ul className="space-y-1">
+                                {homePlayers.map((p:any, i:number) => <li key={i} className={`text-xs flex gap-2 py-1 border-b border-slate-50 ${!p.is_starter && i>10 ? 'opacity-50' : 'text-slate-800'}`}><span className="font-mono text-slate-400 w-5 text-right font-bold">{p.number}</span> <span className={p.is_starter?'font-bold':''}>{p.name}</span></li>)}
+                            </ul>
+                        </div>
+                        <div>
+                            <div className="bg-slate-100 py-1 px-2 rounded mb-2 text-center flex flex-col items-center">
+                                <h4 className="text-[10px] font-black uppercase text-slate-500">Away</h4>
+                                {lineups.formations?.away && <span className="text-[8px] font-bold text-red-500 bg-white px-1 mt-0.5 rounded shadow-sm">{lineups.formations.away}</span>}
+                            </div>
+                            <ul className="space-y-1">
+                                {awayPlayers.map((p:any, i:number) => <li key={i} className={`text-xs flex gap-2 py-1 border-b border-slate-50 ${!p.is_starter && i>10 ? 'opacity-50' : 'text-slate-800'}`}><span className="font-mono text-slate-400 w-5 text-right font-bold">{p.number}</span> <span className={p.is_starter?'font-bold':''}>{p.name}</span></li>)}
+                            </ul>
+                        </div>
                     </div>
                 }
             </>

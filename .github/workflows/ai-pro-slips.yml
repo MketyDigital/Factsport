@@ -1,0 +1,29 @@
+name: Generate AI Pro Slips
+
+on:
+  schedule:
+    # Runs every 12 hours (at 02:00 and 12:00 UTC) to catch newly mapped matches
+    - cron: '0 2,12 * * *'
+  workflow_dispatch: # This line adds a button in GitHub so you can trigger it manually!
+
+jobs:
+  generate-slips:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm install @supabase/supabase-js @google/generative-ai
+
+      - name: Run AI Pro Slip Engine
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: node scripts/generate-pro-slips.js
