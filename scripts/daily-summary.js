@@ -1,18 +1,15 @@
 const { createClient } = require('@supabase/supabase-js');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const GEMINI_KEY = process.env.GEMINI_API_KEY; 
+const GROQ_KEY = process.env.GROQ_API_KEY; 
 
-if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) { 
+if (!SUPABASE_URL || !SUPABASE_KEY || !GROQ_KEY) { 
     console.error("❌ Missing Keys."); 
     process.exit(1); 
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
 async function generateDailySummaries() {
     console.log("🌙 Starting Daily Matchday Analysis...");
@@ -40,7 +37,6 @@ async function generateDailySummaries() {
         return;
     }
 
-    // 🟢 UPGRADE: Check for the single combined Round-Up article first
     const reportSlug = `matchday-roundup-${dateSlug}`;
     const { data: existing } = await supabase.from('news').select('id').eq('slug', reportSlug).single();
     if (existing) {
@@ -56,7 +52,6 @@ async function generateDailySummaries() {
         leagues[m.league].push(m);
     });
 
-    // 🟢 UPGRADE: Combine all matches into sections
     let matchSummaries = "";
     for (const [leagueName, leagueMatches] of Object.entries(leagues)) {
         matchSummaries += `\n### ${leagueName}:\n`;
@@ -65,12 +60,8 @@ async function generateDailySummaries() {
         });
     }
 
-    // 🟢 UPGRADED PROMPT: Tells Gemini to combine them into one article
-    const prompt = `
-        You are a top-tier European football journalist writing for 'FactSport'.
-        Write a deep, engaging "Daily Matchday Round-Up" article covering ALL the leagues and results listed below. 
-        Use clear headings to separate the analysis for each league/competition.
-        
+    const systemPrompt = "You are a top-tier European football journalist writing for 'FactSport'. Write a deep, engaging Daily Matchday Round-Up article covering ALL the leagues and results.";
+    const userPrompt = `
         TODAY'S EXACT DATE: ${exactDateString}
         
         Results to discuss:
@@ -80,13 +71,32 @@ async function generateDailySummaries() {
         1. ZERO HALLUCINATIONS: Do NOT invent or name any specific goalscorers, players, or managers. Focus entirely on the team performance, the final scoreline, and the tactical battle.
         2. EXACT MATCH LINKS: When you mention a match, you MUST copy and paste the "EXACT LINK TO USE" provided in the data above. Do not try to write the URL yourself.
         3. Headline: Catchy and dramatic, covering the global day of football. Under 10 words. Do not use asterisks (*).
-        4. Length: 500-800 words. Plain text only.
+        4. Length: 500-800 words. Plain text only. Use clear headings for each league.
         5. FACEBOOK SUMMARY: At the very end, skip a line and write the exact text "FB_POST:" followed by a comprehensive Facebook post. You MUST mention ALL the major results and scorelines across every league provided. Make it highly engaging, use emojis, and tease the full article. Do not use hashtags.
     `;
 
     try {
-        const result = await model.generateContent(prompt);
-        const text = (await result.response).text();
+        console.log("   🧠 Calling Groq API (Llama 3.3)...");
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${GROQ_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'llama-3.3-70b-versatile',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                temperature: 0.7,
+                max_completion_tokens: 1500
+            })
+        });
+
+        if (!response.ok) throw new Error(`Groq API Error: ${response.statusText}`);
+        const data = await response.json();
+        const text = data.choices[0].message.content;
 
         const splitText = text.split('FB_POST:');
         const articleContent = splitText[0].trim();
@@ -96,16 +106,14 @@ async function generateDailySummaries() {
         const headline = lines[0].replace(/^#+\s*/, '').replace(/[\*"]/g, ''); 
         const body = lines.slice(1).join('\n').trim();
 
-        // Pick the most high-profile match of the day to use as the thumbnail
         const giants = ['Arsenal','Chelsea','Liverpool','Man City','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG'];
         let featureMatch = matches.find(g => giants.some(t => g.home_team.includes(t) || g.away_team.includes(t))) || matches[0];
 
-        // 🟢 ADDED CATEGORY
         const { error } = await supabase.from('news').insert([{
             title: headline, 
             slug: reportSlug, 
             body: body,
-            category: 'Football', // Ensures it displays properly
+            category: 'Football',
             image_url: null, 
             team_1_logo: featureMatch ? featureMatch.home_logo : null, 
             team_2_logo: featureMatch ? featureMatch.away_logo : null,
@@ -131,7 +139,7 @@ async function generateDailySummaries() {
             }
         }
     } catch (e) {
-        console.error(`   🔥 Gemini Error: ${e.message}`);
+        console.error(`   🔥 Groq Error: ${e.message}`);
     }
 }
 
