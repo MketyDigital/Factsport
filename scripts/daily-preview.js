@@ -1,15 +1,18 @@
 const { createClient } = require('@supabase/supabase-js');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const GROQ_KEY = process.env.GROQ_API_KEY; 
+const GEMINI_KEY = process.env.GEMINI_NEWS_KEY; 
 
-if (!SUPABASE_URL || !SUPABASE_KEY || !GROQ_KEY) { 
+if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) { 
     console.error("❌ Missing Keys"); 
     process.exit(1); 
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
 async function generateDailyPreview() {
     console.log("☀️ Starting Daily Preview...");
@@ -52,8 +55,10 @@ async function generateDailyPreview() {
         });
     }
 
-    const systemPrompt = "You are a top-tier European football journalist writing for 'FactSport'. Write a deep, engaging Daily Briefing article previewing today's football action.";
-    const userPrompt = `
+    const prompt = `
+        You are a top-tier European football journalist writing for 'FactSport'.
+        Write a deep, engaging "Daily Briefing" article previewing today's football action.
+        
         TODAY'S EXACT DATE: ${exactDateString}
         
         Schedule:
@@ -70,27 +75,8 @@ async function generateDailyPreview() {
     `;
 
     try {
-        console.log("   🧠 Calling Groq API (Llama 3.3)...");
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${GROQ_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
-                temperature: 0.7,
-                max_completion_tokens: 1500
-            })
-        });
-
-        if (!response.ok) throw new Error(`Groq API Error: ${response.statusText}`);
-        const data = await response.json();
-        const text = data.choices[0].message.content;
+        const result = await model.generateContent(prompt);
+        const text = (await result.response).text();
 
         const splitText = text.split('FB_POST:');
         const articleContent = splitText[0].trim();
@@ -126,7 +112,7 @@ async function generateDailyPreview() {
             }
         }
     } catch (e) {
-        console.error(`   🔥 Groq Error: ${e.message}`);
+        console.error(`   🔥 Gemini Error: ${e.message}`);
     }
 }
 
