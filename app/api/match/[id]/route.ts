@@ -11,11 +11,28 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+
+  // 🛡️ THE SAFE BROWSER BOUNCER 
+  // (Allows your Admin Dashboard to use this route, but blocks scrapers)
+  if (process.env.NODE_ENV === 'production') {
+      const referer = request.headers.get('referer') || '';
+      const fetchSite = request.headers.get('sec-fetch-site') || '';
+      const isBrowser = referer.includes('factsport.com') || fetchSite === 'same-origin';
+      
+      // We still allow the CRON_KEY just in case you ever use a backend script, 
+      // but now the browser check will let your admin panel through!
+      const authHeader = request.headers.get('Authorization') || '';
+      const isVIP = authHeader === `Bearer ${process.env.CRON_KEY}`;
+
+      if (!isBrowser && !isVIP) {
+          return NextResponse.json({ error: 'Direct ESPN Bridge Access is Restricted.' }, { status: 403 });
+      }
+  }
+
   try {
     const supabase = createClient();
     
     // 1. Fetch the match record from your Database
-    // We need this to get the ESPN api_id and team names
     const { data: dbData, error } = await supabase
       .from('matches')
       .select('*')
@@ -27,7 +44,6 @@ export async function GET(
     }
 
     // 2. Use the Centralized Service to fetch fresh data from ESPN
-    // This uses the 'matchService.ts' logic we built to keep things modular
     const freshData = await getExternalData(dbData);
 
     // 3. Return the clean, unified data to your frontend components

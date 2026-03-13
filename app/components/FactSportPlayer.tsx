@@ -1,234 +1,179 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { 
-  Play, Pause, Volume2, VolumeX, Maximize, ExternalLink, Loader2, Info 
-} from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Radio, Loader2, Clock } from 'lucide-react';
 
-// --- 🔧 AD CONFIGURATION ---
-const AD_CONFIG = {
-  // Replace this with your actual betting affiliate banner
-  image: "https://images.unsplash.com/photo-1518091043644-c1d4457512c6?q=80&w=1000&auto=format&fit=crop",
-  link: "https://bit.ly/your-affiliate-link",
-  timer: 5 
-};
-// ---------------------------
-
-export default function FactSportPlayer({ videoUrl }: { videoUrl: string }) {
-  const [viewState, setViewState] = useState<'thumbnail' | 'ad' | 'playing'>('thumbnail');
-  const [timer, setTimer] = useState(AD_CONFIG.timer);
-  
-  // Custom Player State
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [isPlaying, setIsPlaying] = useState(true);
+export default function FactSportPlayer({ mediaUrl, mode = 'video', isUpcoming = false }: { mediaUrl: string, mode?: 'video' | 'audio', isUpcoming?: boolean }) {
+  const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [isBuffering, setIsBuffering] = useState(false);
+  
+  const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
 
-  // 1. DETECT IF YOUTUBE (To bypass Ad)
-  const isYouTube = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be');
+  const isYouTube = mediaUrl.includes('youtube.com') || mediaUrl.includes('youtu.be');
+  const isRawMedia = mediaUrl.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
+  const isRawAudio = mediaUrl.match(/\.(mp3|wav)$/i);
 
-  // --- AD TIMER LOGIC ---
-  useEffect(() => {
-    if (viewState === 'ad' && timer > 0) {
-      const interval = setInterval(() => setTimer((t) => t - 1), 1000);
-      return () => clearInterval(interval);
-    }
-  }, [viewState, timer]);
-
-  // --- CUSTOM PLAYER LOGIC (For MP4s) ---
   const togglePlay = () => {
-    if (videoRef.current) {
-      if (isPlaying) videoRef.current.pause();
-      else videoRef.current.play();
+    if (mediaRef.current) {
+      if (isPlaying) mediaRef.current.pause();
+      else mediaRef.current.play();
       setIsPlaying(!isPlaying);
     }
   };
 
   const toggleMute = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = !isMuted;
+    if (mediaRef.current) {
+      mediaRef.current.muted = !isMuted;
       setIsMuted(!isMuted);
     }
   };
 
   const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      const current = videoRef.current.currentTime;
-      const total = videoRef.current.duration;
+    if (mediaRef.current) {
+      const current = mediaRef.current.currentTime;
+      const total = mediaRef.current.duration || 1; 
       setProgress((current / total) * 100);
     }
   };
 
   const handleFullscreen = () => {
-    const container = document.getElementById('factsport-player-container');
-    if (container) {
-      if (!document.fullscreenElement) container.requestFullscreen();
-      else document.exitFullscreen();
-    }
+    const container = document.getElementById('fs-player-wrapper');
+    if (container && !document.fullscreenElement) container.requestFullscreen();
+    else if (document.fullscreenElement) document.exitFullscreen();
   };
 
-  // --- RENDERERS ---
-
-  // 1. YouTube Renderer (Max Whitelabel Privacy)
-  const renderYouTube = (url: string) => {
-    let videoId = '';
-    if (url.includes('v=')) videoId = url.split('v=')[1]?.split('&')[0];
-    else if (url.includes('.be/')) videoId = url.split('.be/')[1];
-    else if (url.includes('embed/')) videoId = url.split('embed/')[1];
-
-    return (
-      <div className="w-full h-full bg-black relative overflow-hidden group">
-        {/* 🟢 WHITELABEL HACK: Top Gradient to hide YouTube Video Title and Avatar */}
-        <div className="absolute top-0 left-0 w-full h-20 bg-gradient-to-b from-black/90 to-transparent z-10 pointer-events-none transition-opacity duration-500 group-hover:opacity-0"></div>
-
-        <iframe 
-          // 🟢 Added disablekb=1 and strictly enforced modestbranding
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&showinfo=0&controls=1&playsinline=1&fs=1&color=white&iv_load_policy=3&disablekb=1`} 
-          // 🟢 WHITELABEL HACK: scale-[1.03] crops out the thin YouTube borders and top links 
-          className="w-full h-full scale-[1.03] pointer-events-auto" 
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-          allowFullScreen
-        ></iframe>
-      </div>
-    );
-  };
-
-  // 2. Third-Party Iframe (Robust Container)
-  const renderGenericIframe = (url: string) => {
-    return (
-      <div className="w-full h-full bg-black relative">
-        <iframe 
-          src={url} 
-          className="w-full h-full" 
-          allowFullScreen 
-          allow="autoplay; fullscreen; picture-in-picture"
-          referrerPolicy="no-referrer"
-        ></iframe>
-        {/* Branding Overlay (Bottom Right) */}
-        <div className="absolute bottom-2 right-2 bg-black/50 text-white/50 text-[8px] px-2 py-1 rounded pointer-events-none z-10">
-          Powered by FactSport
-        </div>
-      </div>
-    );
-  };
-
-  // 3. Custom HTML5 Player (The "White Label" King)
-  const renderCustomPlayer = (url: string) => {
-    return (
-      <div className="w-full h-full bg-black relative group overflow-hidden" id="factsport-player-container">
-        <video 
-          ref={videoRef}
-          src={url} 
-          className="w-full h-full object-contain" 
-          autoPlay 
-          onTimeUpdate={handleTimeUpdate}
-          onEnded={() => setIsPlaying(false)}
-          onClick={togglePlay}
-        />
-        
-        {/* Custom Controls Overlay */}
-        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/90 to-transparent px-4 py-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          {/* Progress Bar */}
-          <div className="w-full h-1 bg-white/20 rounded-full mb-3 cursor-pointer overflow-hidden">
-            <div className="h-full bg-red-600 transition-all duration-100" style={{ width: `${progress}%` }}></div>
+  // 🟢 NEW: THE TEASER STATE (Shows before kickoff)
+  if (isUpcoming) {
+      return (
+          <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative flex flex-col items-center justify-center overflow-hidden rounded-xl border border-slate-800 shadow-xl group`}>
+              <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-30 blur-md grayscale"></div>
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+              
+              <div className="relative z-10 flex flex-col items-center gap-2 md:gap-3">
+                  <div className="w-10 h-10 md:w-14 md:h-14 bg-white/5 rounded-full flex items-center justify-center border border-white/10 shadow-lg">
+                     <Clock className="text-slate-400 w-5 h-5 md:w-6 md:h-6" />
+                  </div>
+                  <div className="flex flex-col items-center">
+                      <span className="text-white font-black uppercase tracking-widest text-[10px] md:text-xs text-center drop-shadow-md">
+                          {mode === 'audio' ? 'Live Radio Broadcast' : 'Live Match Stream'}
+                      </span>
+                      <span className="text-blue-400 font-bold uppercase tracking-widest text-[8px] md:text-[9px] bg-blue-900/30 px-3 py-1 rounded-full border border-blue-500/30 mt-1 md:mt-2 shadow-inner">
+                          Available at Kick-off
+                      </span>
+                  </div>
+              </div>
           </div>
-          
+      );
+  }
+
+  const renderYouTube = () => {
+    let videoId = '';
+    if (mediaUrl.includes('v=')) videoId = mediaUrl.split('v=')[1]?.split('&')[0];
+    else if (mediaUrl.includes('.be/')) videoId = mediaUrl.split('.be/')[1];
+    else if (mediaUrl.includes('embed/')) videoId = mediaUrl.split('embed/')[1];
+
+    if (mode === 'audio') {
+      return (
+        <div className="w-full h-[90px] bg-[#0a1428] relative overflow-hidden rounded-xl border border-slate-800 shadow-xl">
+           <div className="absolute top-2 left-4 z-10 flex items-center gap-2 pointer-events-none bg-black/50 px-2 py-1 rounded">
+               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_red]"></div>
+               <span className="text-white text-[10px] font-black tracking-widest uppercase">Live Audio Feed</span>
+           </div>
+           <iframe 
+             src={`https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1`} 
+             style={{ position: 'absolute', top: '-220px', left: '0', width: '100%', height: '310px' }} 
+             frameBorder="0" allow="autoplay; encrypted-media">
+           </iframe>
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-full aspect-video bg-black relative overflow-hidden rounded-xl border border-slate-800 group">
+        <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-black via-black/80 to-transparent z-10 pointer-events-none transition-opacity duration-500 group-hover:opacity-0"></div>
+        <iframe 
+          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&showinfo=0&controls=1&playsinline=1`} 
+          className="w-full h-full scale-[1.05]" 
+          allowFullScreen>
+        </iframe>
+      </div>
+    );
+  };
+
+  const renderRawPlayer = () => {
+    return (
+      <div id="fs-player-wrapper" className={`w-full ${mode === 'audio' || isRawAudio ? 'h-[120px]' : 'aspect-video'} bg-black relative group overflow-hidden rounded-xl border border-slate-800 shadow-xl`}>
+        {(mode === 'audio' || isRawAudio) && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a1428]">
+                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-sm"></div>
+                <Radio className="text-red-500 w-12 h-12 animate-pulse drop-shadow-lg mb-2 z-10" />
+                <span className="text-white text-xs font-black tracking-widest uppercase z-10 bg-black/50 px-3 py-1 rounded">FactSport Audio</span>
+            </div>
+        )}
+
+        {mode === 'audio' || isRawAudio ? (
+             <audio ref={mediaRef as React.RefObject<HTMLAudioElement>} src={mediaUrl} autoPlay onTimeUpdate={handleTimeUpdate} onWaiting={() => setIsBuffering(true)} onPlaying={() => setIsBuffering(false)} />
+        ) : (
+             <video ref={mediaRef as React.RefObject<HTMLVideoElement>} src={mediaUrl} className="w-full h-full object-contain" autoPlay onClick={togglePlay} onTimeUpdate={handleTimeUpdate} onWaiting={() => setIsBuffering(true)} onPlaying={() => setIsBuffering(false)} />
+        )}
+
+        {isBuffering && <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"><Loader2 className="text-white animate-spin w-10 h-10 drop-shadow-lg" /></div>}
+
+        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/90 to-transparent px-4 py-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30">
+          <div className="w-full h-1.5 bg-white/20 rounded-full mb-3 cursor-pointer overflow-hidden backdrop-blur-sm">
+            <div className="h-full bg-blue-600 transition-all duration-100" style={{ width: `${progress}%` }}></div>
+          </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <button onClick={togglePlay} className="text-white hover:text-red-500 transition">
+              <button onClick={togglePlay} className="text-white hover:text-blue-500 transition">
                 {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
               </button>
-              <button onClick={toggleMute} className="text-white hover:text-gray-300 transition">
+              <button onClick={toggleMute} className="text-white hover:text-slate-300 transition">
                 {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
               </button>
-              <span className="text-white text-xs font-bold tracking-widest"><span className="text-red-600">LIVE</span> HIGHLIGHTS</span>
+              <span className="text-white text-[10px] font-bold tracking-widest"><span className="text-red-600 animate-pulse">●</span> FACTSPORT PLAYER</span>
             </div>
-            
-            <button onClick={handleFullscreen} className="text-white hover:text-red-500 transition">
-              <Maximize size={20} />
-            </button>
+            {!(mode === 'audio' || isRawAudio) && (
+                <button onClick={handleFullscreen} className="text-white hover:text-blue-500 transition"><Maximize size={20} /></button>
+            )}
           </div>
         </div>
       </div>
     );
   };
 
-  // --- MAIN RENDER LOGIC ---
-  const renderContent = () => {
-    // A. THUMBNAIL (Premium Start)
-    if (viewState === 'thumbnail') {
-      return (
-        <div 
-          className="absolute inset-0 flex items-center justify-center bg-[#0a1428] cursor-pointer group overflow-hidden" 
-          onClick={() => {
-            // 🟢 SAFETY CHECK: Only show ads for Non-YouTube videos
-            if (isYouTube) {
-              setViewState('playing');
-            } else {
-              setViewState('ad');
-            }
-          }}
-        >
-           {/* 🟢 NEW: Blurred Tournament Background Image */}
-           <div className="absolute inset-0 bg-[url('/tournaments/default-bg.jpg')] bg-cover bg-center blur-[4px] scale-105 opacity-60 transition-transform duration-700 group-hover:scale-110"></div>
-           
-           {/* Dark gradient to ensure the play button pops */}
-           <div className="absolute inset-0 bg-gradient-to-t from-[#0a1428] via-[#0a1428]/40 to-transparent"></div>
-           
-           <div className="relative z-10 flex flex-col items-center">
-             <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.6)] group-hover:scale-110 transition duration-300 animate-pulse">
-                 <Play className="text-white fill-white ml-1" size={32} />
+  const renderGenericIframe = () => {
+    return (
+      <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative rounded-xl border border-slate-800 overflow-hidden shadow-xl`}>
+         {mode === 'audio' && (
+             <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-sm pointer-events-none"></div>
+         )}
+         
+         <iframe 
+             src={mediaUrl} 
+             className="relative z-10 w-full h-full" 
+             frameBorder="0" 
+             scrolling="no" 
+             sandbox="allow-scripts allow-same-origin" 
+             allowFullScreen
+         ></iframe>
+         
+         <div className="absolute bottom-0 left-0 w-full h-[30px] bg-[#0a1428] border-t border-slate-800 z-40 flex items-center justify-between px-3 pointer-events-none">
+             <div className="flex items-center gap-1.5">
+                 <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_red]"></div>
+                 <span className="text-[9px] font-black text-white uppercase tracking-widest">{mode === 'audio' ? 'Live Radio' : 'Match Tracker'}</span>
              </div>
-             <p className="text-white text-xs font-bold mt-4 tracking-widest uppercase opacity-90 group-hover:opacity-100 drop-shadow-md">
-                 Watch Highlights
-             </p>
-           </div>
-        </div>
-      );
-    }
-
-    // B. ADVERTISEMENT (Revenue)
-    if (viewState === 'ad') {
-      return (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-50 overflow-hidden">
-           <img src={AD_CONFIG.image} className="absolute inset-0 w-full h-full object-cover opacity-80" />
-           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black"></div>
-
-           <div className="absolute bottom-6 right-6 z-50">
-             {timer > 0 ? (
-               <div className="bg-black/90 backdrop-blur text-white text-xs font-bold px-5 py-2.5 rounded-full border border-white/10 flex items-center gap-2 shadow-xl">
-                 <Loader2 size={12} className="animate-spin text-yellow-500" /> Ad ends in {timer}s
-               </div>
-             ) : (
-               <button onClick={() => setViewState('playing')} className="bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-black px-8 py-3 rounded-full shadow-[0_0_20px_rgba(234,179,8,0.6)] flex items-center gap-2 transition transform hover:scale-105 animate-bounce">
-                 SKIP AD <Play size={12} fill="black" />
-               </button>
-             )}
-           </div>
-           
-           <a href={AD_CONFIG.link} target="_blank" className="absolute top-4 right-4 bg-blue-600 text-white text-[10px] font-bold px-4 py-2 rounded-lg z-50 flex items-center gap-1 hover:bg-blue-500 shadow-lg border border-white/10">
-             Open Site <ExternalLink size={10} />
-           </a>
-        </div>
-      );
-    }
-
-    // C. VIDEO PLAYER (The Content)
-    if (isYouTube) {
-      return renderYouTube(videoUrl);
-    } 
-    
-    if (videoUrl.match(/\.(mp4|webm|ogg)$/i)) {
-      return renderCustomPlayer(videoUrl);
-    }
-
-    // Fallback for generic iframes (Streamable, etc.)
-    return renderGenericIframe(videoUrl);
+             <div className="text-[8px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
+                 Powered by <span className="text-white">FactSport</span>
+             </div>
+         </div>
+      </div>
+    );
   };
 
-  return (
-    <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-slate-800 ring-1 ring-white/10">
-      {renderContent()}
-    </div>
-  );
+  if (isRawMedia) return renderRawPlayer();
+  if (isYouTube) return renderYouTube();
+  return renderGenericIframe();
 }

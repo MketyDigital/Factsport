@@ -1,6 +1,10 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 
+// 🟢 THE MASTER STATUS ARRAYS
+const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
+const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
+
 export default function LiveScoreLabel({ 
     matchId, 
     initialStatus, 
@@ -36,7 +40,8 @@ export default function LiveScoreLabel({
                 clock: matchData.displayClock
             });
 
-            if (['FT', 'FINISHED', 'AET', 'PEN', 'ABD'].includes(matchData.status)) {
+            const currentStatus = (matchData.status || '').toUpperCase();
+            if (FINISHED_STATUSES.includes(currentStatus)) {
                 if (intervalRef.current) clearInterval(intervalRef.current);
             }
           }
@@ -45,7 +50,8 @@ export default function LiveScoreLabel({
       }
     };
 
-    if (!['FT', 'FINISHED', 'AET', 'PEN', 'ABD'].includes(data.status)) {
+    const currentDataStatus = (data.status || '').toUpperCase();
+    if (!FINISHED_STATUSES.includes(currentDataStatus)) {
         intervalRef.current = setInterval(fetchLiveScore, 5000);
     }
 
@@ -61,12 +67,17 @@ export default function LiveScoreLabel({
   }, [matchId, data.status]);
 
   const userTime = new Date(matchDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  const cleanStatus = (data.status || '').toUpperCase();
 
   if (variant === 'badge') {
-      const isLive = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT'].includes(data.status);
-      if (isLive) {
+      if (LIVE_STATUSES.includes(cleanStatus)) {
           return <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded animate-pulse shadow-sm tracking-widest border border-red-500">LIVE</span>;
       }
+      
+      if (FINISHED_STATUSES.includes(cleanStatus)) {
+          return <span className="bg-slate-200 text-slate-600 text-[9px] font-black px-2 py-0.5 rounded tracking-widest shadow-inner border border-slate-300">FT</span>;
+      }
+      
       return <span className="bg-slate-100 text-slate-500 text-[9px] font-bold px-2 py-0.5 rounded shadow-inner uppercase tracking-widest border border-slate-200">UPCOMING</span>;
   }
 
@@ -86,11 +97,11 @@ export default function LiveScoreLabel({
       );
   }
 
-  if (['LIVE', 'IN_PLAY', 'HT'].includes(data.status)) {
+  if (LIVE_STATUSES.includes(cleanStatus)) {
     return (
         <div className="flex flex-col items-center justify-center">
-            <span className={`font-black text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${data.status === 'HT' ? 'text-amber-600 bg-amber-50 border border-amber-200' : 'text-red-600 bg-red-50 border border-red-100 animate-pulse'}`}>
-                {data.status === 'HT' ? <span className="text-[8px] mr-1">HT</span> : null} 
+            <span className={`font-black text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${cleanStatus === 'HT' || cleanStatus === 'HALFTIME' ? 'text-amber-600 bg-amber-50 border border-amber-200' : 'text-red-600 bg-red-50 border border-red-100 animate-pulse'}`}>
+                {cleanStatus === 'HT' || cleanStatus === 'HALFTIME' ? <span className="text-[8px] mr-1">HT</span> : null} 
                 {data.home} - {data.away}
             </span>
             {data.clock && <span className="text-[9px] text-red-500 font-bold mt-1">{data.clock}</span>}
@@ -98,7 +109,7 @@ export default function LiveScoreLabel({
     );
   }
   
-  if (['FT', 'FINISHED', 'ABD'].includes(data.status)) {
+  if (FINISHED_STATUSES.includes(cleanStatus)) {
      return <span className="text-slate-700 font-black text-[11px] bg-slate-100 border border-slate-200 px-2 py-0.5 rounded shadow-sm">{data.home} - {data.away}</span>;
   }
   

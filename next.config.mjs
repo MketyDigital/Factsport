@@ -63,6 +63,15 @@ const nextConfig = {
           }
         ],
       },
+      // 🟢 THE CORS BOUNCER (Stops other websites from using your API)
+      {
+        source: "/api/:path*",
+        headers: [
+          { key: "Access-Control-Allow-Origin", value: "https://factsport.com" }, 
+          { key: "Access-Control-Allow-Methods", value: "GET,OPTIONS,PATCH,DELETE,POST,PUT" },
+          { key: "Access-Control-Allow-Headers", value: "Content-Type, Authorization" },
+        ]
+      }
     ];
   },
 };

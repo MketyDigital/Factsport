@@ -13,10 +13,12 @@ const PRIORITY_LEAGUES = [
     'Serie A', 'Ligue 1', 'Champions League'
 ];
 
+// 🟢 BULLETPROOF STATUS ARRAY 
+const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
+
 export default async function AllMatchesPage() {
   const supabase = createClient();
    
-  // 1. FETCH WINDOW: (-7 Days to +14 Days)
   const startDate = new Date(); startDate.setDate(startDate.getDate() - 7); 
   const endDate = new Date(); endDate.setDate(endDate.getDate() + 14); 
 
@@ -27,7 +29,6 @@ export default async function AllMatchesPage() {
     .lte('match_date', endDate.toISOString())
     .order('match_date', { ascending: true });
 
-  // 2. GROUP BY LEAGUE
   const leagues: { [key: string]: any[] } = {};
   PRIORITY_LEAGUES.forEach(league => { leagues[league] = []; });
 
@@ -36,36 +37,56 @@ export default async function AllMatchesPage() {
     leagues[match.league].push(match);
   });
 
-  // 3. GAP FILLING
-  const missingLeagues = PRIORITY_LEAGUES.filter(l => leagues[l].length === 0);
+  const leaguesToProcess = Array.from(new Set([...PRIORITY_LEAGUES, ...Object.keys(leagues)]));
 
-  if (missingLeagues.length > 0) {
-      const gapFillPromises = missingLeagues.map(async (leagueName) => {
+  const gapFillPromises = leaguesToProcess.map(async (leagueName) => {
+      const currentMatches = leagues[leagueName] || [];
+      const currentResults = currentMatches.filter(m => FINISHED_STATUSES.includes((m.status || '').toUpperCase()));
+      
+      let extraMatches: any[] = [];
+
+      if (currentResults.length < 10) {
+          const { data: pastMatches } = await supabase
+              .from('matches')
+              .select('*')
+              .eq('league', leagueName)
+              .lt('match_date', new Date().toISOString())
+              .order('match_date', { ascending: false })
+              .limit(10);
+          
+          if (pastMatches) extraMatches = [...extraMatches, ...pastMatches];
+      }
+
+      if (currentMatches.length === 0 && PRIORITY_LEAGUES.includes(leagueName)) {
           const { data: nextMatches } = await supabase
-              .from('matches').select('*').eq('league', leagueName)
-              .gt('match_date', new Date().toISOString()) 
-              .order('match_date', { ascending: true }).limit(10); 
+              .from('matches')
+              .select('*')
+              .eq('league', leagueName)
+              .gt('match_date', new Date().toISOString())
+              .order('match_date', { ascending: true })
+              .limit(10);
 
-          if (nextMatches && nextMatches.length > 0) return nextMatches;
+          if (nextMatches) extraMatches = [...extraMatches, ...nextMatches];
+      }
 
-          const { data: lastMatches } = await supabase
-              .from('matches').select('*').eq('league', leagueName)
-              .lt('match_date', new Date().toISOString()) 
-              .order('match_date', { ascending: false }).limit(10);
-              
-          return lastMatches || [];
-      });
+      return { leagueName, extraMatches };
+  });
 
-      const filledGroups = await Promise.all(gapFillPromises);
-      filledGroups.forEach(group => {
-          if (group && group.length > 0) {
-              const league = group[0].league;
-              if (leagues[league]) leagues[league] = group;
-          }
-      });
-  }
+  const gapFillData = await Promise.all(gapFillPromises);
+  
+  gapFillData.forEach(({ leagueName, extraMatches }) => {
+      if (extraMatches && extraMatches.length > 0) {
+          if (!leagues[leagueName]) leagues[leagueName] = [];
+          const existingIds = new Set(leagues[leagueName].map(m => m.id));
+          extraMatches.forEach(m => {
+              if (!existingIds.has(m.id)) {
+                  leagues[leagueName].push(m);
+                  existingIds.add(m.id);
+              }
+          });
+      }
+  });
 
-  // Cleanup
   Object.keys(leagues).forEach(key => {
       if (leagues[key].length === 0) delete leagues[key];
   });
@@ -78,7 +99,6 @@ export default async function AllMatchesPage() {
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-20 font-sans">
       
-      {/* PAGE HEADER */}
       <div className="bg-[#0a1428] text-white p-4 flex items-center gap-4 sticky top-0 z-50 shadow-md">
           <Link href="/" className="p-1 rounded-full hover:bg-white/10 transition"><ChevronLeft /></Link>
           <div>
@@ -94,16 +114,15 @@ export default async function AllMatchesPage() {
         
         {activeLeagues.map((leagueName) => {
             const leagueMatches = leagues[leagueName];
-            // 🟢 DISPLAY RICH LEAGUE BANNER
             const leagueBanner = leagueMatches[0]?.league_banner;
 
             const fixtures = leagueMatches
-                .filter(m => !['FT', 'FINISHED', 'ABD'].includes(m.status))
+                .filter(m => !FINISHED_STATUSES.includes((m.status || '').toUpperCase()))
                 .sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime())
                 .slice(0, 10);
 
             const results = leagueMatches
-                .filter(m => ['FT', 'FINISHED', 'ABD'].includes(m.status))
+                .filter(m => FINISHED_STATUSES.includes((m.status || '').toUpperCase()))
                 .sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime())
                 .slice(0, 10);
 
@@ -111,7 +130,6 @@ export default async function AllMatchesPage() {
 
             return (
                 <div key={leagueName} id={leagueName.replace(/\s+/g, '-')}>
-                    {/* Banner Header */}
                     {leagueBanner ? (
                         <div className="mb-3 rounded-lg overflow-hidden shadow-sm border border-slate-200 bg-white">
                             <img src={leagueBanner} alt={leagueName} className="w-full h-16 object-cover object-center" />
