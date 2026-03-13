@@ -8,6 +8,9 @@ const ADMIN_EMAILS = [
     'fact@factsport.com'
 ];
 
+// 🔒 Strict security: Pulls PIN from your Cloudflare/Vercel environment variables
+const MASTER_ADMIN_PIN = process.env.ADMIN_PIN; 
+
 export async function POST(request: Request) {
     try {
         // 1. THE BOUNCER: Check session identity
@@ -20,13 +23,19 @@ export async function POST(request: Request) {
 
         // 2. Parse Request
         const body = await request.json();
-        const { userId, isVip, action } = body;
+        const { userId, isVip, action, pin } = body;
+
+        // 3. THE EXTRA PADLOCK: Check the PIN!
+        // If MASTER_ADMIN_PIN is not set in .env, it defaults to blocking everyone to be safe.
+        if (!MASTER_ADMIN_PIN || pin !== MASTER_ADMIN_PIN) {
+            return NextResponse.json({ error: 'Invalid Master PIN. Intrusion logged.' }, { status: 401 });
+        }
 
         if (!userId || !action) {
             return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
         }
 
-        // 3. Initialize God Mode (Bypasses RLS safely because we already checked the email)
+        // 4. Initialize God Mode (Bypasses RLS safely)
         const supabaseAdmin = createAdminClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!
