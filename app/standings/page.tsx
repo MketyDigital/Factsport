@@ -19,7 +19,7 @@ async function getStandings(leagueName: string) {
     try {
         const res = await fetch(`https://api.football-data.org/v4/competitions/${leagueCode}/standings`, {
             headers: { 'X-Auth-Token': process.env.FOOTBALL_DATA_KEY! },
-            next: { revalidate: 3600 } // Super safe caching: only hits the API once per hour
+            next: { revalidate: 3600 } // Super safe caching: hits API once per hour
         });
         
         if (!res.ok) return [];
@@ -40,6 +40,9 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
     const validLeague = LEAGUE_MAP[currentLeague] ? currentLeague : 'Premier League';
     const standings = await getStandings(validLeague);
     const totalTeams = standings.length;
+
+    // 🟢 SMART CHECK: Does the API give us form data for at least one team?
+    const hasFormData = standings.some((entry: any) => entry.form && entry.form.length > 0);
 
     const ALL_LEAGUES = Object.keys(LEAGUE_MAP);
 
@@ -77,8 +80,9 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                          <h2 className="font-black text-slate-700 uppercase tracking-widest text-xs md:text-sm">{validLeague} Table</h2>
                     </div>
                     
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-xs min-w-[550px]">
+                    <div className="overflow-x-auto scrollbar-hide">
+                        {/* Auto-adjusts minimum width based on whether the form column exists */}
+                        <table className={`w-full text-xs ${hasFormData ? 'min-w-[550px]' : 'min-w-[400px]'}`}>
                             <thead className="bg-[#f8f9fa] border-b-2 border-slate-200 text-slate-500 font-black uppercase tracking-widest text-[9px]">
                                 <tr>
                                     <th className="py-3 px-2 text-center w-8">#</th>
@@ -89,7 +93,7 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                                     <th className="py-3 px-1 text-center w-6" title="Lost">L</th>
                                     <th className="py-3 px-1 text-center w-8" title="Goal Difference">GD</th>
                                     <th className="py-3 px-2 text-center w-10 text-slate-800" title="Points">Pts</th>
-                                    <th className="py-3 px-2 text-center w-24">Form</th>
+                                    {hasFormData && <th className="py-3 px-2 text-center w-24">Form</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -97,8 +101,9 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                                     const isUCL = index < 4 && validLeague !== 'Champions League';
                                     const isRelegation = index >= totalTeams - 3 && validLeague !== 'Champions League';
 
-                                    // Safely parse the form string (e.g. "W,W,D,L,W")
-                                    const formArray = entry.form ? entry.form.split(',') : [];
+                                    // 🟢 BULLETPROOF FORM PARSER: Handles "W,L,D", "WLD", or missing data
+                                    const rawForm = String(entry.form || '');
+                                    const formArray = rawForm ? (rawForm.includes(',') ? rawForm.split(',') : rawForm.split('')) : [];
 
                                     return (
                                         <tr key={entry.team.id} className={`hover:bg-slate-50 transition-colors ${isUCL ? 'bg-blue-50/20' : ''} ${isRelegation ? 'bg-red-50/20' : ''}`}>
@@ -121,16 +126,19 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                                             <td className="py-2.5 px-1 text-center text-slate-500">{entry.lost}</td>
                                             <td className="py-2.5 px-1 text-center font-bold text-slate-600">{entry.goalDifference > 0 ? `+${entry.goalDifference}` : entry.goalDifference}</td>
                                             <td className="py-2.5 px-2 text-center font-black text-sm text-slate-900 bg-slate-50/50">{entry.points}</td>
-                                            <td className="py-2.5 px-2 text-center">
-                                                <div className="flex items-center justify-center gap-0.5">
-                                                    {formArray.map((result: string, i: number) => (
-                                                        <span key={i} className={`w-3.5 h-3.5 flex items-center justify-center text-[7px] font-black text-white rounded-sm ${result === 'W' ? 'bg-green-500' : result === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>
-                                                            {result}
-                                                        </span>
-                                                    ))}
-                                                    {formArray.length === 0 && <span className="text-slate-300 text-[10px]">-</span>}
-                                                </div>
-                                            </td>
+                                            
+                                            {/* Conditionally render the form cells ONLY if the column exists */}
+                                            {hasFormData && (
+                                                <td className="py-2.5 px-2 text-center">
+                                                    <div className="flex items-center justify-center gap-0.5">
+                                                        {formArray.map((result: string, i: number) => (
+                                                            <span key={i} className={`w-3.5 h-3.5 flex items-center justify-center text-[7px] font-black text-white rounded-sm ${result === 'W' ? 'bg-green-500' : result === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>
+                                                                {result}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 })}
