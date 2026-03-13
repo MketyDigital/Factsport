@@ -65,7 +65,8 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                                             {isScheduled ? <span className="text-[8px] md:text-sm opacity-60">VS</span> : `${match.home_score}-${match.away_score}`}
                                         </div>
                                         <div className="mt-1 w-full flex justify-center">
-                                            <span className="text-[7px] md:text-[9px] font-black text-blue-300 uppercase tracking-widest text-center drop-shadow-md bg-blue-900/30 px-1 py-0.5 rounded whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
+                                            {/* 🟢 THE FIX: tracking-normal on mobile so the time fits, tracking-wider on desktop */}
+                                            <span className="text-[6px] md:text-[8px] font-black text-blue-300 uppercase tracking-normal md:tracking-wider text-center drop-shadow-md bg-blue-900/30 px-1.5 py-0.5 rounded whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
                                                 {isScheduled 
                                                     ? <MatchTime date={match.match_date} />
                                                     : (rawStatus === 'HT' || rawStatus === 'HALFTIME' ? 'HT' : rawStatus)

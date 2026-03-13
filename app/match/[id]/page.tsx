@@ -116,17 +116,18 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
       <div className="max-w-4xl mx-auto px-4 mt-2 relative z-20 space-y-3 md:space-y-6">
         
-        <div className="bg-white rounded-xl p-2 md:p-3 shadow-sm border border-slate-100 flex flex-wrap gap-2 items-center justify-center text-[9px] md:text-[10px] font-bold text-slate-500">
-            <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 shadow-sm text-slate-700">
-                <Calendar className="w-2.5 h-2.5 text-slate-400"/> {formattedDate} <span className="text-slate-300 mx-0.5">•</span> <MatchTime date={dbData.match_date} />
+        {/* 🟢 THE FIX: ULTRA-COMPACT MATCH INFO STRIP */}
+        <div className="bg-white rounded-lg p-1.5 shadow-sm border border-slate-100 flex overflow-x-auto scrollbar-hide flex-nowrap items-center gap-1.5 text-[8px] md:text-[9px] font-bold text-slate-500 whitespace-nowrap">
+            <span className="flex items-center gap-1 uppercase bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 shadow-sm text-slate-700 shrink-0">
+                <Calendar className="w-2 h-2 text-slate-400"/> {formattedDate} <span className="text-slate-300 mx-0.5">•</span> <MatchTime date={dbData.match_date} />
             </span>
 
             {(data?.venue || data?.stage || data?.group || (data?.referees && data.referees.length > 0) || data?.predictor) && (
                 <>
-                    {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 shadow-sm"><Trophy className="w-2.5 h-2.5 text-yellow-500"/> {data.stage.replace(/_/g, ' ')}</span>}
-                    {data?.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 shadow-sm"><Grid className="w-2.5 h-2.5 text-blue-500"/> {data.group.replace(/_/g, ' ')}</span>}
-                    {data?.venue && <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 shadow-sm"><MapPin className="w-2.5 h-2.5 text-red-500"/> {data.venue}</span>}
-                    {data?.predictor && <span className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2 py-1 rounded-lg border border-blue-100 shadow-sm"><Percent className="w-2.5 h-2.5 text-blue-600"/> Win Prob: {parseFloat(String(data.predictor.home)).toFixed(0)}% | {parseFloat(String(data.predictor.away)).toFixed(0)}%</span>}
+                    {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 shadow-sm shrink-0"><Trophy className="w-2 h-2 text-yellow-500"/> {data.stage.replace(/_/g, ' ')}</span>}
+                    {data?.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 shadow-sm shrink-0"><Grid className="w-2 h-2 text-blue-500"/> {data.group.replace(/_/g, ' ')}</span>}
+                    {data?.venue && <span className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 shadow-sm shrink-0"><MapPin className="w-2 h-2 text-red-500"/> {data.venue}</span>}
+                    {data?.predictor && <span className="flex items-center gap-1 bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 shadow-sm shrink-0"><Percent className="w-2 h-2 text-blue-600"/> Win Prob: {parseFloat(String(data.predictor.home)).toFixed(0)}% | {parseFloat(String(data.predictor.away)).toFixed(0)}%</span>}
                 </>
             )}
         </div>
@@ -180,27 +181,27 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             </div>
         )}
 
-        <div id="predictions" className="scroll-mt-6 bg-white rounded-xl shadow-xl p-2 md:p-5 border border-slate-200 overflow-hidden relative">
-           <h3 className="text-[11px] md:text-sm font-black uppercase tracking-tighter text-slate-800 flex items-center gap-1.5 mb-2 md:mb-5 relative z-10">
-               <Zap className="w-3.5 h-3.5 md:w-4 md:h-4 text-yellow-500 fill-yellow-500" /> Predict & Win
+        <div id="predictions" className="scroll-mt-6 bg-white rounded-xl shadow-md p-2 md:p-4 border border-slate-200 overflow-hidden relative">
+           <h3 className="text-[10px] md:text-xs font-black uppercase tracking-tighter text-slate-800 flex items-center gap-1 mb-2 md:mb-3 relative z-10">
+               <Zap className="w-3 h-3 md:w-3.5 md:h-3.5 text-yellow-500 fill-yellow-500" /> Predict & Win
            </h3>
-           <div className="relative z-10 scale-[0.98] md:scale-100 origin-top">
+           <div className="relative z-10">
                <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
            </div>
         </div>
 
         {!hasWidget && (
-            <div className="bg-[#1A1A1A] rounded-xl p-2 md:p-4 shadow-2xl border border-slate-800 flex items-center justify-between relative overflow-hidden group">
-                <div className="flex items-center gap-2 md:gap-4 relative z-10">
-                    <div className="w-8 h-8 md:w-12 md:h-12 bg-blue-600 text-white text-[10px] md:text-xs font-black rounded-lg flex items-center justify-center shadow-lg italic">1X</div>
+            <div className="bg-[#1A1A1A] rounded-xl p-2 md:p-3 shadow-md border border-slate-800 flex items-center justify-between relative overflow-hidden group">
+                <div className="flex items-center gap-2 relative z-10">
+                    <div className="w-8 h-8 md:w-10 md:h-10 bg-blue-600 text-white text-[9px] md:text-xs font-black rounded-md flex items-center justify-center shadow-lg italic">1X</div>
                     <div>
-                        <div className="text-white font-black text-[11px] md:text-sm tracking-tight mb-0">1xBet Partner</div>
-                        <div className="text-[8px] md:text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                        <div className="text-white font-black text-[10px] md:text-xs tracking-tight mb-0">1xBet Partner</div>
+                        <div className="text-[7px] md:text-[9px] text-slate-400 font-bold uppercase tracking-widest">
                             Code: <span className="text-yellow-400 font-black">FACTSPORT</span>
                         </div>
                     </div>
                 </div>
-                <a href={sanitizeUrl(dbData.affiliate_link) || "#"} target="_blank" rel="noopener noreferrer" className="relative z-10 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest px-3 py-1.5 md:px-5 md:py-3 rounded-lg shadow-lg text-[8px] md:text-[10px] flex items-center gap-1">
+                <a href={sanitizeUrl(dbData.affiliate_link) || "#"} target="_blank" rel="noopener noreferrer" className="relative z-10 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest px-2 py-1.5 md:px-4 md:py-2.5 rounded-md shadow-md text-[7px] md:text-[9px] flex items-center gap-1">
                     Bet <span className="hidden sm:inline">Now</span> <LinkIcon className="w-2.5 h-2.5" />
                 </a>
             </div>
@@ -209,7 +210,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       </div>
 
       {!hasWidget && (
-          <div id="match-center" className="scroll-mt-6 max-w-4xl mx-auto px-4 mt-4 md:mt-8 space-y-6">
+          <div id="match-center" className="scroll-mt-6 max-w-4xl mx-auto px-4 mt-3 md:mt-6 space-y-6">
               <StatsLineupsTabs matchId={dbData.id} initialData={data} />
           </div>
       )}
