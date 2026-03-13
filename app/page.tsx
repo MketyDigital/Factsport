@@ -5,7 +5,6 @@ import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
 import { ArrowRight, Youtube, Newspaper, TrendingUp, Calendar, Award, Trophy } from "lucide-react";
 
-// 🔥 ALL MODULAR COMPONENTS IMPORTED
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
@@ -16,6 +15,11 @@ import HighlightsSlider from '@/app/components/HighlightsSlider';
 import HeroMatchCards from '@/app/components/HeroMatchCards'; 
 
 const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599"; 
+
+// 🟢 THE MASTER STATUS ARRAYS
+const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
+const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
+const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
 export const metadata = {
   title: 'FactSport | Live Scores, News & Predictions',
@@ -45,9 +49,8 @@ const groupByDate = (matchList: any[]) => {
 
 const sortMatches = (matches: any[]) => {
   return matches.sort((a, b) => {
-    const liveStatus = ['LIVE', 'HT', 'IN_PLAY'];
-    const isLiveA = liveStatus.includes(a.status);
-    const isLiveB = liveStatus.includes(b.status);
+    const isLiveA = LIVE_STATUSES.includes((a.status || '').toUpperCase());
+    const isLiveB = LIVE_STATUSES.includes((b.status || '').toUpperCase());
 
     if (isLiveA && !isLiveB) return -1; 
     if (!isLiveA && isLiveB) return 1;  
@@ -58,8 +61,8 @@ const sortMatches = (matches: any[]) => {
 };
 
 const getDiverseMatches = (allMatches: any[], limit: number) => {
-    const live = allMatches.filter(m => ['LIVE', 'HT', 'IN_PLAY'].includes(m.status));
-    const scheduled = allMatches.filter(m => !['LIVE', 'HT', 'IN_PLAY'].includes(m.status));
+    const live = allMatches.filter(m => LIVE_STATUSES.includes((m.status || '').toUpperCase()));
+    const scheduled = allMatches.filter(m => !LIVE_STATUSES.includes((m.status || '').toUpperCase()));
 
     const leagues: { [key: string]: any[] } = {};
     scheduled.forEach(m => {
@@ -104,7 +107,7 @@ async function getHomepageData(leagueFilter: string | undefined) {
       tomorrowEnd.setHours(23,59,59,999);
       
       matchQuery = matchQuery
-        .or(`status.eq.LIVE,status.eq.IN_PLAY,status.eq.HT,match_date.gte.${todayStart.toISOString()}`)
+        .or(`status.eq.LIVE,status.eq.IN_PLAY,status.eq.HT,status.eq.in,match_date.gte.${todayStart.toISOString()}`)
         .lte('match_date', tomorrowEnd.toISOString()) 
         .order('match_date', { ascending: true })
         .limit(50); 
@@ -119,7 +122,7 @@ async function getHomepageData(leagueFilter: string | undefined) {
       .neq('video_url', '') 
       .order('match_date', { ascending: false })
       .limit(5),
-    supabase.from('matches').select('*').eq('is_featured', true).order('match_date', { ascending: true }).limit(5)
+    supabase.from('matches').select('*').eq('is_featured', true).order('updated_at', { ascending: false }).limit(5)
   ]);
 
   let matches = matchesRes.data || [];
@@ -131,8 +134,9 @@ async function getHomepageData(leagueFilter: string | undefined) {
   }
 
   if (matches.length === 0 && !leagueFilter) {
+      // 🟢 Uses wide array of common string endings to ensure we grab past matches securely
       const { data: finishedMatches } = await supabase.from('matches').select('*')
-        .in('status', ['FT', 'FINISHED', 'ABD']) 
+        .in('status', ['FT', 'FINISHED', 'ABD', 'post', 'POST', 'ENDED', 'AET', 'PEN']) 
         .order('match_date', { ascending: false })
         .limit(10);
       if (finishedMatches) matches = finishedMatches;
@@ -158,14 +162,11 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const latestNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id)).slice(0, 5);
 
   let heroMatches: any[] = [];
-  const todayStr = new Date().toISOString().split('T')[0];
-
-  // 1. Try to find up to 3 matches manually set by the Admin
+  
   if (featuredMatches.length > 0) {
-      heroMatches = featuredMatches.filter(m => m.match_date.split('T')[0] >= todayStr).slice(0, 3);
+      heroMatches = featuredMatches.slice(0, 2);
   } 
   
-  // 2. SMART FALLBACK: If Admin didn't set any, hunt for up to 3 global giant teams!
   if (heroMatches.length === 0) {
       const bigTeams = [
           'Arsenal', 'Chelsea', 'Liverpool', 'Man City', 'Manchester City', 'Man United', 'Manchester United', 'Tottenham',
@@ -175,9 +176,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
           'PSG', 'Paris Saint Germain'
       ];
 
-      const validMatches = matches.filter(m => m.match_date.split('T')[0] >= todayStr);
-
-      const bigMatches = validMatches.filter(m => {
+      const bigMatches = matches.filter(m => {
           return bigTeams.some(giant => 
               (m.home_team && m.home_team.toLowerCase().includes(giant.toLowerCase())) || 
               (m.away_team && m.away_team.toLowerCase().includes(giant.toLowerCase()))
@@ -185,10 +184,9 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       });
 
       if (bigMatches.length > 0) {
-          heroMatches = bigMatches.slice(0, 3);
+          heroMatches = bigMatches.slice(0, 2);
       } else {
-          // Absolute worst-case scenario: just show the next 3 upcoming matches
-          heroMatches = validMatches.slice(0, 3);
+          heroMatches = matches.slice(0, 2);
       }
   }
 
@@ -198,19 +196,11 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-0 overflow-x-hidden">
       
-      {/* 1. TICKER */}
       <NewsTicker tickerNews={tickerNews} />
-
-      {/* 2. AUTO-SLIDER */}
       {finalHeadlines.length > 0 && <div className="mt-4 px-4"><HeadlinesSlider headlines={finalHeadlines} /></div>}
-
-      {/* 3. HIGHLIGHTS (MODULAR) */}
       <HighlightsSlider highlights={highlights} />
-
-      {/* 4. LATEST NEWS (MODULAR) */}
       <LatestNewsList latestNews={latestNews} />
 
-      {/* 5. MATCH CENTER */}
       <section className="mt-8">
          <div className="px-4 flex justify-between items-center mb-3">
             <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2"><TrendingUp className="text-red-500" size={14}/> Match Center</h3>
@@ -219,7 +209,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             </Link>
         </div>
         
-        {/* League Tabs */}
         <div className="bg-white border-y border-slate-200 sticky top-0 z-30 overflow-x-auto scrollbar-hide py-2 shadow-sm mb-4">
             <div className="flex px-4 space-x-2 min-w-max">
             <Link href="/" scroll={false} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all ${!selectedLeague ? 'bg-[#0a1428] text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}`}>For You</Link>
@@ -237,10 +226,8 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             </div>
         )}
 
-        {/* HERO MATCH CARDS (MODULAR) */}
         {!selectedLeague && <HeroMatchCards heroMatches={heroMatches} />}
         
-        {/* FULL MATCH LIST */}
         <div className="px-4 py-0 space-y-4 mt-2">
              <FreeTipsBanner />
 
@@ -254,9 +241,12 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
 
                         <div className="divide-y divide-slate-50">
                             {groupedMatches[dateKey].map((match) => {
-                                const isLive = ['LIVE', 'HT', 'IN_PLAY'].includes(match.status);
-                                const isScheduled = match.status === 'SCHEDULED' || match.status === 'PRE';
-                                const isFinished = ['FT', 'FINISHED', 'ABD'].includes(match.status);
+                                const rawStatus = (match.status || '').toUpperCase();
+                                
+                                // 🟢 USING MASTER ARRAYS
+                                const isScheduled = SCHEDULED_STATUSES.includes(rawStatus);
+                                const isFinished = FINISHED_STATUSES.includes(rawStatus);
+                                
                                 const stageText = match.match_group ? match.match_group.replace(/_/g, ' ') : (match.stage && match.stage !== 'REGULAR_SEASON' ? match.stage.replace(/_/g, ' ') : null);
 
                                 return (
@@ -313,7 +303,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </section>
 
-      {/* 6. VIP REWARD */}
       <div className="mx-4 mb-4 mt-6">
         <div className="rounded-2xl overflow-hidden relative shadow-2xl group cursor-pointer bg-black p-6 text-center">
             <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 blur-[60px] opacity-20 group-hover:opacity-30 transition"></div>
@@ -327,7 +316,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </div>
 
-      {/* 🚀 QUICK ACTION LINKS */}
       <div className="grid grid-cols-4 gap-3 px-4 py-6">
           <Link href="/matches" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
               <Trophy className="text-yellow-500" size={20} />
