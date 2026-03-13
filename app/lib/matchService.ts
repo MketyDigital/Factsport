@@ -11,11 +11,16 @@ const LEAGUE_MAP: Record<string, string> = {
   'Euros': 'EC', 'World Cup': 'WC', 'Europa League': 'EL', 
 };
 
-const normalizeStatus = (status: string) => {
+// 🟢 POLISH: Forces uppercase to guarantee frontend arrays always match
+const normalizeStatus = (rawStatus: string) => {
+  if (!rawStatus) return '';
+  const status = rawStatus.toUpperCase();
+  
   const map: Record<string, string> = {
     'IN_PLAY': 'LIVE', 'PAUSED': 'HT', 'HALFTIME': 'HT',
     'FINISHED': 'FT', 'AWARDED': 'FT', 'TIMED': 'SCHEDULED',
-    'SCHEDULED': 'SCHEDULED', 'POSTPONED': 'POSTPONED'
+    'SCHEDULED': 'SCHEDULED', 'POSTPONED': 'POSTPONED',
+    'POST': 'FT' // Translates ESPN's POST to FT just to be safe
   };
   return map[status] || status;
 };
@@ -120,12 +125,16 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
           draw: Number(rawPredictor.draw) || 0
       };
   }
+  
+  // 🟢 POLISH: Guarantee standard status output to the frontend
+  const rawStatus = (dbData.status || '').toUpperCase();
+  const safeStatus = rawStatus === 'SCHEDULED' ? 'PRE' : rawStatus;
 
   return {
     ...dbData, // 🔥 MAGIC FIX: Spreads all DB keys so the Header Logos and Time never break!
     
-    status: dbData.status === 'SCHEDULED' ? 'PRE' : dbData.status,
-    displayClock: dbData.displayClock || (dbData.status === 'LIVE' ? 'Live' : (dbData.status === 'HT' ? 'HT' : '')),
+    status: safeStatus,
+    displayClock: dbData.displayClock || (safeStatus === 'LIVE' ? 'Live' : (safeStatus === 'HT' ? 'HT' : '')),
     home: { name: dbData.home_team, logo: dbData.home_logo, score: dbData.home_score ?? 0, id: 'home' },
     away: { name: dbData.away_team, logo: dbData.away_logo, score: dbData.away_score ?? 0, id: 'away' },
     

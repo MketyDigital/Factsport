@@ -64,7 +64,7 @@ export async function fetchEspnDetails(gameId: string) {
         };
     }
 
-    // 🟢 2. PARSE STATS
+    // 🟢 2. PARSE STATS (Upgraded to catch all shot variations)
     const boxscore = data.boxscore;
     const stats: any = { home: {}, away: {} };
     if (boxscore?.teams) {
@@ -72,10 +72,14 @@ export async function fetchEspnDetails(gameId: string) {
           const side = String(t.team.id) === homeId ? 'home' : 'away';
           t.statistics.forEach((s: any) => {
              if(s.name === 'possessionPct') stats[side].possession = s.displayValue;
-             if(s.name === 'shotsSummary') stats[side].shots = s.displayValue;
              if(s.name === 'foulsCommitted') stats[side].fouls = s.displayValue;
              if(s.name === 'wonCorners') stats[side].corners = s.displayValue;
              if(s.name === 'saves') stats[side].saves = s.displayValue;
+             
+             // The Shot Catcher
+             if(s.name === 'shotsSummary' || s.name === 'totalShots') stats[side].shots = s.displayValue;
+             if(s.name === 'shotsOnTarget') stats[side].shotsOnTarget = s.displayValue;
+             if(s.name === 'shotsOffTarget') stats[side].shotsOffTarget = s.displayValue;
           });
        });
     }
@@ -89,8 +93,7 @@ export async function fetchEspnDetails(gameId: string) {
     if (rosters) {
        rosters.forEach((r: any) => {
           const side = String(r.team.id) === homeId ? 'home' : 'away';
-          
-          if (r.formation) lineups.formations[side] = r.formation; // 🔥 FORMATION SAVED
+          if (r.formation) lineups.formations[side] = r.formation; 
 
           let athletes = r.athletes || r.roster || r.statistics?.[0]?.athletes || [];
           lineups[side] = athletes.map((p: any) => ({
