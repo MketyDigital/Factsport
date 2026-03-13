@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { BarChart2, Users, List, AlertCircle, Shield } from 'lucide-react';
+import { BarChart2, Users, List, AlertCircle } from 'lucide-react';
 
 export default function StatsLineupsTabs({ matchId, initialData }: { matchId: string, initialData: any }) {
   const [activeTab, setActiveTab] = useState('events');
@@ -55,7 +55,29 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
   const { stats, lineups, events } = liveData;
   
   const hasLineups = lineups?.home?.length > 0 || lineups?.away?.length > 0;
-  const hasStats = stats?.home?.possession || stats?.home?.shots;
+
+  // 🟢 SMART TOTAL SHOTS CALCULATOR
+  const getSafeShots = (teamStats: any) => {
+      if (!teamStats) return '0';
+      if (teamStats.shots && parseInt(teamStats.shots) > 0) return teamStats.shots.toString();
+      
+      const onTarget = parseInt(teamStats.shotsOnTarget || teamStats.shots_on_target || 0) || 0;
+      const offTarget = parseInt(teamStats.shotsOffTarget || teamStats.shots_off_target || 0) || 0;
+      const total = onTarget + offTarget;
+      
+      return total > 0 ? total.toString() : '0';
+  };
+
+  // 🟢 EXTRACT ON/OFF TARGET DATA FOR SPLIT ROWS
+  const homeShotsOn = stats?.home?.shotsOnTarget || stats?.home?.shots_on_target || '0';
+  const awayShotsOn = stats?.away?.shotsOnTarget || stats?.away?.shots_on_target || '0';
+  const homeShotsOff = stats?.home?.shotsOffTarget || stats?.home?.shots_off_target || '0';
+  const awayShotsOff = stats?.away?.shotsOffTarget || stats?.away?.shots_off_target || '0';
+  
+  // Only show the target rows if ESPN actually gave us the detailed split data
+  const showTargetStats = parseInt(homeShotsOn) > 0 || parseInt(awayShotsOn) > 0 || parseInt(homeShotsOff) > 0 || parseInt(awayShotsOff) > 0;
+
+  const hasStats = stats?.home?.possession || getSafeShots(stats?.home) !== '0' || stats?.home?.corners;
 
   const getSortedLineup = (players: any[]) => {
       if (!players || !Array.isArray(players)) return [];
@@ -139,13 +161,23 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
             <div className="space-y-4">
                 {!hasStats ? <div className="text-center py-10 opacity-50"><p className="text-xs">Stats updating...</p></div> : <>
                     <StatRow label="Possession" home={stats?.home?.possession || '50%'} away={stats?.away?.possession || '50%'} />
-                    <StatRow label="Shots" home={stats?.home?.shots || '0'} away={stats?.away?.shots || '0'} />
+                    <StatRow label="Total Shots" home={getSafeShots(stats?.home)} away={getSafeShots(stats?.away)} />
+                    
+                    {/* 🟢 THE SPLIT ROWS (Only appear if data exists) */}
+                    {showTargetStats && (
+                        <>
+                            <StatRow label="Shots on Target" home={homeShotsOn} away={awayShotsOn} />
+                            <StatRow label="Shots off Target" home={homeShotsOff} away={awayShotsOff} />
+                        </>
+                    )}
+
                     <StatRow label="Corners" home={stats?.home?.corners || '0'} away={stats?.away?.corners || '0'} />
                     <StatRow label="Fouls" home={stats?.home?.fouls || '0'} away={stats?.away?.fouls || '0'} />
                     <StatRow label="Saves" home={stats?.home?.saves || '0'} away={stats?.away?.saves || '0'} />
                 </>}
             </div>
         )}
+        
         {activeTab === 'lineups' && (
             <>
                 {!hasLineups ? <div className="text-center py-10 opacity-50 bg-slate-50 rounded-xl border border-dashed border-slate-300"><Users className="mx-auto mb-2 text-slate-400" size={24} /><p className="text-xs font-bold text-slate-500">Waiting for team sheets...</p></div> : 
