@@ -8,7 +8,14 @@ import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  if (searchParams.get('key') !== process.env.CRON_KEY) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  
+  // Security Check
+  if (searchParams.get('key') !== process.env.CRON_KEY) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // 🟢 THE SECRET OVERRIDE: ?force=true
+  const forceSync = searchParams.get('force') === 'true';
 
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const API_KEY = process.env.FOOTBALL_DATA_KEY;
@@ -38,7 +45,6 @@ export async function GET(request: Request) {
         const data = await res.json();
         
         for (const m of data.matches || []) {
-            // Check if this match belongs to a league we actually track
             const compCode = m.competition?.code;
             if (!TARGET_LEAGUES.includes(compCode)) continue;
             
@@ -79,6 +85,12 @@ export async function GET(request: Request) {
         }
     } else {
         logs.push(`Global match fetch failed with status: ${res.status}`);
+    }
+
+    // 🟢 THE BYPASS: If forced, flag all target leagues for a standings update
+    if (forceSync) {
+        TARGET_LEAGUES.forEach(league => leaguesNeedingStandingsUpdate.add(league));
+        logs.push("Admin forced a full standings sync.");
     }
 
     // 🟢 PHASE 2: STANDINGS SYNC (Max 6 calls, only if needed)
