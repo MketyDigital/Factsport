@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     }
 
     const frontendUrl = 'https://factsport.com'; 
-    const imageUrl = 'https://factsport.vercel.app'; 
+    const imageUrl = 'https://factsport.com'; 
     const matchUrl = `${frontendUrl}/match/${newState.id}`; 
     let payload: SocialPayload = {}; 
 
