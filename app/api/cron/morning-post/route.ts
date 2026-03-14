@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     }
 
     const frontendUrl = 'https://factsport.com'; 
-    const imageUrl = 'https://factsport.vercel.app'; 
+    const imageUrl = 'https://factsport.com'; 
     const todayString = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
 
     // 🏆 GROUP MATCHES BY LEAGUE
