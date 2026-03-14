@@ -51,7 +51,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   }
 
   const rawData = await getExternalData(dbData);
-  const data = rawData || {};
+  const data: any = rawData || {};
   
   data.home_form = await getTeamForm(dbData.home_team);
   data.away_form = await getTeamForm(dbData.away_team);
