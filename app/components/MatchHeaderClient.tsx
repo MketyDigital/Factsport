@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
+import Link from 'next/link';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget'; 
 import { getLeagueAssets } from '@/app/lib/league-assets';
 import MatchTime from '@/app/components/MatchTime';
@@ -60,11 +61,16 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
   const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'].includes(currentStatus);
   const leagueData = getLeagueAssets(initialData?.league);
 
-  // 🟢 Safe Referee extraction
   let refName = null;
   if (initialData?.referees && initialData.referees.length > 0) {
       refName = typeof initialData.referees[0] === 'string' ? initialData.referees[0] : initialData.referees[0].name;
   }
+
+  const homeTeamName = initialData?.home_team || initialData?.home?.name || '';
+  const awayTeamName = initialData?.away_team || initialData?.away?.name || '';
+  
+  const homeForm = initialData?.home_form || [];
+  const awayForm = initialData?.away_form || [];
 
   return (
     <div className="relative z-10 px-4 mt-1 pb-4 pt-1 rounded-b-2xl md:rounded-b-3xl overflow-hidden bg-slate-900 shadow-2xl">
@@ -108,12 +114,26 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
             </div>
 
             <div className="flex justify-between items-start">
-                <div className="flex flex-col items-center w-[35%] group">
-                    <div className="w-14 h-14 md:w-20 md:h-20 bg-gradient-to-b from-white/10 to-transparent p-2 md:p-4 rounded-xl md:rounded-2xl mb-1.5 flex items-center justify-center border border-white/10 shadow-xl backdrop-blur-md transition-transform group-hover:scale-105">
+                
+                <Link 
+                    href={`/matches?team=${encodeURIComponent(homeTeamName)}`}
+                    className="flex flex-col items-center w-[35%] group cursor-pointer active:scale-95 transition-transform"
+                >
+                    <div className="w-14 h-14 md:w-20 md:h-20 bg-gradient-to-b from-white/10 to-transparent p-2 md:p-4 rounded-xl md:rounded-2xl mb-1 flex items-center justify-center border border-white/10 shadow-xl backdrop-blur-md transition-transform group-hover:scale-105">
                         {initialData?.home_logo ? <img src={initialData.home_logo} className="w-full h-full object-contain drop-shadow-lg" /> : <div className="font-black text-slate-500 text-xs md:text-base">H</div>}
                     </div>
-                    <h2 className="font-bold text-center text-[9px] md:text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md px-1">{initialData?.home_team || initialData?.home?.name}</h2>
-                </div>
+                    <h2 className="font-bold text-center text-[9px] md:text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md px-1 mb-1.5">{homeTeamName}</h2>
+                    
+                    {homeForm.length > 0 && (
+                        <div className="flex items-center gap-0.5">
+                            {homeForm.map((result: string, i: number) => (
+                                <span key={i} className={`w-3 h-3 md:w-4 md:h-4 flex items-center justify-center text-[6px] md:text-[8px] font-black text-white rounded-sm ${result === 'W' ? 'bg-green-500' : result === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>
+                                    {result}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                </Link>
                 
                 <div className="flex flex-col items-center justify-center w-[30%] pt-2 md:pt-4">
                     {currentStatus === 'SCHEDULED' || currentStatus === 'PRE' ? (
@@ -127,12 +147,26 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                     )}
                 </div>
 
-                <div className="flex flex-col items-center w-[35%] group">
-                    <div className="w-14 h-14 md:w-20 md:h-20 bg-gradient-to-b from-white/10 to-transparent p-2 md:p-4 rounded-xl md:rounded-2xl mb-1.5 flex items-center justify-center border border-white/10 shadow-xl backdrop-blur-md transition-transform group-hover:scale-105">
+                <Link 
+                    href={`/matches?team=${encodeURIComponent(awayTeamName)}`}
+                    className="flex flex-col items-center w-[35%] group cursor-pointer active:scale-95 transition-transform"
+                >
+                    <div className="w-14 h-14 md:w-20 md:h-20 bg-gradient-to-b from-white/10 to-transparent p-2 md:p-4 rounded-xl md:rounded-2xl mb-1 flex items-center justify-center border border-white/10 shadow-xl backdrop-blur-md transition-transform group-hover:scale-105">
                         {initialData?.away_logo ? <img src={initialData.away_logo} className="w-full h-full object-contain drop-shadow-lg" /> : <div className="font-black text-slate-500 text-xs md:text-base">A</div>}
                     </div>
-                    <h2 className="font-bold text-center text-[9px] md:text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md px-1">{initialData?.away_team || initialData?.away?.name}</h2>
-                </div>
+                    <h2 className="font-bold text-center text-[9px] md:text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md px-1 mb-1.5">{awayTeamName}</h2>
+                    
+                    {awayForm.length > 0 && (
+                        <div className="flex items-center gap-0.5">
+                            {awayForm.map((result: string, i: number) => (
+                                <span key={i} className={`w-3 h-3 md:w-4 md:h-4 flex items-center justify-center text-[6px] md:text-[8px] font-black text-white rounded-sm ${result === 'W' ? 'bg-green-500' : result === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>
+                                    {result}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                </Link>
+
             </div>
         </div>
     </div>
