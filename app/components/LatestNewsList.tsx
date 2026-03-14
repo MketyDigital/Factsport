@@ -19,23 +19,24 @@ export default function LatestNewsList({ latestNews }: { latestNews: any[] }) {
         
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm divide-y divide-slate-50 overflow-hidden">
             {latestNews.map((item, index) => (
-                <Link href={`/news/${item.slug || '#'}`} key={item.id} className="flex gap-4 items-center p-4 active:bg-slate-50 transition group hover:bg-slate-50/80 relative overflow-hidden">
+                <Link href={`/news/${item.slug || '#'}`} key={item.id} className="flex gap-4 items-center p-3 md:p-4 active:bg-slate-50 transition group hover:bg-slate-50/80 relative overflow-hidden">
                     
-                    <div className="w-16 h-16 bg-slate-100 rounded-xl shrink-0 overflow-hidden relative shadow-sm border border-slate-200/50">
+                    {/* 🟢 THE FIX: Increased from w-16 h-16 to w-20 h-20 (and wider on desktop) for better visibility */}
+                    <div className="w-20 h-20 md:w-24 md:h-20 bg-slate-100 rounded-xl shrink-0 overflow-hidden relative shadow-sm border border-slate-200/50">
                         <NewsArtwork image={item.image_url} team1Logo={item.team_1_logo} team2Logo={item.team_2_logo} title={item.title} className="w-full h-full object-cover group-hover:scale-110 transition duration-700 ease-out" />
                     </div>
                     
-                    <div className="flex-1 pr-6">
-                        {/* 🔥 NEW: Trending Badge for the first item */}
+                    <div className="flex-1 pr-6 py-1">
                         {index === 0 && (
                             <span className="flex items-center gap-1 text-[8px] font-black text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-sm uppercase tracking-widest mb-1.5 w-max border border-orange-100">
                                 <Flame size={8} className="animate-pulse" /> Trending
                             </span>
                         )}
                         
-                        <h4 className="text-xs font-bold leading-relaxed line-clamp-2 text-slate-800 group-hover:text-blue-600 transition">{item.title}</h4>
+                        {/* 🟢 Slightly increased text size on desktop to match the bigger image */}
+                        <h4 className="text-xs md:text-sm font-bold leading-relaxed line-clamp-2 text-slate-800 group-hover:text-blue-600 transition">{item.title}</h4>
                         
-                        <div className="flex items-center gap-3 mt-1.5">
+                        <div className="flex items-center gap-3 mt-2">
                             <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
                                 <Clock size={10} /> {new Date(item.created_at).toLocaleDateString('en-GB', {day: 'numeric', month: 'short'})}
                             </span>
@@ -43,7 +44,6 @@ export default function LatestNewsList({ latestNews }: { latestNews: any[] }) {
                         </div>
                     </div>
 
-                    {/* 🔥 NEW: Interactive Hover Arrow */}
                     <div className="absolute right-4 text-slate-300 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
                         <ChevronRight size={16} className="text-blue-500" />
                     </div>
