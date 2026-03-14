@@ -17,6 +17,7 @@ import ProBettingSlipLock from '@/app/components/ProBettingSlipLock';
 import MatchTime from '@/app/components/MatchTime';
 
 import { getExternalData } from '@/app/lib/matchService';
+import { getTeamForm } from '@/app/lib/teamForm';
 
 const sanitizeUrl = (url: string | null | undefined) => {
     if (!url) return null;
@@ -24,7 +25,6 @@ const sanitizeUrl = (url: string | null | undefined) => {
     return url;
 };
 
-// 🟢 THE MASTER STATUS ARRAYS
 const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
@@ -51,7 +51,10 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   }
 
   const rawData = await getExternalData(dbData);
-  const data = rawData || {};
+  const data: any = rawData || {};
+  
+  data.home_form = await getTeamForm(dbData.home_team);
+  data.away_form = await getTeamForm(dbData.away_team);
   
   const currentStatus = (dbData.status || '').toUpperCase();
   const isFinished = FINISHED_STATUSES.includes(currentStatus);
@@ -116,7 +119,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
       <div className="max-w-4xl mx-auto px-4 mt-2 relative z-20 space-y-3 md:space-y-6">
         
-        {/* 🟢 THE FIX: ULTRA-COMPACT MATCH INFO STRIP */}
         <div className="bg-white rounded-lg p-1.5 shadow-sm border border-slate-100 flex overflow-x-auto scrollbar-hide flex-nowrap items-center gap-1.5 text-[8px] md:text-[9px] font-bold text-slate-500 whitespace-nowrap">
             <span className="flex items-center gap-1 uppercase bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 shadow-sm text-slate-700 shrink-0">
                 <Calendar className="w-2 h-2 text-slate-400"/> {formattedDate} <span className="text-slate-300 mx-0.5">•</span> <MatchTime date={dbData.match_date} />
