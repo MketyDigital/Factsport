@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-export const revalidate = 3;
+export const revalidate = 10; // 🟢 Perfect for Cloudflare: Lightning fast live scores, but still protects the database from traffic spikes
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";
@@ -89,6 +89,12 @@ const getDiverseMatches = (allMatches: any[], limit: number) => {
 async function getHomepageData(leagueFilter: string | undefined) {
   const supabase = createClient();
     
+  // 🟢 Define today globally so we can use it to filter out yesterday's featured matches
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const tomorrowEnd = new Date(); 
+  tomorrowEnd.setDate(tomorrowEnd.getDate() + 1); 
+  tomorrowEnd.setHours(23,59,59,999);
+
   let matchQuery = supabase.from('matches').select('*');
 
   if (leagueFilter) {
@@ -101,11 +107,6 @@ async function getHomepageData(leagueFilter: string | undefined) {
         .order('match_date', { ascending: true });
   } 
   else {
-      const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-      const tomorrowEnd = new Date(); 
-      tomorrowEnd.setDate(tomorrowEnd.getDate() + 1); 
-      tomorrowEnd.setHours(23,59,59,999);
-      
       matchQuery = matchQuery
         .or(`status.eq.LIVE,status.eq.IN_PLAY,status.eq.HT,status.eq.in,match_date.gte.${todayStart.toISOString()}`)
         .lte('match_date', tomorrowEnd.toISOString()) 
@@ -122,7 +123,14 @@ async function getHomepageData(leagueFilter: string | undefined) {
       .neq('video_url', '') 
       .order('match_date', { ascending: false })
       .limit(5),
-    supabase.from('matches').select('*').eq('is_featured', true).order('updated_at', { ascending: false }).limit(5)
+    
+    // 🟢 THE FIX: Now strictly enforces that featured matches MUST be from today or future
+    supabase.from('matches')
+      .select('*')
+      .eq('is_featured', true)
+      .gte('match_date', todayStart.toISOString()) 
+      .order('match_date', { ascending: true })
+      .limit(5)
   ]);
 
   let matches = matchesRes.data || [];
@@ -134,7 +142,6 @@ async function getHomepageData(leagueFilter: string | undefined) {
   }
 
   if (matches.length === 0 && !leagueFilter) {
-      // 🟢 Uses wide array of common string endings to ensure we grab past matches securely
       const { data: finishedMatches } = await supabase.from('matches').select('*')
         .in('status', ['FT', 'FINISHED', 'ABD', 'post', 'POST', 'ENDED', 'AET', 'PEN']) 
         .order('match_date', { ascending: false })
@@ -176,7 +183,11 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
           'PSG', 'Paris Saint Germain'
       ];
 
-      const bigMatches = matches.filter(m => {
+      // 🟢 THE FIX: Only fall back to Active (Live/Scheduled) matches first. Excludes old finished matches.
+      const activeMatches = matches.filter(m => !FINISHED_STATUSES.includes((m.status || '').toUpperCase()));
+      const candidates = activeMatches.length > 0 ? activeMatches : matches;
+
+      const bigMatches = candidates.filter(m => {
           return bigTeams.some(giant => 
               (m.home_team && m.home_team.toLowerCase().includes(giant.toLowerCase())) || 
               (m.away_team && m.away_team.toLowerCase().includes(giant.toLowerCase()))
@@ -186,7 +197,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       if (bigMatches.length > 0) {
           heroMatches = bigMatches.slice(0, 2);
       } else {
-          heroMatches = matches.slice(0, 2);
+          heroMatches = candidates.slice(0, 2);
       }
   }
 
