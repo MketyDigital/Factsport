@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
 import Link from 'next/link';
-import { ChevronLeft, BarChart2 } from 'lucide-react';
+import { ChevronLeft, BarChart2, AlertTriangle } from 'lucide-react';
 
 // 🟢 Mapped to Football-Data.org League Codes
 const LEAGUE_MAP: Record<string, string> = {
@@ -14,22 +14,74 @@ const LEAGUE_MAP: Record<string, string> = {
 };
 
 async function getStandings(leagueName: string) {
-    const leagueCode = LEAGUE_MAP[leagueName] || 'PL'; // Fallback to EPL
+    const leagueCode = LEAGUE_MAP[leagueName] || 'PL'; 
+    const apiKey = process.env.FOOTBALL_DATA_KEY;
+
+    if (!apiKey) {
+        return { error: 'FATAL: Missing FOOTBALL_DATA_KEY.', data: [] };
+    }
 
     try {
-        const res = await fetch(`https://api.football-data.org/v4/competitions/${leagueCode}/standings`, {
-            headers: { 'X-Auth-Token': process.env.FOOTBALL_DATA_KEY! },
-            next: { revalidate: 3600 } // Super safe caching: hits API once per hour
+        const standingsRes = await fetch(`https://api.football-data.org/v4/competitions/${leagueCode}/standings`, {
+            headers: { 'X-Auth-Token': apiKey },
+            next: { revalidate: 3600 } 
         });
         
-        if (!res.ok) return [];
-        const data = await res.json();
+        if (standingsRes.status === 429) return { error: 'API Rate Limit Hit. Wait 60 seconds.', data: [] };
+        if (!standingsRes.ok) return { error: `API Error: ${standingsRes.status}`, data: [] };
         
-        // Football-Data puts the main league table in standings[0]
-        return data?.standings?.[0]?.table || [];
-    } catch (error) {
-        console.error("Football-Data Standings Fetch Error:", error);
-        return []; 
+        const standingsJson = await standingsRes.json();
+        const standingsData = standingsJson?.standings?.[0]?.table || [];
+
+        // 🟢 THE JEDI MIND TRICK: Fetch all finished matches to calculate form manually!
+        try {
+            const matchesRes = await fetch(`https://api.football-data.org/v4/competitions/${leagueCode}/matches?status=FINISHED`, {
+                headers: { 'X-Auth-Token': apiKey },
+                next: { revalidate: 3600 }
+            });
+
+            if (matchesRes.ok) {
+                const matchesJson = await matchesRes.json();
+                const allMatches = matchesJson.matches || [];
+                
+                allMatches.sort((a: any, b: any) => new Date(b.utcDate).getTime() - new Date(a.utcDate).getTime());
+
+                const teamForms: Record<number, string[]> = {};
+
+                allMatches.forEach((m: any) => {
+                    const homeId = m.homeTeam?.id;
+                    const awayId = m.awayTeam?.id;
+                    const homeScore = m.score?.fullTime?.home;
+                    const awayScore = m.score?.fullTime?.away;
+
+                    if (!teamForms[homeId]) teamForms[homeId] = [];
+                    if (!teamForms[awayId]) teamForms[awayId] = [];
+
+                    if (teamForms[homeId].length < 5 && homeScore !== null && awayScore !== null) {
+                        if (homeScore > awayScore) teamForms[homeId].push('W');
+                        else if (homeScore === awayScore) teamForms[homeId].push('D');
+                        else teamForms[homeId].push('L');
+                    }
+
+                    if (teamForms[awayId].length < 5 && homeScore !== null && awayScore !== null) {
+                        if (awayScore > homeScore) teamForms[awayId].push('W');
+                        else if (awayScore === homeScore) teamForms[awayId].push('D');
+                        else teamForms[awayId].push('L');
+                    }
+                });
+
+                standingsData.forEach((entry: any) => {
+                    const customForm = teamForms[entry.team.id] || [];
+                    entry.form = customForm.reverse().join(','); 
+                });
+            }
+        } catch (matchErr) {
+            console.error("Silent fail on custom form calculation:", matchErr);
+        }
+
+        return { error: null, data: standingsData };
+    } catch (error: any) {
+        return { error: `Server Connection Failed: ${error.message}`, data: [] }; 
     }
 }
 
@@ -38,27 +90,23 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
     const currentLeague = resolvedParams?.league || 'Premier League';
     
     const validLeague = LEAGUE_MAP[currentLeague] ? currentLeague : 'Premier League';
-    const standings = await getStandings(validLeague);
+    const { error, data: standings } = await getStandings(validLeague);
     const totalTeams = standings.length;
 
-    // 🟢 SMART CHECK: Does the API give us form data for at least one team?
     const hasFormData = standings.some((entry: any) => entry.form && entry.form.length > 0);
-
     const ALL_LEAGUES = Object.keys(LEAGUE_MAP);
 
     return (
         <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-20 font-sans">
-            {/* Header */}
             <div className="bg-[#0a1428] text-white p-4 flex items-center gap-4 sticky top-0 z-50 shadow-lg">
                 <Link href="/matches" className="p-1.5 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-sm">
                     <ChevronLeft size={20}/>
                 </Link>
-                <h1 className="font-black text-lg uppercase tracking-wider flex items-center gap-2">
+                <h1 className="font-bold text-lg uppercase tracking-wider flex items-center gap-2">
                     <BarChart2 className="text-blue-500" size={18} /> Standings
                 </h1>
             </div>
 
-            {/* Dynamic League Navigator */}
             <div className="bg-white border-b border-slate-200 sticky top-[60px] z-40 overflow-x-auto scrollbar-hide shadow-sm">
                 <div className="flex px-4 py-3 space-x-2 min-w-max">
                     {ALL_LEAGUES.map((league) => (
@@ -75,13 +123,21 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
             </div>
 
             <div className="p-2 md:p-4 max-w-5xl mx-auto mt-2">
+                
+                {error && (
+                    <div className="bg-red-50 border-2 border-red-500 text-red-700 p-4 rounded-xl mb-4 shadow-sm flex flex-col items-center text-center">
+                        <AlertTriangle size={32} className="mb-2 text-red-500" />
+                        <h3 className="font-black uppercase tracking-widest text-sm mb-1">API Connection Failed</h3>
+                        <p className="text-xs font-bold">{error}</p>
+                    </div>
+                )}
+
                 <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
                     <div className="bg-slate-50 p-3 md:p-4 border-b border-slate-200 flex justify-between items-center">
                          <h2 className="font-black text-slate-700 uppercase tracking-widest text-xs md:text-sm">{validLeague} Table</h2>
                     </div>
                     
                     <div className="overflow-x-auto scrollbar-hide">
-                        {/* Auto-adjusts minimum width based on whether the form column exists */}
                         <table className={`w-full text-xs ${hasFormData ? 'min-w-[550px]' : 'min-w-[400px]'}`}>
                             <thead className="bg-[#f8f9fa] border-b-2 border-slate-200 text-slate-500 font-black uppercase tracking-widest text-[9px]">
                                 <tr>
@@ -101,9 +157,10 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                                     const isUCL = index < 4 && validLeague !== 'Champions League';
                                     const isRelegation = index >= totalTeams - 3 && validLeague !== 'Champions League';
 
-                                    // 🟢 BULLETPROOF FORM PARSER: Handles "W,L,D", "WLD", or missing data
                                     const rawForm = String(entry.form || '');
                                     const formArray = rawForm ? (rawForm.includes(',') ? rawForm.split(',') : rawForm.split('')) : [];
+                                    
+                                    const teamName = entry.team.shortName || entry.team.name;
 
                                     return (
                                         <tr key={entry.team.id} className={`hover:bg-slate-50 transition-colors ${isUCL ? 'bg-blue-50/20' : ''} ${isRelegation ? 'bg-red-50/20' : ''}`}>
@@ -112,14 +169,22 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                                                 {isRelegation && <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r-sm"></div>}
                                                 {entry.position}
                                             </td>
-                                            <td className="py-2.5 px-2 font-black text-slate-800 flex items-center gap-2">
-                                                {entry.team.crest ? (
-                                                    <img src={entry.team.crest} className="w-5 h-5 object-contain drop-shadow-sm" alt="" />
-                                                ) : (
-                                                    <div className="w-5 h-5 bg-slate-200 rounded-full"></div>
-                                                )}
-                                                <span className="truncate max-w-[120px] md:max-w-[200px]">{entry.team.shortName || entry.team.name}</span>
+                                            
+                                            {/* 🟢 THE CLICKABLE TEAM LINK IN THE TABLE */}
+                                            <td className="py-2.5 px-2 font-black text-slate-800">
+                                                <Link 
+                                                    href={`/matches?team=${encodeURIComponent(teamName)}`}
+                                                    className="flex items-center gap-2 hover:text-blue-600 transition-colors group cursor-pointer"
+                                                >
+                                                    {entry.team.crest ? (
+                                                        <img src={entry.team.crest} className="w-5 h-5 object-contain drop-shadow-sm group-hover:scale-110 transition-transform" alt="" />
+                                                    ) : (
+                                                        <div className="w-5 h-5 bg-slate-200 rounded-full"></div>
+                                                    )}
+                                                    <span className="truncate max-w-[120px] md:max-w-[200px]">{teamName}</span>
+                                                </Link>
                                             </td>
+
                                             <td className="py-2.5 px-1 text-center text-slate-500 font-medium">{entry.playedGames}</td>
                                             <td className="py-2.5 px-1 text-center text-slate-500">{entry.won}</td>
                                             <td className="py-2.5 px-1 text-center text-slate-500">{entry.draw}</td>
@@ -127,7 +192,6 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                                             <td className="py-2.5 px-1 text-center font-bold text-slate-600">{entry.goalDifference > 0 ? `+${entry.goalDifference}` : entry.goalDifference}</td>
                                             <td className="py-2.5 px-2 text-center font-black text-sm text-slate-900 bg-slate-50/50">{entry.points}</td>
                                             
-                                            {/* Conditionally render the form cells ONLY if the column exists */}
                                             {hasFormData && (
                                                 <td className="py-2.5 px-2 text-center">
                                                     <div className="flex items-center justify-center gap-0.5">
@@ -146,11 +210,10 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                         </table>
                     </div>
 
-                    {standings.length === 0 && (
+                    {standings.length === 0 && !error && (
                         <div className="p-16 text-center text-slate-400 flex flex-col items-center">
                             <BarChart2 size={40} className="mb-3 opacity-20" />
                             <span className="font-bold uppercase tracking-widest text-[10px]">Table currently unavailable</span>
-                            <span className="text-[9px] mt-2">Check API Key or rate limits.</span>
                         </div>
                     )}
                 </div>
