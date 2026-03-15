@@ -1,7 +1,7 @@
 export const runtime = 'edge';
-export const revalidate = 5; // 🟢 Perfect for Cloudflare: Lightning fast live scores, but still protects the database from traffic spikes
+export const revalidate = 5; 
 
-import { createClient } from '@/app/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js'; // 🟢 FIXED TO ANON CLIENT
 import Link from "next/link";
 import { ArrowRight, Youtube, Newspaper, TrendingUp, Calendar, Award, Trophy } from "lucide-react";
 
@@ -16,7 +16,6 @@ import HeroMatchCards from '@/app/components/HeroMatchCards';
 
 const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599"; 
 
-// 🟢 THE MASTER STATUS ARRAYS
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
@@ -87,9 +86,9 @@ const getDiverseMatches = (allMatches: any[], limit: number) => {
 };
 
 async function getHomepageData(leagueFilter: string | undefined) {
-  const supabase = createClient();
+  // 🟢 GUARANTEES NEXT.JS CATCHES THIS AND PROTECTS SUPABASE
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     
-  // 🟢 Define today globally so we can use it to filter out yesterday's featured matches
   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
   const tomorrowEnd = new Date(); 
   tomorrowEnd.setDate(tomorrowEnd.getDate() + 1); 
@@ -124,7 +123,6 @@ async function getHomepageData(leagueFilter: string | undefined) {
       .order('match_date', { ascending: false })
       .limit(5),
     
-    // 🟢 THE FIX: Now strictly enforces that featured matches MUST be from today or future
     supabase.from('matches')
       .select('*')
       .eq('is_featured', true)
@@ -183,7 +181,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
           'PSG', 'Paris Saint Germain'
       ];
 
-      // 🟢 THE FIX: Only fall back to Active (Live/Scheduled) matches first. Excludes old finished matches.
       const activeMatches = matches.filter(m => !FINISHED_STATUSES.includes((m.status || '').toUpperCase()));
       const candidates = activeMatches.length > 0 ? activeMatches : matches;
 
@@ -254,7 +251,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                             {groupedMatches[dateKey].map((match) => {
                                 const rawStatus = (match.status || '').toUpperCase();
                                 
-                                // 🟢 USING MASTER ARRAYS
                                 const isScheduled = SCHEDULED_STATUSES.includes(rawStatus);
                                 const isFinished = FINISHED_STATUSES.includes(rawStatus);
                                 
@@ -304,7 +300,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                             })}
                         </div>
                     </div>
-                 ))
+                ))
              ) : (
                 <div className="text-center py-12 opacity-50 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
                    <Calendar size={24} className="mx-auto mb-2 text-slate-400"/>

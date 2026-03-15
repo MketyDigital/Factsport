@@ -3,7 +3,7 @@ export const revalidate = 300; // Caches for 5 mins to protect your database
 
 import Link from 'next/link';
 import { ChevronLeft, BarChart2, AlertTriangle } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js'; // 🟢 THE ANON CLIENT BYPASS
+import { createClient } from '@supabase/supabase-js'; 
 
 const LEAGUE_MAP: Record<string, string> = {
     'Premier League': 'PL',
@@ -177,6 +177,9 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                                     const formArray = rawForm ? (rawForm.includes(',') ? rawForm.split(',') : rawForm.split('')) : [];
                                     
                                     const teamName = entry.team.shortName || entry.team.name;
+                                    
+                                    // 🟢 NEW: Strip quotes from team name so Cloudflare's WAF doesn't block the click
+                                    const safeUrlName = teamName.replace(/['"]/g, '');
 
                                     return (
                                         <tr key={entry.team.id} className={`hover:bg-slate-50 transition-colors ${isUCL ? 'bg-blue-50/20' : ''} ${isRelegation ? 'bg-red-50/20' : ''}`}>
@@ -188,7 +191,7 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                                             
                                             <td className="py-2 md:py-2.5 px-1 md:px-2 font-black text-slate-800">
                                                 <Link 
-                                                    href={`/matches?team=${encodeURIComponent(teamName)}`}
+                                                    href={`/matches?team=${encodeURIComponent(safeUrlName)}`}
                                                     className="flex items-center gap-1.5 md:gap-2 hover:text-blue-600 transition-colors group cursor-pointer"
                                                 >
                                                     {entry.team.crest ? (
