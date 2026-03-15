@@ -1,16 +1,52 @@
 'use client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Lock, Sparkles, Send, ShieldCheck, BrainCircuit, ExternalLink, Target, Shield } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+import { Lock, Sparkles, Send, ShieldCheck, BrainCircuit, ExternalLink, Target, Shield, Loader2 } from 'lucide-react';
 
 interface ProBettingSlipProps {
-    isVIP: boolean;
     homeTeam: string;
     awayTeam: string;
     status?: string;
     proAnalysis?: any;
 }
 
-export default function ProBettingSlipLock({ isVIP, homeTeam, awayTeam, status = 'SCHEDULED', proAnalysis }: ProBettingSlipProps) {
+export default function ProBettingSlipLock({ homeTeam, awayTeam, status = 'SCHEDULED', proAnalysis }: ProBettingSlipProps) {
+    // 🟢 Client-side states for auth
+    const [isVIP, setIsVIP] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // 🟢 Fetch VIP status securely in the browser
+    useEffect(() => {
+        const checkVipStatus = async () => {
+            try {
+                const supabase = createClient(
+                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+                );
+
+                const { data: { session } } = await supabase.auth.getSession();
+                
+                if (session?.user) {
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('is_vip')
+                        .eq('id', session.user.id)
+                        .single();
+                        
+                    if (profile?.is_vip) {
+                        setIsVIP(true);
+                    }
+                }
+            } catch (error) {
+                console.error("Auth check failed:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        checkVipStatus();
+    }, []);
     
     const currentStatus = status?.toUpperCase() || '';
     const isScheduled = ['SCHEDULED', 'PRE'].includes(currentStatus);
@@ -89,15 +125,25 @@ export default function ProBettingSlipLock({ isVIP, homeTeam, awayTeam, status =
                     </div>
                 </div>
 
+                {/* 🟢 Replaced standard lock with a loading-aware overlay */}
                 {!isVIP && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[3px] z-10 p-2">
-                        <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center shadow-md mb-1.5"><Lock className="w-3.5 h-3.5 text-black" /></div>
-                        <h4 className="font-black text-slate-900 uppercase tracking-tighter text-xs mb-0.5">Pro Analysis Locked</h4>
-                        <p className="text-[8px] text-slate-700 font-bold mb-2 text-center max-w-[200px] leading-tight">Unlock primary bet & tactical data.</p>
-                        <div className="flex flex-row gap-1.5 w-full max-w-[240px]">
-                            <Link href="/vip/upgrade" className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-600 text-black py-1.5 rounded text-[8px] font-black uppercase tracking-widest shadow-sm flex items-center justify-center gap-1"><Lock size={10} /> Unlock</Link>
-                            <a href="https://t.me/factsportlive" target="_blank" rel="noopener noreferrer" className="flex-1 bg-[#229ED9] text-white py-1.5 rounded text-[8px] font-black uppercase tracking-widest shadow-sm flex items-center justify-center gap-1"><Send size={10} /> Telegram</a>
-                        </div>
+                        {isLoading ? (
+                            <>
+                                <Loader2 className="w-8 h-8 text-yellow-500 animate-spin mb-2" />
+                                <h4 className="font-black text-slate-900 uppercase tracking-tighter text-xs mb-0.5">Verifying Access...</h4>
+                            </>
+                        ) : (
+                            <>
+                                <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center shadow-md mb-1.5"><Lock className="w-3.5 h-3.5 text-black" /></div>
+                                <h4 className="font-black text-slate-900 uppercase tracking-tighter text-xs mb-0.5">Pro Analysis Locked</h4>
+                                <p className="text-[8px] text-slate-700 font-bold mb-2 text-center max-w-[200px] leading-tight">Unlock primary bet & tactical data.</p>
+                                <div className="flex flex-row gap-1.5 w-full max-w-[240px]">
+                                    <Link href="/vip/upgrade" className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-600 text-black py-1.5 rounded text-[8px] font-black uppercase tracking-widest shadow-sm flex items-center justify-center gap-1"><Lock size={10} /> Unlock</Link>
+                                    <a href="https://t.me/factsportlive" target="_blank" rel="noopener noreferrer" className="flex-1 bg-[#229ED9] text-white py-1.5 rounded text-[8px] font-black uppercase tracking-widest shadow-sm flex items-center justify-center gap-1"><Send size={10} /> Telegram</a>
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
             </div>

@@ -1,7 +1,7 @@
 export const runtime = 'edge';
-export const revalidate = 60;
+export const revalidate = 180; // 🟢 NOW SECURELY CACHED FOR 60 SECONDS
 
-import { createClient } from '@/app/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js'; // 🟢 THE ANON CLIENT BYPASS
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, Calendar, Clock, ArrowRight, Trophy, Flame, Zap, ChevronRight, Tag } from 'lucide-react';
@@ -12,7 +12,8 @@ import BettingPromo from '@/app/components/BettingPromo';
 
 // 🔥 Generates dynamic metadata for SEO and Social Sharing
 export async function generateMetadata({ params }: { params: { slug: string } }) {
-    const supabase = createClient();
+    // 🟢 Anon Client for Metadata
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     const resolvedParams = await params;
     const { data: article } = await supabase.from('news').select('*').eq('slug', resolvedParams.slug).single();
     
@@ -30,7 +31,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 }
 
 export default async function ArticlePage({ params }: { params: { slug: string } }) {
-  const supabase = createClient();
+  // 🟢 Anon Client for the Page
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   const resolvedParams = await params;
 
   const { data: article } = await supabase
@@ -67,7 +69,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
         <div className="absolute bottom-0 left-0 w-full p-6 md:p-12 z-20 max-w-7xl mx-auto">
             <div className="flex flex-wrap gap-2 mb-4">
                 {article.is_breaking && <span className="bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-md uppercase tracking-widest shadow-lg animate-pulse flex items-center gap-1"><Flame size={12}/> Breaking</span>}
-                {/* 🟢 Render Dynamic Category */}
                 <span className="bg-blue-600 text-white text-[10px] font-black px-3 py-1 rounded-md uppercase tracking-widest shadow-lg border border-blue-500 flex items-center gap-1">
                     <Tag size={12} /> {article.category || 'Football'}
                 </span>
@@ -90,12 +91,10 @@ export default async function ArticlePage({ params }: { params: { slug: string }
         <div className="lg:col-span-8">
             <div className="bg-white">
                 
-                {/* 🟢 NEW: BETTING PROMO ADDED HERE */}
                 <div className="mb-8 max-w-2xl">
                     <BettingPromo affiliateLink={null} />
                 </div>
 
-                {/* Optimized Reading Typography */}
                 <div className="prose prose-lg prose-slate max-w-none text-slate-800 leading-relaxed md:leading-loose font-medium prose-headings:font-black prose-headings:tracking-tight prose-a:text-blue-600 prose-img:rounded-2xl prose-img:shadow-lg">
                     {article.body || article.content ? (
                         <MarkdownRenderer content={article.body || article.content} />

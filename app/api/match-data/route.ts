@@ -1,8 +1,7 @@
 import { createClient } from '@/app/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
-// 🟢 THE SHIELD: Caches the database response for 5 seconds at the edge.
-export const revalidate = 5; 
+// You can remove export const revalidate = 5; because the headers do the real work now!
 
 export async function GET(request: Request) {
     // 🛡️ THE BOUNCER LOGIC
@@ -11,7 +10,7 @@ export async function GET(request: Request) {
         const fetchSite = request.headers.get('sec-fetch-site') || '';
         const isBrowser = referer.includes('factsport.com') || fetchSite === 'same-origin';
         
-        // 🎫 THE VIP PASS: If you ever need to hit this with a cron job, just send your CRON_KEY!
+        // 🎫 THE VIP PASS
         const authHeader = request.headers.get('Authorization') || '';
         const isVIP = authHeader === `Bearer ${process.env.CRON_KEY}`;
 
@@ -34,5 +33,12 @@ export async function GET(request: Request) {
         .eq('id', matchId)
         .single();
 
-    return NextResponse.json(data);
+    // 🟢 THE TRUE SHIELD: Cloudflare Edge Caching
+    // s-maxage=5: Cloudflare caches this exact response globally for 5 seconds.
+    // stale-while-revalidate=5: Serves stale data quickly while fetching fresh data in the background.
+    return NextResponse.json(data, {
+        headers: {
+            'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=5',
+        },
+    });
 }

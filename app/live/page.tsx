@@ -1,16 +1,15 @@
 export const runtime = 'edge';
 export const revalidate = 3; 
 
-import { createClient } from '@/app/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js'; // 🟢 THIS PAGE IS NOW 100% SECURELY CACHED
 import Link from 'next/link';
-// 🔥 Added ArrowRight to imports for the banner
 import { Video, Mic, Calendar, ChevronLeft, Radio, Trophy, Activity, PlayCircle, ArrowRight } from 'lucide-react';
 import LiveScoreLabel from '@/app/components/LiveScoreLabel'; 
 import AutoRefresh from '@/app/components/AutoRefresh';
-import BettingPromo from '@/app/components/BettingPromo'; // 🔥 IMPORTED BETTING PROMO
+import BettingPromo from '@/app/components/BettingPromo';
 
 export default async function LiveMediaPage() {
-  const supabase = createClient();
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
   const { data: matches } = await supabase
     .from('matches')
@@ -33,7 +32,6 @@ export default async function LiveMediaPage() {
   return (
     <div className="min-h-screen bg-[#0a1428] pb-20 font-sans text-white selection:bg-red-500">
       
-      {/* 🔥 INVISIBLE AUTO REFRESH COMPONENT (Fires every 60s) */}
       <AutoRefresh interval={60000} />
       
       <div className="bg-[#0f1c3a] border-b border-white/10 text-white p-4 sticky top-0 z-50 shadow-2xl flex items-center gap-4 backdrop-blur-lg">
@@ -48,7 +46,6 @@ export default async function LiveMediaPage() {
 
       <div className="p-4 space-y-8 max-w-5xl mx-auto mt-4">
         
-        {/* 🟢 COMPONENT 1: BETTING PROMO (Compact layout at the top) */}
         <div className="max-w-2xl mx-auto">
             <BettingPromo affiliateLink={null} />
         </div>
@@ -99,7 +96,6 @@ export default async function LiveMediaPage() {
             </>
         )}
 
-        {/* 🟢 COMPONENT 2: PREDICT & WIN BANNER (Slim layout at the bottom) */}
         <div className="mt-10 max-w-3xl mx-auto bg-[#0a1428] rounded-2xl p-4 md:p-5 border border-yellow-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 opacity-10 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
             <div className="flex items-center gap-4 relative z-10">
@@ -121,7 +117,6 @@ export default async function LiveMediaPage() {
   );
 }
 
-// THE UNTOUCHED MATCH CARD LOGIC
 function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean }) {
     return (
         <div className={`rounded-2xl shadow-xl overflow-hidden relative flex flex-col transition-all duration-500 border ${hasCoverage ? 'bg-slate-900 border-slate-700 hover:border-blue-500/50' : 'bg-white/5 border-white/10'}`}>

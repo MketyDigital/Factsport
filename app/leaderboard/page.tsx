@@ -2,12 +2,13 @@
 export const runtime = 'edge';
 export const revalidate = 15;
 
-import { createClient } from '@/app/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js'; // 🟢 THE ANON CLIENT BYPASS
 import { Trophy, Star, Crown, History, TrendingUp, Calendar, Send, ExternalLink, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 export default async function LeaderboardPage() {
-  const supabase = createClient();
+  // 🟢 Guaranteed to cache perfectly without triggering auth/cookie checks
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
   const { data: settings } = await supabase
     .from('site_settings')
@@ -44,7 +45,6 @@ export default async function LeaderboardPage() {
     .order('created_at', { ascending: false })
     .limit(15);
 
-  // 🟢 TS FIX: Safely map the winners and handle the full_name whether it's an array or object
   const pastWinners = approvedWinners?.map(w => {
     let winnerName = 'Champion';
     if (w.user) {
