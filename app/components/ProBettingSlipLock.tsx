@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/app/lib/supabase/client'; // 🟢 FIXED: Using your configured browser client to read the secure cookies!
 import { Lock, Sparkles, Send, ShieldCheck, BrainCircuit, ExternalLink, Target, Shield, Loader2 } from 'lucide-react';
 
 interface ProBettingSlipProps {
@@ -12,18 +12,14 @@ interface ProBettingSlipProps {
 }
 
 export default function ProBettingSlipLock({ homeTeam, awayTeam, status = 'SCHEDULED', proAnalysis }: ProBettingSlipProps) {
-    // 🟢 Client-side states for auth
     const [isVIP, setIsVIP] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
-    // 🟢 Fetch VIP status securely in the browser
     useEffect(() => {
         const checkVipStatus = async () => {
             try {
-                const supabase = createClient(
-                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-                );
+                // 🟢 FIXED: It now knows exactly how to read your login session
+                const supabase = createClient();
 
                 const { data: { session } } = await supabase.auth.getSession();
                 
@@ -125,7 +121,6 @@ export default function ProBettingSlipLock({ homeTeam, awayTeam, status = 'SCHED
                     </div>
                 </div>
 
-                {/* 🟢 Replaced standard lock with a loading-aware overlay */}
                 {!isVIP && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[3px] z-10 p-2">
                         {isLoading ? (
