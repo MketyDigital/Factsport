@@ -1,7 +1,7 @@
 export const runtime = 'edge';
-export const revalidate = 3;
+export const revalidate = 5;
 
-import { createClient } from '@/app/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js'; // 🟢 THE ANON CLIENT BYPASS
 import Link from 'next/link';
 import { ChevronLeft, X, Search } from 'lucide-react';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner'; 
@@ -22,7 +22,7 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
   const resolvedParams = await searchParams;
   const teamFilter = resolvedParams?.team || null; 
 
-  const supabase = createClient();
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
    
   const startDate = new Date(); startDate.setDate(startDate.getDate() - 7); 
   const endDate = new Date(); endDate.setDate(endDate.getDate() + 14); 

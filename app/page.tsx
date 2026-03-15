@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-export const revalidate = 10; // 🟢 Perfect for Cloudflare: Lightning fast live scores, but still protects the database from traffic spikes
+export const revalidate = 5; // 🟢 Perfect for Cloudflare: Lightning fast live scores, but still protects the database from traffic spikes
 
 import { createClient } from '@/app/lib/supabase/server';
 import Link from "next/link";

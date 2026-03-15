@@ -1,7 +1,7 @@
 export const runtime = 'edge';
-export const revalidate = 300;
+export const revalidate = 180;
 
-import { createClient } from '@/app/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js'; // 🟢 THE ANON CLIENT BYPASS
 import Link from 'next/link';
 import { Calendar, ChevronRight, Zap, Trophy, Youtube, Newspaper, ArrowRight, Flame, Radio, BarChart2, ChevronLeft } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
@@ -10,7 +10,8 @@ const CATEGORIES = ['All', 'Football', 'Transfers', 'Sports Update', 'Champions 
 const ITEMS_PER_PAGE = 12;
 
 export default async function NewsListingPage({ searchParams }: { searchParams: { category?: string, page?: string } }) {
-  const supabase = createClient();
+  // 🟢 Anon Client
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   const resolvedParams = await searchParams;
   
   const currentCategory = resolvedParams.category || 'All';
@@ -50,7 +51,7 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
         </div>
       </div>
 
-      {/* 🟢 NEW: CATEGORY NAVIGATOR */}
+      {/* CATEGORY NAVIGATOR */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm overflow-x-auto scrollbar-hide">
           <div className="max-w-7xl mx-auto flex px-4 py-3 space-x-2 min-w-max">
               {CATEGORIES.map((cat) => (
@@ -111,7 +112,7 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
             ))}
         </div>
 
-        {/* 🟢 NEW: PAGINATION CONTROLS */}
+        {/* PAGINATION CONTROLS */}
         {totalPages > 1 && (
             <div className="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mt-8">
                 <Link 
@@ -139,7 +140,7 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
         )}
       </div>
 
-      {/* QUICK ACTIONS FOOTER (Unchanged) */}
+      {/* QUICK ACTIONS FOOTER */}
       <div className="max-w-7xl mx-auto px-4 mt-16 mb-8">
           <div className="bg-[#0a1428] rounded-3xl p-8 shadow-2xl relative overflow-hidden border border-slate-800">
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600 rounded-full blur-[100px] opacity-20"></div>

@@ -3,7 +3,7 @@ export const revalidate = 300; // Caches for 5 mins to protect your database
 
 import Link from 'next/link';
 import { ChevronLeft, BarChart2, AlertTriangle } from 'lucide-react';
-import { createClient } from '@/app/lib/supabase/server'; 
+import { createClient } from '@supabase/supabase-js'; // 🟢 THE ANON CLIENT BYPASS
 
 const LEAGUE_MAP: Record<string, string> = {
     'Premier League': 'PL',
@@ -14,7 +14,6 @@ const LEAGUE_MAP: Record<string, string> = {
     'Champions League': 'CL'
 };
 
-// Normalizes names so DB matches perfectly regardless of "FC" or "CF"
 const normalizeName = (name: string) => {
     if (!name) return "";
     return name.toLowerCase()
@@ -27,7 +26,7 @@ const normalizeName = (name: string) => {
 
 async function getStandings(leagueName: string) {
     const leagueCode = LEAGUE_MAP[leagueName] || 'PL'; 
-    const supabase = createClient();
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
     try {
         const { data: dbStandings, error: standingsError } = await supabase
@@ -40,11 +39,10 @@ async function getStandings(leagueName: string) {
             return { error: 'No standings data available yet.', data: [] };
         }
 
-        // INDUSTRY STANDARD: Fetch matches STRICTLY for this specific league
         const { data: dbMatches } = await supabase
             .from('matches')
             .select('home_team, away_team, home_score, away_score')
-            .eq('league', leagueName) // <-- Filters out Cup/European games!
+            .eq('league', leagueName)
             .in('status', ['FT', 'FINISHED', 'AWARDED', 'AET', 'PEN'])
             .order('match_date', { ascending: false });
 
