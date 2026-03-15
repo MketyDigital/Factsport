@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 export const revalidate = 60;
 
-import { createClient } from '@/app/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js'; // 🟢 THE ANON CLIENT BYPASS
 import Link from "next/link";
 import { PlayCircle, Calendar, ArrowLeft, Tv, ShieldCheck, Trophy, ArrowRight, ChevronRight, ChevronLeft } from "lucide-react";
 import BettingPromo from '@/app/components/BettingPromo';
@@ -14,7 +14,8 @@ export const metadata = {
 };
 
 export default async function HighlightsPage({ searchParams }: { searchParams: { league?: string, page?: string } }) {
-  const supabase = createClient();
+  // 🟢 Guaranteed to prevent auth/cookie checks
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   const resolvedParams = await searchParams;
   
   const currentLeague = resolvedParams.league || 'All';
@@ -25,14 +26,12 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
   const to = from + ITEMS_PER_PAGE - 1;
 
   // 2. 🔥 DYNAMIC LEAGUE EXTRACTOR
-  // We quickly grab just the league names of matches that actually have videos
   const { data: leagueData } = await supabase
     .from('matches')
     .select('league')
     .not('video_url', 'is', null)
     .neq('video_url', '');
 
-  // Extract unique leagues, sort them alphabetically, and add 'All' to the front
   const uniqueLeagues = Array.from(new Set((leagueData || []).map(m => m.league))).filter(Boolean).sort();
   const dynamicLeagues = ['All', ...uniqueLeagues];
 

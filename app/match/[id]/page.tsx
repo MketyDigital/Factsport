@@ -1,7 +1,7 @@
 export const runtime = 'edge';
-export const revalidate = 3;
+export const revalidate = 3; // 🟢 Back to a lightning-fast 5 seconds. Cloudflare will shield the database perfectly.
 
-import { createClient } from '@/app/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js'; // 🟢 Using standard client to avoid cookie checks breaking the cache
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronLeft, Zap, ExternalLink, Link as LinkIcon, MapPin, Trophy, Grid, Percent, BarChart2, BrainCircuit, History, Play, Calendar } from 'lucide-react';
@@ -29,7 +29,8 @@ const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
 async function getSupabaseData(id: string) {
-    const supabase = createClient();
+    // 🟢 Using Anon Key so Next.js doesn't look for user cookies and ruin the static edge cache
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     const { data, error } = await supabase.from('matches').select('*').eq('id', id).single();
     if (error) return null;
     return data;
@@ -39,16 +40,10 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const resolvedParams = await params;
   if (!resolvedParams?.id) return notFound();
 
-  const supabase = createClient();
   const dbData = await getSupabaseData(resolvedParams.id);
   if (!dbData) return notFound();
 
-  let isUserVIP = false;
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session?.user) {
-      const { data: profile } = await supabase.from('profiles').select('is_vip').eq('id', session.user.id).single();
-      if (profile?.is_vip) isUserVIP = true;
-  }
+  // 🔴 VIP Check removed from here. The ProBettingSlipLock component will handle it on the client side!
 
   const rawData = await getExternalData(dbData);
   const data: any = rawData || {};
@@ -173,8 +168,8 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
         {!hasWidget && (
             <div id="pro-analysis" className="scroll-mt-6">
+                {/* 🟢 Notice we no longer pass isVIP. The component figures it out itself! */}
                 <ProBettingSlipLock 
-                    isVIP={isUserVIP} 
                     homeTeam={dbData.home_team} 
                     awayTeam={dbData.away_team} 
                     status={dbData.status} 

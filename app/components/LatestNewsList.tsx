@@ -21,9 +21,9 @@ export default function LatestNewsList({ latestNews }: { latestNews: any[] }) {
             {latestNews.map((item, index) => (
                 <Link href={`/news/${item.slug || '#'}`} key={item.id} className="flex gap-4 items-center p-3 md:p-4 active:bg-slate-50 transition group hover:bg-slate-50/80 relative overflow-hidden">
                     
-                    {/* 🟢 THE FIX: Increased from w-16 h-16 to w-20 h-20 (and wider on desktop) for better visibility */}
-                    <div className="w-20 h-20 md:w-24 md:h-20 bg-slate-100 rounded-xl shrink-0 overflow-hidden relative shadow-sm border border-slate-200/50">
-                        <NewsArtwork image={item.image_url} team1Logo={item.team_1_logo} team2Logo={item.team_2_logo} title={item.title} className="w-full h-full object-cover group-hover:scale-110 transition duration-700 ease-out" />
+                    {/* 🟢 BIGGER THUMBNAILS: Increased to w-28 h-24 (mobile) and w-36 h-28 (desktop) */}
+                    <div className="w-28 h-24 md:w-36 md:h-28 bg-slate-100 rounded-xl shrink-0 overflow-hidden relative shadow-sm border border-slate-200/50">
+                        <NewsArtwork image={item.image_url} team1Logo={item.team_1_logo} team2Logo={item.team_2_logo} title={item.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-700 ease-out" />
                     </div>
                     
                     <div className="flex-1 pr-6 py-1">
@@ -33,10 +33,9 @@ export default function LatestNewsList({ latestNews }: { latestNews: any[] }) {
                             </span>
                         )}
                         
-                        {/* 🟢 Slightly increased text size on desktop to match the bigger image */}
-                        <h4 className="text-xs md:text-sm font-bold leading-relaxed line-clamp-2 text-slate-800 group-hover:text-blue-600 transition">{item.title}</h4>
+                        <h4 className="text-xs md:text-sm font-bold leading-relaxed line-clamp-3 text-slate-800 group-hover:text-blue-600 transition">{item.title}</h4>
                         
-                        <div className="flex items-center gap-3 mt-2">
+                        <div className="flex items-center gap-3 mt-2.5">
                             <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
                                 <Clock size={10} /> {new Date(item.created_at).toLocaleDateString('en-GB', {day: 'numeric', month: 'short'})}
                             </span>
