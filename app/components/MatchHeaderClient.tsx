@@ -115,8 +115,9 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
 
             <div className="flex justify-between items-start">
                 
+                {/* 🟢 WAF FIX: Strips quotes from home team name */}
                 <Link 
-                    href={`/matches?team=${encodeURIComponent(homeTeamName)}`}
+                    href={`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g, ''))}`}
                     className="flex flex-col items-center w-[35%] group cursor-pointer active:scale-95 transition-transform"
                 >
                     <div className="w-14 h-14 md:w-20 md:h-20 bg-gradient-to-b from-white/10 to-transparent p-2 md:p-4 rounded-xl md:rounded-2xl mb-1 flex items-center justify-center border border-white/10 shadow-xl backdrop-blur-md transition-transform group-hover:scale-105">
@@ -147,8 +148,9 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                     )}
                 </div>
 
+                {/* 🟢 WAF FIX: Strips quotes from away team name */}
                 <Link 
-                    href={`/matches?team=${encodeURIComponent(awayTeamName)}`}
+                    href={`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g, ''))}`}
                     className="flex flex-col items-center w-[35%] group cursor-pointer active:scale-95 transition-transform"
                 >
                     <div className="w-14 h-14 md:w-20 md:h-20 bg-gradient-to-b from-white/10 to-transparent p-2 md:p-4 rounded-xl md:rounded-2xl mb-1 flex items-center justify-center border border-white/10 shadow-xl backdrop-blur-md transition-transform group-hover:scale-105">

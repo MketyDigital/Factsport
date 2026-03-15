@@ -4,7 +4,7 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@/app/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js'; // 🟢 OPTIMIZED: Anon Client for pure speed
 import { getExternalData } from '@/app/lib/matchService';
 
 export async function GET(
@@ -30,7 +30,8 @@ export async function GET(
   }
 
   try {
-    const supabase = createClient();
+    // 🟢 OPTIMIZED: Bypasses cookie checks entirely for maximum Edge speed
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     
     // 1. Fetch the match record from your Database
     const { data: dbData, error } = await supabase
