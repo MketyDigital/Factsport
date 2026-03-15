@@ -1,21 +1,21 @@
 'use client';
 
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw'; // 🟢 THE FIX: Allows HTML embeds like Twitter/YouTube!
 import Link from 'next/link';
 import { ExternalLink, Link as LinkIcon } from 'lucide-react';
 
 export default function MarkdownRenderer({ content }: { content: string }) {
   return (
     <ReactMarkdown
+      rehypePlugins={[rehypeRaw]} // 🟢 Tells React to safely render the iframe/script tags
       components={{
-        // 🟢 1. CUSTOM LINK RENDERER (Turns links into beautiful buttons)
+        // 🟢 1. CUSTOM LINK RENDERER
         a: ({ href, children, ...props }) => {
           const isInternal = href?.startsWith('/');
           
-          // The Tailwind classes that make it look like a button
           const buttonClasses = "inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-lg font-black text-xs uppercase tracking-wider hover:bg-blue-600 hover:text-white transition shadow-sm border border-blue-100 my-1 no-underline group active:scale-95";
 
-          // Internal Links (using Next.js Link)
           if (isInternal) {
             return (
               <Link href={href || '#'} className={buttonClasses} {...props}>
@@ -25,7 +25,6 @@ export default function MarkdownRenderer({ content }: { content: string }) {
             );
           }
 
-          // External Links (Using <a> with maximum security)
           return (
             <a 
               href={href} 
@@ -40,7 +39,7 @@ export default function MarkdownRenderer({ content }: { content: string }) {
           );
         },
 
-        // 🟢 2. CUSTOM IMAGE RENDERER (Makes injected images look premium)
+        // 🟢 2. CUSTOM IMAGE RENDERER
         img: ({ src, alt, ...props }) => (
           <span className="block my-6 rounded-2xl overflow-hidden shadow-lg border border-slate-100 bg-slate-50">
             <img 
@@ -54,11 +53,18 @@ export default function MarkdownRenderer({ content }: { content: string }) {
           </span>
         ),
 
-        // 🟢 3. PARAGRAPH FIX (Ensures smooth spacing)
+        // 🟢 3. PARAGRAPH FIX
         p: ({ children, ...props }) => (
           <p className="mb-4 text-slate-700 leading-relaxed" {...props}>
             {children}
           </p>
+        ),
+
+        // 🟢 4. IFRAME RE-SIZER (Prevents embeds from breaking your mobile layout)
+        iframe: ({ node, ...props }) => (
+            <div className="w-full overflow-hidden rounded-xl my-6 flex justify-center bg-slate-50 border border-slate-100">
+                <iframe {...props} className="max-w-full" />
+            </div>
         )
       }}
     >
