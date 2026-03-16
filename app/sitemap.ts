@@ -24,7 +24,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const matchUrls = (matches || []).map((match) => ({
     url: `${baseUrl}/match/${match.id}`,
     lastModified: match.updated_at ? new Date(match.updated_at) : new Date(),
-    changeFrequency: 'always' as const, // Tells Google live matches change constantly
+    changeFrequency: 'always' as const, 
     priority: 0.9,
   }));
 
@@ -46,7 +46,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/standings',
     '/leaderboard',
     '/vip/upgrade',
-    ‘/how-to-play’,
+    '/how-to-play',
   ].map((route) => ({
     url: `${baseUrl}${route}`,
     lastModified: new Date(),
