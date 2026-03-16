@@ -21,8 +21,8 @@ const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
 export const metadata = {
-  title: 'FactSport | Live Scores, News & Predictions',
-  description: 'The #1 Platform for sports predictions, live scores, and breaking news.',
+  title: 'FactSport | Live Football, Sport News & Predictions',
+  description: 'The #1 Platform for sports | football predictions, live scores, and breaking news.',
   // 🟢 WebSite Schema for Search Box
   other: {
       "application/ld+json": JSON.stringify({
