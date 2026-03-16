@@ -11,14 +11,17 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchHeaderData = async () => {
-      if (document.visibilityState !== 'visible') return;
+      if (document.visibilityState !== 'visible' || !isMounted) return;
       try {
-          const res = await fetch(`/api/match-data?id=${matchId}`);
+          // 🔥 CACHE BUSTER ADDED TO PREVENT DELAYS
+          const res = await fetch(`/api/match-data?id=${matchId}&t=${Date.now()}`);
           if (!res.ok) return;
           const payload = await res.json();
           
-          if (payload && !payload.error) {
+          if (payload && !payload.error && isMounted) {
               setData((prev:any) => ({ 
                   ...prev, 
                   status: payload.status, 
@@ -47,6 +50,7 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+        isMounted = false;
         if (intervalRef.current) clearInterval(intervalRef.current);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
@@ -57,7 +61,8 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
   }
 
   const currentStatus = data?.status?.toUpperCase() || '';
-  const isLive = ['LIVE', 'HT', 'IN_PLAY'].includes(currentStatus);
+  const isHT = ['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME'].includes(currentStatus);
+  const isLive = ['LIVE', 'IN_PLAY', '1H', '2H', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'].includes(currentStatus) || isHT;
   const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'].includes(currentStatus);
   const leagueData = getLeagueAssets(initialData?.league);
 
@@ -76,11 +81,7 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
     <div className="relative z-10 px-4 mt-1 pb-4 pt-1 rounded-b-2xl md:rounded-b-3xl overflow-hidden bg-slate-900 shadow-2xl">
         
         <div className="absolute inset-0 z-0 pointer-events-none">
-            <img 
-                src={leagueData.bg} 
-                alt="Stadium Atmosphere" 
-                className="absolute inset-0 w-full h-full object-cover opacity-80" 
-            />
+            <img src={leagueData.bg} alt="Stadium Atmosphere" className="absolute inset-0 w-full h-full object-cover opacity-80" />
         </div>
 
         <div className="absolute inset-0 z-0 pointer-events-none">
@@ -102,9 +103,9 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                     <div className="flex flex-col items-center">
                         <span className="bg-red-600/90 backdrop-blur-sm text-white text-[9px] md:text-[10px] font-black px-3 py-1 md:px-4 md:py-1.5 rounded-full animate-pulse flex items-center gap-1.5 shadow-[0_0_15px_rgba(220,38,38,0.5)] border border-white/10">
                             <span className="w-1.5 h-1.5 bg-white rounded-full"></span> 
-                            {currentStatus === 'HT' ? 'HALF TIME' : 'LIVE'}
+                            {isHT ? 'HALF TIME' : 'LIVE'}
                         </span>
-                        {data?.displayClock && <span className="text-red-300 text-[9px] md:text-[10px] font-mono mt-0.5 md:mt-1 font-bold bg-black/30 px-1.5 rounded">{data.displayClock}</span>}
+                        {data?.displayClock && !isHT && <span className="text-red-300 text-[9px] md:text-[10px] font-mono mt-0.5 md:mt-1 font-bold bg-black/30 px-1.5 rounded">{data.displayClock}</span>}
                     </div>
                 ) : (
                     <span className={`text-[8px] md:text-[10px] font-bold px-3 py-1 md:px-4 md:py-1.5 rounded-full border backdrop-blur-md shadow-lg flex items-center ${isFinished ? 'bg-slate-900/80 text-slate-300 border-slate-700' : 'bg-white/10 text-white border-white/20'}`}>
@@ -114,12 +115,7 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
             </div>
 
             <div className="flex justify-between items-start">
-                
-                {/* 🟢 WAF FIX: Strips quotes from home team name */}
-                <Link 
-                    href={`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g, ''))}`}
-                    className="flex flex-col items-center w-[35%] group cursor-pointer active:scale-95 transition-transform"
-                >
+                <Link href={`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center w-[35%] group cursor-pointer active:scale-95 transition-transform">
                     <div className="w-14 h-14 md:w-20 md:h-20 bg-gradient-to-b from-white/10 to-transparent p-2 md:p-4 rounded-xl md:rounded-2xl mb-1 flex items-center justify-center border border-white/10 shadow-xl backdrop-blur-md transition-transform group-hover:scale-105">
                         {initialData?.home_logo ? <img src={initialData.home_logo} className="w-full h-full object-contain drop-shadow-lg" /> : <div className="font-black text-slate-500 text-xs md:text-base">H</div>}
                     </div>
@@ -148,11 +144,7 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                     )}
                 </div>
 
-                {/* 🟢 WAF FIX: Strips quotes from away team name */}
-                <Link 
-                    href={`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g, ''))}`}
-                    className="flex flex-col items-center w-[35%] group cursor-pointer active:scale-95 transition-transform"
-                >
+                <Link href={`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center w-[35%] group cursor-pointer active:scale-95 transition-transform">
                     <div className="w-14 h-14 md:w-20 md:h-20 bg-gradient-to-b from-white/10 to-transparent p-2 md:p-4 rounded-xl md:rounded-2xl mb-1 flex items-center justify-center border border-white/10 shadow-xl backdrop-blur-md transition-transform group-hover:scale-105">
                         {initialData?.away_logo ? <img src={initialData.away_logo} className="w-full h-full object-contain drop-shadow-lg" /> : <div className="font-black text-slate-500 text-xs md:text-base">A</div>}
                     </div>
@@ -168,7 +160,6 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                         </div>
                     )}
                 </Link>
-
             </div>
         </div>
     </div>

@@ -1,25 +1,25 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script"; // 🟢 ADDED NEXT.JS SCRIPT COMPONENT
 import "./globals.css";
 import AuthProvider from "@/app/components/AuthProvider";
 import Footer from '@/app/components/Footer'; 
 import SiteHeader from '@/app/components/SiteHeader'; 
 
-
 export const runtime = 'edge';
 
 const inter = Inter({ subsets: ["latin"] });
 
-// 1. UPDATE METADATA (Manifest & Apple Config)
+// 1. UPDATE METADATA (Manifest, Apple Config & SEO)
 export const metadata: Metadata = {
   title: "FactSport | Live Football, Sport News, Predict & Win",
-  description: "The #1 Platform for sports updates,predictions, live scores, analysis and breaking news. Join VIP to win monthly prizes.",
+  description: "The #1 Platform for sports updates, predictions, live scores, analysis and breaking news. Join VIP to win monthly prizes.",
   metadataBase: new URL('https://factsport.com'), 
   
   // 🟢 PWA LINKING
   manifest: '/manifest.json',
   
-  // 🟢 FIXED ICONS: Pointing explicitly to public folder
+  // 🟢 FIXED ICONS
   icons: {
     icon: '/icon.png',
     shortcut: '/favicon.ico',
@@ -38,13 +38,13 @@ export const metadata: Metadata = {
 
   openGraph: {
     title: "FactSport - Live Football, Sport News, Predict & Win",
-    description: "Latest Sport Updates, Livescores, Watch Football highlights, Live Radio Commentary, Analysis , Predict and win monthly prizes.",
+    description: "Latest Sport Updates, Livescores, Watch Football highlights, Live Radio Commentary, Analysis, Predict and win monthly prizes.",
     siteName: 'FactSport',
     locale: 'en_US',
     type: 'website',
     images: [
       {
-        url: '/logo.png', // Uses your logo for social sharing
+        url: '/logo.png',
         width: 1200,
         height: 630,
         alt: 'FactSport Logo',
@@ -52,9 +52,14 @@ export const metadata: Metadata = {
     ],
   },
   robots: "index, follow",
+  
+  // 🟢 GOOGLE SEARCH CONSOLE VERIFICATION (Required for rapid SEO indexing)
+  verification: {
+    google: 'YOUR_GOOGLE_SEARCH_CONSOLE_VERIFICATION_CODE', // Replace this later
+  },
 };
 
-// 2. NEW VIEWPORT EXPORT (Next.js 14 Standard for Theme Color)
+// 2. VIEWPORT EXPORT
 export const viewport: Viewport = {
   themeColor: '#0a1428',
   width: 'device-width',
@@ -70,6 +75,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* 🟢 GOOGLE ADSENSE AUTO ADS SCRIPT */}
+        <Script
+          id="adsbygoogle-init"
+          strategy="afterInteractive"
+          crossOrigin="anonymous"
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6393486260333696"
+        />
+      </head>
       <body className={`${inter.className} bg-[#F0F2F5] text-slate-900`}>
         <AuthProvider>
           <div className="flex flex-col min-h-screen">
@@ -84,7 +98,7 @@ export default function RootLayout({
           </div>
         </AuthProvider>
 
-        {/* 🟢 SERVICE WORKER REGISTRATION (Safe Static Method) */}
+        {/* 🟢 SERVICE WORKER REGISTRATION */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
