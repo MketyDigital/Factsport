@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import Script from "next/script"; // 🟢 ADDED NEXT.JS SCRIPT COMPONENT
+import Script from "next/script"; 
 import "./globals.css";
 import AuthProvider from "@/app/components/AuthProvider";
 import Footer from '@/app/components/Footer'; 
@@ -10,24 +10,18 @@ export const runtime = 'edge';
 
 const inter = Inter({ subsets: ["latin"] });
 
-// 1. UPDATE METADATA (Manifest, Apple Config & SEO)
+// 1. METADATA
 export const metadata: Metadata = {
   title: "FactSport | Live Football, Sport News, Predict & Win",
   description: "The #1 Platform for sports updates, predictions, live scores, analysis and breaking news. Join VIP to win monthly prizes.",
   metadataBase: new URL('https://factsport.com'), 
   
-  // 🟢 PWA LINKING
   manifest: '/manifest.json',
   
-  // 🟢 FIXED ICONS
   icons: {
     icon: '/icon.png',
     shortcut: '/favicon.ico',
     apple: '/apple-icon.png',
-    other: {
-      rel: 'apple-touch-icon-precomposed',
-      url: '/apple-icon.png',
-    },
   },
 
   appleWebApp: {
@@ -52,11 +46,6 @@ export const metadata: Metadata = {
     ],
   },
   robots: "index, follow",
-  
-  // 🟢 GOOGLE SEARCH CONSOLE VERIFICATION (Required for rapid SEO indexing)
-  verification: {
-    google: 'YOUR_GOOGLE_SEARCH_CONSOLE_VERIFICATION_CODE', // Replace this later
-  },
 };
 
 // 2. VIEWPORT EXPORT
@@ -76,18 +65,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* 🟢 GOOGLE ADSENSE AUTO ADS SCRIPT */}
-        <Script
-          id="adsbygoogle-init"
-          strategy="afterInteractive"
-          crossOrigin="anonymous"
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6393486260333696"
-        />
+        {/* 🟢 EXACT MONETAG VERIFICATION TAG */}
+        <meta name="monetag" content="a140e0902356fac8ba39118de3a36047" />
       </head>
       <body className={`${inter.className} bg-[#F0F2F5] text-slate-900`}>
         <AuthProvider>
           <div className="flex flex-col min-h-screen">
-            {/* ✅ HEADER ADDED HERE (Visible on ALL pages) */}
             <SiteHeader /> 
             
             <main className="flex-grow">
@@ -98,7 +81,6 @@ export default function RootLayout({
           </div>
         </AuthProvider>
 
-        {/* 🟢 SERVICE WORKER REGISTRATION */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
