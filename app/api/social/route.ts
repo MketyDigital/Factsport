@@ -131,6 +131,23 @@ export async function POST(request: Request) {
     }
 
     if (!payload.fb1Message && !payload.xMessage) return NextResponse.json({ message: "No postable event occurred." });
+    
+    // Post to Facebook & Twitter
     await postToSocials(payload);
-    return NextResponse.json({ success: true, event: "Webhook complete" });
+
+    // 🟢 NEW: INSTANT GOOGLE INDEXING PING
+    try {
+        await fetch(`${frontendUrl}/api/index-url`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.CRON_KEY}`
+            },
+            body: JSON.stringify({ url: matchUrl, type: 'URL_UPDATED' })
+        });
+    } catch (e) {
+        console.error("Google Ping Failed", e);
+    }
+
+    return NextResponse.json({ success: true, event: "Webhook complete & Google Pinged" });
 }

@@ -1,31 +1,29 @@
 export const runtime = 'edge';
 export const revalidate = 60;
 
-import { createClient } from '@supabase/supabase-js'; // 🟢 THE ANON CLIENT BYPASS
+import { createClient } from '@supabase/supabase-js'; 
 import Link from "next/link";
 import { PlayCircle, Calendar, ArrowLeft, Tv, ShieldCheck, Trophy, ArrowRight, ChevronRight, ChevronLeft } from "lucide-react";
 import BettingPromo from '@/app/components/BettingPromo';
 
 const ITEMS_PER_PAGE = 12;
 
+// 🔥 SEO METADATA ADDED
 export const metadata = {
-  title: 'Match Highlights | FactSport',
-  description: 'Watch the latest match highlights and recap the best moments.',
+  title: 'Football Highlights & Goal Replays | FactSport',
+  description: 'Watch the latest football highlights, goal replays, and match recaps from the top leagues worldwide.',
 };
 
 export default async function HighlightsPage({ searchParams }: { searchParams: { league?: string, page?: string } }) {
-  // 🟢 Guaranteed to prevent auth/cookie checks
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   const resolvedParams = await searchParams;
   
   const currentLeague = resolvedParams.league || 'All';
   const currentPage = parseInt(resolvedParams.page || '1');
 
-  // 1. Pagination Math
   const from = (currentPage - 1) * ITEMS_PER_PAGE;
   const to = from + ITEMS_PER_PAGE - 1;
 
-  // 2. 🔥 DYNAMIC LEAGUE EXTRACTOR
   const { data: leagueData } = await supabase
     .from('matches')
     .select('league')
@@ -35,7 +33,6 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
   const uniqueLeagues = Array.from(new Set((leagueData || []).map(m => m.league))).filter(Boolean).sort();
   const dynamicLeagues = ['All', ...uniqueLeagues];
 
-  // 3. Query Builder (Strictly Videos Only)
   let query = supabase
     .from('matches')
     .select('*', { count: 'exact' })
@@ -56,7 +53,6 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
   return (
     <div className="min-h-screen bg-[#0a1428] text-white font-sans pb-16 overflow-x-hidden selection:bg-red-500">
       
-      {/* HEADER */}
       <div className="bg-[#0f1c3a] border-b border-white/10 sticky top-0 z-40 shadow-2xl backdrop-blur-lg">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -73,7 +69,6 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
             </div>
         </div>
         
-        {/* 🟢 DYNAMIC LEAGUE NAVIGATOR BAR */}
         {dynamicLeagues.length > 1 && (
             <div className="border-t border-white/5 mt-2 bg-[#0a1428]/50 overflow-x-auto scrollbar-hide">
                 <div className="max-w-7xl mx-auto flex px-4 py-2.5 space-x-2 min-w-max">
@@ -94,12 +89,10 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
 
       <div className="max-w-7xl mx-auto px-4 mt-6">
         
-        {/* COMPONENT 1: BETTING PROMO */}
         <div className="max-w-xl mx-auto mb-8">
             <BettingPromo affiliateLink={null} />
         </div>
 
-        {/* HIGHLIGHTS GRID */}
         {safeHighlights.length > 0 ? (
             <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
@@ -141,7 +134,6 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
                     ))}
                 </div>
 
-                {/* PAGINATION CONTROLS */}
                 {totalPages > 1 && (
                     <div className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/10 mt-8 shadow-sm">
                         <Link 
@@ -160,7 +152,6 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
                     </div>
                 )}
 
-                {/* COMPONENT 2: PREDICT & WIN BANNER */}
                 <div className="mt-10 max-w-3xl mx-auto bg-[#0f1c3a] rounded-2xl p-4 md:p-5 border border-yellow-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 opacity-10 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
                     <div className="flex items-center gap-4 relative z-10">

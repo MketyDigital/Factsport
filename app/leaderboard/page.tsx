@@ -1,13 +1,17 @@
-// ✅ RUNS ON EDGE
 export const runtime = 'edge';
 export const revalidate = 15;
 
-import { createClient } from '@supabase/supabase-js'; // 🟢 THE ANON CLIENT BYPASS
+import { createClient } from '@supabase/supabase-js'; 
 import { Trophy, Star, Crown, History, TrendingUp, Calendar, Send, ExternalLink, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
+// 🔥 SEO METADATA ADDED
+export const metadata = {
+  title: 'Prediction Leaderboard & Winners | FactSport',
+  description: 'View the global VIP prediction leaderboard. See who is winning monthly cash prizes by predicting football matches and scores.',
+};
+
 export default async function LeaderboardPage() {
-  // 🟢 Guaranteed to cache perfectly without triggering auth/cookie checks
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
   const { data: settings } = await supabase
@@ -26,7 +30,6 @@ export default async function LeaderboardPage() {
     .order('monthly_correct_scores', { ascending: false })
     .limit(50);
 
-  // STRICT PODIUM LOGIC
   const podiumQualifiers = users?.filter(u => 
       u.is_vip && 
       u.eligible_monthly_correct_scores >= targetCS && 
@@ -37,7 +40,6 @@ export default async function LeaderboardPage() {
   const second = podiumQualifiers[1];
   const third = podiumQualifiers[2];
 
-  // 🟢 LIVE DATABASE FETCH FOR PAST WINNERS
   const { data: approvedWinners } = await supabase
     .from('monthly_winners')
     .select('month_year, points, prize_amount, rank, user:profiles(full_name)')
