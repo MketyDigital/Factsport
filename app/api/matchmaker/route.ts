@@ -13,13 +13,12 @@ const getCanonicalName = (rawName: string) => {
     let name = rawName.toLowerCase()
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
         .replace(/[^a-z0-9 ]/g, '') 
-        // 🔥 ADDED '1', 'olympique', 'de' to aggressively strip German/French prefixes
         .replace(/\b(1|fc|cf|afc|sc|sv|rc|fk|vfl|fsv|tsg|ssc|bayer|rcd|ud|as|us|osc|cfa|aja|ca|bc|ac|sk|olympique|de)\b/g, '') 
         .replace(/\s+/g, ' ') 
         .trim();
 
     const aliases: Record<string, string> = {
-        'manchester utd': 'manchester united', 'man utd': 'manchester united', 'man city': 'manchester city',
+        'manchester utd': 'manchester united', 'man utd': 'manchester united', 'man united': 'manchester united', 'man city': 'manchester city',
         'spurs': 'tottenham hotspur', 'tottenham': 'tottenham hotspur', 'wolves': 'wolverhampton wanderers',
         'wolverhampton': 'wolverhampton wanderers', 'nottm forest': 'nottingham forest', 'nottingham': 'nottingham forest',
         'sheff utd': 'sheffield united', 'brighton hove albion': 'brighton', 'brighton hove': 'brighton', 
@@ -50,8 +49,8 @@ const getCanonicalName = (rawName: string) => {
         'ac monza': 'monza', 'us sassuolo': 'sassuolo', 'frosinone calcio': 'frosinone', 'us salernitana 1919': 'salernitana',
         'fiorentina': 'acf fiorentina', 'empoli fc': 'empoli', 'bologna fc': 'bologna', 'udinese calcio': 'udinese',
         'psg': 'paris saint germain', 'paris sg': 'paris saint germain', 'om': 'marseille',
-        'olympique de marseille': 'marseille', 'ol': 'lyon', 'olympique lyonnais': 'lyon', 'olympique lyon': 'lyon', // 🔥 Added Lyon variation
-        'paris fc': 'paris fc', // 🔥 Added explicit Paris FC to prevent overlap
+        'olympique de marseille': 'marseille', 'ol': 'lyon', 'olympique lyonnais': 'lyon', 'olympique lyon': 'lyon', 
+        'paris fc': 'paris fc', 
         'auxerre': 'auxerre', 'stade rennais': 'rennes', 'clermont foot 63': 'clermont', 'clermont foot': 'clermont', 
         'toulouse fc': 'toulouse', 'le havre ac': 'le havre', 'mhsc': 'montpellier', 'montpellier hsc': 'montpellier',
         'st etienne': 'saint etienne', 'asse': 'saint etienne', 'lille osc': 'lille', 'ogc nice': 'nice',
@@ -88,8 +87,15 @@ const similarity = (s1: string, s2: string) => {
 
 // 🔥 2.5 THE NEW SUBSTRING SAFETY NET
 const isStrongSubstring = (s1: string, s2: string) => {
-    if (s1.length < 4 || s2.length < 4) return false; // Prevent tiny words like "FC" from auto-matching
+    if (s1.length < 4 || s2.length < 4) return false; 
     return s1.includes(s2) || s2.includes(s1);
+};
+
+// 🔥 2.6 THE NEW TOKEN MATCHER (Catches "Man United" vs "Manchester United")
+const isTokenMatch = (s1: string, s2: string) => {
+    const tokens1 = s1.split(' ').filter(w => w.length > 4); // Only care about substantial words
+    const tokens2 = s2.split(' ').filter(w => w.length > 4);
+    return tokens1.some(t1 => tokens2.includes(t1));
 };
 
 // 3. THE MASTER MATCHMAKER
@@ -146,11 +152,10 @@ async function runMatchmaker(request: Request) {
                  const homeScore = similarity(dbHome, espnHome);
                  const awayScore = similarity(dbAway, espnAway);
                  
-                 // 🔥 THE NEW 99.9% LOGIC: Check Substrings FIRST
-                 const homeMatch = isStrongSubstring(dbHome, espnHome) || homeScore > 0.75;
-                 const awayMatch = isStrongSubstring(dbAway, espnAway) || awayScore > 0.75;
+                 // 🔥 THE NEW 99.9% LOGIC: Check Substrings, Token Words, or High Fuzzy Score
+                 const homeMatch = isStrongSubstring(dbHome, espnHome) || isTokenMatch(dbHome, espnHome) || homeScore > 0.75;
+                 const awayMatch = isStrongSubstring(dbAway, espnAway) || isTokenMatch(dbAway, espnAway) || awayScore > 0.75;
 
-                 // If BOTH teams match either via Substring OR high fuzzy score, we map it!
                  return homeMatch && awayMatch;
              });
 
