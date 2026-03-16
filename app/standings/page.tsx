@@ -14,6 +14,16 @@ const LEAGUE_MAP: Record<string, string> = {
     'Champions League': 'CL'
 };
 
+// 🔥 DYNAMIC METADATA ADDED FOR STANDINGS
+export async function generateMetadata({ searchParams }: { searchParams: { league?: string } }) {
+    const resolvedParams = await searchParams;
+    const league = resolvedParams?.league || 'Premier League';
+    return {
+        title: `${league} Table & Standings | FactSport`,
+        description: `Check the latest ${league} table, points, and current team form. Live updates on the title race and relegation battles.`
+    }
+}
+
 const normalizeName = (name: string) => {
     if (!name) return "";
     return name.toLowerCase()
@@ -178,7 +188,6 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                                     
                                     const teamName = entry.team.shortName || entry.team.name;
                                     
-                                    // 🟢 NEW: Strip quotes from team name so Cloudflare's WAF doesn't block the click
                                     const safeUrlName = teamName.replace(/['"]/g, '');
 
                                     return (

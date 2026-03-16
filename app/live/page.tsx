@@ -86,7 +86,8 @@ export default async function LiveMediaPage() {
                             <Activity size={14} className="text-red-500 animate-pulse"/>
                             <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">Other Live Scores</h2>
                         </div>
-                        <div className="space-y-4 opacity-95">
+                        {/* 🟢 Smaller gap for the sleeker live score cards */}
+                        <div className="space-y-2.5 opacity-95">
                             {liveUncoveredMatches.map(match => (
                                 <MatchCard key={match.id} match={match} hasCoverage={false} />
                             ))}
@@ -118,14 +119,51 @@ export default async function LiveMediaPage() {
 }
 
 function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean }) {
-    return (
-        <div className={`rounded-2xl shadow-xl overflow-hidden relative flex flex-col transition-all duration-500 border ${hasCoverage ? 'bg-slate-900 border-slate-700 hover:border-blue-500/50' : 'bg-white/5 border-white/10'}`}>
-            
-            {hasCoverage && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-purple-500 to-red-600"></div>}
+    // 🟢 SMALLER, SLEEKER LAYOUT FOR LIVE SCORES WITHOUT MEDIA
+    if (!hasCoverage) {
+        return (
+            <div className="rounded-xl overflow-hidden relative flex flex-col transition-colors border bg-white/[0.03] border-white/5 hover:bg-white/[0.06] group shadow-lg">
+                <Link href={`/match/${match.id}`} className="block">
+                    {/* Top League Bar */}
+                    <div className="flex justify-between items-center px-3 py-1.5 border-b border-white/5 bg-black/20">
+                         <div className="flex items-center gap-1.5 text-[8px] font-black text-slate-400 uppercase tracking-widest line-clamp-1">
+                             <Trophy size={10} className="text-slate-500"/>
+                             {match.league || 'Competition'}
+                         </div>
+                         <div className="shrink-0">
+                             <LiveScoreLabel matchId={match.id} initialStatus={match.status} variant="badge" />
+                         </div>
+                    </div>
+                    
+                    {/* Horizontal Team & Score Body */}
+                    <div className="flex items-center justify-between p-3 md:p-4">
+                        <div className="flex-1 text-right text-xs md:text-sm font-black text-white truncate pr-3">{match.home_team}</div>
+                        <div className="shrink-0 flex justify-center w-16">
+                            <LiveScoreLabel 
+                                matchId={match.id} 
+                                initialStatus={match.status} 
+                                homeScore={match.home_score} 
+                                awayScore={match.away_score} 
+                                matchDate={match.match_date} 
+                                // Default small variant gives the perfect little score pill
+                            />
+                        </div>
+                        <div className="flex-1 text-left text-xs md:text-sm font-black text-white truncate pl-3">{match.away_team}</div>
+                    </div>
+                </Link>
+            </div>
+        );
+    }
 
-            <div className={`flex justify-between items-center px-4 py-2.5 border-b ${hasCoverage ? 'bg-slate-800/50 border-slate-700/50' : 'bg-black/20 border-white/5'}`}>
+    // 🔴 ORIGINAL MASSIVE LAYOUT FOR MEDIA COVERAGE MATCHES
+    return (
+        <div className="rounded-2xl shadow-xl overflow-hidden relative flex flex-col transition-all duration-500 border bg-slate-900 border-slate-700 hover:border-blue-500/50">
+            
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-purple-500 to-red-600"></div>
+
+            <div className="flex justify-between items-center px-4 py-2.5 border-b bg-slate-800/50 border-slate-700/50">
                  <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest line-clamp-1">
-                     <Trophy size={10} className={hasCoverage ? "text-yellow-500" : "text-slate-500"}/>
+                     <Trophy size={10} className="text-yellow-500"/>
                      {match.league || 'Competition'}
                  </div>
                  <div className="shrink-0 drop-shadow-md">
@@ -149,7 +187,7 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
                     variant="large" 
                 />
 
-                {hasCoverage && (match.livestream_url || match.audio_url) && (
+                {(match.livestream_url || match.audio_url) && (
                     <div className="flex gap-3 mb-2 mt-4">
                         {match.livestream_url && (
                             <div className="flex-1 bg-red-600/20 text-red-500 border border-red-500/30 py-2.5 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black group-hover:bg-red-600 group-hover:text-white transition-all shadow-inner">

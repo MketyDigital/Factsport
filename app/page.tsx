@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 export const revalidate = 5; 
 
-import { createClient } from '@supabase/supabase-js'; // 🟢 FIXED TO ANON CLIENT
+import { createClient } from '@supabase/supabase-js'; 
 import Link from "next/link";
 import { ArrowRight, Youtube, Newspaper, TrendingUp, Calendar, Award, Trophy } from "lucide-react";
 
@@ -23,6 +23,15 @@ const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET'
 export const metadata = {
   title: 'FactSport | Live Scores, News & Predictions',
   description: 'The #1 Platform for sports predictions, live scores, and breaking news.',
+  // 🟢 WebSite Schema for Search Box
+  other: {
+      "application/ld+json": JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          "name": "FactSport",
+          "url": "https://factsport.com/"
+      })
+  }
 };
 
 const formatDateLabel = (dateString: string) => {
@@ -86,7 +95,6 @@ const getDiverseMatches = (allMatches: any[], limit: number) => {
 };
 
 async function getHomepageData(leagueFilter: string | undefined) {
-  // 🟢 GUARANTEES NEXT.JS CATCHES THIS AND PROTECTS SUPABASE
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     
   const todayStart = new Date(); todayStart.setHours(0,0,0,0);

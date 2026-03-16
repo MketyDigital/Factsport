@@ -1,7 +1,9 @@
 import { createClient } from '@/app/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
-// You can remove export const revalidate = 5; because the headers do the real work now!
+// 🛡️ VERCEL SHIELD: Forces Vercel's Edge Cache to group user requests together
+export const revalidate = 5; 
+export const runtime = 'edge';
 
 export async function GET(request: Request) {
     // 🛡️ THE BOUNCER LOGIC
@@ -26,19 +28,22 @@ export async function GET(request: Request) {
 
     const supabase = createClient();
     
-    // Grabs everything your client components need in one read
-    const { data } = await supabase
+    // 🔥 THE SWEET SPOT: We fetch the score/clock AND the live events, stats, and lineups.
+    // We leave out pro_analysis and affiliate links because those don't change by the minute.
+    const { data, error } = await supabase
         .from('matches')
-        .select('*')
+        .select('id, status, home_score, away_score, displayClock, widget_id, match_events, lineups, stats')
         .eq('id', matchId)
         .single();
 
-    // 🟢 THE TRUE SHIELD: Cloudflare Edge Caching
-    // s-maxage=5: Cloudflare caches this exact response globally for 5 seconds.
-    // stale-while-revalidate=5: Serves stale data quickly while fetching fresh data in the background.
+    if (error || !data) {
+        return NextResponse.json({ error: 'Match not found' }, { status: 404 });
+    }
+
+    // 🔥 CACHE RULES: Browser asks instantly, Cloudflare/Vercel holds for exactly 5s.
     return NextResponse.json(data, {
         headers: {
-            'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=5',
+            'Cache-Control': 'max-age=0, s-maxage=5',
         },
     });
 }
