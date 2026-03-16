@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 export const revalidate = 180;
 
-import { createClient } from '@supabase/supabase-js'; // 🟢 THE ANON CLIENT BYPASS
+import { createClient } from '@supabase/supabase-js'; 
 import Link from 'next/link';
 import { Calendar, ChevronRight, Zap, Trophy, Youtube, Newspaper, ArrowRight, Flame, Radio, BarChart2, ChevronLeft } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
@@ -9,19 +9,22 @@ import NewsArtwork from '@/app/components/NewsArtwork';
 const CATEGORIES = ['All', 'Football', 'Transfers', 'Sports Update', 'Champions League', 'Euros', 'World Cup', 'AFCON', 'Copa America'];
 const ITEMS_PER_PAGE = 12;
 
+// 🔥 SEO METADATA ADDED
+export const metadata = {
+  title: 'Breaking Sports News & Football Updates | FactSport',
+  description: 'Read the latest football news, transfer rumors, and breaking sports updates from around the globe.',
+};
+
 export default async function NewsListingPage({ searchParams }: { searchParams: { category?: string, page?: string } }) {
-  // 🟢 Anon Client
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   const resolvedParams = await searchParams;
   
   const currentCategory = resolvedParams.category || 'All';
   const currentPage = parseInt(resolvedParams.page || '1');
 
-  // 1. Pagination Math
   const from = (currentPage - 1) * ITEMS_PER_PAGE;
   const to = from + ITEMS_PER_PAGE - 1;
 
-  // 2. Build the Query
   let query = supabase.from('news').select('*', { count: 'exact' }).order('created_at', { ascending: false });
   if (currentCategory !== 'All') {
       query = query.eq('category', currentCategory);
@@ -31,7 +34,6 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
   const { data: news, count } = await query;
   const totalPages = count ? Math.ceil(count / ITEMS_PER_PAGE) : 1;
 
-  // 3. Logic: Featured only shows on Page 1 to save space
   const isFirstPage = currentPage === 1;
   const featured = isFirstPage ? (news?.find(n => n.is_headline) || news?.[0]) : null;
   const rest = featured ? (news?.filter(n => n.id !== featured.id) || []) : (news || []);

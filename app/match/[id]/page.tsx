@@ -1,10 +1,12 @@
 export const runtime = 'edge';
-export const revalidate = 3; // 🟢 Back to a lightning-fast 5 seconds. Cloudflare will shield the database perfectly.
+export const revalidate = 3; 
 
-import { createClient } from '@supabase/supabase-js'; // 🟢 Using standard client to avoid cookie checks breaking the cache
+import { createClient } from '@supabase/supabase-js'; 
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ChevronLeft, Zap, ExternalLink, Link as LinkIcon, MapPin, Trophy, Grid, Percent, BarChart2, BrainCircuit, History, Play, Calendar } from 'lucide-react';
+import { Metadata, ResolvingMetadata } from 'next';
+import { cache } from 'react'; 
+import { ChevronLeft, Zap, MapPin, Trophy, Grid, Percent, BarChart2, BrainCircuit, History, Play, Calendar, LinkIcon } from 'lucide-react';
 
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import PredictionBoard from '@/app/components/PredictionBoard';
@@ -28,12 +30,60 @@ const sanitizeUrl = (url: string | null | undefined) => {
 const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
-async function getSupabaseData(id: string) {
-    // 🟢 Using Anon Key so Next.js doesn't look for user cookies and ruin the static edge cache
+// 🟢 CACHED DB CALL: Generates metadata and builds the page using only ONE database read!
+const getSupabaseData = cache(async (id: string) => {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     const { data, error } = await supabase.from('matches').select('*').eq('id', id).single();
     if (error) return null;
     return data;
+});
+
+// 🔥 DYNAMIC METADATA GENERATOR FOR MAXIMUM CTR
+export async function generateMetadata(
+    { params }: { params: { id: string } },
+    parent: ResolvingMetadata
+): Promise<Metadata> {
+    const resolvedParams = await params;
+    const match = await getSupabaseData(resolvedParams.id);
+    
+    if (!match) return { title: 'Match Not Found | FactSport' };
+
+    const status = (match.status || '').toUpperCase();
+    const isLive = !SCHEDULED_STATUSES.includes(status) && !FINISHED_STATUSES.includes(status);
+    const isFinished = FINISHED_STATUSES.includes(status);
+
+    let mediaTag = "";
+    if (match.livestream_url) mediaTag = " | Watch Live";
+    else if (match.audio_url) mediaTag = " | Live Radio";
+
+    let title = `${match.home_team} vs ${match.away_team} Predictions, H2H & Live Score | FactSport`;
+    let description = `Get expert predictions, pro betting analysis, starting lineups, and live updates for ${match.home_team} vs ${match.away_team} in the ${match.league}.`;
+
+    if (isLive) {
+        title = `🔴 LIVE: ${match.home_team} ${match.home_score}-${match.away_score} ${match.away_team}${mediaTag}`;
+        description = `Follow the live score, minute-by-minute text commentary, and live match stats for ${match.home_team} vs ${match.away_team}.`;
+    } else if (isFinished) {
+        title = `${match.home_team} ${match.home_score}-${match.away_score} ${match.away_team} Result, Highlights & Match Stats`;
+        description = `Full time result: ${match.home_team} ${match.home_score}-${match.away_score} ${match.away_team}. Watch the highlights, review the pro analysis, and check the final match stats.`;
+    }
+
+    const previousImages = (await parent).openGraph?.images || [];
+
+    return {
+        title,
+        description,
+        openGraph: {
+            title,
+            description,
+            type: 'website',
+            images: match.home_logo && match.away_logo ? [match.home_logo, ...previousImages] : previousImages,
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title,
+            description,
+        }
+    };
 }
 
 export default async function MatchDetailsPage({ params }: { params: { id: string } }) {
@@ -42,8 +92,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
   const dbData = await getSupabaseData(resolvedParams.id);
   if (!dbData) return notFound();
-
-  // 🔴 VIP Check removed from here. The ProBettingSlipLock component will handle it on the client side!
 
   const rawData = await getExternalData(dbData);
   const data: any = rawData || {};
@@ -61,9 +109,54 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
   const formattedDate = new Date(dbData.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
+  // 🔥 GOOGLE RICH SNIPPETS: SportsEvent Schema
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SportsEvent",
+    "name": `${dbData.home_team} vs ${dbData.away_team}`,
+    "description": `Live coverage, predictions, and stats for ${dbData.home_team} vs ${dbData.away_team}.`,
+    "startDate": new Date(dbData.match_date).toISOString(),
+    "sport": "Soccer",
+    "competitor": [
+      {
+        "@type": "SportsTeam",
+        "name": dbData.home_team,
+        "image": dbData.home_logo || ""
+      },
+      {
+        "@type": "SportsTeam",
+        "name": dbData.away_team,
+        "image": dbData.away_logo || ""
+      }
+    ],
+    "homeTeam": {
+      "@type": "SportsTeam",
+      "name": dbData.home_team
+    },
+    "awayTeam": {
+      "@type": "SportsTeam",
+      "name": dbData.away_team
+    },
+    ...(dbData.venue && {
+      "location": {
+        "@type": "Place",
+        "name": dbData.venue
+      }
+    }),
+    ...(!isUpcomingMatch && {
+       "eventStatus": isFinished ? "https://schema.org/EventRescheduled" : "https://schema.org/EventLive" 
+    })
+  };
+
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       
+      {/* 🟢 INJECTING THE SCHEMA INTO THE HEAD OF THE PAGE */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       {hasWidget ? (
           <div className="bg-[#0a1428] text-white p-4 shadow-md flex items-center justify-between sticky top-0 z-40">
               <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
@@ -168,7 +261,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
         {!hasWidget && (
             <div id="pro-analysis" className="scroll-mt-6">
-                {/* 🟢 Notice we no longer pass isVIP. The component figures it out itself! */}
                 <ProBettingSlipLock 
                     homeTeam={dbData.home_team} 
                     awayTeam={dbData.away_team} 

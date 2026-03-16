@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 export const revalidate = 5;
 
-import { createClient } from '@supabase/supabase-js'; // 🟢 THE ANON CLIENT BYPASS
+import { createClient } from '@supabase/supabase-js'; 
 import Link from 'next/link';
 import { ChevronLeft, X, Search } from 'lucide-react';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner'; 
@@ -10,6 +10,12 @@ import LeagueNavigator from '@/app/components/LeagueNavigator';
 
 import { getTeamForm } from '@/app/lib/teamForm';
 import { getTeamQueryFilter } from '@/app/lib/teamAliases';
+
+// 🔥 SEO METADATA ADDED
+export const metadata = {
+  title: 'Football Fixtures, Live Scores & Results | FactSport',
+  description: 'View today\'s football fixtures, live scores, and recent match results from the Premier League, Champions League, La Liga, WorldCup and more.',
+};
 
 const PRIORITY_LEAGUES = [
     'Premier League', 'La Liga', 'Bundesliga', 
