@@ -13,15 +13,18 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchStatsData = async () => {
-      if (document.visibilityState !== 'visible') return;
+      if (document.visibilityState !== 'visible' || !isMounted) return;
 
       try {
-          const res = await fetch(`/api/match-data?id=${matchId}`);
+          // 🔥 CACHE BUSTER ADDED: Forces the browser to get the freshest live events/stats instantly
+          const res = await fetch(`/api/match-data?id=${matchId}&t=${Date.now()}`);
           if (!res.ok) return;
           const payload = await res.json();
           
-          if (payload && !payload.error) {
+          if (payload && !payload.error && isMounted) {
               setLiveData(prev => ({
                   stats: payload.stats || prev.stats,
                   lineups: payload.lineups || prev.lineups,
@@ -47,6 +50,7 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+        isMounted = false;
         if (intervalRef.current) clearInterval(intervalRef.current);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
@@ -74,9 +78,7 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
   const homeShotsOff = stats?.home?.shotsOffTarget || stats?.home?.shots_off_target || '0';
   const awayShotsOff = stats?.away?.shotsOffTarget || stats?.away?.shots_off_target || '0';
   
-  // Only show the target rows if ESPN actually gave us the detailed split data
   const showTargetStats = parseInt(homeShotsOn) > 0 || parseInt(awayShotsOn) > 0 || parseInt(homeShotsOff) > 0 || parseInt(awayShotsOff) > 0;
-
   const hasStats = stats?.home?.possession || getSafeShots(stats?.home) !== '0' || stats?.home?.corners;
 
   const getSortedLineup = (players: any[]) => {
@@ -163,7 +165,6 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
                     <StatRow label="Possession" home={stats?.home?.possession || '50%'} away={stats?.away?.possession || '50%'} />
                     <StatRow label="Total Shots" home={getSafeShots(stats?.home)} away={getSafeShots(stats?.away)} />
                     
-                    {/* 🟢 THE SPLIT ROWS (Only appear if data exists) */}
                     {showTargetStats && (
                         <>
                             <StatRow label="Shots on Target" home={homeShotsOn} away={awayShotsOn} />
