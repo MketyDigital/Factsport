@@ -39,12 +39,9 @@ export async function POST(request: Request) {
     const oldState = body.old_record || { home_score: 0, away_score: 0, status: 'PRE_MATCH', lineups: { home: [], away: [] }, match_events: [] };
     if (!newState) return NextResponse.json({ message: "No record found" });
 
-    // 🛑 ANTI-GHOST POST FILTER
-    // If it was already FT/FINISHED, block late corrections. Allows PEN, AET, IN_PLAY to post freely!
-    const strictlyFinishedStatuses = ['FT', 'FINISHED', 'ABD'];
+    const strictlyFinishedStatuses = ['FT', 'FINISHED', 'ABD', 'AET'];
     if (strictlyFinishedStatuses.includes(oldState.status) && strictlyFinishedStatuses.includes(newState.status)) {
-        console.log(`[Webhook] Match ${newState.id} is already finished. Ignoring late correction.`);
-        return NextResponse.json({ message: "Match already finished. Ignoring late correction for socials." });
+        return NextResponse.json({ message: "Match already finished. Ignoring late correction." });
     }
 
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
@@ -60,7 +57,7 @@ export async function POST(request: Request) {
     }
 
     const frontendUrl = 'https://factsport.com'; 
-    const imageUrl = 'https://factsport.vercel.app'; 
+    const imageUrl = 'https://factsport.com'; 
     const matchUrl = `${frontendUrl}/match/${newState.id}`; 
     let payload: SocialPayload = {}; 
 
@@ -77,11 +74,11 @@ export async function POST(request: Request) {
     const oldWasIncomplete = oldValidH.length < 11 || oldValidA.length < 11;
     const newIsComplete = newValidH.length >= 11 && newValidA.length >= 11;
 
-    // 1. VAR DISALLOWED
+    const htStatuses = ['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME'];
+
     if (newTotal < oldTotal) {
         payload.fb1Message = `❌ VAR DECISION: OVERTURNED - Previous G/Event has been canceled.\n\nThe score returns to:\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
     } 
-    // 2. GOAL / PENALTY SCORED
     else if (newTotal > oldTotal || newGoalsList.length > oldGoalsList.length) {
         if (newGoalsList.length < newTotal) return NextResponse.json({ message: "Facts data lagging behind scoreboard. Waiting for next ping." });
         let statusText = ['IN_PLAY', 'LIVE', '1H', '2H'].includes(newState.status) ? '' : ` (${newState.status})`;
@@ -102,14 +99,12 @@ export async function POST(request: Request) {
             payload.fb1Message = `🚨 GOAL ALERT!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\n${matchUrl}`;
         }
     } 
-    // 3. PENALTY AWARDED
     else if (newTotal === oldTotal && newPenaltiesList.length > oldPenaltiesList.length) {
         const sortedPens = [...newPenaltiesList].sort((a, b) => parseTime(b.time || b.minute) - parseTime(a.time || a.minute));
         const latestPen = sortedPens[0];
         const time = latestPen.time || latestPen.minute ? `${latestPen.time || latestPen.minute}'` : '';
         payload.fb1Message = `⚠️ PENALTY AWARDED - (Confirmed by Referee/VAR) ${time}\n\nMassive moment in the match! Will they convert it?\n\n👇\n${matchUrl}`;
     }
-    // 4. STARTING XI 
     else if (oldWasIncomplete && newIsComplete) {
         const hXI = newValidH.slice(0, 11).join(', '); const aXI = newValidA.slice(0, 11).join(', ');
         payload.fb1Message = `📋 STARTING XI ANNOUNCED!\n\n${newState.home_team} vs ${newState.away_team}\n\nHome: ${hXI}\n\nAway: ${aXI}\n\n👇\n${matchUrl}`;
@@ -121,14 +116,13 @@ export async function POST(request: Request) {
     else if (oldWasIncomplete && !newIsComplete && (newValidH.length > 0 || newValidA.length > 0)) {
         return NextResponse.json({ message: "Lineups still incomplete." });
     } 
-    // 5. MATCH STATUS UPDATES
     else if (['PRE_MATCH', 'SCHEDULED', 'PRE', 'NS'].includes(oldState.status) && ['IN_PLAY', 'LIVE', '1H'].includes(newState.status)) {
         payload.fb1Message = `⏱️ KICK-OFF!\n\nWe are officially underway: ${newState.home_team} vs ${newState.away_team}.\n\nFollow live updates here:\n👇\n${matchUrl}`;
     }
-    else if (oldState.status !== 'HT' && newState.status === 'HT') {
-        payload.fb1Message = `⏸️ HALF TIME.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
+    else if (!htStatuses.includes(oldState.status) && htStatuses.includes(newState.status)) {
+        payload.fb1Message = `⏸️ HALF TIME.\n\nHow do you rate the first half performance?\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇 Match Stats so far:\n${matchUrl}`;
     }
-    else if (!['FT', 'FINISHED'].includes(oldState.status) && ['FT', 'FINISHED'].includes(newState.status)) {
+    else if (!strictlyFinishedStatuses.includes(oldState.status) && strictlyFinishedStatuses.includes(newState.status)) {
         payload.fb1Message = `⏹️ FULL TIME!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\nMatch stats and ratings available now:\n👇\n${matchUrl}`;
         payload.xMessage = `⏹️ FULL TIME.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}. Rate the performance!`;
         const ftOg = { type: 'versus', label: 'FULL TIME', home: newState.home_team, away: newState.away_team, hScore: newState.home_score, aScore: newState.away_score };
