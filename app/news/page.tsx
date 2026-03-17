@@ -5,6 +5,9 @@ import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { Calendar, ChevronRight, Zap, Trophy, Youtube, Newspaper, ArrowRight, Flame, Radio, BarChart2, ChevronLeft } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
+import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
+import BettingPromo from '@/app/components/BettingPromo';
 
 const CATEGORIES = ['All', 'Football', 'Transfers', 'Sports Update', 'Champions League', 'Euros', 'World Cup', 'AFCON', 'Copa America'];
 const ITEMS_PER_PAGE = 12;
@@ -38,18 +41,28 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
   const featured = isFirstPage ? (news?.find(n => n.is_headline) || news?.[0]) : null;
   const rest = featured ? (news?.filter(n => n.id !== featured.id) || []) : (news || []);
 
+  // 🟢 Split the grid to insert the ad in the middle
+  const midIndex = Math.floor(rest.length / 2);
+  const firstHalf = rest.slice(0, midIndex);
+  const secondHalf = rest.slice(midIndex);
+
   return (
     <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans text-slate-900">
       
       {/* HEADER */}
-      <div className="bg-[#0a1428] text-white pt-8 pb-16 px-6 relative overflow-hidden shadow-lg border-b border-blue-900/30">
+      <div className="bg-[#0a1428] text-white pt-8 pb-12 px-6 relative overflow-hidden shadow-lg border-b border-blue-900/30">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
         <div className="relative z-10 max-w-7xl mx-auto">
              <Link href="/" className="text-xs font-bold text-slate-400 hover:text-white mb-6 inline-flex items-center gap-1 transition-colors"><ChevronRight size={14} className="rotate-180"/> Back Home</Link>
              <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter flex items-center gap-3">
                  <Newspaper className="text-blue-500" size={36} /> The Newsroom
              </h1>
-             <p className="text-slate-400 font-medium tracking-wide mt-2 text-sm max-w-md">Breaking stories, tactical Football analysis, and the latest from the world of Sport.</p>
+             <p className="text-slate-400 font-medium tracking-wide mt-2 mb-6 text-sm max-w-md">Breaking stories, tactical Football analysis, and the latest from the world of Sport.</p>
+             
+             {/* 1. 🟢 THE TOP BILLBOARD (Under News Page Title) */}
+             <div className="mt-2">
+                 <AdsterraStandardBanner />
+             </div>
         </div>
       </div>
 
@@ -70,6 +83,11 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
       </div>
 
       <div className="px-4 mt-6 relative z-20 max-w-7xl mx-auto">
+
+        {/* 2. 🟢 SLIM BETTING PROMO (Before the News List/Featured Card) */}
+        <div className="mb-8 w-full max-w-3xl mx-auto overflow-hidden rounded-xl bg-white border border-slate-200 shadow-sm max-h-[90px]">
+            <BettingPromo affiliateLink={null} />
+        </div>
 
         {/* FEATURED CARD (Only Page 1) */}
         {featured && (
@@ -96,7 +114,9 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
 
         {/* NEWS GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {rest.map((item) => (
+            
+            {/* Render First Half of News Grid */}
+            {firstHalf.map((item) => (
                 <Link key={item.id} href={`/news/${item.slug}`} className="group bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col h-full">
                     <div className="aspect-[16/10] relative overflow-hidden bg-slate-900 border-b border-slate-100">
                         <NewsArtwork image={item.image_url} team1Logo={item.team_1_logo} team2Logo={item.team_2_logo} title={item.title} className="w-full h-full object-cover transition duration-700 group-hover:scale-110 opacity-90 group-hover:opacity-100" />
@@ -112,6 +132,32 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
                     </div>
                 </Link>
             ))}
+
+            {/* 3. 🟢 NATIVE BANNER INJECTED MID-GRID */}
+            {rest.length > 0 && (
+                <div className="col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-4 my-2 border-y border-slate-200 py-4">
+                    <AdsterraNativeBanner />
+                </div>
+            )}
+
+            {/* Render Second Half of News Grid */}
+            {secondHalf.map((item) => (
+                <Link key={item.id} href={`/news/${item.slug}`} className="group bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col h-full">
+                    <div className="aspect-[16/10] relative overflow-hidden bg-slate-900 border-b border-slate-100">
+                        <NewsArtwork image={item.image_url} team1Logo={item.team_1_logo} team2Logo={item.team_2_logo} title={item.title} className="w-full h-full object-cover transition duration-700 group-hover:scale-110 opacity-90 group-hover:opacity-100" />
+                        <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
+                            {item.category && <span className="bg-black/60 backdrop-blur-md text-white text-[8px] font-black px-2 py-1 rounded shadow-sm uppercase tracking-widest">{item.category}</span>}
+                            {item.is_breaking && <span className="bg-red-600 text-white text-[8px] font-black tracking-widest px-2 py-1 rounded shadow-lg flex items-center gap-1"><Flame size={10} className="animate-pulse"/> BREAKING</span>}
+                        </div>
+                    </div>
+                    <div className="p-5 flex flex-col flex-1">
+                        <div className="text-[9px] text-slate-400 font-black mb-3 uppercase tracking-widest flex items-center gap-1.5"><Calendar size={12} className="text-blue-500" /> {new Date(item.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric'})}</div>
+                        <h3 className="font-black text-slate-800 text-lg leading-snug group-hover:text-blue-600 transition-colors line-clamp-3 mb-4">{item.title}</h3>
+                        <div className="mt-auto pt-4 border-t border-slate-50 flex items-center text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-blue-600 transition-colors">Read Article <ArrowRight size={12} className="ml-1 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300" /></div>
+                    </div>
+                </Link>
+            ))}
+
         </div>
 
         {/* PAGINATION CONTROLS */}
@@ -140,10 +186,15 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
                 <p className="text-slate-500 font-medium">Try checking a different category.</p>
             </div>
         )}
+
+        {/* 4. 🟢 END-OF-LIST NATIVE BANNER (Before Quick Actions) */}
+        <div className="mt-12 mb-4">
+            <AdsterraNativeBanner />
+        </div>
       </div>
 
       {/* QUICK ACTIONS FOOTER */}
-      <div className="max-w-7xl mx-auto px-4 mt-16 mb-8">
+      <div className="max-w-7xl mx-auto px-4 mt-8 mb-8">
           <div className="bg-[#0a1428] rounded-3xl p-8 shadow-2xl relative overflow-hidden border border-slate-800">
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600 rounded-full blur-[100px] opacity-20"></div>
               <h3 className="text-white font-black text-xl italic mb-6 relative z-10 flex items-center gap-2"><Zap className="text-yellow-500"/> EXPLORE FACTSPORT</h3>

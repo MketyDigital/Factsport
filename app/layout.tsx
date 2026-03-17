@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import Script from "next/script"; 
 import "./globals.css";
 import AuthProvider from "@/app/components/AuthProvider";
 import Footer from '@/app/components/Footer'; 
 import SiteHeader from '@/app/components/SiteHeader'; 
+import MonetagVignette from '@/app/components/MonetagVignette'; 
+import StickyAffiliateBanner from '@/app/components/StickyAffiliateBanner'; // 🟢 INJECTED THE NEW BANNER
 
 export const runtime = 'edge';
 
@@ -65,10 +66,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* 🟢 EXACT MONETAG VERIFICATION TAG */}
+        {/* 🟢 PERMANENT MONETAG VERIFICATION TAG */}
         <meta name="monetag" content="a140e0902356fac8ba39118de3a36047" />
       </head>
       <body className={`${inter.className} bg-[#F0F2F5] text-slate-900`}>
+        
+        {/* 🟢 SILENT INTERSTITIAL AD CONTROLLER */}
+        <MonetagVignette />
+
         <AuthProvider>
           <div className="flex flex-col min-h-screen">
             <SiteHeader /> 
@@ -81,6 +86,10 @@ export default function RootLayout({
           </div>
         </AuthProvider>
 
+        {/* 🟢 THE GLOBAL STICKY AFFILIATE BANNER */}
+        <StickyAffiliateBanner />
+
+        {/* SERVICE WORKER REGISTRATION */}
         <script
           dangerouslySetInnerHTML={{
             __html: `

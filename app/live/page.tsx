@@ -1,12 +1,14 @@
 export const runtime = 'edge';
 export const revalidate = 3; 
 
-import { createClient } from '@supabase/supabase-js'; // 🟢 THIS PAGE IS NOW 100% SECURELY CACHED
+import { createClient } from '@supabase/supabase-js'; 
 import Link from 'next/link';
 import { Video, Mic, Calendar, ChevronLeft, Radio, Trophy, Activity, PlayCircle, ArrowRight } from 'lucide-react';
 import LiveScoreLabel from '@/app/components/LiveScoreLabel'; 
 import AutoRefresh from '@/app/components/AutoRefresh';
 import BettingPromo from '@/app/components/BettingPromo';
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
+import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
 export default async function LiveMediaPage() {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
@@ -46,6 +48,9 @@ export default async function LiveMediaPage() {
 
       <div className="p-4 space-y-8 max-w-5xl mx-auto mt-4">
         
+        {/* 1. 🟢 STANDARD BANNER (Top) */}
+        <AdsterraStandardBanner />
+
         <div className="max-w-2xl mx-auto">
             <BettingPromo affiliateLink={null} />
         </div>
@@ -80,13 +85,15 @@ export default async function LiveMediaPage() {
                     )}
                 </div>
 
+                {/* 2. 🟢 MID-PAGE NATIVE BANNER (Between Media matches and text matches) */}
+                <AdsterraNativeBanner />
+
                 {liveUncoveredMatches.length > 0 && (
                     <div>
-                        <div className="flex items-center gap-2 mb-4 pl-1 mt-8 border-t border-white/10 pt-8">
+                        <div className="flex items-center gap-2 mb-4 pl-1 mt-4 border-t border-white/10 pt-8">
                             <Activity size={14} className="text-red-500 animate-pulse"/>
                             <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">Other Live Scores</h2>
                         </div>
-                        {/* 🟢 Smaller gap for the sleeker live score cards */}
                         <div className="space-y-2.5 opacity-95">
                             {liveUncoveredMatches.map(match => (
                                 <MatchCard key={match.id} match={match} hasCoverage={false} />
@@ -96,6 +103,9 @@ export default async function LiveMediaPage() {
                 )}
             </>
         )}
+
+        {/* 3. 🟢 END OF PAGE NATIVE BANNER */}
+        <AdsterraNativeBanner />
 
         <div className="mt-10 max-w-3xl mx-auto bg-[#0a1428] rounded-2xl p-4 md:p-5 border border-yellow-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 opacity-10 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
@@ -119,12 +129,10 @@ export default async function LiveMediaPage() {
 }
 
 function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean }) {
-    // 🟢 SMALLER, SLEEKER LAYOUT FOR LIVE SCORES WITHOUT MEDIA
     if (!hasCoverage) {
         return (
             <div className="rounded-xl overflow-hidden relative flex flex-col transition-colors border bg-white/[0.03] border-white/5 hover:bg-white/[0.06] group shadow-lg">
                 <Link href={`/match/${match.id}`} className="block">
-                    {/* Top League Bar */}
                     <div className="flex justify-between items-center px-3 py-1.5 border-b border-white/5 bg-black/20">
                          <div className="flex items-center gap-1.5 text-[8px] font-black text-slate-400 uppercase tracking-widest line-clamp-1">
                              <Trophy size={10} className="text-slate-500"/>
@@ -135,7 +143,6 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
                          </div>
                     </div>
                     
-                    {/* Horizontal Team & Score Body */}
                     <div className="flex items-center justify-between p-3 md:p-4">
                         <div className="flex-1 text-right text-xs md:text-sm font-black text-white truncate pr-3">{match.home_team}</div>
                         <div className="shrink-0 flex justify-center w-16">
@@ -145,7 +152,6 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
                                 homeScore={match.home_score} 
                                 awayScore={match.away_score} 
                                 matchDate={match.match_date} 
-                                // Default small variant gives the perfect little score pill
                             />
                         </div>
                         <div className="flex-1 text-left text-xs md:text-sm font-black text-white truncate pl-3">{match.away_team}</div>
@@ -155,7 +161,6 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
         );
     }
 
-    // 🔴 ORIGINAL MASSIVE LAYOUT FOR MEDIA COVERAGE MATCHES
     return (
         <div className="rounded-2xl shadow-xl overflow-hidden relative flex flex-col transition-all duration-500 border bg-slate-900 border-slate-700 hover:border-blue-500/50">
             
