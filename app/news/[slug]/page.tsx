@@ -1,4 +1,4 @@
-lexport const runtime = 'edge';
+export const runtime = 'edge';
 export const revalidate = 180; // 🟢 SECURELY CACHED FOR 3 MINUTES
 
 import { createClient } from '@supabase/supabase-js'; 
@@ -101,7 +101,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                 {article.title}
             </h1>
             
-            {/* 🟢 THE FIX: Standard Banner placed directly inside the Hero, below the title! */}
+            {/* 🟢 STANDARD BANNER INSIDE HERO SECTION */}
             <div className="mb-4">
                 <AdsterraStandardBanner />
             </div>
@@ -118,7 +118,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
         {/* MAIN ARTICLE CONTENT */}
         <div className="lg:col-span-8">
             <div className="bg-white">
-                
+
                 <div className="mb-8 mt-6 max-w-2xl">
                     <BettingPromo affiliateLink={null} />
                 </div>
