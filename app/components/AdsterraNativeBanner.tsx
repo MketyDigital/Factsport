@@ -11,6 +11,7 @@ export default function AdsterraNativeBanner() {
 
         const script = document.createElement('script');
         script.type = 'text/javascript';
+        // Your existing script URL
         script.src = 'https://duepose.com/c280e1cae35afe77612b6777cbe424b6/invoke.js'; 
         script.async = true;
         script.setAttribute('data-cfasync', 'false');
@@ -19,16 +20,14 @@ export default function AdsterraNativeBanner() {
     }, []);
 
     return (
-        // 🟢 THE FIX: We make the outer box horizontally scrollable with hidden scrollbars
-        <div className="w-full my-6 px-2 overflow-x-auto snap-x" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-            {/* 🟢 THE TRICK: We force this inner box to be 600px wide on mobile so Adsterra doesn't stack them! */}
-            <div className="min-w-[600px] md:min-w-full">
-                <div 
-                    id="container-c280e1cae35afe77612b6777cbe424b6" 
-                    ref={bannerRef}
-                    className="w-full bg-transparent"
-                ></div>
-            </div>
+        // 🟢 A perfectly clean, centered wrapper. No scrolling, no strict height limits.
+        // It will perfectly hug the new 1x1 "Image-Left" layout you just saved in the dashboard!
+        <div className="flex justify-center items-center my-6 w-full px-4">
+            <div 
+                id="container-c280e1cae35afe77612b6777cbe424b6" 
+                ref={bannerRef}
+                className="w-full max-w-2xl mx-auto bg-transparent rounded-lg overflow-hidden"
+            ></div>
         </div>
     );
 }
