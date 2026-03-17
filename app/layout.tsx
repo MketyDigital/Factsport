@@ -4,7 +4,8 @@ import "./globals.css";
 import AuthProvider from "@/app/components/AuthProvider";
 import Footer from '@/app/components/Footer'; 
 import SiteHeader from '@/app/components/SiteHeader'; 
-import MonetagVignette from '@/app/components/MonetagVignette'; // 🟢 Import the new custom ad
+import MonetagVignette from '@/app/components/MonetagVignette'; 
+import StickyAffiliateBanner from '@/app/components/StickyAffiliateBanner'; // 🟢 INJECTED THE NEW BANNER
 
 export const runtime = 'edge';
 
@@ -84,6 +85,9 @@ export default function RootLayout({
             <Footer />
           </div>
         </AuthProvider>
+
+        {/* 🟢 THE GLOBAL STICKY AFFILIATE BANNER */}
+        <StickyAffiliateBanner />
 
         {/* SERVICE WORKER REGISTRATION */}
         <script

@@ -7,6 +7,8 @@ import { ChevronLeft, X, Search } from 'lucide-react';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner'; 
 import LeagueMatchGroup from '@/app/components/LeagueMatchGroup'; 
 import LeagueNavigator from '@/app/components/LeagueNavigator'; 
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
+import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
 import { getTeamForm } from '@/app/lib/teamForm';
 import { getTeamQueryFilter } from '@/app/lib/teamAliases';
@@ -69,6 +71,8 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
                 </div>
             </div>
 
+            <AdsterraStandardBanner />
+
             <div className="p-3 space-y-4">
                 <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl p-4 shadow-md flex items-center justify-between text-white">
                     <div>
@@ -97,6 +101,8 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
                     matches={validMatches} 
                 />
             </div>
+
+            <AdsterraNativeBanner />
         </div>
       );
   }
@@ -181,6 +187,9 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
 
       <LeagueNavigator leagues={activeLeagues} />
 
+      {/* 1. 🟢 STANDARD BANNER (Under Navigator) */}
+      <AdsterraStandardBanner />
+
       <div className="p-3 space-y-6">
         <FreeTipsBanner />
         
@@ -225,6 +234,9 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
                 <p>No matches found.</p>
             </div>
         )}
+
+        {/* 2. 🟢 NATIVE BANNER (End of List) */}
+        <AdsterraNativeBanner />
       </div>
     </div>
   );
