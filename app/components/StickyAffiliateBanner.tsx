@@ -54,7 +54,7 @@ export default function StickyAffiliateBanner() {
                     <div className="flex flex-col flex-1 overflow-hidden pr-2">
                         <div className="flex items-center gap-1.5">
                             <span className="font-black text-[11px] md:text-sm uppercase tracking-tight drop-shadow-sm truncate">
-                                300% Welcome Bonus!
+                                300% Welcome Bonus On 1xbet!
                             </span>
                         </div>
                         
