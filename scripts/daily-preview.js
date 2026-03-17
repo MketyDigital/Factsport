@@ -100,8 +100,26 @@ async function generateDailyPreview() {
         if (error) console.error(`   ❌ Supabase DB Error:`, error.message);
         else {
             console.log(`   ✅ Published Preview: ${headline}`);
+            
+            const articleUrl = `https://factsport.com/news/${reportSlug}`;
+
+            // 🟢 NEW: INSTANT GOOGLE INDEXING PING
+            try {
+                const pingRes = await fetch('https://factsport.com/api/index-url', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${process.env.CRON_KEY}`
+                    },
+                    body: JSON.stringify({ url: articleUrl, type: 'URL_UPDATED' })
+                });
+                if (pingRes.ok) console.log(`   🚀 Successfully pinged Google Indexing API`);
+                else console.error(`   ⚠️ Google Ping failed:`, pingRes.status);
+            } catch (pingError) {
+                console.error(`   ❌ Google Ping Network Error:`, pingError.message);
+            }
+
             if (process.env.MAKE_WEBHOOK_URL) {
-                const articleUrl = `https://factsport.com/news/${reportSlug}`;
                 await fetch(process.env.MAKE_WEBHOOK_URL, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
