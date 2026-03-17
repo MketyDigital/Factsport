@@ -68,6 +68,12 @@ export default async function ArticlePage({ params }: { params: { slug: string }
       "description": article.body?.substring(0, 160) + '...'
   };
 
+  // 🟢 MID-ARTICLE AD SPLITTER LOGIC
+  const content = article.body || article.content || '';
+  const splitIndex = content.indexOf('\n\n', Math.floor(content.length / 2));
+  const part1 = splitIndex !== -1 ? content.slice(0, splitIndex) : content;
+  const part2 = splitIndex !== -1 ? content.slice(splitIndex) : '';
+
   return (
     <div className="min-h-screen bg-white pb-24 font-sans text-slate-900 selection:bg-blue-200">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
@@ -101,7 +107,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                 {article.title}
             </h1>
             
-            {/* 🟢 STANDARD BANNER INSIDE HERO SECTION */}
+            {/* 1. 🟢 STANDARD BANNER INSIDE HERO SECTION */}
             <div className="mb-4">
                 <AdsterraStandardBanner />
             </div>
@@ -119,13 +125,27 @@ export default async function ArticlePage({ params }: { params: { slug: string }
         <div className="lg:col-span-8">
             <div className="bg-white">
 
-                <div className="mb-8 mt-6 max-w-2xl">
+                {/* 2. 🟢 BETTING PROMO (Styled as a slim banner right before the text) */}
+                <div className="mb-8 w-full max-w-3xl overflow-hidden rounded-xl bg-slate-50 border border-slate-100 shadow-sm max-h-[90px]">
                     <BettingPromo affiliateLink={null} />
                 </div>
 
                 <div className="prose prose-lg prose-slate max-w-none text-slate-800 leading-relaxed md:leading-loose font-medium prose-headings:font-black prose-headings:tracking-tight prose-a:text-blue-600 prose-img:rounded-2xl prose-img:shadow-lg">
-                    {article.body || article.content ? (
-                        <MarkdownRenderer content={article.body || article.content} />
+                    {content ? (
+                        <>
+                            {/* Render First Half of Article */}
+                            <MarkdownRenderer content={part1} />
+                            
+                            {/* 3. 🟢 MID-ARTICLE NATIVE BANNER */}
+                            {part2 && (
+                                <div className="my-8">
+                                    <AdsterraNativeBanner />
+                                </div>
+                            )}
+
+                            {/* Render Second Half of Article */}
+                            {part2 && <MarkdownRenderer content={part2} />}
+                        </>
                     ) : (
                         <p className="text-slate-500 italic">This story is currently being updated...</p>
                     )}
@@ -137,7 +157,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                     <ShareButton title={article.title} slug={article.slug} />
                 </div>
 
-                {/* 🟢 AD 2: Immediately after the share row */}
+                {/* 4. 🟢 END-OF-ARTICLE NATIVE BANNER */}
                 <div className="mt-6">
                     <AdsterraNativeBanner />
                 </div>
