@@ -5,6 +5,8 @@ import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { Calendar, ChevronRight, Zap, Trophy, Youtube, Newspaper, ArrowRight, Flame, Radio, BarChart2, ChevronLeft } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
+import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
 const CATEGORIES = ['All', 'Football', 'Transfers', 'Sports Update', 'Champions League', 'Euros', 'World Cup', 'AFCON', 'Copa America'];
 const ITEMS_PER_PAGE = 12;
@@ -70,6 +72,9 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
       </div>
 
       <div className="px-4 mt-6 relative z-20 max-w-7xl mx-auto">
+
+        {/* 🟢 THE TOP BILLBOARD: Instant money on page load! */}
+        <AdsterraStandardBanner />
 
         {/* FEATURED CARD (Only Page 1) */}
         {featured && (
@@ -141,6 +146,9 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
             </div>
         )}
       </div>
+
+           {/* 🟢 THE SCROLL CATCHER: Native banner blends into the feed */}
+           <AdsterraNativeBanner />
 
       {/* QUICK ACTIONS FOOTER */}
       <div className="max-w-7xl mx-auto px-4 mt-16 mb-8">
