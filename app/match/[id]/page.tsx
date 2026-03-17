@@ -17,6 +17,8 @@ import HeadToHeadStats from '@/app/components/HeadToHeadStats';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
 import ProBettingSlipLock from '@/app/components/ProBettingSlipLock'; 
 import MatchTime from '@/app/components/MatchTime';
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
+import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
 import { getExternalData } from '@/app/lib/matchService';
 import { getTeamForm } from '@/app/lib/teamForm';
@@ -30,7 +32,6 @@ const sanitizeUrl = (url: string | null | undefined) => {
 const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
-// 🟢 CACHED DB CALL: Generates metadata and builds the page using only ONE database read!
 const getSupabaseData = cache(async (id: string) => {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     const { data, error } = await supabase.from('matches').select('*').eq('id', id).single();
@@ -38,7 +39,6 @@ const getSupabaseData = cache(async (id: string) => {
     return data;
 });
 
-// 🔥 DYNAMIC METADATA GENERATOR FOR MAXIMUM CTR
 export async function generateMetadata(
     { params }: { params: { id: string } },
     parent: ResolvingMetadata
@@ -109,7 +109,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
   const formattedDate = new Date(dbData.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  // 🔥 GOOGLE RICH SNIPPETS: SportsEvent Schema
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "SportsEvent",
@@ -150,8 +149,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
-      
-      {/* 🟢 INJECTING THE SCHEMA INTO THE HEAD OF THE PAGE */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -192,6 +189,9 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
             <MatchHeaderClient matchId={dbData.id} initialData={data} />
           </div>
       )}
+
+      {/* 1. 🟢 STANDARD BANNER (Visble immediately without scrolling) */}
+      <AdsterraStandardBanner />
 
       {!hasWidget && (
           <div className="flex gap-2 overflow-x-auto scrollbar-hide py-2 md:py-3 px-4 max-w-4xl mx-auto relative z-20 snap-x">
@@ -303,6 +303,11 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
               <StatsLineupsTabs matchId={dbData.id} initialData={data} />
           </div>
       )}
+
+      {/* 2. 🟢 NATIVE BANNER (End of Stats/Lineups before Free Tips) */}
+      <div className="max-w-4xl mx-auto px-4 mt-4">
+          <AdsterraNativeBanner />
+      </div>
 
       <div className="max-w-4xl mx-auto px-4 mt-6">
         <FreeTipsBanner />

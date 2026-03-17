@@ -5,10 +5,11 @@ import { createClient } from '@supabase/supabase-js';
 import Link from "next/link";
 import { PlayCircle, Calendar, ArrowLeft, Tv, ShieldCheck, Trophy, ArrowRight, ChevronRight, ChevronLeft } from "lucide-react";
 import BettingPromo from '@/app/components/BettingPromo';
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
+import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
 const ITEMS_PER_PAGE = 12;
 
-// 🔥 SEO METADATA ADDED
 export const metadata = {
   title: 'Football Highlights & Goal Replays | FactSport',
   description: 'Watch the latest football highlights, goal replays, and match recaps from the top leagues worldwide.',
@@ -50,6 +51,11 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
   const safeHighlights = highlights || [];
   const totalPages = count ? Math.ceil(count / ITEMS_PER_PAGE) : 1;
 
+  // 🟢 Split the grid for mid-page ad injection
+  const midIndex = Math.floor(safeHighlights.length / 2);
+  const firstHalf = safeHighlights.slice(0, midIndex);
+  const secondHalf = safeHighlights.slice(midIndex);
+
   return (
     <div className="min-h-screen bg-[#0a1428] text-white font-sans pb-16 overflow-x-hidden selection:bg-red-500">
       
@@ -89,16 +95,66 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
 
       <div className="max-w-7xl mx-auto px-4 mt-6">
         
-        <div className="max-w-xl mx-auto mb-8">
+        {/* 1. 🟢 STANDARD BANNER (Top of page content) */}
+        <AdsterraStandardBanner />
+
+        <div className="max-w-xl mx-auto mb-8 mt-4">
             <BettingPromo affiliateLink={null} />
         </div>
 
         {safeHighlights.length > 0 ? (
             <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-                    {safeHighlights.map((item) => (
+                    {/* Render First Half */}
+                    {firstHalf.map((item) => (
                         <Link href={`/match/${item.id}`} key={item.id} className="group flex flex-col bg-slate-900 rounded-2xl shadow-xl border border-slate-800 overflow-hidden hover:shadow-2xl hover:border-blue-500/50 transition-all duration-500 hover:-translate-y-1">
+                            {/* ... (Existing Highlights Card Content) ... */}
                             <div className="relative aspect-video bg-black overflow-hidden border-b border-slate-800">
+                                <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 group-hover:scale-110 transition-transform duration-700 ease-out"></div>
+                                <div className="absolute inset-0 flex items-center justify-center gap-6 opacity-90 group-hover:opacity-50 transition-opacity duration-500">
+                                    <div className="w-12 h-12 md:w-16 md:h-16 flex items-center justify-center">
+                                        {item.home_logo ? <img src={item.home_logo} alt={item.home_team} className="w-full h-full object-contain drop-shadow-2xl"/> : <span className="text-white text-xs font-bold">{item.home_team.substring(0,3)}</span>}
+                                    </div>
+                                    <span className="text-slate-600 font-black italic text-xl drop-shadow-lg">VS</span>
+                                    <div className="w-12 h-12 md:w-16 md:h-16 flex items-center justify-center">
+                                        {item.away_logo ? <img src={item.away_logo} alt={item.away_team} className="w-full h-full object-contain drop-shadow-2xl"/> : <span className="text-white text-xs font-bold">{item.away_team.substring(0,3)}</span>}
+                                    </div>
+                                </div>
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div className="bg-red-600/90 w-14 h-14 rounded-full flex items-center justify-center shadow-[0_0_25px_rgba(220,38,38,0.7)] transform scale-90 group-hover:scale-110 transition-all duration-300 backdrop-blur-sm">
+                                        <PlayCircle className="text-white ml-1" size={28} />
+                                    </div>
+                                </div>
+                                <div className="absolute top-3 left-3">
+                                    <span className="bg-black/60 backdrop-blur-md text-white text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-widest border border-white/10 shadow-lg">{item.league}</span>
+                                </div>
+                                {(item.home_score !== null && item.away_score !== null) && (
+                                    <div className="absolute top-3 right-3">
+                                        <span className="bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black px-2 py-1 rounded-md border border-white/10 shadow-lg tracking-widest">{item.home_score} - {item.away_score}</span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="p-4 md:p-5 flex flex-col flex-1 justify-between gap-4 bg-slate-900">
+                                <h2 className="text-sm md:text-base font-black text-white leading-snug group-hover:text-blue-400 transition-colors line-clamp-2">{item.home_team} vs {item.away_team}</h2>
+                                <div className="flex items-center justify-between border-t border-slate-800 pt-3 mt-auto">
+                                    <div className="flex items-center gap-1.5 text-slate-400"><Calendar size={12} /><span className="text-[10px] font-bold uppercase tracking-widest">{new Date(item.match_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>
+                                    <span className="text-[10px] font-black text-slate-300 group-hover:text-red-400 flex items-center gap-1 transition-colors uppercase tracking-widest">Play <PlayCircle size={10}/></span>
+                                </div>
+                            </div>
+                        </Link>
+                    ))}
+                    
+                    {/* 2. 🟢 MID-PAGE NATIVE BANNER */}
+                    {safeHighlights.length > 0 && (
+                        <div className="col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-4 py-4">
+                            <AdsterraNativeBanner />
+                        </div>
+                    )}
+
+                    {/* Render Second Half */}
+                    {secondHalf.map((item) => (
+                        <Link href={`/match/${item.id}`} key={item.id} className="group flex flex-col bg-slate-900 rounded-2xl shadow-xl border border-slate-800 overflow-hidden hover:shadow-2xl hover:border-blue-500/50 transition-all duration-500 hover:-translate-y-1">
+                             <div className="relative aspect-video bg-black overflow-hidden border-b border-slate-800">
                                 <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 group-hover:scale-110 transition-transform duration-700 ease-out"></div>
                                 <div className="absolute inset-0 flex items-center justify-center gap-6 opacity-90 group-hover:opacity-50 transition-opacity duration-500">
                                     <div className="w-12 h-12 md:w-16 md:h-16 flex items-center justify-center">
@@ -151,6 +207,9 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
                         </Link>
                     </div>
                 )}
+
+                {/* 3. 🟢 END OF PAGE NATIVE BANNER */}
+                <AdsterraNativeBanner />
 
                 <div className="mt-10 max-w-3xl mx-auto bg-[#0f1c3a] rounded-2xl p-4 md:p-5 border border-yellow-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 opacity-10 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>

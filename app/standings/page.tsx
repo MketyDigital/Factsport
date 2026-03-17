@@ -1,9 +1,11 @@
 export const runtime = 'edge';
-export const revalidate = 300; // Caches for 5 mins to protect your database
+export const revalidate = 300; 
 
 import Link from 'next/link';
 import { ChevronLeft, BarChart2, AlertTriangle } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js'; 
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
+import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
 const LEAGUE_MAP: Record<string, string> = {
     'Premier League': 'PL',
@@ -14,7 +16,6 @@ const LEAGUE_MAP: Record<string, string> = {
     'Champions League': 'CL'
 };
 
-// 🔥 DYNAMIC METADATA ADDED FOR STANDINGS
 export async function generateMetadata({ searchParams }: { searchParams: { league?: string } }) {
     const resolvedParams = await searchParams;
     const league = resolvedParams?.league || 'Premier League';
@@ -150,6 +151,9 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
 
             <div className="p-1.5 md:p-4 max-w-5xl mx-auto mt-2">
                 
+                {/* 1. 🟢 STANDARD BANNER (Immediately visible below the sticky league selector) */}
+                <AdsterraStandardBanner />
+
                 {error && (
                     <div className="bg-red-50 border-2 border-red-500 text-red-700 p-4 rounded-xl mb-4 shadow-sm flex flex-col items-center text-center">
                         <AlertTriangle size={32} className="mb-2 text-red-500" />
@@ -158,7 +162,7 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                     </div>
                 )}
 
-                <div className="bg-white rounded-xl md:rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                <div className="bg-white rounded-xl md:rounded-2xl shadow-xl border border-slate-200 overflow-hidden mt-4">
                     <div className="bg-slate-50 p-2.5 md:p-4 border-b border-slate-200 flex justify-between items-center">
                          <h2 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-sm">{validLeague} Table</h2>
                     </div>
@@ -251,6 +255,9 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                         <div className="flex items-center gap-1 md:gap-1.5"><span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-red-500"></span> Relegation</div>
                     </div>
                 )}
+
+                {/* 2. 🟢 NATIVE BANNER (End of Page) */}
+                <AdsterraNativeBanner />
             </div>
         </div>
     );

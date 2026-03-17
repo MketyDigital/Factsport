@@ -4,6 +4,8 @@ export const revalidate = 15;
 import { createClient } from '@supabase/supabase-js'; 
 import { Trophy, Star, Crown, History, TrendingUp, Calendar, Send, ExternalLink, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
+import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
 // 🔥 SEO METADATA ADDED
 export const metadata = {
@@ -108,7 +110,7 @@ export default async function LeaderboardPage() {
 
   return (
     <div className="min-h-screen bg-[#0a1428] pb-24 font-sans text-white p-4">
-        <div className="text-center mb-6 pt-4">
+        <div className="text-center mb-4 pt-4">
             <h1 className="text-3xl font-black italic flex items-center justify-center gap-2 mb-2">
                 <Trophy className="text-yellow-500 fill-yellow-500" /> Monthly Kings
             </h1>
@@ -117,7 +119,10 @@ export default async function LeaderboardPage() {
             </p>
         </div>
 
-        <div className="flex items-end justify-center gap-2 mb-4 max-w-lg mx-auto h-[320px]">
+        {/* 1. 🟢 STANDARD BANNER (Top of the page, under the intro) */}
+        <AdsterraStandardBanner />
+
+        <div className="flex items-end justify-center gap-2 mt-6 mb-4 max-w-lg mx-auto h-[320px]">
             <div className="w-1/3 flex justify-center">{renderPodiumCard(second, 2, 'border-slate-400/30 shadow-[0_-5px_20px_rgba(148,163,184,0.1)]', 'h-[240px]')}</div>
             <div className="w-1/3 flex justify-center z-10">{renderPodiumCard(first, 1, 'border-yellow-500/50 shadow-[0_-5px_30px_rgba(234,179,8,0.2)]', 'h-[300px]')}</div>
             <div className="w-1/3 flex justify-center">{renderPodiumCard(third, 3, 'border-orange-600/30 shadow-[0_-5px_20px_rgba(234,88,12,0.1)]', 'h-[220px]')}</div>
@@ -202,6 +207,11 @@ export default async function LeaderboardPage() {
                     ))
                 )}
              </div>
+        </div>
+
+        {/* 2. 🟢 END OF PAGE NATIVE BANNER */}
+        <div className="mt-8">
+            <AdsterraNativeBanner />
         </div>
     </div>
   );

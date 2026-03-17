@@ -13,6 +13,8 @@ import NewsTicker from '@/app/components/NewsTicker';
 import LatestNewsList from '@/app/components/LatestNewsList'; 
 import HighlightsSlider from '@/app/components/HighlightsSlider'; 
 import HeroMatchCards from '@/app/components/HeroMatchCards'; 
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
+import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
 const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599"; 
 
@@ -213,6 +215,8 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-0 overflow-x-hidden">
       
       <NewsTicker tickerNews={tickerNews} />
+     {/* 🟢 THE TOP BILLBOARD: Instant money on page load! */}
+      <AdsterraStandardBanner />
       {finalHeadlines.length > 0 && <div className="mt-4 px-4"><HeadlinesSlider headlines={finalHeadlines} /></div>}
       <HighlightsSlider highlights={highlights} />
       <LatestNewsList latestNews={latestNews} />
@@ -330,6 +334,9 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             </div>
         </div>
       </div>
+
+              {/* 🟢 THE SCROLL CATCHER: Native banner blends into the feed */}
+              <AdsterraNativeBanner />
 
       <div className="grid grid-cols-4 gap-3 px-4 py-6">
           <Link href="/matches" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">

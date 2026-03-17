@@ -4,14 +4,16 @@ export const revalidate = 180; // 🟢 SECURELY CACHED FOR 3 MINUTES
 import { createClient } from '@supabase/supabase-js'; 
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { cache } from 'react'; // 🟢 Added to prevent double DB fetching
+import { cache } from 'react'; 
 import { ChevronLeft, Calendar, Clock, ArrowRight, Trophy, Flame, Zap, ChevronRight, Tag } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
 import ShareButton from '@/app/components/ShareButton';
 import MarkdownRenderer from '@/app/components/MarkdownRenderer'; 
 import BettingPromo from '@/app/components/BettingPromo';
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
+import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
-// 🟢 CACHED DB CALL: Generates metadata and page content with only 1 database read!
+// 🟢 CACHED DB CALL
 const getArticleData = cache(async (slug: string) => {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     const { data, error } = await supabase.from('news').select('*').eq('slug', slug).single();
@@ -66,6 +68,12 @@ export default async function ArticlePage({ params }: { params: { slug: string }
       "description": article.body?.substring(0, 160) + '...'
   };
 
+  // 🟢 MID-ARTICLE AD SPLITTER LOGIC
+  const content = article.body || article.content || '';
+  const splitIndex = content.indexOf('\n\n', Math.floor(content.length / 2));
+  const part1 = splitIndex !== -1 ? content.slice(0, splitIndex) : content;
+  const part2 = splitIndex !== -1 ? content.slice(splitIndex) : '';
+
   return (
     <div className="min-h-screen bg-white pb-24 font-sans text-slate-900 selection:bg-blue-200">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
@@ -95,9 +103,14 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                 </span>
             </div>
             
-            <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white leading-tight md:leading-tight drop-shadow-2xl mb-6 tracking-tight max-w-4xl">
+            <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white leading-tight md:leading-tight drop-shadow-2xl mb-4 tracking-tight max-w-4xl">
                 {article.title}
             </h1>
+            
+            {/* 1. 🟢 STANDARD BANNER INSIDE HERO SECTION */}
+            <div className="mb-4">
+                <AdsterraStandardBanner />
+            </div>
             
             <div className="flex items-center gap-6 text-xs font-bold text-slate-300 uppercase tracking-widest">
                 <span className="flex items-center gap-1.5"><Calendar size={14} className="text-blue-500"/> {new Date(article.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric'})}</span>
@@ -111,14 +124,28 @@ export default async function ArticlePage({ params }: { params: { slug: string }
         {/* MAIN ARTICLE CONTENT */}
         <div className="lg:col-span-8">
             <div className="bg-white">
-                
-                <div className="mb-8 max-w-2xl">
+
+                {/* 2. 🟢 BETTING PROMO (Styled as a slim banner right before the text) */}
+                <div className="mb-8 w-full max-w-3xl overflow-hidden rounded-xl bg-slate-50 border border-slate-100 shadow-sm max-h-[90px]">
                     <BettingPromo affiliateLink={null} />
                 </div>
 
                 <div className="prose prose-lg prose-slate max-w-none text-slate-800 leading-relaxed md:leading-loose font-medium prose-headings:font-black prose-headings:tracking-tight prose-a:text-blue-600 prose-img:rounded-2xl prose-img:shadow-lg">
-                    {article.body || article.content ? (
-                        <MarkdownRenderer content={article.body || article.content} />
+                    {content ? (
+                        <>
+                            {/* Render First Half of Article */}
+                            <MarkdownRenderer content={part1} />
+                            
+                            {/* 3. 🟢 MID-ARTICLE NATIVE BANNER */}
+                            {part2 && (
+                                <div className="my-8">
+                                    <AdsterraNativeBanner />
+                                </div>
+                            )}
+
+                            {/* Render Second Half of Article */}
+                            {part2 && <MarkdownRenderer content={part2} />}
+                        </>
                     ) : (
                         <p className="text-slate-500 italic">This story is currently being updated...</p>
                     )}
@@ -130,20 +157,12 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                     <ShareButton title={article.title} slug={article.slug} />
                 </div>
 
-                {/* IN-ARTICLE PREDICT BANNER */}
-                <div className="mt-10 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-2xl p-8 text-black relative overflow-hidden group shadow-2xl border border-yellow-300">
-                    <div className="absolute top-0 right-0 w-48 h-48 bg-white opacity-30 rounded-full blur-3xl transform translate-x-10 -translate-y-10 group-hover:scale-150 transition-transform duration-700"></div>
-                    <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div>
-                            <h3 className="font-black text-2xl uppercase tracking-tighter mb-2">Think You Know Football?</h3>
-                            <p className="text-sm font-bold opacity-80 max-w-sm">Join our VIP Prediction League and turn your football knowledge into real cash prizes.</p>
-                        </div>
-                        <Link href="/matches" className="w-full md:w-auto flex items-center justify-center gap-2 bg-black text-white px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:scale-105 transition-transform shadow-xl shrink-0">
-                            Predict & Win <ArrowRight size={14} />
-                        </Link>
-                    </div>
+                {/* 4. 🟢 END-OF-ARTICLE NATIVE BANNER */}
+                <div className="mt-6">
+                    <AdsterraNativeBanner />
                 </div>
-            </div>
+
+            </div> 
         </div>
 
         {/* STICKY SIDEBAR */}
@@ -154,8 +173,8 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                 <div className="bg-[#0a1428] rounded-3xl p-8 text-white text-center shadow-2xl relative overflow-hidden border border-slate-800 group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600 rounded-full blur-[80px] opacity-30 group-hover:opacity-50 transition-opacity"></div>
                     <Trophy className="text-yellow-500 mx-auto mb-4" size={40} />
-                    <h3 className="text-2xl font-black uppercase tracking-tighter leading-tight mb-3">Join The<br/><span className="text-yellow-500">Winners Circle</span></h3>
-                    <p className="text-sm text-slate-400 mb-6 font-medium">Predict upcoming fixtures correctly and climb the global leaderboard.</p>
+                    <h3 className="text-2xl font-black uppercase tracking-tighter leading-tight mb-3">Think You<br/><span className="text-yellow-500">Know Football?</span></h3>
+                    <p className="text-sm text-slate-400 mb-6 font-medium">Predict upcoming fixtures correctly and Win Amazing Prizes Every Months.</p>
                     <Link href="/matches" className="block w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl text-xs tracking-widest uppercase transition-colors shadow-[0_5px_15px_rgba(234,179,8,0.3)]">
                         Start Predicting
                     </Link>
