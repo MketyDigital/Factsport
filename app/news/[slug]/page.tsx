@@ -10,6 +10,8 @@ import NewsArtwork from '@/app/components/NewsArtwork';
 import ShareButton from '@/app/components/ShareButton';
 import MarkdownRenderer from '@/app/components/MarkdownRenderer'; 
 import BettingPromo from '@/app/components/BettingPromo';
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
+import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
 // 🟢 CACHED DB CALL: Generates metadata and page content with only 1 database read!
 const getArticleData = cache(async (slug: string) => {
@@ -106,6 +108,9 @@ export default async function ArticlePage({ params }: { params: { slug: string }
         </div>
       </div>
 
+        {/* 🟢 THE TOP BILLBOARD: Instant money on page load! */}
+        <AdsterraStandardBanner />
+
       <div className="max-w-7xl mx-auto px-4 mt-12 grid grid-cols-1 lg:grid-cols-12 gap-12">
         
         {/* MAIN ARTICLE CONTENT */}
@@ -130,21 +135,9 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                     <ShareButton title={article.title} slug={article.slug} />
                 </div>
 
-                {/* IN-ARTICLE PREDICT BANNER */}
-                <div className="mt-10 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-2xl p-8 text-black relative overflow-hidden group shadow-2xl border border-yellow-300">
-                    <div className="absolute top-0 right-0 w-48 h-48 bg-white opacity-30 rounded-full blur-3xl transform translate-x-10 -translate-y-10 group-hover:scale-150 transition-transform duration-700"></div>
-                    <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div>
-                            <h3 className="font-black text-2xl uppercase tracking-tighter mb-2">Think You Know Football?</h3>
-                            <p className="text-sm font-bold opacity-80 max-w-sm">Join our VIP Prediction League and turn your football knowledge into real cash prizes.</p>
-                        </div>
-                        <Link href="/matches" className="w-full md:w-auto flex items-center justify-center gap-2 bg-black text-white px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:scale-105 transition-transform shadow-xl shrink-0">
-                            Predict & Win <ArrowRight size={14} />
-                        </Link>
-                    </div>
-                </div>
-            </div>
-        </div>
+                {/* 🟢 THE SCROLL CATCHER: Native banner blends into the feed */}
+                <AdsterraNativeBanner />
+
 
         {/* STICKY SIDEBAR */}
         <div className="lg:col-span-4 space-y-8">
@@ -154,8 +147,8 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                 <div className="bg-[#0a1428] rounded-3xl p-8 text-white text-center shadow-2xl relative overflow-hidden border border-slate-800 group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600 rounded-full blur-[80px] opacity-30 group-hover:opacity-50 transition-opacity"></div>
                     <Trophy className="text-yellow-500 mx-auto mb-4" size={40} />
-                    <h3 className="text-2xl font-black uppercase tracking-tighter leading-tight mb-3">Join The<br/><span className="text-yellow-500">Winners Circle</span></h3>
-                    <p className="text-sm text-slate-400 mb-6 font-medium">Predict upcoming fixtures correctly and climb the global leaderboard.</p>
+                    <h3 className="text-2xl font-black uppercase tracking-tighter leading-tight mb-3">Think You<br/><span className="text-yellow-500">Know Football?</span></h3>
+                    <p className="text-sm text-slate-400 mb-6 font-medium">Predict upcoming fixtures correctly and Win Amazing Prizes Every Months.</p>
                     <Link href="/matches" className="block w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl text-xs tracking-widest uppercase transition-colors shadow-[0_5px_15px_rgba(234,179,8,0.3)]">
                         Start Predicting
                     </Link>
