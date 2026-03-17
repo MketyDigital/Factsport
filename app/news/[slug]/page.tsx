@@ -1,10 +1,10 @@
-export const runtime = 'edge';
+lexport const runtime = 'edge';
 export const revalidate = 180; // 🟢 SECURELY CACHED FOR 3 MINUTES
 
 import { createClient } from '@supabase/supabase-js'; 
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { cache } from 'react'; // 🟢 Added to prevent double DB fetching
+import { cache } from 'react'; 
 import { ChevronLeft, Calendar, Clock, ArrowRight, Trophy, Flame, Zap, ChevronRight, Tag } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
 import ShareButton from '@/app/components/ShareButton';
@@ -13,7 +13,7 @@ import BettingPromo from '@/app/components/BettingPromo';
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
-// 🟢 CACHED DB CALL: Generates metadata and page content with only 1 database read!
+// 🟢 CACHED DB CALL
 const getArticleData = cache(async (slug: string) => {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     const { data, error } = await supabase.from('news').select('*').eq('slug', slug).single();
@@ -97,9 +97,14 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                 </span>
             </div>
             
-            <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white leading-tight md:leading-tight drop-shadow-2xl mb-6 tracking-tight max-w-4xl">
+            <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-white leading-tight md:leading-tight drop-shadow-2xl mb-4 tracking-tight max-w-4xl">
                 {article.title}
             </h1>
+            
+            {/* 🟢 THE FIX: Standard Banner placed directly inside the Hero, below the title! */}
+            <div className="mb-4">
+                <AdsterraStandardBanner />
+            </div>
             
             <div className="flex items-center gap-6 text-xs font-bold text-slate-300 uppercase tracking-widest">
                 <span className="flex items-center gap-1.5"><Calendar size={14} className="text-blue-500"/> {new Date(article.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric'})}</span>
@@ -108,16 +113,13 @@ export default async function ArticlePage({ params }: { params: { slug: string }
         </div>
       </div>
 
-        {/* 🟢 THE TOP BILLBOARD: Instant money on page load! */}
-        <AdsterraStandardBanner />
-
       <div className="max-w-7xl mx-auto px-4 mt-12 grid grid-cols-1 lg:grid-cols-12 gap-12">
         
         {/* MAIN ARTICLE CONTENT */}
         <div className="lg:col-span-8">
             <div className="bg-white">
                 
-                <div className="mb-8 max-w-2xl">
+                <div className="mb-8 mt-6 max-w-2xl">
                     <BettingPromo affiliateLink={null} />
                 </div>
 
@@ -135,9 +137,13 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                     <ShareButton title={article.title} slug={article.slug} />
                 </div>
 
-                {/* 🟢 THE SCROLL CATCHER: Native banner blends into the feed */}
-                <AdsterraNativeBanner />
+                {/* 🟢 AD 2: Immediately after the share row */}
+                <div className="mt-6">
+                    <AdsterraNativeBanner />
+                </div>
 
+            </div> 
+        </div>
 
         {/* STICKY SIDEBAR */}
         <div className="lg:col-span-4 space-y-8">
