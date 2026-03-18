@@ -22,7 +22,12 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
     const [liveMatches, setLiveMatches] = useState(matches);
 
     useEffect(() => {
-        setLiveMatches(matches);
+        setLiveMatches(prev => {
+            const prevIds = prev.map(p => p.id).join(',');
+            const newIds = matches.map(n => n.id).join(',');
+            if (prevIds !== newIds) return matches;
+            return prev;
+        });
     }, [matches]);
 
     useEffect(() => {
@@ -52,7 +57,7 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
             }
         };
 
-        const interval = setInterval(fetchUpdates, 10000);
+        const interval = setInterval(fetchUpdates, 5000); // 🟢 5 SECONDS
         return () => clearInterval(interval);
     }, [liveMatches]);
 
