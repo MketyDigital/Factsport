@@ -11,6 +11,17 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
       events: initialData?.goals || initialData?.match_events || [] 
   });
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasFetchedLive = useRef(false);
+
+  useEffect(() => {
+      if (!hasFetchedLive.current) {
+          setLiveData({
+              stats: initialData?.stats || { home: {}, away: {} },
+              lineups: initialData?.lineups || { home: [], away: [], formations: { home: null, away: null } },
+              events: initialData?.goals || initialData?.match_events || [] 
+          });
+      }
+  }, [initialData]);
 
   useEffect(() => {
     let isMounted = true;
@@ -30,6 +41,8 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
           const payload = await res.json();
           
           if (payload && !payload.error && isMounted) {
+              hasFetchedLive.current = true;
+
               setLiveData(prev => ({
                   stats: payload.stats || prev.stats,
                   lineups: payload.lineups || prev.lineups,
@@ -46,7 +59,7 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
     fetchStatsData();
 
     if (!['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(initialData?.status)) {
-        intervalRef.current = setInterval(fetchStatsData, 5000);
+        intervalRef.current = setInterval(fetchStatsData, 3000); // 🟢 3 SECONDS
     }
 
     const handleVisibilityChange = () => {

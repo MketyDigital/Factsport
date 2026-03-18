@@ -9,6 +9,19 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
   const [data, setData] = useState(initialData);
   const hasPremiumWidget = !!initialData?.widget_id;
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const hasFetchedLive = useRef(false);
+
+  const [homeFlash, setHomeFlash] = useState(false);
+  const [awayFlash, setAwayFlash] = useState(false);
+  const prevHomeScore = useRef(initialData?.home_score || 0);
+  const prevAwayScore = useRef(initialData?.away_score || 0);
+
+  useEffect(() => {
+      if (!hasFetchedLive.current) {
+          setData(initialData);
+      }
+  }, [initialData]);
 
   useEffect(() => {
     let isMounted = true;
@@ -27,6 +40,19 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
           const payload = await res.json();
           
           if (payload && !payload.error && isMounted) {
+              hasFetchedLive.current = true; 
+              
+              if (payload.home_score > prevHomeScore.current) {
+                  setHomeFlash(true);
+                  setTimeout(() => setHomeFlash(false), 5000);
+              }
+              if (payload.away_score > prevAwayScore.current) {
+                  setAwayFlash(true);
+                  setTimeout(() => setAwayFlash(false), 5000);
+              }
+              prevHomeScore.current = payload.home_score;
+              prevAwayScore.current = payload.away_score;
+
               setData((prev:any) => ({ 
                   ...prev, 
                   status: payload.status, 
@@ -46,7 +72,7 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
     fetchHeaderData();
 
     if (!['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(initialData?.status)) {
-        intervalRef.current = setInterval(fetchHeaderData, 5000);
+        intervalRef.current = setInterval(fetchHeaderData, 3000); // 🟢 3 SECONDS
     }
 
     const handleVisibilityChange = () => {
@@ -61,9 +87,7 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
     };
   }, [matchId, initialData?.status, initialData?.espn_id]);
 
-  if (hasPremiumWidget) {
-      return <ScoreAxisWidget matchId={initialData.widget_id} />;
-  }
+  if (hasPremiumWidget) return <ScoreAxisWidget matchId={initialData.widget_id} />;
 
   const currentStatus = data?.status?.toUpperCase() || '';
   const isHT = ['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME'].includes(currentStatus);
@@ -137,10 +161,14 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                     {currentStatus === 'SCHEDULED' || currentStatus === 'PRE' ? (
                          <div className="text-2xl md:text-4xl font-black text-white/20 italic">VS</div>
                     ) : (
-                        <div className="text-4xl md:text-6xl font-black tracking-tighter text-white flex gap-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
-                            <span>{data?.home_score ?? 0}</span>
+                        <div className="text-4xl md:text-6xl font-black tracking-tighter flex gap-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
+                            <span className={`transition-all duration-500 ease-out inline-block ${homeFlash ? 'text-green-400 scale-125 drop-shadow-[0_0_15px_rgba(74,222,128,0.8)] -translate-y-1' : 'text-white'}`}>
+                                {data?.home_score ?? 0}
+                            </span>
                             <span className="text-white/40 mb-1 md:mb-2 text-3xl md:text-5xl">:</span>
-                            <span>{data?.away_score ?? 0}</span>
+                            <span className={`transition-all duration-500 ease-out inline-block ${awayFlash ? 'text-green-400 scale-125 drop-shadow-[0_0_15px_rgba(74,222,128,0.8)] -translate-y-1' : 'text-white'}`}>
+                                {data?.away_score ?? 0}
+                            </span>
                         </div>
                     )}
                 </div>

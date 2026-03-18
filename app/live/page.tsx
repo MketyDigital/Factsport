@@ -5,8 +5,8 @@ import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { Video, Mic, Calendar, ChevronLeft, Radio, Trophy, Activity, PlayCircle, ArrowRight } from 'lucide-react';
 import LiveScoreLabel from '@/app/components/LiveScoreLabel'; 
-import AutoRefresh from '@/app/components/AutoRefresh';
 import BettingPromo from '@/app/components/BettingPromo';
+import AutoRefresh from '@/app/components/AutoRefresh'; // 🟢 RESTORED
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
@@ -34,6 +34,7 @@ export default async function LiveMediaPage() {
   return (
     <div className="min-h-screen bg-[#0a1428] pb-20 font-sans text-white selection:bg-red-500">
       
+      {/* 🟢 ONLY ON THE LIVE PAGE: Pulls in new matches when they kick off! */}
       <AutoRefresh interval={60000} />
       
       <div className="bg-[#0f1c3a] border-b border-white/10 text-white p-4 sticky top-0 z-50 shadow-2xl flex items-center gap-4 backdrop-blur-lg">

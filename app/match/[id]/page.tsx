@@ -17,6 +17,7 @@ import HeadToHeadStats from '@/app/components/HeadToHeadStats';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
 import ProBettingSlipLock from '@/app/components/ProBettingSlipLock'; 
 import MatchTime from '@/app/components/MatchTime';
+import GoalRush from '@/app/components/GoalRush'; 
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
@@ -90,8 +91,17 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const resolvedParams = await params;
   if (!resolvedParams?.id) return notFound();
 
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+
   const dbData = await getSupabaseData(resolvedParams.id);
   if (!dbData) return notFound();
+
+  const { data: otherLiveMatches } = await supabase
+      .from('matches')
+      .select('id, espn_id, home_team, away_team, home_score, away_score, status')
+      .in('status', ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'P', 'PENALTIES'])
+      .neq('id', resolvedParams.id) 
+      .limit(8);
 
   const rawData = await getExternalData(dbData);
   const data: any = rawData || {};
@@ -117,42 +127,18 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
     "startDate": new Date(dbData.match_date).toISOString(),
     "sport": "Soccer",
     "competitor": [
-      {
-        "@type": "SportsTeam",
-        "name": dbData.home_team,
-        "image": dbData.home_logo || ""
-      },
-      {
-        "@type": "SportsTeam",
-        "name": dbData.away_team,
-        "image": dbData.away_logo || ""
-      }
+      { "@type": "SportsTeam", "name": dbData.home_team, "image": dbData.home_logo || "" },
+      { "@type": "SportsTeam", "name": dbData.away_team, "image": dbData.away_logo || "" }
     ],
-    "homeTeam": {
-      "@type": "SportsTeam",
-      "name": dbData.home_team
-    },
-    "awayTeam": {
-      "@type": "SportsTeam",
-      "name": dbData.away_team
-    },
-    ...(dbData.venue && {
-      "location": {
-        "@type": "Place",
-        "name": dbData.venue
-      }
-    }),
-    ...(!isUpcomingMatch && {
-       "eventStatus": isFinished ? "https://schema.org/EventRescheduled" : "https://schema.org/EventLive" 
-    })
+    "homeTeam": { "@type": "SportsTeam", "name": dbData.home_team },
+    "awayTeam": { "@type": "SportsTeam", "name": dbData.away_team },
+    ...(dbData.venue && { "location": { "@type": "Place", "name": dbData.venue } }),
+    ...(!isUpcomingMatch && { "eventStatus": isFinished ? "https://schema.org/EventRescheduled" : "https://schema.org/EventLive" })
   };
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       {hasWidget ? (
           <div className="bg-[#0a1428] text-white p-4 shadow-md flex items-center justify-between sticky top-0 z-40">
@@ -190,7 +176,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           </div>
       )}
 
-      {/* 1. 🟢 STANDARD BANNER (Visble immediately without scrolling) */}
       <AdsterraStandardBanner />
 
       {!hasWidget && (
@@ -304,7 +289,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           </div>
       )}
 
-      {/* 2. 🟢 NATIVE BANNER (End of Stats/Lineups before Free Tips) */}
       <div className="max-w-4xl mx-auto px-4 mt-4">
           <AdsterraNativeBanner />
       </div>
@@ -312,6 +296,12 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       <div className="max-w-4xl mx-auto px-4 mt-6">
         <FreeTipsBanner />
       </div>
+
+      {otherLiveMatches && otherLiveMatches.length > 0 && (
+          <div className="max-w-4xl mx-auto px-4 mt-6 pb-6">
+              <GoalRush initialMatches={otherLiveMatches} />
+          </div>
+      )}
     </div>
   );
 }

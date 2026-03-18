@@ -12,7 +12,12 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
     const [liveMatches, setLiveMatches] = useState(heroMatches);
 
     useEffect(() => {
-        setLiveMatches(heroMatches);
+        setLiveMatches(prev => {
+            const prevIds = prev.map(p => p.id).join(',');
+            const newIds = heroMatches.map(n => n.id).join(',');
+            if (prevIds !== newIds) return heroMatches;
+            return prev;
+        });
     }, [heroMatches]);
 
     useEffect(() => {
@@ -42,7 +47,7 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
             }
         };
 
-        const interval = setInterval(fetchUpdates, 10000); 
+        const interval = setInterval(fetchUpdates, 5000); // 🟢 5 SECONDS
         return () => clearInterval(interval);
     }, [liveMatches]);
 

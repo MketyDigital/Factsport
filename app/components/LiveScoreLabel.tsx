@@ -24,6 +24,13 @@ export default function LiveScoreLabel({
   });
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasFetchedLive = useRef(false);
+
+  useEffect(() => {
+      if (!hasFetchedLive.current) {
+          setData(prev => ({ ...prev, status: initialStatus, home: homeScore, away: awayScore }));
+      }
+  }, [initialStatus, homeScore, awayScore]);
 
   useEffect(() => {
     let isMounted = true;
@@ -32,7 +39,6 @@ export default function LiveScoreLabel({
       if (document.visibilityState !== 'visible' || !isMounted) return;
       try {
           let res;
-          
           if (espnId) {
               res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${espnId}&t=${Date.now()}`);
           } else {
@@ -43,6 +49,8 @@ export default function LiveScoreLabel({
           const matchData = await res.json();
 
           if (matchData && !matchData.error && isMounted) {
+            hasFetchedLive.current = true; 
+
             setData((prevData) => {
                 const currentStatus = (matchData.status || '').toUpperCase();
                 if (FINISHED_STATUSES.includes(currentStatus)) {
@@ -63,7 +71,7 @@ export default function LiveScoreLabel({
 
     const currentDataStatus = (initialStatus || '').toUpperCase();
     if (!FINISHED_STATUSES.includes(currentDataStatus)) {
-        intervalRef.current = setInterval(fetchLiveScore, 5000);
+        intervalRef.current = setInterval(fetchLiveScore, 3000); // 🟢 3 SECONDS
     }
 
     const handleVisibilityChange = () => {
