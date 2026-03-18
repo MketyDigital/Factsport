@@ -32,9 +32,9 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                 try {
                     let res;
                     if (m.espn_id) {
-                        res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${m.espn_id}`);
+                        res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${m.espn_id}&t=${Date.now()}`);
                     } else {
-                        res = await fetch(`/api/match-data?id=${m.id}`);
+                        res = await fetch(`/api/match-data?id=${m.id}&t=${Date.now()}`);
                     }
 
                     if (res.ok) {
