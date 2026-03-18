@@ -1,13 +1,13 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 
-// 🟢 MASTER STATUS ARRAYS
 const HT_STATUSES = ['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME'];
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'ET', 'EXTRA TIME', 'P', 'PENALTIES', ...HT_STATUSES];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
 export default function LiveScoreLabel({ 
     matchId, 
+    espnId, 
     initialStatus, 
     homeScore, 
     awayScore, 
@@ -31,8 +31,14 @@ export default function LiveScoreLabel({
     const fetchLiveScore = async () => {
       if (document.visibilityState !== 'visible' || !isMounted) return;
       try {
-          // 🔥 CACHE BUSTER ADDED: Forces fresh network request instantly
-          const res = await fetch(`/api/match-data?id=${matchId}&t=${Date.now()}`);
+          let res;
+          
+          if (espnId) {
+              res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${espnId}`);
+          } else {
+              res = await fetch(`/api/match-data?id=${matchId}&t=${Date.now()}`);
+          }
+          
           if (!res.ok) return;
           const matchData = await res.json();
 
@@ -50,12 +56,10 @@ export default function LiveScoreLabel({
                 };
             });
           }
-      } catch (error) {
-          console.error("Failed to fetch score");
-      }
+      } catch (error) {}
     };
 
-    fetchLiveScore(); // 🔥 FETCH INSTANTLY ON MOUNT
+    fetchLiveScore();
 
     const currentDataStatus = (initialStatus || '').toUpperCase();
     if (!FINISHED_STATUSES.includes(currentDataStatus)) {
@@ -72,7 +76,7 @@ export default function LiveScoreLabel({
         if (intervalRef.current) clearInterval(intervalRef.current);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [matchId, initialStatus]); 
+  }, [matchId, espnId, initialStatus]); 
 
   const userTime = new Date(matchDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
   const cleanStatus = (data.status || '').toUpperCase();

@@ -47,8 +47,6 @@ export default async function LiveMediaPage() {
       </div>
 
       <div className="p-4 space-y-8 max-w-5xl mx-auto mt-4">
-        
-        {/* 1. 🟢 STANDARD BANNER (Top) */}
         <AdsterraStandardBanner />
 
         <div className="max-w-2xl mx-auto">
@@ -85,7 +83,6 @@ export default async function LiveMediaPage() {
                     )}
                 </div>
 
-                {/* 2. 🟢 MID-PAGE NATIVE BANNER (Between Media matches and text matches) */}
                 <AdsterraNativeBanner />
 
                 {liveUncoveredMatches.length > 0 && (
@@ -104,7 +101,6 @@ export default async function LiveMediaPage() {
             </>
         )}
 
-        {/* 3. 🟢 END OF PAGE NATIVE BANNER */}
         <AdsterraNativeBanner />
 
         <div className="mt-10 max-w-3xl mx-auto bg-[#0a1428] rounded-2xl p-4 md:p-5 border border-yellow-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden group">
@@ -139,7 +135,7 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
                              {match.league || 'Competition'}
                          </div>
                          <div className="shrink-0">
-                             <LiveScoreLabel matchId={match.id} initialStatus={match.status} variant="badge" />
+                             <LiveScoreLabel matchId={match.id} espnId={match.espn_id} initialStatus={match.status} variant="badge" />
                          </div>
                     </div>
                     
@@ -148,6 +144,7 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
                         <div className="shrink-0 flex justify-center w-16">
                             <LiveScoreLabel 
                                 matchId={match.id} 
+                                espnId={match.espn_id}
                                 initialStatus={match.status} 
                                 homeScore={match.home_score} 
                                 awayScore={match.away_score} 
@@ -174,6 +171,7 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
                  <div className="shrink-0 drop-shadow-md">
                      <LiveScoreLabel 
                         matchId={match.id} 
+                        espnId={match.espn_id}
                         initialStatus={match.status} 
                         variant="badge" 
                      />
@@ -184,6 +182,7 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
                 
                 <LiveScoreLabel 
                     matchId={match.id} 
+                    espnId={match.espn_id}
                     initialStatus={match.status} 
                     homeScore={match.home_score} 
                     awayScore={match.away_score}
