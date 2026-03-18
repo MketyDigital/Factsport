@@ -131,6 +131,7 @@ async function getHomepageData(leagueFilter: string | undefined) {
       .neq('video_url', '') 
       .order('match_date', { ascending: false })
       .limit(5),
+    
     supabase.from('matches')
       .select('*')
       .eq('is_featured', true)

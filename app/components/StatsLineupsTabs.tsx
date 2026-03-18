@@ -21,7 +21,7 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
       try {
           let res;
           if (initialData?.espn_id) {
-              res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}`);
+              res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}&t=${Date.now()}`);
           } else {
               res = await fetch(`/api/match-data?id=${matchId}&t=${Date.now()}`);
           }

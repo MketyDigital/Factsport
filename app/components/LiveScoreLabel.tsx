@@ -34,7 +34,7 @@ export default function LiveScoreLabel({
           let res;
           
           if (espnId) {
-              res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${espnId}`);
+              res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${espnId}&t=${Date.now()}`);
           } else {
               res = await fetch(`/api/match-data?id=${matchId}&t=${Date.now()}`);
           }
