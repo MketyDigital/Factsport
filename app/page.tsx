@@ -25,7 +25,6 @@ const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET'
 export const metadata = {
   title: 'FactSport | Live Football, Sport News & Predictions',
   description: 'The #1 Platform for sports | football predictions, live scores, and breaking news.',
-  // 🟢 WebSite Schema for Search Box
   other: {
       "application/ld+json": JSON.stringify({
           "@context": "https://schema.org",
@@ -132,7 +131,6 @@ async function getHomepageData(leagueFilter: string | undefined) {
       .neq('video_url', '') 
       .order('match_date', { ascending: false })
       .limit(5),
-    
     supabase.from('matches')
       .select('*')
       .eq('is_featured', true)
@@ -215,7 +213,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-0 overflow-x-hidden">
       
       <NewsTicker tickerNews={tickerNews} />
-     {/* 🟢 THE TOP BILLBOARD: Instant money on page load! */}
       <AdsterraStandardBanner />
       {finalHeadlines.length > 0 && <div className="mt-4 px-4"><HeadlinesSlider headlines={finalHeadlines} /></div>}
       <HighlightsSlider highlights={highlights} />
@@ -302,7 +299,13 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                                 </div>
                                                 
                                                 <div className="flex flex-col items-end justify-center pl-4 border-l border-slate-100 ml-4 w-16 shrink-0">
-                                                    <LiveScoreLabel matchId={match.id} initialStatus={match.status} variant="badge" matchDate={match.match_date} />
+                                                    <LiveScoreLabel 
+                                                        matchId={match.id} 
+                                                        espnId={match.espn_id} 
+                                                        initialStatus={match.status} 
+                                                        variant="badge" 
+                                                        matchDate={match.match_date} 
+                                                    />
                                                     {isScheduled && <span className="text-[10px] font-bold text-slate-500 mt-1"><MatchTime date={match.match_date} /></span>}
                                                 </div>
                                             </div>
@@ -335,8 +338,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </div>
 
-              {/* 🟢 THE SCROLL CATCHER: Native banner blends into the feed */}
-              <AdsterraNativeBanner />
+      <AdsterraNativeBanner />
 
       <div className="grid grid-cols-4 gap-3 px-4 py-6">
           <Link href="/matches" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">

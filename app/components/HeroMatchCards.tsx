@@ -1,11 +1,9 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import Link from "next/link";
 import { Video, Radio } from "lucide-react";
 import MatchTime from '@/app/components/MatchTime';
 
-// 🟢 THE MASTER STATUS ARRAYS
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
@@ -13,18 +11,22 @@ const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET'
 export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) {
     const [liveMatches, setLiveMatches] = useState(heroMatches);
 
-    // Sync if parent passes fresh matches
     useEffect(() => {
         setLiveMatches(heroMatches);
     }, [heroMatches]);
 
-    // 🟢 Auto-updates the scores/status in the background without refreshing the page!
     useEffect(() => {
         const fetchUpdates = async () => {
             const updated = await Promise.all(liveMatches.map(async (m) => {
                 if (FINISHED_STATUSES.includes((m.status || '').toUpperCase())) return m;
                 try {
-                    const res = await fetch(`/api/match-data?id=${m.id}`);
+                    let res;
+                    if (m.espn_id) {
+                        res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${m.espn_id}`);
+                    } else {
+                        res = await fetch(`/api/match-data?id=${m.id}`);
+                    }
+
                     if (res.ok) {
                         const data = await res.json();
                         if (!data.error) {
@@ -49,7 +51,6 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
     const isSingle = liveMatches.length === 1;
 
     return (
-        // 🟢 Reverted back to your preferred Grid layout
         <div className={`px-4 mb-5 grid gap-3 ${isSingle ? 'grid-cols-1' : 'grid-cols-2'}`}>
              {liveMatches.map((match) => {
                 const rawStatus = (match.status || '').toUpperCase();
@@ -91,14 +92,11 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                                 )}
                                 
                                 <div className="flex justify-between items-center mt-6 gap-1">
-                                    
-                                    {/* Left Team */}
                                     <div className="flex flex-col items-center flex-1 min-w-0 w-[35%]">
                                         {match.home_logo ? <img src={match.home_logo} className="w-6 h-6 object-contain mb-1 drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"/> : <div className="w-6 h-6 bg-white/10 rounded-full mb-1 flex items-center justify-center text-[9px] font-bold text-white">H</div>}
                                         <span className="text-[8px] font-bold text-center leading-tight text-white drop-shadow-md w-full truncate">{match.home_team}</span>
                                     </div>
                                     
-                                    {/* Center Score/Time (🟢 FIX: Shrunk padding and enforced max-width so it doesn't push the team names away) */}
                                     <div className="flex flex-col items-center justify-center shrink-0 z-10 w-[30%]">
                                         <div className="text-sm font-black tabular-nums tracking-wider bg-black/50 px-1.5 py-0.5 rounded-md backdrop-blur-md border border-white/10 shadow-inner text-white whitespace-nowrap flex items-center justify-center">
                                             {isScheduled ? <span className="text-[8px] opacity-60">VS</span> : `${match.home_score}-${match.away_score}`}
@@ -113,12 +111,10 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                                         </div>
                                     </div>
 
-                                    {/* Right Team */}
                                     <div className="flex flex-col items-center flex-1 min-w-0 w-[35%]">
                                         {match.away_logo ? <img src={match.away_logo} className="w-6 h-6 object-contain mb-1 drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"/> : <div className="w-6 h-6 bg-white/10 rounded-full mb-1 flex items-center justify-center text-[9px] font-bold text-white">A</div>}
                                         <span className="text-[8px] font-bold text-center leading-tight text-white drop-shadow-md w-full truncate">{match.away_team}</span>
                                     </div>
-
                                 </div>
                             </div>
                         </div>

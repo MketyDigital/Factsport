@@ -16,8 +16,13 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
     const fetchHeaderData = async () => {
       if (document.visibilityState !== 'visible' || !isMounted) return;
       try {
-          // 🔥 CACHE BUSTER ADDED TO PREVENT DELAYS
-          const res = await fetch(`/api/match-data?id=${matchId}&t=${Date.now()}`);
+          let res;
+          if (initialData?.espn_id) {
+              res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}`);
+          } else {
+              res = await fetch(`/api/match-data?id=${matchId}&t=${Date.now()}`);
+          }
+          
           if (!res.ok) return;
           const payload = await res.json();
           
@@ -27,7 +32,7 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                   status: payload.status, 
                   home_score: payload.home_score, 
                   away_score: payload.away_score,
-                  widget_id: payload.widget_id,
+                  widget_id: payload.widget_id || prev.widget_id,
                   displayClock: payload.displayClock
               }));
 
@@ -54,7 +59,7 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
         if (intervalRef.current) clearInterval(intervalRef.current);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [matchId, initialData?.status]);
+  }, [matchId, initialData?.status, initialData?.espn_id]);
 
   if (hasPremiumWidget) {
       return <ScoreAxisWidget matchId={initialData.widget_id} />;
@@ -73,17 +78,14 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
 
   const homeTeamName = initialData?.home_team || initialData?.home?.name || '';
   const awayTeamName = initialData?.away_team || initialData?.away?.name || '';
-  
   const homeForm = initialData?.home_form || [];
   const awayForm = initialData?.away_form || [];
 
   return (
     <div className="relative z-10 px-4 mt-1 pb-4 pt-1 rounded-b-2xl md:rounded-b-3xl overflow-hidden bg-slate-900 shadow-2xl">
-        
         <div className="absolute inset-0 z-0 pointer-events-none">
             <img src={leagueData.bg} alt="Stadium Atmosphere" className="absolute inset-0 w-full h-full object-cover opacity-80" />
         </div>
-
         <div className="absolute inset-0 z-0 pointer-events-none">
             <div className="absolute inset-0 bg-slate-900/60" />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />
@@ -120,7 +122,6 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                         {initialData?.home_logo ? <img src={initialData.home_logo} className="w-full h-full object-contain drop-shadow-lg" /> : <div className="font-black text-slate-500 text-xs md:text-base">H</div>}
                     </div>
                     <h2 className="font-bold text-center text-[9px] md:text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md px-1 mb-1.5">{homeTeamName}</h2>
-                    
                     {homeForm.length > 0 && (
                         <div className="flex items-center gap-0.5">
                             {homeForm.map((result: string, i: number) => (
@@ -149,7 +150,6 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
                         {initialData?.away_logo ? <img src={initialData.away_logo} className="w-full h-full object-contain drop-shadow-lg" /> : <div className="font-black text-slate-500 text-xs md:text-base">A</div>}
                     </div>
                     <h2 className="font-bold text-center text-[9px] md:text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md px-1 mb-1.5">{awayTeamName}</h2>
-                    
                     {awayForm.length > 0 && (
                         <div className="flex items-center gap-0.5">
                             {awayForm.map((result: string, i: number) => (

@@ -19,8 +19,13 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
       if (document.visibilityState !== 'visible' || !isMounted) return;
 
       try {
-          // 🔥 CACHE BUSTER ADDED: Forces the browser to get the freshest live events/stats instantly
-          const res = await fetch(`/api/match-data?id=${matchId}&t=${Date.now()}`);
+          let res;
+          if (initialData?.espn_id) {
+              res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}`);
+          } else {
+              res = await fetch(`/api/match-data?id=${matchId}&t=${Date.now()}`);
+          }
+          
           if (!res.ok) return;
           const payload = await res.json();
           
@@ -54,25 +59,20 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
         if (intervalRef.current) clearInterval(intervalRef.current);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [matchId, initialData?.status]);
+  }, [matchId, initialData?.status, initialData?.espn_id]);
 
   const { stats, lineups, events } = liveData;
-  
   const hasLineups = lineups?.home?.length > 0 || lineups?.away?.length > 0;
 
-  // 🟢 SMART TOTAL SHOTS CALCULATOR
   const getSafeShots = (teamStats: any) => {
       if (!teamStats) return '0';
       if (teamStats.shots && parseInt(teamStats.shots) > 0) return teamStats.shots.toString();
-      
       const onTarget = parseInt(teamStats.shotsOnTarget || teamStats.shots_on_target || 0) || 0;
       const offTarget = parseInt(teamStats.shotsOffTarget || teamStats.shots_off_target || 0) || 0;
       const total = onTarget + offTarget;
-      
       return total > 0 ? total.toString() : '0';
   };
 
-  // 🟢 EXTRACT ON/OFF TARGET DATA FOR SPLIT ROWS
   const homeShotsOn = stats?.home?.shotsOnTarget || stats?.home?.shots_on_target || '0';
   const awayShotsOn = stats?.away?.shotsOnTarget || stats?.away?.shots_on_target || '0';
   const homeShotsOff = stats?.home?.shotsOffTarget || stats?.home?.shots_off_target || '0';
