@@ -106,13 +106,16 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
 
         <div className="relative z-10 px-2 py-3 md:py-4">
             <div className="flex justify-between items-center max-w-lg mx-auto">
+                
+                {/* 🟢 HOME TEAM (Clean Blank Fallback) */}
                 <Link href={`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center w-[30%] group active:scale-95 transition-transform">
                     <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-lg">
-                        {dbData?.home_logo ? <img src={dbData.home_logo} className="w-full h-full object-contain" /> : <div className="font-black text-slate-500">H</div>}
+                        {dbData?.home_logo && <img src={dbData.home_logo} className="w-full h-full object-contain" alt="" />}
                     </div>
                     <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2">{homeTeamName}</h2>
                 </Link>
                 
+                {/* SCORES */}
                 <div className="flex flex-col items-center justify-center w-[40%]">
                     {isLive && (
                         <div className="flex items-center gap-1 bg-red-600/90 text-white text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded-sm animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.5)] mb-1">
@@ -136,9 +139,10 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                     )}
                 </div>
 
+                {/* 🟢 AWAY TEAM (Clean Blank Fallback) */}
                 <Link href={`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center w-[30%] group active:scale-95 transition-transform">
                     <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-lg">
-                        {dbData?.away_logo ? <img src={dbData.away_logo} className="w-full h-full object-contain" /> : <div className="font-black text-slate-500">A</div>}
+                        {dbData?.away_logo && <img src={dbData.away_logo} className="w-full h-full object-contain" alt="" />}
                     </div>
                     <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2">{awayTeamName}</h2>
                 </Link>
