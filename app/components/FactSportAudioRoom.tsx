@@ -1,17 +1,17 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { StreamVideo, StreamVideoClient, StreamCall, SpeakerLayout } from '@stream-io/video-react-sdk';
+import { StreamVideo, StreamVideoClient, StreamCall, SpeakerLayout, Call } from '@stream-io/video-react-sdk';
 import '@stream-io/video-react-sdk/dist/css/styles.css';
 import { Loader2, Radio } from 'lucide-react';
 
 export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
     const [client, setClient] = useState<StreamVideoClient | null>(null);
-    const [call, setCall] = useState<StreamCall | null>(null);
+    const [call, setCall] = useState<Call | null>(null); // 🟢 Fixed Type Here
 
     useEffect(() => {
         const initAudioRoom = async () => {
             const res = await fetch('/api/stream/token');
-            if (!res.ok) return; // User must be logged in to connect
+            if (!res.ok) return; 
             
             const { token, userId, username, image } = await res.json();
 
@@ -57,7 +57,6 @@ export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
                             <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span> Live Radio Room
                         </span>
                         
-                        {/* Hidden UI element that processes the WebRTC audio */}
                         <div className="opacity-0 pointer-events-none absolute">
                             <SpeakerLayout />
                         </div>
