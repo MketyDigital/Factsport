@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Metadata, ResolvingMetadata } from 'next';
 import { cache } from 'react'; 
-import { ChevronLeft, Zap, LinkIcon } from 'lucide-react';
+import { ChevronLeft, Zap, LinkIcon, RadioTower } from 'lucide-react';
 
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import MatchHeaderClient from '@/app/components/MatchHeaderClient'; 
@@ -87,7 +87,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const currentStatus = (dbData.status || '').toUpperCase();
   const isFinished = FINISHED_STATUSES.includes(currentStatus);
   
-  // 🟢 EXACT 5-MINUTE KICKOFF LOGIC
   const matchDateMs = new Date(dbData.match_date).getTime();
   const minutesToKick = (matchDateMs - Date.now()) / 60000;
   const isUpcomingMatch = SCHEDULED_STATUSES.includes(currentStatus) && minutesToKick > 5;
@@ -96,15 +95,11 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const activeAudioUrl = sanitizeUrl(dbData.audio_url);
   const hasWidget = !!dbData.widget_id; 
 
-  const jsonLd = { /* ... keep your existing jsonLd block here */ };
-
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-
       {!hasWidget ? (
           <div className="w-full">
-              {/* HEADER */}
+              {/* 1. HEADER */}
               <div className="bg-[#0a1428]">
                   <div className="text-white px-2 py-1.5 flex items-center justify-between border-b border-white/5 max-w-4xl mx-auto">
                       <Link href="/matches" className="p-1 bg-white/10 rounded-full hover:bg-white/20 transition"><ChevronLeft size={16} /></Link>
@@ -114,21 +109,30 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                   <MatchHeaderClient matchId={dbData.id} initialData={data} dbData={dbData} />
               </div>
 
-              {/* MEDIA PLAYER (Directly attached to header) */}
+              {/* 2. HEAD TO HEAD (Flushed directly under header, ALWAYS SHOWS) */}
+              <div className="w-full bg-white border-b border-slate-200">
+                  <HeadToHeadStats dbData={data} />
+              </div>
+
+              {/* 3. MEDIA PLAYER & GUEST BANNER */}
               {(activeVideoUrl || activeAudioUrl) && (
-                  <div className="w-full bg-black border-t border-blue-900/30">
+                  <div className="w-full bg-black">
                       {activeVideoUrl ? (
                           <FactSportPlayer mediaUrl={activeVideoUrl} matchId={dbData.id} mode="video" isUpcoming={isUpcomingMatch} isFinished={isFinished} />
                       ) : (
                           <FactSportPlayer mediaUrl={activeAudioUrl!} matchId={dbData.id} mode="audio" isUpcoming={isUpcomingMatch} isFinished={isFinished} />
                       )}
+
+                      {/* 4. GUEST BROADCASTER BANNER */}
+                      <div className="w-full bg-gradient-to-r from-yellow-500 to-amber-500 px-3 py-2 flex items-center justify-between text-black shadow-inner">
+                          <div className="flex items-center gap-1.5">
+                              <RadioTower size={12} className="animate-pulse" />
+                              <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest">Studio</span>
+                          </div>
+                          <span className="text-[9px] md:text-[10px] font-bold">Want to have your say on air? <a href="#" className="underline font-black decoration-black/50 underline-offset-2">Click Here</a></span>
+                      </div>
                   </div>
               )}
-
-              {/* 3-LINE H2H (Flushed directly under media/header, zero margin!) */}
-              <div className="w-full">
-                  <HeadToHeadStats dbData={data} />
-              </div>
           </div>
       ) : (
           <div className="bg-[#0a1428] text-white p-3 shadow-md flex items-center justify-between sticky top-0 z-40">
@@ -138,7 +142,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           </div>
       )}
 
-      {/* MOBILE HUB & PREDICT */}
+      {/* 5. MOBILE HUB (Tabs) */}
       <div className="max-w-4xl mx-auto mt-3 px-2">
           {!hasWidget ? (
               <MatchMobileHub matchId={dbData.id} espnId={dbData.espn_id} currentUser={currentUser} initialData={data} dbData={dbData} />
@@ -148,15 +152,13 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
           {!hasWidget && (
               <div className="mt-4 space-y-4">
-                  {/* Predict Target Anchor */}
-                  <div id="predictions" className="bg-white rounded-lg shadow-sm p-3 border border-slate-200">
+                  <div id="predictions" className="bg-white rounded-lg shadow-sm p-3 border border-slate-200 scroll-mt-20">
                       <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 flex items-center gap-1 mb-2">
                           <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" /> Predict & Win
                       </h3>
                       <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
                   </div>
 
-                  {/* Affiliate Banner */}
                   <div className="bg-[#1A1A1A] rounded-lg p-2.5 shadow-sm border border-slate-800 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                           <div className="w-8 h-8 bg-blue-600 text-white text-[9px] font-black rounded flex items-center justify-center italic">1X</div>

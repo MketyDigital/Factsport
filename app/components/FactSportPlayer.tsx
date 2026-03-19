@@ -11,7 +11,6 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
   
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
 
-  // 🟢 1. STREAM.IO INTERCEPT
   if (mediaUrl === 'streamio') return <FactSportAudioRoom matchId={matchId} />;
 
   const isYouTube = mediaUrl.includes('youtube.com') || mediaUrl.includes('youtu.be');
@@ -47,7 +46,6 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
     else if (document.fullscreenElement) document.exitFullscreen();
   };
 
-  // 🟢 2. UPCOMING MATCH (WAITING SCREEN)
   if (isUpcoming) {
       return (
           <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative flex flex-col items-center justify-center overflow-hidden border-b border-slate-800 shadow-inner group`}>
@@ -69,7 +67,6 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
       );
   }
 
-  // 🟢 3. YOUTUBE PLAYER (Masked & Cleaned)
   const renderYouTube = () => {
     let videoId = '';
     if (mediaUrl.includes('v=')) videoId = mediaUrl.split('v=')[1]?.split('&')[0];
@@ -110,7 +107,6 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
     );
   };
 
-  // 🟢 4. RAW MEDIA PLAYER (The complete, uncut logic)
   const renderRawPlayer = () => {
     return (
       <div id="fs-player-wrapper" className={`w-full ${mode === 'audio' || isRawAudio ? 'h-[120px]' : 'aspect-video'} bg-black relative group overflow-hidden border-b border-slate-800 shadow-xl`}>
@@ -153,7 +149,6 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
     );
   };
 
-  // 🟢 5. GENERIC IFRAME (TalkSport, TuneIn, etc)
   const renderGenericIframe = () => {
     return (
       <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative border-b border-slate-800 overflow-hidden shadow-xl`}>
@@ -161,14 +156,7 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
              <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-sm pointer-events-none"></div>
          )}
          
-         <iframe 
-             src={mediaUrl} 
-             className="relative z-10 w-full h-full" 
-             frameBorder="0" 
-             scrolling="no" 
-             sandbox="allow-scripts allow-same-origin" 
-             allowFullScreen
-         ></iframe>
+         <iframe src={mediaUrl} className="relative z-10 w-full h-full" frameBorder="0" scrolling="no" sandbox="allow-scripts allow-same-origin" allowFullScreen></iframe>
          
          <div className="absolute bottom-0 left-0 w-full h-[30px] bg-[#0a1428] border-t border-slate-800 z-40 flex items-center justify-between px-3 pointer-events-none">
              <div className="flex items-center gap-1.5">

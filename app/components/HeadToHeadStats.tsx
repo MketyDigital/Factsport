@@ -1,12 +1,6 @@
 'use client';
 import { History } from 'lucide-react';
 
-const sanitizeUrl = (url: string | null | undefined) => {
-    if (!url) return null;
-    if (url.trim().toLowerCase().startsWith('javascript:')) return '#';
-    return url;
-};
-
 export default function HeadToHeadStats({ dbData }: { dbData: any }) {
     let parsedH2h = dbData?.h2h;
     if (typeof parsedH2h === 'string') {
@@ -70,16 +64,14 @@ export default function HeadToHeadStats({ dbData }: { dbData: any }) {
 
     return (
         <div className="w-full bg-white border-b border-slate-200 px-3 py-2 flex flex-col gap-1.5 shadow-sm">
-            {/* Line 1: Title */}
             <div className="flex items-center gap-1.5">
                 <History size={10} className="text-blue-600" />
                 <span className="text-[9px] md:text-[10px] font-black uppercase text-slate-800 tracking-wider">H2H (Last {h2hTotal})</span>
             </div>
             
-            {/* Line 2: Logos, Names, Scores */}
             <div className="flex items-center justify-between text-[10px] font-black px-1">
                 <div className="flex items-center gap-1.5 w-[33%]">
-                    {dbData?.home_logo && <img src={sanitizeUrl(dbData.home_logo) || undefined} className="w-3.5 h-3.5 object-contain" />}
+                    {dbData?.home_logo && <img src={dbData.home_logo} className="w-3.5 h-3.5 object-contain" alt="" />}
                     <span className="truncate">{dbData?.home_team?.substring(0,3).toUpperCase()}</span>
                     <span className="text-blue-600 text-xs ml-auto">{h2hHomeWins}</span>
                 </div>
@@ -91,11 +83,10 @@ export default function HeadToHeadStats({ dbData }: { dbData: any }) {
                 <div className="flex items-center gap-1.5 w-[33%] justify-end">
                     <span className="text-red-500 text-xs mr-auto">{h2hAwayWins}</span>
                     <span className="truncate">{dbData?.away_team?.substring(0,3).toUpperCase()}</span>
-                    {dbData?.away_logo && <img src={sanitizeUrl(dbData.away_logo) || undefined} className="w-3.5 h-3.5 object-contain" />}
+                    {dbData?.away_logo && <img src={dbData.away_logo} className="w-3.5 h-3.5 object-contain" alt="" />}
                 </div>
             </div>
 
-            {/* Line 3: Progress Bar */}
             <div className="flex w-full h-1.5 rounded-full overflow-hidden bg-slate-100 mt-0.5">
                 <div style={{ width: `${homePct}%` }} className="bg-blue-600"></div>
                 <div style={{ width: `${drawPct}%` }} className="bg-slate-300"></div>
