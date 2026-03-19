@@ -19,7 +19,6 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
     const handleScroll = () => {
         if (scrollContainerRef.current) {
             const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
-            // If user scrolled up more than 150px, show the "Jump to Latest" button
             setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 150);
         }
     };
@@ -82,10 +81,9 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
 
         setIsSending(true);
         
-        // 🟢 Format the message if replying to someone
         let finalMessageStr = newMessage;
         if (replyTo) {
-            const safeQuote = replyTo.text.replace(/\[Reply @.*?\]/g, '').substring(0, 40); // Prevent quote-ception
+            const safeQuote = replyTo.text.replace(/\[Reply @.*?\]/g, '').substring(0, 40); 
             finalMessageStr = `[Reply @${replyTo.user}: "${safeQuote}..."] ${newMessage}`;
         }
 
@@ -99,7 +97,7 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
 
         setMessages(prev => [...prev, tempMsg]);
         setNewMessage("");
-        setReplyTo(null); // Clear reply state
+        setReplyTo(null); 
         setTimeout(() => scrollToBottom(true), 50);
 
         try {
@@ -124,9 +122,9 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
 
     const latestEvent = officialEvents.length > 0 ? officialEvents[0] : null;
 
-    // Helper to render quoted text
+    // 🟢 NEW: Fixed TypeScript Regex Issue. Using [\s\S] instead of the /s flag
     const renderMessageContent = (text: string) => {
-        const quoteMatch = text.match(/^\[Reply @(.*?): "(.*?)"\] (.*)$/s);
+        const quoteMatch = text.match(/^\[Reply @([^:]*?): "([\s\S]*?)"\] ([\s\S]*)$/);
         if (quoteMatch) {
             return (
                 <div className="flex flex-col gap-1">
@@ -209,7 +207,6 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
                 )}
             </div>
 
-            {/* 🟢 FLOATING "JUMP TO LATEST" BUTTON */}
             {showScrollBottom && (
                 <button onClick={() => scrollToBottom(true)} className="absolute bottom-[70px] right-4 bg-blue-600 text-white p-2 rounded-full shadow-[0_4px_15px_rgba(0,0,0,0.3)] animate-bounce active:scale-95 flex items-center justify-center z-40">
                     <ArrowDown size={16} />
@@ -217,7 +214,6 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
             )}
 
             <div className="bg-white border-t border-slate-200 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] z-10 shrink-0 flex flex-col">
-                {/* 🟢 REPLY UI PREVIEW */}
                 {replyTo && (
                     <div className="bg-slate-50 border-b border-slate-200 px-3 py-1.5 flex items-center justify-between">
                         <div className="flex items-center gap-1.5 overflow-hidden">
