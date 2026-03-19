@@ -4,30 +4,56 @@ import Link from 'next/link';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget'; 
 import { getLeagueAssets } from '@/app/lib/league-assets';
 import MatchTime from '@/app/components/MatchTime';
+import { MapPin, Trophy, Calendar, Percent, Flag } from 'lucide-react';
 
-export default function MatchHeaderClient({ matchId, initialData }: any) {
+export default function MatchHeaderClient({ matchId, initialData, dbData }: any) {
   const [data, setData] = useState(initialData);
   const hasPremiumWidget = !!initialData?.widget_id;
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const hasFetchedLive = useRef(false);
+
+  const [homeFlash, setHomeFlash] = useState(false);
+  const [awayFlash, setAwayFlash] = useState(false);
+  const prevHomeScore = useRef(initialData?.home_score || 0);
+  const prevAwayScore = useRef(initialData?.away_score || 0);
+
+  useEffect(() => {
+      if (!hasFetchedLive.current) setData(initialData);
+  }, [initialData]);
 
   useEffect(() => {
     let isMounted = true;
-
     const fetchHeaderData = async () => {
       if (document.visibilityState !== 'visible' || !isMounted) return;
       try {
-          // 🔥 CACHE BUSTER ADDED TO PREVENT DELAYS
-          const res = await fetch(`/api/match-data?id=${matchId}&t=${Date.now()}`);
+          let res;
+          if (initialData?.espn_id) {
+              res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}&t=${Date.now()}`);
+          } else {
+              res = await fetch(`/api/match-data?id=${matchId}&t=${Date.now()}`);
+          }
           if (!res.ok) return;
           const payload = await res.json();
           
           if (payload && !payload.error && isMounted) {
+              hasFetchedLive.current = true; 
+              
+              if (payload.home_score > prevHomeScore.current) {
+                  setHomeFlash(true); setTimeout(() => setHomeFlash(false), 5000);
+              }
+              if (payload.away_score > prevAwayScore.current) {
+                  setAwayFlash(true); setTimeout(() => setAwayFlash(false), 5000);
+              }
+              prevHomeScore.current = payload.home_score;
+              prevAwayScore.current = payload.away_score;
+
               setData((prev:any) => ({ 
                   ...prev, 
                   status: payload.status, 
                   home_score: payload.home_score, 
                   away_score: payload.away_score,
-                  widget_id: payload.widget_id,
+                  widget_id: payload.widget_id || prev.widget_id,
                   displayClock: payload.displayClock
               }));
 
@@ -39,14 +65,10 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
     };
 
     fetchHeaderData();
-
     if (!['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(initialData?.status)) {
-        intervalRef.current = setInterval(fetchHeaderData, 5000);
+        intervalRef.current = setInterval(fetchHeaderData, 3000);
     }
-
-    const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible') fetchHeaderData();
-    };
+    const handleVisibilityChange = () => { if (document.visibilityState === 'visible') fetchHeaderData(); };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
@@ -54,113 +76,82 @@ export default function MatchHeaderClient({ matchId, initialData }: any) {
         if (intervalRef.current) clearInterval(intervalRef.current);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [matchId, initialData?.status]);
+  }, [matchId, initialData?.status, initialData?.espn_id]);
 
-  if (hasPremiumWidget) {
-      return <ScoreAxisWidget matchId={initialData.widget_id} />;
-  }
+  if (hasPremiumWidget) return <ScoreAxisWidget matchId={initialData.widget_id} />;
 
   const currentStatus = data?.status?.toUpperCase() || '';
   const isHT = ['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME'].includes(currentStatus);
   const isLive = ['LIVE', 'IN_PLAY', '1H', '2H', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'].includes(currentStatus) || isHT;
   const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'].includes(currentStatus);
-  const leagueData = getLeagueAssets(initialData?.league);
+  const isUpcoming = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'].includes(currentStatus);
+  const leagueData = getLeagueAssets(dbData?.league);
 
+  const homeTeamName = dbData?.home_team || initialData?.home?.name || '';
+  const awayTeamName = dbData?.away_team || initialData?.away?.name || '';
+  
+  const formattedDate = dbData?.match_date ? new Date(dbData.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  
   let refName = null;
   if (initialData?.referees && initialData.referees.length > 0) {
       refName = typeof initialData.referees[0] === 'string' ? initialData.referees[0] : initialData.referees[0].name;
   }
 
-  const homeTeamName = initialData?.home_team || initialData?.home?.name || '';
-  const awayTeamName = initialData?.away_team || initialData?.away?.name || '';
-  
-  const homeForm = initialData?.home_form || [];
-  const awayForm = initialData?.away_form || [];
-
   return (
-    <div className="relative z-10 px-4 mt-1 pb-4 pt-1 rounded-b-2xl md:rounded-b-3xl overflow-hidden bg-slate-900 shadow-2xl">
-        
+    <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
+        {/* 🟢 ENHANCED BACKGROUND: Higher opacity, lighter gradient so the stadium is highly visible */}
         <div className="absolute inset-0 z-0 pointer-events-none">
-            <img src={leagueData.bg} alt="Stadium Atmosphere" className="absolute inset-0 w-full h-full object-cover opacity-80" />
+            <img src={leagueData.bg} alt="Stadium" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0a1428]/60 via-[#0a1428]/50 to-[#0a1428]/90" />
         </div>
 
-        <div className="absolute inset-0 z-0 pointer-events-none">
-            <div className="absolute inset-0 bg-slate-900/60" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />
-        </div>
-
-        <div className="relative z-10">
-            {refName && (
-                <div className="flex justify-center mb-1.5">
-                    <span className="bg-black/40 backdrop-blur border border-white/5 text-[7px] md:text-[8px] text-slate-300 px-2 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-widest">
-                        👨‍⚖️ Official: {refName}
-                    </span>
-                </div>
-            )}
-
-            <div className="flex justify-center mb-3 md:mb-5">
-                {isLive ? (
-                    <div className="flex flex-col items-center">
-                        <span className="bg-red-600/90 backdrop-blur-sm text-white text-[9px] md:text-[10px] font-black px-3 py-1 md:px-4 md:py-1.5 rounded-full animate-pulse flex items-center gap-1.5 shadow-[0_0_15px_rgba(220,38,38,0.5)] border border-white/10">
-                            <span className="w-1.5 h-1.5 bg-white rounded-full"></span> 
-                            {isHT ? 'HALF TIME' : 'LIVE'}
-                        </span>
-                        {data?.displayClock && !isHT && <span className="text-red-300 text-[9px] md:text-[10px] font-mono mt-0.5 md:mt-1 font-bold bg-black/30 px-1.5 rounded">{data.displayClock}</span>}
+        <div className="relative z-10 px-2 py-3 md:py-4">
+            <div className="flex justify-between items-center max-w-lg mx-auto">
+                <Link href={`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center w-[30%] group active:scale-95 transition-transform">
+                    <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
+                        {dbData?.home_logo && <img src={dbData.home_logo} className="w-full h-full object-contain" alt="" />}
                     </div>
-                ) : (
-                    <span className={`text-[8px] md:text-[10px] font-bold px-3 py-1 md:px-4 md:py-1.5 rounded-full border backdrop-blur-md shadow-lg flex items-center ${isFinished ? 'bg-slate-900/80 text-slate-300 border-slate-700' : 'bg-white/10 text-white border-white/20'}`}>
-                        {isFinished ? 'FULL TIME' : <MatchTime date={data?.match_date} />}
-                    </span>
-                )}
-            </div>
-
-            <div className="flex justify-between items-start">
-                <Link href={`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center w-[35%] group cursor-pointer active:scale-95 transition-transform">
-                    <div className="w-14 h-14 md:w-20 md:h-20 bg-gradient-to-b from-white/10 to-transparent p-2 md:p-4 rounded-xl md:rounded-2xl mb-1 flex items-center justify-center border border-white/10 shadow-xl backdrop-blur-md transition-transform group-hover:scale-105">
-                        {initialData?.home_logo ? <img src={initialData.home_logo} className="w-full h-full object-contain drop-shadow-lg" /> : <div className="font-black text-slate-500 text-xs md:text-base">H</div>}
-                    </div>
-                    <h2 className="font-bold text-center text-[9px] md:text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md px-1 mb-1.5">{homeTeamName}</h2>
-                    
-                    {homeForm.length > 0 && (
-                        <div className="flex items-center gap-0.5">
-                            {homeForm.map((result: string, i: number) => (
-                                <span key={i} className={`w-3 h-3 md:w-4 md:h-4 flex items-center justify-center text-[6px] md:text-[8px] font-black text-white rounded-sm ${result === 'W' ? 'bg-green-500' : result === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>
-                                    {result}
-                                </span>
-                            ))}
-                        </div>
-                    )}
+                    <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{homeTeamName}</h2>
                 </Link>
                 
-                <div className="flex flex-col items-center justify-center w-[30%] pt-2 md:pt-4">
-                    {currentStatus === 'SCHEDULED' || currentStatus === 'PRE' ? (
-                         <div className="text-2xl md:text-4xl font-black text-white/20 italic">VS</div>
+                <div className="flex flex-col items-center justify-center w-[40%] drop-shadow-lg">
+                    {isLive && (
+                        <div className="flex items-center gap-1 bg-red-600/90 text-white text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded-sm animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.5)] mb-1">
+                            <span className="w-1 h-1 bg-white rounded-full"></span> {isHT ? 'HT' : 'LIVE'} {data?.displayClock && !isHT && <span className="text-red-200 ml-0.5">{data.displayClock}</span>}
+                        </div>
+                    )}
+                    {!isLive && (
+                         <span className={`text-[8px] md:text-[9px] font-bold px-2 py-0.5 rounded-sm mb-1 shadow-md ${isFinished ? 'bg-slate-800/80 backdrop-blur text-slate-300' : 'bg-white/20 backdrop-blur text-white'}`}>
+                            {isFinished ? 'FT' : <MatchTime date={dbData?.match_date} />}
+                         </span>
+                    )}
+
+                    {isUpcoming ? (
+                         <div className="text-xl md:text-2xl font-black text-white/30 italic">VS</div>
                     ) : (
-                        <div className="text-4xl md:text-6xl font-black tracking-tighter text-white flex gap-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
-                            <span>{data?.home_score ?? 0}</span>
-                            <span className="text-white/40 mb-1 md:mb-2 text-3xl md:text-5xl">:</span>
-                            <span>{data?.away_score ?? 0}</span>
+                        <div className="text-3xl md:text-4xl font-black tracking-tighter flex gap-1 items-center drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
+                            <span className={`transition-all duration-300 ${homeFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{data?.home_score ?? 0}</span>
+                            <span className="text-white/40 text-2xl md:text-3xl pb-1">-</span>
+                            <span className={`transition-all duration-300 ${awayFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{data?.away_score ?? 0}</span>
                         </div>
                     )}
                 </div>
 
-                <Link href={`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center w-[35%] group cursor-pointer active:scale-95 transition-transform">
-                    <div className="w-14 h-14 md:w-20 md:h-20 bg-gradient-to-b from-white/10 to-transparent p-2 md:p-4 rounded-xl md:rounded-2xl mb-1 flex items-center justify-center border border-white/10 shadow-xl backdrop-blur-md transition-transform group-hover:scale-105">
-                        {initialData?.away_logo ? <img src={initialData.away_logo} className="w-full h-full object-contain drop-shadow-lg" /> : <div className="font-black text-slate-500 text-xs md:text-base">A</div>}
+                <Link href={`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center w-[30%] group active:scale-95 transition-transform">
+                    <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
+                        {dbData?.away_logo && <img src={dbData.away_logo} className="w-full h-full object-contain" alt="" />}
                     </div>
-                    <h2 className="font-bold text-center text-[9px] md:text-sm text-white leading-tight w-full line-clamp-2 drop-shadow-md px-1 mb-1.5">{awayTeamName}</h2>
-                    
-                    {awayForm.length > 0 && (
-                        <div className="flex items-center gap-0.5">
-                            {awayForm.map((result: string, i: number) => (
-                                <span key={i} className={`w-3 h-3 md:w-4 md:h-4 flex items-center justify-center text-[6px] md:text-[8px] font-black text-white rounded-sm ${result === 'W' ? 'bg-green-500' : result === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>
-                                    {result}
-                                </span>
-                            ))}
-                        </div>
-                    )}
+                    <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{awayTeamName}</h2>
                 </Link>
             </div>
+        </div>
+
+        <div className="relative z-10 w-full bg-black/40 backdrop-blur-sm border-t border-white/5 py-1.5 px-2 flex justify-center items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide text-[7px] md:text-[8px] font-bold text-slate-300 uppercase tracking-widest whitespace-nowrap drop-shadow-md">
+            {formattedDate && <span className="flex items-center gap-1"><Calendar size={9} className="text-blue-400"/> {formattedDate}</span>}
+            {initialData?.venue && <span className="flex items-center gap-1"><MapPin size={9} className="text-red-400"/> {initialData.venue}</span>}
+            {initialData?.stage && <span className="flex items-center gap-1"><Trophy size={9} className="text-yellow-500"/> {initialData.stage.replace(/_/g, ' ')}</span>}
+            {refName && <span className="flex items-center gap-1"><Flag size={9} className="text-slate-400"/> {refName}</span>}
+            {initialData?.predictor && <span className="flex items-center gap-1 text-green-400"><Percent size={9}/> {parseFloat(String(initialData.predictor.home)).toFixed(0)}% / {parseFloat(String(initialData.predictor.away)).toFixed(0)}%</span>}
         </div>
     </div>
   );

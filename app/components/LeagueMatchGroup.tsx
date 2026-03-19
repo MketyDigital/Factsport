@@ -1,6 +1,5 @@
 'use client';
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Calendar, Zap, Ticket, ExternalLink, BarChart2, ChevronRight, Clock, CheckCircle, Trophy } from 'lucide-react';
 import MatchTime from '@/app/components/MatchTime';
@@ -20,13 +19,53 @@ const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&s
 
 export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: string, matches: any[] }) {
     const [activeTab, setActiveTab] = useState<'fixtures' | 'results'>('fixtures');
+    const [liveMatches, setLiveMatches] = useState(matches);
 
-    const now = new Date();
-    const fixtures = matches
+    useEffect(() => {
+        setLiveMatches(prev => {
+            const prevIds = prev.map(p => p.id).join(',');
+            const newIds = matches.map(n => n.id).join(',');
+            if (prevIds !== newIds) return matches;
+            return prev;
+        });
+    }, [matches]);
+
+    useEffect(() => {
+        const fetchUpdates = async () => {
+            const updated = await Promise.all(liveMatches.map(async (m) => {
+                if (['FT', 'FINISHED', 'ABD'].includes((m.status || '').toUpperCase())) return m;
+                try {
+                    let res;
+                    if (m.espn_id) {
+                        res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${m.espn_id}&t=${Date.now()}`);
+                    } else {
+                        res = await fetch(`/api/match-data?id=${m.id}&t=${Date.now()}`);
+                    }
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (!data.error) {
+                            return { ...m, status: data.status, home_score: data.home_score, away_score: data.away_score };
+                        }
+                    }
+                } catch(e) { }
+                return m;
+            }));
+            
+            if (JSON.stringify(updated) !== JSON.stringify(liveMatches)) {
+                setLiveMatches(updated);
+            }
+        };
+
+        const interval = setInterval(fetchUpdates, 5000); // 🟢 5 SECONDS
+        return () => clearInterval(interval);
+    }, [liveMatches]);
+
+    const fixtures = liveMatches
         .filter(m => !['FT', 'FINISHED', 'ABD'].includes(m.status))
         .sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
     
-    const results = matches
+    const results = liveMatches
         .filter(m => ['FT', 'FINISHED', 'ABD'].includes(m.status))
         .sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
 
@@ -36,7 +75,6 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
 
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6 flex flex-col">
-            
             <div className="bg-slate-50 border-b border-slate-200">
                 <div className="px-4 py-3 flex justify-between items-center">
                     <h2 className="font-black text-sm uppercase text-slate-800 tracking-wider truncate">{leagueName}</h2>
@@ -100,7 +138,6 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                                 </div>
                                             )}
 
-                                            {/* Home Team Row (FULL NAME RESTORED & TRUNCATED) */}
                                             <div className="flex items-center gap-3">
                                                 <div className="w-7 h-7 flex items-center justify-center shrink-0">
                                                     {match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain drop-shadow-sm" /> : <div className="w-5 h-5 bg-slate-200 rounded-full"/>}
@@ -111,7 +148,6 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                                 {!isScheduled && <span className={`ml-auto font-black text-lg ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-400'}`}>{match.home_score}</span>}
                                             </div>
 
-                                            {/* Away Team Row (FULL NAME RESTORED & TRUNCATED) */}
                                             <div className="flex items-center gap-3">
                                                 <div className="w-7 h-7 flex items-center justify-center shrink-0">
                                                     {match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain drop-shadow-sm" /> : <div className="w-5 h-5 bg-slate-200 rounded-full"/>}
