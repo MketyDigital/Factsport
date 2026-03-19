@@ -4,6 +4,7 @@ import { MessageCircle, BarChart2, Zap, History, BrainCircuit } from 'lucide-rea
 import FanZoneChat from '@/app/components/FanZoneChat';
 import StatsLineupsTabs from '@/app/components/StatsLineupsTabs';
 import ProBettingSlipLock from '@/app/components/ProBettingSlipLock';
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
 export default function MatchMobileHub({ matchId, espnId, currentUser, initialData, dbData }: any) {
     const [activeTab, setActiveTab] = useState<'chat' | 'stats' | 'pro'>('chat');
@@ -11,7 +12,7 @@ export default function MatchMobileHub({ matchId, espnId, currentUser, initialDa
     const scrollToSection = (id: string) => {
         const element = document.getElementById(id);
         if (element) {
-            const y = element.getBoundingClientRect().top + window.scrollY - 60; // Perfect offset!
+            const y = element.getBoundingClientRect().top + window.scrollY - 60; 
             window.scrollTo({ top: y, behavior: 'smooth' });
         }
     };
@@ -35,7 +36,14 @@ export default function MatchMobileHub({ matchId, espnId, currentUser, initialDa
                 </button>
             </div>
 
-            <div className="bg-[#F0F2F5]">
+            <div className="bg-[#F0F2F5] relative">
+                
+                {/* 🟢 GLOBAL ADSTERRA BANNER (Visible across all tabs) */}
+                <div className="w-full bg-white border-b border-slate-200 py-1 sticky top-[46px] z-30">
+                    <AdsterraStandardBanner />
+                </div>
+
+                {/* Tab Content */}
                 {activeTab === 'chat' && <FanZoneChat matchId={matchId} espnId={espnId} user={currentUser} />}
                 {activeTab === 'stats' && <div className="p-2 md:p-4 bg-white"><StatsLineupsTabs matchId={matchId} initialData={initialData} /></div>}
                 {activeTab === 'pro' && <div className="p-3 md:p-6 bg-slate-900"><ProBettingSlipLock homeTeam={dbData.home_team} awayTeam={dbData.away_team} status={dbData.status} proAnalysis={dbData.pro_analysis} /></div>}

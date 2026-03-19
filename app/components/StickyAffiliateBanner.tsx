@@ -7,7 +7,6 @@ export default function StickyAffiliateBanner() {
     const [isVisible, setIsVisible] = useState(false);
     const [copied, setCopied] = useState(false);
 
-    // 🟢 Delay appearance so it slides up beautifully after the page loads
     useEffect(() => {
         const timer = setTimeout(() => setIsVisible(true), 1500);
         return () => clearTimeout(timer);
@@ -15,7 +14,6 @@ export default function StickyAffiliateBanner() {
 
     if (!isVisible) return null;
 
-    // 🟢 YOUR 1XBET DIRECT LINK
     const AFFILIATE_LINK = "https://refpa14435.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599&r=registration"; 
     const PROMO_CODE = "FACTSPORT";
 
@@ -27,77 +25,66 @@ export default function StickyAffiliateBanner() {
     };
 
     return (
-        // 🟢 FLOATING WRAPPER: bottom-3, left-3, right-3 makes it hover with curvy edges!
-        <div className="fixed bottom-3 left-3 right-3 z-[100] max-w-2xl mx-auto animate-slide-up">
+        <div className="fixed bottom-3 left-3 right-3 z-[100] max-w-2xl mx-auto animate-slide-up pointer-events-none">
             
-            {/* 🟢 1XBET BRANDING: Deep blue gradients and lime green accents */}
-            <div className="bg-gradient-to-r from-[#0d477a] via-[#1562a3] to-[#0d477a] text-white rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.6)] border border-[#2fa1ff]/30 relative overflow-hidden">
+            {/* 🟢 Completely Transparent Wrapper - Only inner items catch pointer events */}
+            <div className="relative overflow-visible w-full flex items-center justify-between gap-2 px-1">
                 
-                {/* Slim Close Button */}
+                {/* Floating Close Button */}
                 <button 
                     onClick={() => setIsVisible(false)}
-                    className="absolute top-1 right-1 bg-[#093052] text-blue-200 hover:text-white rounded-full p-1 z-10 transition-colors"
+                    className="absolute -top-4 -right-1 text-slate-400 hover:text-slate-600 bg-white/50 backdrop-blur rounded-full p-0.5 z-20 pointer-events-auto transition-colors shadow-sm"
                     aria-label="Close"
                 >
-                    <X size={12} />
+                    <X size={14} />
                 </button>
 
-                {/* Extremely compact padding to reduce height */}
-                <div className="px-2 py-2 md:px-3 md:py-2.5 flex items-center justify-between gap-2">
-                    
-                    {/* Small Icon */}
-                    <div className="w-8 h-8 md:w-10 md:h-10 bg-white rounded-lg flex items-center justify-center shrink-0 shadow-lg relative">
-                        <Gift className="text-[#1562a3] w-4 h-4 md:w-5 md:h-5 animate-pulse" />
+                <div className="flex items-center gap-2 flex-1 pointer-events-auto">
+                    {/* Floating Icon */}
+                    <div className="w-10 h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center shrink-0 shadow-[0_4px_15px_rgba(0,0,0,0.3)] relative">
+                        <Gift className="text-[#1562a3] w-5 h-5 md:w-6 md:h-6 animate-pulse" />
                     </div>
                     
-                    {/* Text Area with Slider */}
-                    <div className="flex flex-col flex-1 overflow-hidden pr-2">
-                        <div className="flex items-center gap-1.5">
-                            <span className="font-black text-[11px] md:text-sm uppercase tracking-tight drop-shadow-sm truncate">
-                                300% Welcome Bonus On 1xbet!
-                            </span>
-                        </div>
+                    {/* Floating Text with Heavy Shadows for visibility */}
+                    <div className="flex flex-col flex-1 overflow-hidden drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                        <span className="font-black text-white text-xs md:text-sm uppercase tracking-tight truncate">
+                            300% Welcome Bonus!
+                        </span>
                         
-                        {/* 🟢 ANIMATED TEXT SLIDER */}
-                        <div className="h-3.5 md:h-4 overflow-hidden relative mt-0.5">
+                        <div className="h-4 overflow-hidden relative mt-0.5">
                             <div className="animate-text-slide flex flex-col absolute w-full">
-                                {/* Slide 1 */}
-                                <span className="text-[9px] md:text-[10px] text-blue-100 truncate h-3.5 md:h-4 flex items-center">
-                                    Use Code: <strong className="text-[#6ae045] mx-1">{PROMO_CODE}</strong> for up to $100
+                                <span className="text-[10px] md:text-[11px] text-[#6ae045] font-black truncate h-4 flex items-center">
+                                    Code: {PROMO_CODE}
                                 </span>
-                                {/* Slide 2 */}
-                                <span className="text-[9px] md:text-[10px] text-blue-100 truncate h-3.5 md:h-4 flex items-center">
-                                    Best global odds & instant payouts!
+                                <span className="text-[10px] md:text-[11px] text-white font-bold truncate h-4 flex items-center">
+                                    Best global odds!
                                 </span>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* CTA & Copy Area */}
-                    <div className="flex items-center gap-1.5 shrink-0 pr-3 md:pr-0">
-                        {/* Tiny Copy Code Button */}
-                        <button 
-                            onClick={copyToClipboard}
-                            className={`flex items-center justify-center w-6 h-6 md:w-8 md:h-8 rounded-lg border transition-all ${copied ? 'bg-[#6ae045]/20 border-[#6ae045]/50 text-[#6ae045]' : 'bg-white/10 border-white/20 text-[#6ae045] hover:bg-white/20'}`}
-                            title="Copy Promo Code"
-                        >
-                            {copied ? <CheckCircle2 size={12} /> : <Copy size={12} />}
-                        </button>
+                {/* Floating Buttons */}
+                <div className="flex items-center gap-2 shrink-0 pointer-events-auto">
+                    <button 
+                        onClick={copyToClipboard}
+                        className={`flex items-center justify-center w-8 h-8 rounded-full transition-all shadow-[0_4px_10px_rgba(0,0,0,0.4)] ${copied ? 'bg-white text-[#6ae045]' : 'bg-[#1562a3] text-white hover:bg-[#0d477a]'}`}
+                        title="Copy Promo Code"
+                    >
+                        {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                    </button>
 
-                        {/* 1xBet Lime Green Button */}
-                        <a 
-                            href={AFFILIATE_LINK}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="bg-[#6ae045] hover:bg-[#5bc23a] text-[#052b4d] px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-black text-[10px] md:text-xs uppercase tracking-widest flex items-center gap-1 shadow-lg active:scale-95 transition-transform"
-                        >
-                            Claim <ArrowRight size={12} className="hidden sm:block" />
-                        </a>
-                    </div>
+                    <a 
+                        href={AFFILIATE_LINK}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-[#6ae045] hover:bg-[#5bc23a] text-[#052b4d] px-4 py-2 rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest flex items-center gap-1 shadow-[0_4px_15px_rgba(106,224,69,0.5)] active:scale-95 transition-transform"
+                    >
+                        Claim <ArrowRight size={12} className="hidden sm:block" />
+                    </a>
                 </div>
             </div>
 
-            {/* Custom Animations for the Slide-Up and the Text Ticker */}
             <style jsx>{`
                 @keyframes slide-up {
                     0% { transform: translateY(150%); opacity: 0; }
@@ -106,19 +93,10 @@ export default function StickyAffiliateBanner() {
                 .animate-slide-up {
                     animation: slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
                 }
-                
-                /* The Text Slider Animation */
                 @keyframes text-slide {
                     0%, 40% { transform: translateY(0); }
-                    50%, 90% { transform: translateY(-14px); } /* Mobile height */
+                    50%, 90% { transform: translateY(-16px); }
                     100% { transform: translateY(0); }
-                }
-                @media (min-width: 768px) {
-                    @keyframes text-slide {
-                        0%, 40% { transform: translateY(0); }
-                        50%, 90% { transform: translateY(-16px); } /* Desktop height */
-                        100% { transform: translateY(0); }
-                    }
                 }
                 .animate-text-slide {
                     animation: text-slide 6s infinite ease-in-out;
