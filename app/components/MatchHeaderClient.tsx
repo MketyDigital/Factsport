@@ -99,31 +99,29 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
 
   return (
     <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
+        {/* 🟢 ENHANCED BACKGROUND: Higher opacity, lighter gradient so the stadium is highly visible */}
         <div className="absolute inset-0 z-0 pointer-events-none">
-            <img src={leagueData.bg} alt="Stadium" className="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-overlay" />
-            <div className="absolute inset-0 bg-gradient-to-b from-[#0a1428]/90 via-[#0a1428]/80 to-[#0a1428]" />
+            <img src={leagueData.bg} alt="Stadium" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0a1428]/60 via-[#0a1428]/50 to-[#0a1428]/90" />
         </div>
 
         <div className="relative z-10 px-2 py-3 md:py-4">
             <div className="flex justify-between items-center max-w-lg mx-auto">
-                
-                {/* 🟢 HOME TEAM (Clean Blank Fallback) */}
                 <Link href={`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center w-[30%] group active:scale-95 transition-transform">
-                    <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-lg">
+                    <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
                         {dbData?.home_logo && <img src={dbData.home_logo} className="w-full h-full object-contain" alt="" />}
                     </div>
-                    <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2">{homeTeamName}</h2>
+                    <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{homeTeamName}</h2>
                 </Link>
                 
-                {/* SCORES */}
-                <div className="flex flex-col items-center justify-center w-[40%]">
+                <div className="flex flex-col items-center justify-center w-[40%] drop-shadow-lg">
                     {isLive && (
                         <div className="flex items-center gap-1 bg-red-600/90 text-white text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded-sm animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.5)] mb-1">
                             <span className="w-1 h-1 bg-white rounded-full"></span> {isHT ? 'HT' : 'LIVE'} {data?.displayClock && !isHT && <span className="text-red-200 ml-0.5">{data.displayClock}</span>}
                         </div>
                     )}
                     {!isLive && (
-                         <span className={`text-[8px] md:text-[9px] font-bold px-2 py-0.5 rounded-sm mb-1 ${isFinished ? 'bg-slate-800 text-slate-300' : 'bg-white/10 text-white'}`}>
+                         <span className={`text-[8px] md:text-[9px] font-bold px-2 py-0.5 rounded-sm mb-1 shadow-md ${isFinished ? 'bg-slate-800/80 backdrop-blur text-slate-300' : 'bg-white/20 backdrop-blur text-white'}`}>
                             {isFinished ? 'FT' : <MatchTime date={dbData?.match_date} />}
                          </span>
                     )}
@@ -131,25 +129,24 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                     {isUpcoming ? (
                          <div className="text-xl md:text-2xl font-black text-white/30 italic">VS</div>
                     ) : (
-                        <div className="text-3xl md:text-4xl font-black tracking-tighter flex gap-1 items-center drop-shadow-md">
+                        <div className="text-3xl md:text-4xl font-black tracking-tighter flex gap-1 items-center drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
                             <span className={`transition-all duration-300 ${homeFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{data?.home_score ?? 0}</span>
-                            <span className="text-white/30 text-2xl md:text-3xl pb-1">-</span>
+                            <span className="text-white/40 text-2xl md:text-3xl pb-1">-</span>
                             <span className={`transition-all duration-300 ${awayFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{data?.away_score ?? 0}</span>
                         </div>
                     )}
                 </div>
 
-                {/* 🟢 AWAY TEAM (Clean Blank Fallback) */}
                 <Link href={`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center w-[30%] group active:scale-95 transition-transform">
-                    <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-lg">
+                    <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
                         {dbData?.away_logo && <img src={dbData.away_logo} className="w-full h-full object-contain" alt="" />}
                     </div>
-                    <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2">{awayTeamName}</h2>
+                    <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{awayTeamName}</h2>
                 </Link>
             </div>
         </div>
 
-        <div className="relative z-10 w-full bg-black/40 backdrop-blur-md border-t border-white/5 py-1.5 px-2 flex justify-center items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide text-[7px] md:text-[8px] font-bold text-slate-300 uppercase tracking-widest whitespace-nowrap">
+        <div className="relative z-10 w-full bg-black/40 backdrop-blur-sm border-t border-white/5 py-1.5 px-2 flex justify-center items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide text-[7px] md:text-[8px] font-bold text-slate-300 uppercase tracking-widest whitespace-nowrap drop-shadow-md">
             {formattedDate && <span className="flex items-center gap-1"><Calendar size={9} className="text-blue-400"/> {formattedDate}</span>}
             {initialData?.venue && <span className="flex items-center gap-1"><MapPin size={9} className="text-red-400"/> {initialData.venue}</span>}
             {initialData?.stage && <span className="flex items-center gap-1"><Trophy size={9} className="text-yellow-500"/> {initialData.stage.replace(/_/g, ' ')}</span>}

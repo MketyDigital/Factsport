@@ -95,8 +95,15 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const activeAudioUrl = sanitizeUrl(dbData.audio_url);
   const hasWidget = !!dbData.widget_id; 
 
+  const jsonLd = { /* ... keep your existing jsonLd block here ... */ };
+
+  // 🟢 LOGIC CHECK: Only show the guest banner if there's an active media URL AND the game isn't finished.
+  const showGuestBanner = (activeVideoUrl || activeAudioUrl) && !isFinished;
+
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+
       {!hasWidget ? (
           <div className="w-full">
               {/* 1. HEADER */}
@@ -109,7 +116,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                   <MatchHeaderClient matchId={dbData.id} initialData={data} dbData={dbData} />
               </div>
 
-              {/* 2. HEAD TO HEAD (Flushed directly under header, ALWAYS SHOWS) */}
+              {/* 2. HEAD TO HEAD */}
               <div className="w-full bg-white border-b border-slate-200">
                   <HeadToHeadStats dbData={data} />
               </div>
@@ -123,14 +130,16 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                           <FactSportPlayer mediaUrl={activeAudioUrl!} matchId={dbData.id} mode="audio" isUpcoming={isUpcomingMatch} isFinished={isFinished} />
                       )}
 
-                      {/* 4. GUEST BROADCASTER BANNER */}
-                      <div className="w-full bg-gradient-to-r from-yellow-500 to-amber-500 px-3 py-2 flex items-center justify-between text-black shadow-inner">
-                          <div className="flex items-center gap-1.5">
-                              <RadioTower size={12} className="animate-pulse" />
-                              <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest">Studio</span>
+                      {/* 4. CONDITIONAL GUEST BROADCASTER BANNER */}
+                      {showGuestBanner && (
+                          <div className="w-full bg-gradient-to-r from-yellow-500 to-amber-500 px-3 py-2 flex items-center justify-between text-black shadow-inner">
+                              <div className="flex items-center gap-1.5">
+                                  <RadioTower size={12} className="animate-pulse" />
+                                  <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest">Studio</span>
+                              </div>
+                              <span className="text-[9px] md:text-[10px] font-bold">Want to have your say on air? <a href="#" className="underline font-black decoration-black/50 underline-offset-2">Click Here</a></span>
                           </div>
-                          <span className="text-[9px] md:text-[10px] font-bold">Want to have your say on air? <a href="#" className="underline font-black decoration-black/50 underline-offset-2">Click Here</a></span>
-                      </div>
+                      )}
                   </div>
               )}
           </div>
