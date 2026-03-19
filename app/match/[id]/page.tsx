@@ -6,14 +6,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Metadata, ResolvingMetadata } from 'next';
 import { cache } from 'react'; 
-import { ChevronLeft, Zap, MapPin, Trophy, Grid, Percent, BarChart2, BrainCircuit, History, Play, Calendar, LinkIcon } from 'lucide-react';
+import { ChevronLeft, Zap, LinkIcon } from 'lucide-react';
 
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import MatchHeaderClient from '@/app/components/MatchHeaderClient'; 
 import MatchMobileHub from '@/app/components/MatchMobileHub'; 
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
-import ProBettingSlipLock from '@/app/components/ProBettingSlipLock'; 
-import MatchTime from '@/app/components/MatchTime';
+import PredictionBoard from '@/app/components/PredictionBoard';
+import HeadToHeadStats from '@/app/components/HeadToHeadStats';
 import GoalRush from '@/app/components/GoalRush'; 
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
@@ -90,8 +90,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   if (!resolvedParams?.id) return notFound();
 
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-
-  // 1. Get Logged in User for the Fan Zone Chat
   const { data: authData } = await supabase.auth.getUser();
   const currentUser = authData?.user || null;
 
@@ -119,8 +117,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const activeAudioUrl = sanitizeUrl(dbData.audio_url);
   const hasWidget = !!dbData.widget_id; 
 
-  const formattedDate = new Date(dbData.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "SportsEvent",
@@ -142,21 +138,20 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      {/* 🟢 TOP SECTION: Sticky TV Broadcast Player & Scoreboard */}
       {!hasWidget ? (
-          <div className="sticky top-0 z-50 shadow-2xl bg-[#0a1428]">
-              {/* Minimalist Header */}
-              <div className="bg-[#0a1428] text-white p-2 md:p-3 flex items-center justify-between border-b border-white/5">
-                  <Link href="/matches" className="p-1.5 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
-                    <ChevronLeft size={20} />
+          <div className="bg-[#0a1428] shadow-md">
+              <div className="text-white px-2 py-1.5 flex items-center justify-between border-b border-white/5">
+                  <Link href="/matches" className="p-1 bg-white/10 rounded-full hover:bg-white/20 transition">
+                    <ChevronLeft size={16} />
                   </Link>
-                  <span className="text-[10px] md:text-xs font-black tracking-widest uppercase opacity-90">{dbData.league}</span>
-                  <div className="w-8"></div>
+                  <span className="text-[9px] font-black tracking-widest uppercase opacity-80">{dbData.league}</span>
+                  <div className="w-6"></div>
               </div>
 
-              {/* FactSport Media Player */}
+              <MatchHeaderClient matchId={dbData.id} initialData={data} dbData={dbData} />
+
               {(activeVideoUrl || activeAudioUrl) && (
-                  <div className="w-full">
+                  <div className="w-full bg-black border-t border-blue-900/30">
                       {activeVideoUrl ? (
                           <FactSportPlayer mediaUrl={activeVideoUrl} matchId={dbData.id} mode="video" isUpcoming={isUpcomingMatch} />
                       ) : (
@@ -164,92 +159,71 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                       )}
                   </div>
               )}
-
-              {/* Scoreboard */}
-              <div className={`${(activeVideoUrl || activeAudioUrl) ? 'rounded-none' : 'rounded-b-[2.5rem]'} overflow-hidden shadow-xl border-b border-blue-900/30`}>
-                  <MatchHeaderClient matchId={dbData.id} initialData={data} />
-              </div>
           </div>
       ) : (
-          /* LEGACY WIDGET HEADER (If using third-party widget) */
-          <div className="bg-[#0a1428] text-white p-4 shadow-md flex items-center justify-between sticky top-0 z-40">
-              <Link href="/matches" className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-md">
-                <ChevronLeft size={20} />
-              </Link>
-              <span className="text-xs font-bold tracking-widest uppercase opacity-90">{dbData.league}</span>
-              <div className="w-9"></div>
+          <div className="bg-[#0a1428] text-white p-3 shadow-md flex items-center justify-between sticky top-0 z-40">
+              <Link href="/matches" className="p-1.5 bg-white/10 rounded-full"><ChevronLeft size={16} /></Link>
+              <span className="text-[10px] font-bold tracking-widest uppercase">{dbData.league}</span>
+              <div className="w-8"></div>
           </div>
       )}
 
-      {/* 🟢 MIDDLE SECTION: Adsterra & Match Info Tags */}
-      <div className="max-w-4xl mx-auto mt-2 md:mt-4 px-2">
+      <div className="max-w-4xl mx-auto mt-2 px-2">
           <AdsterraStandardBanner />
           
-          <div className="bg-white rounded-lg p-1.5 shadow-sm border border-slate-100 flex overflow-x-auto scrollbar-hide flex-nowrap items-center gap-1.5 text-[8px] md:text-[9px] font-bold text-slate-500 whitespace-nowrap mt-3">
-              <span className="flex items-center gap-1 uppercase bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 shadow-sm text-slate-700 shrink-0">
-                  <Calendar className="w-2 h-2 text-slate-400"/> {formattedDate} <span className="text-slate-300 mx-0.5">•</span> <MatchTime date={dbData.match_date} />
-              </span>
-
-              {(data?.venue || data?.stage || data?.group || data?.predictor) && (
-                  <>
-                      {data?.stage && <span className="flex items-center gap-1 uppercase bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 shadow-sm shrink-0"><Trophy className="w-2 h-2 text-yellow-500"/> {data.stage.replace(/_/g, ' ')}</span>}
-                      {data?.group && <span className="flex items-center gap-1 uppercase bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 shadow-sm shrink-0"><Grid className="w-2 h-2 text-blue-500"/> {data.group.replace(/_/g, ' ')}</span>}
-                      {data?.venue && <span className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 shadow-sm shrink-0"><MapPin className="w-2 h-2 text-red-500"/> {data.venue}</span>}
-                      {data?.predictor && <span className="flex items-center gap-1 bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 shadow-sm shrink-0"><Percent className="w-2 h-2 text-blue-600"/> Win Prob: {parseFloat(String(data.predictor.home)).toFixed(0)}% | {parseFloat(String(data.predictor.away)).toFixed(0)}%</span>}
-                  </>
-              )}
-          </div>
+          {!hasWidget ? (
+              <div className="mt-2">
+                  <MatchMobileHub 
+                      matchId={dbData.id} 
+                      espnId={dbData.espn_id} 
+                      currentUser={currentUser} 
+                      initialData={data} 
+                      dbData={dbData} 
+                  />
+              </div>
+          ) : (
+              <div className="mt-2">
+                  <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={sanitizeUrl(dbData.affiliate_link) || undefined} />
+              </div>
+          )}
       </div>
 
-      {/* 🟢 THE MOBILE HUB: (Chat, Stats, Predict, H2H) */}
-      {!hasWidget ? (
-          <div className="max-w-4xl mx-auto md:px-4 mt-3">
-              <MatchMobileHub 
-                  matchId={dbData.id} 
-                  espnId={dbData.espn_id} 
-                  currentUser={currentUser} 
-                  initialData={data} 
-                  dbData={dbData} 
-              />
-          </div>
-      ) : (
-          <div className="mt-2">
-              <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={sanitizeUrl(dbData.affiliate_link) || undefined} />
-          </div>
-      )}
-
-      {/* 🟢 BOTTOM SECTION: Pro Tips, Affiliates & Goal Rush */}
-      <div className="max-w-4xl mx-auto px-4 mt-6 space-y-6">
-          
+      <div className="max-w-4xl mx-auto px-2 mt-4 space-y-4">
           {!hasWidget && (
               <>
-                  <div id="pro-analysis">
-                      <ProBettingSlipLock homeTeam={dbData.home_team} awayTeam={dbData.away_team} status={dbData.status} proAnalysis={dbData.pro_analysis} />
+                  <div id="predictions" className="scroll-mt-16 bg-white rounded-lg shadow-sm p-3 border border-slate-200">
+                      <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 flex items-center gap-1 mb-2">
+                          <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" /> Predict & Win
+                      </h3>
+                      <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
                   </div>
 
-                  <div className="bg-[#1A1A1A] rounded-xl p-2 md:p-3 shadow-md border border-slate-800 flex items-center justify-between relative overflow-hidden group">
-                      <div className="flex items-center gap-2 relative z-10">
-                          <div className="w-8 h-8 md:w-10 md:h-10 bg-blue-600 text-white text-[9px] md:text-xs font-black rounded-md flex items-center justify-center shadow-lg italic">1X</div>
+                  <div id="h2h" className="scroll-mt-16">
+                      <HeadToHeadStats dbData={data} />
+                  </div>
+
+                  <div className="bg-[#1A1A1A] rounded-lg p-2.5 shadow-sm border border-slate-800 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-blue-600 text-white text-[9px] font-black rounded flex items-center justify-center italic">1X</div>
                           <div>
-                              <div className="text-white font-black text-[10px] md:text-xs tracking-tight mb-0">1xBet Partner</div>
-                              <div className="text-[7px] md:text-[9px] text-slate-400 font-bold uppercase tracking-widest">
+                              <div className="text-white font-black text-[10px] leading-none">1xBet Partner</div>
+                              <div className="text-[7px] text-slate-400 font-bold uppercase tracking-widest mt-1">
                                   Code: <span className="text-yellow-400 font-black">FACTSPORT</span>
                               </div>
                           </div>
                       </div>
-                      <a href={sanitizeUrl(dbData.affiliate_link) || "#"} target="_blank" rel="noopener noreferrer" className="relative z-10 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest px-2 py-1.5 md:px-4 md:py-2.5 rounded-md shadow-md text-[7px] md:text-[9px] flex items-center gap-1">
-                          Bet <span className="hidden sm:inline">Now</span> <LinkIcon className="w-2.5 h-2.5" />
+                      <a href={sanitizeUrl(dbData.affiliate_link) || "#"} target="_blank" className="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest px-3 py-1.5 rounded shadow text-[8px] flex items-center gap-1 active:scale-95">
+                          Bet <LinkIcon className="w-2.5 h-2.5" />
                       </a>
                   </div>
               </>
           )}
 
           <AdsterraNativeBanner />
-          
           <FreeTipsBanner />
 
           {otherLiveMatches && otherLiveMatches.length > 0 && (
-              <div className="pb-6">
+              <div className="pb-4">
                   <GoalRush initialMatches={otherLiveMatches} />
               </div>
           )}
