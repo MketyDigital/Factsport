@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, MessageCircle, ShieldAlert, Zap, Reply, X, ArrowDown } from 'lucide-react';
 import Link from 'next/link';
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
 export default function FanZoneChat({ matchId, espnId, user }: { matchId: string, espnId?: string, user: any }) {
     const [messages, setMessages] = useState<any[]>([]);
@@ -65,7 +66,7 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
                         player: e.player,
                         created_at: new Date(Date.now() - (index * 60000)).toISOString() 
                     }));
-                    setOfficialEvents(formattedEvents.reverse());
+                    setOfficialEvents(formattedEvents);
                     setTimeout(() => scrollToBottom(false), 100);
                 }
             } catch (e) {}
@@ -120,9 +121,20 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
 
-    const latestEvent = officialEvents.length > 0 ? officialEvents[0] : null;
+    // 🟢 NEW: Bulletproof logic to ALWAYS find the newest match event
+    const getMinute = (timeStr: string) => {
+        if (!timeStr) return 0;
+        const parts = timeStr.replace("'", "").split('+');
+        let total = parseInt(parts[0]) || 0;
+        if (parts.length > 1) total += parseInt(parts[1]) || 0;
+        return total;
+    };
 
-    // 🟢 NEW: Fixed TypeScript Regex Issue. Using [\s\S] instead of the /s flag
+    // Sorts all events by their actual match minute, and pins the highest one to the ticker
+    const latestEvent = officialEvents.length > 0 
+        ? [...officialEvents].sort((a, b) => getMinute(b.time) - getMinute(a.time))[0] 
+        : null;
+
     const renderMessageContent = (text: string) => {
         const quoteMatch = text.match(/^\[Reply @([^:]*?): "([\s\S]*?)"\] ([\s\S]*)$/);
         if (quoteMatch) {
@@ -142,10 +154,11 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
     return (
         <div className="w-full bg-white flex flex-col h-[65vh] min-h-[450px] border-t border-slate-200 relative">
             
+            {/* 🟢 STICKY "LATEST EVENT" TICKER */}
             {latestEvent && (
                 <div className="bg-slate-900 text-white px-3 py-2 flex items-center justify-between border-b border-slate-800 shrink-0 shadow-md relative z-20">
                     <div className="flex items-center gap-2 overflow-hidden">
-                        <span className="bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow">{latestEvent.time}</span>
+                        <span className="bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow shrink-0">{latestEvent.time}</span>
                         <span className="text-[10px] md:text-xs font-bold truncate tracking-wide text-slate-100">
                             {latestEvent.text} {latestEvent.player && <span className="text-yellow-400 font-black ml-1">- {latestEvent.player}</span>}
                         </span>
