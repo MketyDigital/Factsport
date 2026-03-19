@@ -25,7 +25,6 @@
     "@marsidev/react-turnstile": "^1.1.0",
     "browser-image-compression": "^2.0.2",
     "tailwind-merge": "^2.5.2",
-    "@stream-io/node-sdk": "*",
     "@stream-io/video-react-sdk": "*"
   },
   "devDependencies": {
