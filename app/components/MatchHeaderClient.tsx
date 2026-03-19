@@ -4,7 +4,7 @@ import Link from 'next/link';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget'; 
 import { getLeagueAssets } from '@/app/lib/league-assets';
 import MatchTime from '@/app/components/MatchTime';
-import { MapPin, Trophy, Calendar, Percent } from 'lucide-react';
+import { MapPin, Trophy, Calendar, Percent, Flag } from 'lucide-react';
 
 export default function MatchHeaderClient({ matchId, initialData, dbData }: any) {
   const [data, setData] = useState(initialData);
@@ -90,10 +90,15 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
   const homeTeamName = dbData?.home_team || initialData?.home?.name || '';
   const awayTeamName = dbData?.away_team || initialData?.away?.name || '';
   
-  const formattedDate = dbData?.match_date ? new Date(dbData.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+  const formattedDate = dbData?.match_date ? new Date(dbData.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  
+  let refName = null;
+  if (initialData?.referees && initialData.referees.length > 0) {
+      refName = typeof initialData.referees[0] === 'string' ? initialData.referees[0] : initialData.referees[0].name;
+  }
 
   return (
-    <div className="relative z-10 w-full overflow-hidden bg-[#0a1428] shadow-inner">
+    <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
         <div className="absolute inset-0 z-0 pointer-events-none">
             <img src={leagueData.bg} alt="Stadium" className="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-overlay" />
             <div className="absolute inset-0 bg-gradient-to-b from-[#0a1428]/90 via-[#0a1428]/80 to-[#0a1428]" />
@@ -144,6 +149,7 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
             {formattedDate && <span className="flex items-center gap-1"><Calendar size={9} className="text-blue-400"/> {formattedDate}</span>}
             {initialData?.venue && <span className="flex items-center gap-1"><MapPin size={9} className="text-red-400"/> {initialData.venue}</span>}
             {initialData?.stage && <span className="flex items-center gap-1"><Trophy size={9} className="text-yellow-500"/> {initialData.stage.replace(/_/g, ' ')}</span>}
+            {refName && <span className="flex items-center gap-1"><Flag size={9} className="text-slate-400"/> {refName}</span>}
             {initialData?.predictor && <span className="flex items-center gap-1 text-green-400"><Percent size={9}/> {parseFloat(String(initialData.predictor.home)).toFixed(0)}% / {parseFloat(String(initialData.predictor.away)).toFixed(0)}%</span>}
         </div>
     </div>

@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, MessageCircle, ShieldAlert, Zap, RadioTower } from 'lucide-react';
 import Link from 'next/link';
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
 export default function FanZoneChat({ matchId, espnId, user }: { matchId: string, espnId?: string, user: any }) {
     const [messages, setMessages] = useState<any[]>([]);
@@ -12,12 +13,18 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const CHAT_WORKER_URL = "https://chatworkerjs.mkpoikankes.workers.dev"; 
 
-    const scrollToBottom = () => {
+    // 🟢 Smart Scrolling: Only auto-scrolls if user is already near the bottom!
+    const scrollToBottom = (force = false) => {
         if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTo({
-                top: scrollContainerRef.current.scrollHeight,
-                behavior: 'smooth'
-            });
+            const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+            const isNearBottom = scrollHeight - scrollTop - clientHeight < 150;
+            
+            if (force || isNearBottom) {
+                scrollContainerRef.current.scrollTo({
+                    top: scrollHeight,
+                    behavior: 'smooth'
+                });
+            }
         }
     };
 
@@ -28,7 +35,7 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
                 if (res.ok) {
                     const data = await res.json();
                     setMessages(data.messages || []);
-                    setTimeout(scrollToBottom, 100);
+                    setTimeout(() => scrollToBottom(false), 100);
                 }
             } catch (e) {}
         };
@@ -54,7 +61,7 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
                         created_at: new Date(Date.now() - (index * 60000)).toISOString() 
                     }));
                     setOfficialEvents(formattedEvents.reverse());
-                    setTimeout(scrollToBottom, 100);
+                    setTimeout(() => scrollToBottom(false), 100);
                 }
             } catch (e) {}
         };
@@ -78,7 +85,7 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
 
         setMessages(prev => [...prev, tempMsg]);
         setNewMessage("");
-        setTimeout(scrollToBottom, 50);
+        setTimeout(() => scrollToBottom(true), 50); // Force scroll on user send
 
         try {
             await fetch(`${CHAT_WORKER_URL}/messages`, {
@@ -102,14 +109,20 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
     );
 
     return (
-        <div className="w-full bg-white flex flex-col h-[55vh] min-h-[400px] border-t border-slate-200">
-            <div className="bg-gradient-to-r from-yellow-500/10 to-amber-500/5 border-b border-yellow-500/20 px-3 py-2.5 flex flex-col sm:flex-row sm:items-center gap-2">
+        <div className="w-full bg-white flex flex-col h-[65vh] min-h-[450px] border-t border-slate-200">
+            
+            {/* 🟢 Sticky Ad Inside Chat Header */}
+            <div className="w-full bg-white border-b border-slate-100 py-1">
+                <AdsterraStandardBanner />
+            </div>
+
+            <div className="bg-gradient-to-r from-yellow-500/10 to-amber-500/5 border-b border-yellow-500/20 px-3 py-2 flex flex-col sm:flex-row sm:items-center gap-2 shrink-0">
                 <div className="flex items-center gap-1.5 shrink-0">
-                    <RadioTower className="w-3.5 h-3.5 text-yellow-600 animate-pulse" />
+                    <RadioTower className="w-3 h-3 text-yellow-600 animate-pulse" />
                     <span className="bg-yellow-500 text-black text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow-sm">Studio</span>
                 </div>
-                <p className="text-[10px] md:text-xs font-semibold text-slate-700 leading-snug">
-                    Want to jump on as a guest broadcaster? <a href="#" className="text-blue-600 font-bold underline decoration-blue-300 underline-offset-2">Click here to request mic access.</a>
+                <p className="text-[9px] md:text-[10px] font-semibold text-slate-700 leading-snug">
+                    Want to jump on as a guest broadcaster? <a href="#" className="text-blue-600 font-bold underline decoration-blue-300 underline-offset-2">Click here.</a>
                 </p>
             </div>
 
@@ -132,7 +145,6 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
                                 </div>
                             );
                         }
-
                         return (
                             <div key={msg.id} className="flex gap-2 animate-in fade-in slide-in-from-bottom-1">
                                 {msg.avatar_url ? (
@@ -159,31 +171,13 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
             <div className="p-2 md:p-3 bg-white border-t border-slate-200 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] z-10 shrink-0">
                 {user ? (
                     <form onSubmit={handleSendMessage} className="relative flex items-center">
-                        <input 
-                            type="text" 
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            placeholder="Have your say..." 
-                            className="w-full bg-[#F0F2F5] border border-slate-200 rounded-full pl-4 pr-12 py-2 md:py-2.5 text-[11px] md:text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition shadow-inner"
-                            maxLength={200}
-                        />
-                        <button 
-                            type="submit" 
-                            disabled={!newMessage.trim() || isSending}
-                            className="absolute right-1 p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 transition shadow-md"
-                        >
-                            <Send size={14} />
-                        </button>
+                        <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Have your say..." className="w-full bg-[#F0F2F5] border border-slate-200 rounded-full pl-4 pr-12 py-2 md:py-2.5 text-[11px] md:text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition shadow-inner" maxLength={200} />
+                        <button type="submit" disabled={!newMessage.trim() || isSending} className="absolute right-1 p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 transition shadow-md"><Send size={14} /></button>
                     </form>
                 ) : (
                     <div className="flex items-center justify-between bg-[#F0F2F5] rounded-full p-1 pl-4 shadow-inner border border-slate-200">
-                        <div className="flex items-center gap-1.5 text-slate-500">
-                            <ShieldAlert size={12} />
-                            <span className="text-[9px] font-bold uppercase tracking-widest">Login to chat</span>
-                        </div>
-                        <Link href="/login" className="bg-[#0a1428] text-white px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest shadow-md hover:bg-slate-800 transition active:scale-95">
-                            Sign In
-                        </Link>
+                        <div className="flex items-center gap-1.5 text-slate-500"><ShieldAlert size={12} /><span className="text-[9px] font-bold uppercase tracking-widest">Login to chat</span></div>
+                        <Link href="/login" className="bg-[#0a1428] text-white px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest shadow-md hover:bg-slate-800 transition active:scale-95">Sign In</Link>
                     </div>
                 )}
             </div>

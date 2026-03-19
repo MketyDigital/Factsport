@@ -1,67 +1,44 @@
 'use client';
 import { useState } from 'react';
-import { MessageCircle, BarChart2, Zap, History } from 'lucide-react';
+import { MessageCircle, BarChart2, Zap, History, BrainCircuit } from 'lucide-react';
 import FanZoneChat from '@/app/components/FanZoneChat';
 import StatsLineupsTabs from '@/app/components/StatsLineupsTabs';
-import PredictionBoard from '@/app/components/PredictionBoard';
-import HeadToHeadStats from '@/app/components/HeadToHeadStats';
+import ProBettingSlipLock from '@/app/components/ProBettingSlipLock';
 
-export default function MatchMobileHub({ 
-    matchId, 
-    espnId, 
-    currentUser, 
-    initialData, 
-    dbData 
-}: { 
-    matchId: string, 
-    espnId: string, 
-    currentUser: any, 
-    initialData: any, 
-    dbData: any 
-}) {
-    const [activeTab, setActiveTab] = useState<'chat' | 'stats' | 'predict' | 'h2h'>('chat');
+export default function MatchMobileHub({ matchId, espnId, currentUser, initialData, dbData }: any) {
+    const [activeTab, setActiveTab] = useState<'chat' | 'stats' | 'pro'>('chat');
+
+    const scrollToSection = (id: string) => {
+        const element = document.getElementById(id);
+        if (element) {
+            const y = element.getBoundingClientRect().top + window.scrollY - 60; // Perfect offset!
+            window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+    };
 
     return (
-        <div className="w-full flex flex-col bg-white shadow-xl md:rounded-2xl overflow-hidden mb-6">
+        <div className="w-full flex flex-col bg-white shadow-md md:rounded-2xl overflow-hidden mb-4 border border-slate-200">
             
-            {/* The Compact Tab Menu */}
-            <div className="flex overflow-x-auto scrollbar-hide border-b border-slate-200 bg-slate-50 sticky top-[52px] md:top-[60px] z-30">
-                <button onClick={() => setActiveTab('chat')} className={`flex-1 py-3 px-4 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors ${activeTab === 'chat' ? 'text-blue-600 border-b-2 border-blue-600 bg-white' : 'text-slate-500 hover:bg-slate-100'}`}>
-                    <MessageCircle size={14} className={activeTab === 'chat' ? 'fill-blue-100' : ''}/> Fan Zone
+            <div className="flex overflow-x-auto scrollbar-hide border-b border-slate-200 bg-white sticky top-0 z-40 shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
+                <button onClick={() => setActiveTab('chat')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'chat' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
+                    <MessageCircle size={14} className={activeTab === 'chat' ? 'fill-blue-100' : ''}/> Live Chat
                 </button>
-                <button onClick={() => setActiveTab('stats')} className={`flex-1 py-3 px-4 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors ${activeTab === 'stats' ? 'text-blue-600 border-b-2 border-blue-600 bg-white' : 'text-slate-500 hover:bg-slate-100'}`}>
+                <button onClick={() => setActiveTab('stats')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'stats' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
                     <BarChart2 size={14} /> Stats & XI
                 </button>
-                <button onClick={() => setActiveTab('predict')} className={`flex-1 py-3 px-4 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors ${activeTab === 'predict' ? 'text-blue-600 border-b-2 border-blue-600 bg-white' : 'text-slate-500 hover:bg-slate-100'}`}>
-                    <Zap size={14} className={activeTab === 'predict' ? 'fill-blue-100 text-blue-600' : 'text-yellow-500'}/> Predict
+                <button onClick={() => setActiveTab('pro')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'pro' ? 'text-yellow-600 border-b-2 border-yellow-500 bg-yellow-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
+                    <BrainCircuit size={14} className={activeTab === 'pro' ? 'text-yellow-500' : ''}/> Pro Slip
                 </button>
-                <button onClick={() => setActiveTab('h2h')} className={`flex-1 py-3 px-4 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors ${activeTab === 'h2h' ? 'text-blue-600 border-b-2 border-blue-600 bg-white' : 'text-slate-500 hover:bg-slate-100'}`}>
-                    <History size={14} /> H2H
+                
+                <button onClick={() => scrollToSection('predictions')} className="flex-1 py-3 px-4 min-w-max text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 flex items-center justify-center gap-1.5 border-l border-slate-100">
+                    <Zap size={12} /> Predict
                 </button>
             </div>
 
-            {/* The Content Area */}
             <div className="bg-[#F0F2F5]">
-                {activeTab === 'chat' && (
-                    <FanZoneChat matchId={matchId} espnId={espnId} user={currentUser} />
-                )}
-                {activeTab === 'stats' && (
-                    <div className="p-2 md:p-4">
-                        <StatsLineupsTabs matchId={matchId} initialData={initialData} />
-                    </div>
-                )}
-                {activeTab === 'predict' && (
-                    <div className="p-2 md:p-4">
-                        <div className="bg-white rounded-xl shadow-sm p-3 border border-slate-200">
-                            <PredictionBoard matchId={matchId} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
-                        </div>
-                    </div>
-                )}
-                {activeTab === 'h2h' && (
-                    <div className="p-2 md:p-4">
-                        <HeadToHeadStats dbData={initialData} />
-                    </div>
-                )}
+                {activeTab === 'chat' && <FanZoneChat matchId={matchId} espnId={espnId} user={currentUser} />}
+                {activeTab === 'stats' && <div className="p-2 md:p-4 bg-white"><StatsLineupsTabs matchId={matchId} initialData={initialData} /></div>}
+                {activeTab === 'pro' && <div className="p-3 md:p-6 bg-slate-900"><ProBettingSlipLock homeTeam={dbData.home_team} awayTeam={dbData.away_team} status={dbData.status} proAnalysis={dbData.pro_analysis} /></div>}
             </div>
         </div>
     );
