@@ -1,15 +1,17 @@
 'use client';
-
 import { useState, useRef } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize, Radio, Loader2, Clock } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Radio, Loader2, Clock, Tv } from 'lucide-react';
+import FactSportAudioRoom from './FactSportAudioRoom';
 
-export default function FactSportPlayer({ mediaUrl, mode = 'video', isUpcoming = false }: { mediaUrl: string, mode?: 'video' | 'audio', isUpcoming?: boolean }) {
+export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isUpcoming = false, isFinished = false }: { mediaUrl: string, matchId: string, mode?: 'video' | 'audio', isUpcoming?: boolean, isFinished?: boolean }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
   
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
+
+  if (mediaUrl === 'streamio') return <FactSportAudioRoom matchId={matchId} />;
 
   const isYouTube = mediaUrl.includes('youtube.com') || mediaUrl.includes('youtu.be');
   const isRawMedia = mediaUrl.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
@@ -46,20 +48,18 @@ export default function FactSportPlayer({ mediaUrl, mode = 'video', isUpcoming =
 
   if (isUpcoming) {
       return (
-          <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative flex flex-col items-center justify-center overflow-hidden rounded-xl border border-slate-800 shadow-xl group`}>
-              <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-30 blur-md grayscale"></div>
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
-              
-              <div className="relative z-10 flex flex-col items-center gap-2 md:gap-3">
-                  <div className="w-10 h-10 md:w-14 md:h-14 bg-white/5 rounded-full flex items-center justify-center border border-white/10 shadow-lg">
-                     <Clock className="text-slate-400 w-5 h-5 md:w-6 md:h-6" />
+          <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative flex flex-col items-center justify-center overflow-hidden border-b border-slate-800 shadow-inner group`}>
+              <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-md grayscale"></div>
+              <div className="relative z-10 flex flex-col items-center gap-2">
+                  <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10 shadow-lg backdrop-blur-sm">
+                     <Clock className="text-slate-400 w-4 h-4" />
                   </div>
-                  <div className="flex flex-col items-center">
-                      <span className="text-white font-black uppercase tracking-widest text-[10px] md:text-xs text-center drop-shadow-md">
+                  <div className="flex flex-col items-center gap-1">
+                      <span className="text-white font-black uppercase tracking-widest text-[9px] md:text-[10px] text-center drop-shadow-md">
                           {mode === 'audio' ? 'Live Radio Broadcast' : 'Live Match Stream'}
                       </span>
-                      <span className="text-blue-400 font-bold uppercase tracking-widest text-[8px] md:text-[9px] bg-blue-900/30 px-3 py-1 rounded-full border border-blue-500/30 mt-1 md:mt-2 shadow-inner">
-                          Available at Kick-off
+                      <span className="text-blue-400 font-bold uppercase tracking-widest text-[7px] md:text-[8px] bg-blue-900/40 px-2 py-0.5 rounded-full border border-blue-500/30">
+                          Available 5 mins to Kick-off
                       </span>
                   </div>
               </div>
@@ -75,44 +75,41 @@ export default function FactSportPlayer({ mediaUrl, mode = 'video', isUpcoming =
 
     if (mode === 'audio') {
       return (
-        <div className="w-full h-[120px] bg-[#0a1428] relative overflow-hidden rounded-xl border border-slate-800 shadow-xl flex items-center justify-center">
-            {/* Background & Decor */}
-            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-sm pointer-events-none"></div>
-            <Radio className="absolute left-4 text-red-500 w-8 h-8 animate-pulse drop-shadow-lg z-10 pointer-events-none" />
-            
-            <div className="absolute top-3 left-14 z-10 pointer-events-none">
-                <span className="text-white text-[9px] font-black tracking-widest uppercase bg-black/60 px-2 py-0.5 rounded shadow-md border border-white/10">Live Audio</span>
+        <div className="w-full h-[100px] md:h-[120px] bg-[#0a1428] relative overflow-hidden border-b border-slate-800 flex items-center justify-center shadow-inner">
+            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-10 blur-sm pointer-events-none"></div>
+            <Radio className="absolute left-6 text-red-500 w-8 h-8 animate-pulse drop-shadow-[0_0_10px_rgba(239,68,68,0.5)] z-10 pointer-events-none" />
+            <div className="absolute top-3 left-16 z-10 pointer-events-none">
+                <span className="text-white text-[9px] font-black tracking-widest uppercase bg-black/60 px-2 py-0.5 rounded shadow-md border border-white/10 flex items-center gap-1.5">
+                    <span className="w-1 h-1 bg-red-500 rounded-full animate-pulse"></span> Radio Station
+                </span>
             </div>
-
-            {/* 🟢 THE MAGIC CROP FIX: This tiny 80x60 box ONLY reveals the center Play Button of the YouTube video */}
-            <div className="relative z-20 w-[80px] h-[60px] overflow-hidden rounded-lg shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/20 ml-8 md:ml-0 bg-black">
-                <iframe 
-                  src={`https://www.youtube.com/embed/${videoId}?playsinline=1`} 
-                  style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '320px', height: '240px' }} 
-                  frameBorder="0" 
-                  allow="autoplay; encrypted-media">
-                </iframe>
+            <div className="relative z-20 w-[80px] h-[60px] overflow-hidden rounded-lg shadow-[0_0_20px_rgba(0,0,0,0.8)] border border-white/20 ml-12 bg-black scale-90 md:scale-100">
+                <iframe src={`https://www.youtube.com/embed/${videoId}?playsinline=1`} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '320px', height: '240px' }} frameBorder="0" allow="autoplay; encrypted-media"></iframe>
             </div>
         </div>
       );
     }
 
-    // Standard Video Render (Untouched)
     return (
-      <div className="w-full aspect-video bg-black relative overflow-hidden rounded-xl border border-slate-800 group">
-        <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-black via-black/80 to-transparent z-10 pointer-events-none transition-opacity duration-500 group-hover:opacity-0"></div>
-        <iframe 
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&showinfo=0&controls=1&playsinline=1`} 
-          className="w-full h-full scale-[1.05]" 
-          allowFullScreen>
-        </iframe>
+      <div className="w-full aspect-video bg-black relative overflow-hidden border-b border-slate-800 shadow-inner group">
+        <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-[#0a1428] via-[#0a1428]/80 to-transparent z-10 pointer-events-none"></div>
+        <div className="absolute top-2 left-2 z-20 pointer-events-none flex items-center gap-1.5">
+            <span className={`${isFinished ? 'bg-slate-800' : 'bg-red-600'} text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg uppercase tracking-widest flex items-center gap-1`}>
+                {!isFinished && <span className="w-1 h-1 bg-white rounded-full animate-pulse"></span>}
+                {isFinished ? 'HIGHLIGHTS' : 'LIVE'}
+            </span>
+            <span className="bg-black/80 backdrop-blur-md text-white text-[8px] font-black px-1.5 py-0.5 rounded border border-white/10 shadow-lg uppercase tracking-widest flex items-center gap-1">
+                <Tv size={8} className="text-blue-400"/> FactSport TV
+            </span>
+        </div>
+        <iframe src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&iv_load_policy=3&controls=1&playsinline=1&fs=1`} className="w-full h-full scale-[1.03]" allowFullScreen></iframe>
       </div>
     );
   };
 
   const renderRawPlayer = () => {
     return (
-      <div id="fs-player-wrapper" className={`w-full ${mode === 'audio' || isRawAudio ? 'h-[120px]' : 'aspect-video'} bg-black relative group overflow-hidden rounded-xl border border-slate-800 shadow-xl`}>
+      <div id="fs-player-wrapper" className={`w-full ${mode === 'audio' || isRawAudio ? 'h-[120px]' : 'aspect-video'} bg-black relative group overflow-hidden border-b border-slate-800 shadow-xl`}>
         {(mode === 'audio' || isRawAudio) && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a1428]">
                 <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-sm"></div>
@@ -154,19 +151,12 @@ export default function FactSportPlayer({ mediaUrl, mode = 'video', isUpcoming =
 
   const renderGenericIframe = () => {
     return (
-      <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative rounded-xl border border-slate-800 overflow-hidden shadow-xl`}>
+      <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative border-b border-slate-800 overflow-hidden shadow-xl`}>
          {mode === 'audio' && (
              <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-sm pointer-events-none"></div>
          )}
          
-         <iframe 
-             src={mediaUrl} 
-             className="relative z-10 w-full h-full" 
-             frameBorder="0" 
-             scrolling="no" 
-             sandbox="allow-scripts allow-same-origin" 
-             allowFullScreen
-         ></iframe>
+         <iframe src={mediaUrl} className="relative z-10 w-full h-full" frameBorder="0" scrolling="no" sandbox="allow-scripts allow-same-origin" allowFullScreen></iframe>
          
          <div className="absolute bottom-0 left-0 w-full h-[30px] bg-[#0a1428] border-t border-slate-800 z-40 flex items-center justify-between px-3 pointer-events-none">
              <div className="flex items-center gap-1.5">
