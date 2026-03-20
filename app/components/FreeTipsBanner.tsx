@@ -2,22 +2,20 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Copy, CheckCircle, ExternalLink, Lock, Zap } from 'lucide-react';
-import { createClient } from '@/app/lib/supabase/client'; 
 
 export default function FreeTipsBanner() {
   const [copied1x, setCopied1x] = useState(false);
   const [copiedMel, setCopiedMel] = useState(false);
 
-  // 🟢 CONSTANT: Registration Promo (Never changes, protects your affiliate tracking)
+  // 🟢 CONSTANT: Registration Promo
   const PROMO_CODE = "FACTSPORT";
 
-  // 🟢 DYNAMIC LINKS (Fetched from Admin Panel)
+  // 🟢 STATE
   const [globalLinks, setGlobalLinks] = useState({
       link1x: "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599",
       linkMel: "https://refpa54566.com/L?tag=d_1181253m_45415c_&site=1181253&ad=45415"
   });
 
-  // 🟢 DAILY BOOKING CODES (Fetched from Admin Panel)
   const [bookingCodes, setBookingCodes] = useState({
       code1x: "A8J92",
       codeMel: "7X2MM"
@@ -25,37 +23,24 @@ export default function FreeTipsBanner() {
 
   useEffect(() => {
       const fetchData = async () => {
-          const supabase = createClient();
-          
-          // 1. Fetch Global Settings (Links AND Daily Slip Codes)
-          const { data: settings } = await supabase.from('site_settings').select('*').eq('id', 1).single();
-          if (settings) {
+          try {
+              // 🟢 FETCHING FROM CACHE: 0 Database compute cost!
+              const res = await fetch('/api/settings');
+              if (!res.ok) return;
+              
+              const data = await res.json();
+              
               setGlobalLinks({
-                  link1x: settings.link_1xbet || globalLinks.link1x,
-                  linkMel: settings.link_melbet || globalLinks.linkMel
+                  link1x: data.link1x || "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599",
+                  linkMel: data.linkMel || "https://refpa54566.com/L?tag=d_1181253m_45415c_&site=1181253&ad=45415"
               });
               
-              // Map the Admin Panel codes directly to the Betting Slips!
-              setBookingCodes(prev => ({
-                  code1x: settings.code_1xbet || prev.code1x,
-                  codeMel: settings.code_melbet || prev.codeMel
-              }));
-          }
-
-          // 2. Fallback: If Admin 1xBet code is empty, try to find the newest match with a code
-          if (!settings?.code_1xbet) {
-              const { data: latestMatch } = await supabase
-                .from('matches')
-                .select('booking_code')
-                .not('booking_code', 'is', null)
-                .neq('booking_code', '')
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
-
-              if (latestMatch?.booking_code) {
-                  setBookingCodes(prev => ({ ...prev, code1x: latestMatch.booking_code }));
-              }
+              setBookingCodes({
+                  code1x: data.code1x || "A8J92",
+                  codeMel: data.codeMel || "7X2MM"
+              });
+          } catch (e) {
+              console.error("Failed to load banner data", e);
           }
       };
       fetchData();

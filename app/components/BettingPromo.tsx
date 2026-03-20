@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Copy, ExternalLink, CheckCircle } from 'lucide-react';
-import { createClient } from '@/app/lib/supabase/client';
+import { Copy, ExternalLink, CheckCircle, Gift } from 'lucide-react';
 
 export default function BettingPromo({ affiliateLink }: { affiliateLink: string | null }) {
   const [copied, setCopied] = useState(false);
@@ -9,7 +8,7 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
   // 🟢 CONSTANT: Affiliate Promo Code is permanently locked
   const PROMO_CODE = "FACTSPORT";
 
-  // 🟢 DYNAMIC: Affiliate Links are still fetched from the database
+  // 🟢 DYNAMIC: Affiliate Links fetched from the highly-cached API
   const [links, setLinks] = useState({
       link1x: "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599",
       linkMel: "https://refpa54566.com/L?tag=d_1181253m_45415c_&site=1181253&ad=45415"
@@ -17,20 +16,25 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
 
   useEffect(() => {
       const fetchSettings = async () => {
-          const supabase = createClient();
-          const { data } = await supabase.from('site_settings').select('*').eq('id', 1).single();
-          if (data) {
+          try {
+              // 🟢 ZERO DATABASE COST: Fetching from the cached Vercel Edge
+              const res = await fetch('/api/settings');
+              if (!res.ok) return;
+              const data = await res.json();
+              
               setLinks({
-                  link1x: data.link_1xbet || links.link1x,
-                  linkMel: data.link_melbet || links.linkMel
+                  link1x: data.link1x || links.link1x,
+                  linkMel: data.linkMel || links.linkMel
               });
+          } catch (e) {
+              console.error("Failed to load promo settings", e);
           }
       };
       fetchSettings();
   }, []);
 
-  const isOverride = !!affiliateLink;
-  const targetLink = affiliateLink || links.link1x;
+  // 🟢 Changed default fallback to Melbet
+  const targetLink = affiliateLink || links.linkMel;
 
   const copyCode = () => {
       navigator.clipboard.writeText(PROMO_CODE);
@@ -38,62 +42,47 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
       setTimeout(() => setCopied(false), 2000);
   };
 
-  if (isOverride) {
-      // 🟡 MELBET DESIGN (Special Admin Override)
-      return (
-        <div className="bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-xl p-4 text-black shadow-xl relative overflow-hidden group">
-            <div className="absolute right-[-20px] top-[-20px] w-32 h-32 bg-white blur-[50px] opacity-40 group-hover:opacity-50 transition"></div>
-            
-            <div className="flex justify-between items-start mb-3 relative z-10">
-                <div>
-                    <h3 className="font-black text-xl italic tracking-tighter">MELBET</h3>
-                    <p className="text-[10px] font-bold opacity-80">300% Bonus • Best Odds</p>
-                </div>
-                <span className="bg-black text-yellow-500 text-[9px] font-black px-2 py-1 rounded shadow-md">SPECIAL</span>
-            </div>
-            
-            <div className="flex gap-2 relative z-10">
-                <button onClick={copyCode} className="flex-1 bg-black/10 hover:bg-black/20 border border-black/10 rounded-lg px-3 py-2 flex items-center justify-between transition active:scale-95 shadow-sm">
-                    <div className="text-left">
-                        <span className="text-[8px] font-bold block opacity-60 uppercase">Code</span>
-                        <span className="text-xs font-mono font-black tracking-wider">{PROMO_CODE}</span>
-                    </div>
-                    {copied ? <CheckCircle size={16} className="text-black"/> : <Copy size={16} className="text-black opacity-50"/>}
-                </button>
-                <a href={targetLink} target="_blank" rel="noopener noreferrer" className="bg-black text-white px-5 py-2 rounded-lg font-black text-xs flex items-center gap-2 hover:scale-105 transition shadow-lg">
-                    BET <ExternalLink size={12}/>
-                </a>
-            </div>
-        </div>
-      );
-  }
-
-  // 🔵 1XBET DESIGN (Default)
   return (
-    <div className="bg-[#1A1A1A] rounded-xl p-4 shadow-xl border border-slate-800 flex flex-col gap-3 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-24 h-full bg-gradient-to-l from-blue-600/20 to-transparent"></div>
+    <div className="bg-[#121418] border border-yellow-500/20 rounded-lg p-2.5 shadow-md relative overflow-hidden flex items-center justify-between w-full">
+        {/* Subtle Melbet Yellow Glow in the background */}
+        <div className="absolute top-0 right-0 w-32 h-full bg-gradient-to-l from-yellow-500/10 to-transparent pointer-events-none"></div>
         
-        <div className="flex justify-between items-center relative z-10">
-             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-black text-white italic shadow-lg">1X</div>
-                <div>
-                    <div className="text-white font-bold text-sm">1xBet Official</div>
-                    <div className="text-blue-400 text-[10px] font-bold">Highest Odds Guaranteed</div>
-                </div>
+        {/* LEFT: Brand & Offer */}
+        <div className="flex items-center gap-2.5 relative z-10">
+             <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded flex items-center justify-center font-black text-black text-[10px] italic shadow-inner">
+                 MEL
+             </div>
+             <div className="flex flex-col justify-center">
+                 <div className="text-white font-bold text-xs leading-none flex items-center gap-1">
+                     Melbet <Gift size={10} className="text-yellow-500" />
+                 </div>
+                 <div className="text-yellow-500 text-[9px] font-bold mt-0.5 uppercase tracking-wider">
+                     300% Welcome Bonus
+                 </div>
              </div>
         </div>
 
-        <div className="flex gap-2 relative z-10">
-             <button onClick={copyCode} className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-3 py-2 flex-1 flex items-center justify-between transition active:scale-95 shadow-sm">
-                <div className="text-left">
-                    <span className="text-[8px] text-slate-400 block uppercase font-bold">Promo Code</span>
-                    <span className="text-xs text-white font-mono font-black tracking-wider">{PROMO_CODE}</span>
-                </div>
-                {copied ? <CheckCircle size={16} className="text-green-500"/> : <Copy size={16} className="text-slate-500"/>}
+        {/* RIGHT: Promo Code & Action Button */}
+        <div className="flex items-center gap-2 relative z-10">
+             {/* Click to Copy Code */}
+             <button 
+                 onClick={copyCode} 
+                 className="flex items-center gap-1.5 bg-black/40 hover:bg-black/60 border border-white/5 rounded px-2.5 py-1.5 transition active:scale-95"
+                 title="Copy Promo Code"
+             >
+                 <span className="text-[9px] text-slate-400 uppercase font-bold hidden sm:block">Code:</span>
+                 <span className="text-xs text-white font-mono font-black tracking-wide">{PROMO_CODE}</span>
+                 {copied ? <CheckCircle size={14} className="text-green-500"/> : <Copy size={14} className="text-slate-500"/>}
              </button>
 
-             <a href={targetLink} target="_blank" rel="noopener noreferrer" className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-black px-6 py-2 rounded-lg shadow-lg flex items-center gap-1 transition">
-                BET <ExternalLink size={12} />
+             {/* Bet Button */}
+             <a 
+                 href={targetLink} 
+                 target="_blank" 
+                 rel="noopener noreferrer" 
+                 className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black text-[10px] font-black px-4 py-1.5 rounded flex items-center gap-1 transition-all active:scale-95 shadow-md uppercase tracking-widest"
+             >
+                 BET <ExternalLink size={12} />
              </a>
         </div>
     </div>
