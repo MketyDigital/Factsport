@@ -4,17 +4,34 @@ import { StreamVideo, StreamVideoClient, StreamCall, SpeakerLayout, CallControls
 import '@stream-io/video-react-sdk/dist/css/styles.css';
 import { Loader2, Radio, Headphones, Hand, Mic, CheckCircle, XCircle, Link as LinkIcon, Copy, Check } from 'lucide-react';
 
-// 🟢 SUB-COMPONENT: Handles interactive logic and Admin Link Generation
+// 🟢 SUB-COMPONENT: Handles interactive logic, permissions, and Admin Link Generation
 const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest', matchId: string }) => {
     const call = useCall();
-    const { useHasPermissions, useCallPermissionRequests } = useCallStateHooks();
+    const { useHasPermissions } = useCallStateHooks();
     
     const canSpeak = useHasPermissions('send-audio');
-    const permissionRequests = useCallPermissionRequests();
     
     const [handRaised, setHandRaised] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [copied, setCopied] = useState(false);
+    
+    // 🟢 NEW: Storing incoming caller requests in state
+    const [permissionRequests, setPermissionRequests] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (!call || role !== 'admin') return;
+        
+        // 🟢 NEW: Listen to the live WebSocket event when a fan raises their hand
+        const unsubscribe = call.on('call.permission_request', (event: any) => {
+            setPermissionRequests((prev) => {
+                // Prevent duplicate requests from the same user filling up the screen
+                if (prev.some(req => req.user.id === event.user.id)) return prev;
+                return [...prev, event];
+            });
+        });
+
+        return () => unsubscribe();
+    }, [call, role]);
 
     if (!call) return null;
 
@@ -25,7 +42,17 @@ const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest
         } catch (err) {}
     };
 
-    // 🟢 The secure link generator function
+    // 🟢 Action: Grant mic access and clear from queue
+    const handleApprove = async (userId: string) => {
+        await call.grantPermissions(userId, ['send-audio']);
+        setPermissionRequests((prev) => prev.filter(req => req.user.id !== userId));
+    };
+
+    // 🟢 Action: Deny access and clear from queue
+    const handleDeny = async (userId: string) => {
+        setPermissionRequests((prev) => prev.filter(req => req.user.id !== userId));
+    };
+
     const generateVIPLink = async () => {
         setIsGenerating(true);
         try {
@@ -77,10 +104,10 @@ const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest
                             <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest border-b border-white/10 pb-1">Caller Requests</span>
                             {permissionRequests.map((req) => (
                                 <div key={req.user.id} className="flex items-center justify-between bg-black/50 px-2 py-1.5 rounded">
-                                    <span className="text-xs text-white font-medium truncate max-w-[120px]">{req.user.name}</span>
+                                    <span className="text-xs text-white font-medium truncate max-w-[120px]">{req.user.name || req.user.id}</span>
                                     <div className="flex items-center gap-2">
-                                        <button onClick={() => call.grantPermissions(req.user.id, ['send-audio'])} className="text-green-400 hover:scale-110 transition"><CheckCircle size={16} /></button>
-                                        <button onClick={() => call.revokePermissions(req.user.id, ['send-audio'])} className="text-red-400 hover:scale-110 transition"><XCircle size={16} /></button>
+                                        <button onClick={() => handleApprove(req.user.id)} className="text-green-400 hover:scale-110 transition"><CheckCircle size={16} /></button>
+                                        <button onClick={() => handleDeny(req.user.id)} className="text-red-400 hover:scale-110 transition"><XCircle size={16} /></button>
                                     </div>
                                 </div>
                             ))}
