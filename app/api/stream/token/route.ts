@@ -29,7 +29,7 @@ export async function GET(req: Request) {
 
         let userId = '';
         let username = '';
-        let role = 'user';
+        let role = 'anonymous'; // 🟢 Default to anonymous listener
         let avatarUrl = '';
 
         // 🌟 FLOW 1: THE STATELESS VIP GUEST (No Login Required)
@@ -48,33 +48,30 @@ export async function GET(req: Request) {
                 return NextResponse.json({ error: 'Guest link is invalid or has expired.' }, { status: 403 });
             }
         } 
-        // 🌟 FLOW 2: LOGGED-IN FANS & ADMINS
         else {
             const supabase = createClient();
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            const { data: { user } } = await supabase.auth.getUser();
 
-            if (authError || !user) return NextResponse.json({ error: 'Unauthorized Access' }, { status: 401 });
+            // 🌟 FLOW 2: LOGGED-IN FANS & ADMINS
+            if (user) {
+                const { data: profile } = await supabase.from('profiles').select('role, username, avatar_url').eq('id', user.id).single();
 
-            // Fetch the profile to check the database role
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('role, username, avatar_url')
-                .eq('id', user.id)
-                .single();
+                const userEmail = user.email?.toLowerCase() || '';
+                const hasAdminEmail = ADMIN_EMAILS.includes(userEmail);
+                const hasAdminRole = profile?.role === 'admin' || user.user_metadata?.is_admin === true;
 
-            // 1. Check if email is on the master list
-            const userEmail = user.email?.toLowerCase() || '';
-            const hasAdminEmail = ADMIN_EMAILS.includes(userEmail);
-
-            // 2. Check if the database profile says admin
-            const hasAdminRole = profile?.role === 'admin' || user.user_metadata?.is_admin === true;
-
-            userId = user.id;
-            username = profile?.username || user.user_metadata?.username || 'FactSport Fan';
-            avatarUrl = profile?.avatar_url || user.user_metadata?.avatar_url || '';
-            
-            // 3. IRONCLAD CHECK: If EITHER is true, they get Master Controls.
-            role = (hasAdminEmail || hasAdminRole) ? 'admin' : 'user';
+                userId = user.id;
+                username = profile?.username || user.user_metadata?.username || 'FactSport Fan';
+                avatarUrl = profile?.avatar_url || user.user_metadata?.avatar_url || '';
+                role = (hasAdminEmail || hasAdminRole) ? 'admin' : 'user';
+            } 
+            // 🌟 FLOW 3: ANONYMOUS PUBLIC LISTENERS
+            else {
+                userId = `anon-${Math.random().toString(36).substring(2, 10)}`;
+                username = 'Listener';
+                role = 'anonymous';
+                avatarUrl = 'https://ui-avatars.com/api/?name=Listener&background=1e293b&color=fff';
+            }
         }
 
         // 🛡️ Mint the GetStream Token (Valid for 4 hours)
@@ -127,9 +124,9 @@ export async function POST(req: Request) {
             .setExpirationTime(exp)
             .sign(secretKey);
 
-        // 4. Return the full link
+        // 4. Return the full link (Corrected from /matches/ to /match/)
         const domain = process.env.NEXT_PUBLIC_SITE_URL || 'https://factsport.com';
-        const inviteLink = `${domain}/matches/${matchId}?guest=${guestToken}`;
+        const inviteLink = `${domain}/match/${matchId}?guest=${guestToken}`;
 
         return NextResponse.json({ inviteLink });
 
