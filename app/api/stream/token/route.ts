@@ -14,6 +14,9 @@ const ADMIN_EMAILS = [
     'fact@factsport.com'
 ];
 
+// ==========================================
+// GET: THE BOUNCER (Lets people into the room)
+// ==========================================
 export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url);
@@ -29,7 +32,7 @@ export async function GET(req: Request) {
         let role = 'anonymous'; // 🟢 Default to anonymous listener
         let avatarUrl = '';
 
-        // 🌟 FLOW 1: THE STATELESS VIP GUEST
+        // 🌟 FLOW 1: THE STATELESS VIP GUEST (No Login Required)
         if (guestToken) {
             try {
                 const secret = new TextEncoder().encode(apiSecret);
@@ -89,15 +92,19 @@ export async function GET(req: Request) {
     }
 }
 
-// ... Keep your existing POST function below exactly as is ...
+// ==========================================
+// POST: THE GENERATOR (Only Admins can use this to make Guest Links)
+// ==========================================
 export async function POST(req: Request) {
     try {
         const { matchId } = await req.json();
         
+        // 1. Verify the person asking for a link is logged in
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+        // 2. Verify they are actually an Admin
         const userEmail = user.email?.toLowerCase() || '';
         const hasAdminEmail = ADMIN_EMAILS.includes(userEmail);
         const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
@@ -107,6 +114,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
+        // 3. Generate a stateless guest token that expires in 24 hours
         const exp = Math.round(Date.now() / 1000) + 60 * 60 * 24; 
         const secretKey = new TextEncoder().encode(apiSecret);
         
@@ -116,6 +124,7 @@ export async function POST(req: Request) {
             .setExpirationTime(exp)
             .sign(secretKey);
 
+        // 4. Return the full link (Corrected from /matches/ to /match/)
         const domain = process.env.NEXT_PUBLIC_SITE_URL || 'https://factsport.com';
         const inviteLink = `${domain}/match/${matchId}?guest=${guestToken}`;
 

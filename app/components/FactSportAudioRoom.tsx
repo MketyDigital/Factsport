@@ -1,11 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import Link from 'next/link'; // 🟢 ADDED for the login button redirect
+import Link from 'next/link';
 import { StreamVideo, StreamVideoClient, StreamCall, SpeakerLayout, CallControls, Call, useCallStateHooks, useCall } from '@stream-io/video-react-sdk';
 import '@stream-io/video-react-sdk/dist/css/styles.css';
 import { Loader2, Radio, Hand, Mic, CheckCircle, XCircle, Link as LinkIcon, Check } from 'lucide-react';
 
-// 🟢 ADDED 'anonymous' to the role types
 const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest' | 'anonymous', matchId: string }) => {
     const call = useCall();
     const { useHasPermissions } = useCallStateHooks();
@@ -33,7 +32,9 @@ const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest
         try {
             await call.requestPermissions({ permissions: ['send-audio'] });
             setHandRaised(true);
-        } catch (err) {}
+        } catch (err) {
+            console.error("Permission request failed", err);
+        }
     };
 
     const handleApprove = async (userId: string) => {
@@ -94,7 +95,7 @@ const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest
                 </div>
             )}
             
-            {/* 🟢 NEW: Public Listener UI (Prompt to login) */}
+            {/* 🟢 Public Listener UI (Prompt to login) */}
             {role === 'anonymous' && (
                 <div className="flex flex-col items-center gap-3">
                     <Link href="/login" className="flex items-center gap-2 px-6 py-2 rounded-full bg-[#1A1A1A] border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white shadow-lg transition-all active:scale-95">
@@ -165,6 +166,7 @@ export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
                 const myCall = myClient.call('audio_room', matchId);
                 
                 try {
+                    // Admins and Guests CREATE the room. Everyone else just joins.
                     if (data.role === 'admin' || data.role === 'guest') {
                         await myCall.join({ create: true });
                     } else {
@@ -177,12 +179,17 @@ export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
 
                 } catch (joinErr: any) {
                     console.error("Stream Join Error:", joinErr);
-                    if (joinErr.message?.includes('not found') || joinErr.message?.includes('does not exist')) {
+                    
+                    // 🟢 Bulletproof error matching
+                    const errMsg = joinErr.message?.toLowerCase() || '';
+                    
+                    if (errMsg.includes('not found') || errMsg.includes('does not exist') || errMsg.includes("can't find call") || errMsg.includes("code 16")) {
                         setErrorMsg("The host hasn't started this live broadcast yet. Please wait.");
-                    } else if (joinErr.message?.includes('permission')) {
+                    } else if (errMsg.includes('permission') || errMsg.includes('notallowederror')) {
                         setErrorMsg("Browser blocked microphone access. Please allow mic permissions.");
                     } else {
-                        setErrorMsg(`Connection error: ${joinErr.message}`);
+                        const cleanError = joinErr.message?.replace('CONNECTION ERROR: STREAM ERROR CODE ', 'Error ') || "Failed to connect.";
+                        setErrorMsg(cleanError);
                     }
                 }
 
@@ -238,7 +245,7 @@ export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
                                 role === 'guest' ? 'bg-purple-600/20 text-purple-400 border-purple-500/30' : 
                                 'bg-slate-800 text-slate-400 border-slate-700'
                             }`}>
-                                {role === 'admin' ? 'Host Mode' : role === 'guest' ? 'VIP Guest' : 'Listener'}
+                                {role === 'admin' ? 'Host Mode' : role === 'guest' ? 'VIP Guest' : role === 'anonymous' ? 'Public Listener' : 'Listener'}
                             </span>
                         </div>
                         
