@@ -20,6 +20,7 @@ jobs:
           FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CRON_KEY: ${{ secrets.CRON_KEY }} # 🛡️ The Security Bouncer
         run: node scripts/sync-gh.js
 
       - name: Run Cup Sync Script (ESPN)

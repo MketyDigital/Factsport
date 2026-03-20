@@ -1,10 +1,11 @@
-// scripts/sync-gh.js
 const { createClient } = require('@supabase/supabase-js');
 
 // Config
 const API_KEY = process.env.FOOTBALL_DATA_KEY;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const YOUR_DOMAIN = process.env.NEXT_PUBLIC_SITE_URL || 'https://factsport.com'; 
+const CRON_KEY = process.env.CRON_KEY; // 🛡️ Using your existing CRON_KEY
 
 const BASE_URL = 'https://api.football-data.org/v4';
 const LEAGUES = [
@@ -22,14 +23,38 @@ async function fetchSafe(url, options) {
   return res;
 }
 
+// 🟢 LOGO SHIELD INTERCEPTOR
+async function getSafeLogo(teamName, originalLogoUrl) {
+    if (!originalLogoUrl || originalLogoUrl.includes('espncdn') || originalLogoUrl.includes('supabase')) {
+        return originalLogoUrl;
+    }
+    try {
+        const res = await fetch(`${YOUR_DOMAIN}/api/logos/sync`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'x-cron-key': CRON_KEY // 🛡️ Passing the CRON_KEY to the bouncer
+            },
+            body: JSON.stringify({ teamName: teamName, logoUrl: originalLogoUrl })
+        });
+        
+        if (!res.ok) throw new Error('API returned an error or unauthorized');
+        
+        const data = await res.json();
+        return data.local_url || originalLogoUrl;
+    } catch (e) {
+        console.error(`   ⚠️ Logo sync failed for ${teamName}: ${e.message}`);
+        return originalLogoUrl;
+    }
+}
+
 async function run() {
-  if (!API_KEY || !SUPABASE_URL || !SUPABASE_KEY) {
+  if (!API_KEY || !SUPABASE_URL || !SUPABASE_KEY || !CRON_KEY) {
     console.error('❌ Missing Env Variables');
     process.exit(1);
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
   const today = new Date();
   
   const fromDate = new Date(today); fromDate.setDate(today.getDate() - 3);
@@ -82,7 +107,6 @@ async function run() {
           const existing = existingMatches[m.id];
           let h2hData = existing?.h2h || null;
           
-          // 🟢 BULLETPROOF CHECK: Force a re-fetch if the database only has partial/empty H2H data
           const isH2hComplete = h2hData && 
                                 h2hData.aggregates && 
                                 typeof h2hData.aggregates === 'object' && 
@@ -95,22 +119,21 @@ async function run() {
                   
                   if (h2hRes.ok) {
                       const parsedH2h = await h2hRes.json();
-                      
-                      // 🟢 ONLY save if the API actually gave us the aggregates
                       if (parsedH2h && parsedH2h.aggregates) {
-                          h2hData = {
-                              aggregates: parsedH2h.aggregates,
-                              matches: parsedH2h.matches || []
-                          }; 
+                          h2hData = { aggregates: parsedH2h.aggregates, matches: parsedH2h.matches || [] }; 
                           newH2hFetches++;
                       }
                   }
               } catch (err) {
-                  console.error(`   ❌ Failed to fetch H2H for ${m.id}:`, err.message);
+                  console.error(`   ❌ Failed to fetch H2H:`, err.message);
               }
           }
 
           const formattedReferees = m.referees?.map(r => r.name) || existing?.referees || [];
+
+          // 🟢 SECURE LOGO FETCH
+          const safeHomeLogo = await getSafeLogo(m.homeTeam.shortName || m.homeTeam.name, m.homeTeam.crest);
+          const safeAwayLogo = await getSafeLogo(m.awayTeam.shortName || m.awayTeam.name, m.awayTeam.crest);
 
           matches.push({
             api_id: m.id,
@@ -121,8 +144,8 @@ async function run() {
             away_score: m.score.fullTime.away ?? 0,
             match_date: m.utcDate,
             status: (m.status === 'FINISHED' || m.status === 'AWARDED') ? 'FT' : 'SCHEDULED', 
-            home_logo: m.homeTeam.crest,
-            away_logo: m.awayTeam.crest,
+            home_logo: safeHomeLogo, 
+            away_logo: safeAwayLogo, 
             updated_at: new Date().toISOString(),
             venue: m.venue || existing?.venue || null,
             referees: formattedReferees,
@@ -135,10 +158,7 @@ async function run() {
         if (matches.length > 0) {
           const { error } = await supabase.from('matches').upsert(matches, { onConflict: 'api_id' });
           if (error) console.error(`   ❌ DB Error: ${error.message}`);
-          else {
-              console.log(`   ✅ Synced ${matches.length} matches.`);
-              if (newH2hFetches > 0) console.log(`   📡 Fetched H2H data for ${newH2hFetches} NEW matches (Within 3-day window).`);
-          }
+          else console.log(`   ✅ Synced ${matches.length} matches.`);
         }
       }
     } catch (e) {
