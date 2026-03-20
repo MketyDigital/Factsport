@@ -9,13 +9,14 @@ import {
     Call, 
     useCallStateHooks, 
     useCall, 
-    StreamTheme 
+    StreamTheme,
+    hasAudio // 👈 TypeScript fix imported here
 } from '@stream-io/video-react-sdk';
 import '@stream-io/video-react-sdk/dist/css/styles.css';
 import { Loader2, Radio, Hand, Mic, MicOff, CheckCircle, XCircle, Link as LinkIcon, Check, Play, Square } from 'lucide-react';
 
 // ==========================================
-// 🎨 CUSTOM AUDIO LAYOUT (Fixes the black box issue)
+// 🎨 CUSTOM AUDIO LAYOUT (Fixes the black box issue & TS Error)
 // ==========================================
 const CustomAudioLayout = () => {
     const { useParticipants } = useCallStateHooks();
@@ -23,26 +24,31 @@ const CustomAudioLayout = () => {
 
     return (
         <div className="flex flex-wrap items-center justify-center gap-6 py-6 w-full">
-            {participants.map((p) => (
-                <div key={p.sessionId} className="flex flex-col items-center gap-3 animate-in fade-in zoom-in">
-                    <div className={`relative w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center border-4 bg-slate-800 transition-all duration-300 ${
-                        p.isSpeaking ? 'border-green-500 shadow-[0_0_25px_rgba(34,197,94,0.4)] scale-110' : 'border-slate-700'
-                    }`}>
-                        {p.image ? (
-                            <img src={p.image} alt={p.name} className="w-full h-full rounded-full object-cover" />
-                        ) : (
-                            <span className="text-2xl font-black text-white">{p.name?.charAt(0) || 'U'}</span>
-                        )}
-                        
-                        <div className="absolute -bottom-2 -right-2 bg-[#0a1428] p-1.5 rounded-full border border-slate-600 shadow-md">
-                            {p.isMuted ? <MicOff size={12} className="text-red-500" /> : <Mic size={12} className="text-green-400" />}
+            {participants.map((p) => {
+                // 👈 FIX: Calculate muted state using Stream's built-in helper
+                const isMuted = !hasAudio(p); 
+                
+                return (
+                    <div key={p.sessionId} className="flex flex-col items-center gap-3 animate-in fade-in zoom-in">
+                        <div className={`relative w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center border-4 bg-slate-800 transition-all duration-300 ${
+                            p.isSpeaking ? 'border-green-500 shadow-[0_0_25px_rgba(34,197,94,0.4)] scale-110' : 'border-slate-700'
+                        }`}>
+                            {p.image ? (
+                                <img src={p.image} alt={p.name} className="w-full h-full rounded-full object-cover" />
+                            ) : (
+                                <span className="text-2xl font-black text-white">{p.name?.charAt(0) || 'U'}</span>
+                            )}
+                            
+                            <div className="absolute -bottom-2 -right-2 bg-[#0a1428] p-1.5 rounded-full border border-slate-600 shadow-md">
+                                {isMuted ? <MicOff size={12} className="text-red-500" /> : <Mic size={12} className="text-green-400" />}
+                            </div>
                         </div>
+                        <span className="text-[11px] text-white font-bold w-24 text-center truncate drop-shadow-md">
+                            {p.name || p.userId}
+                        </span>
                     </div>
-                    <span className="text-[11px] text-white font-bold w-24 text-center truncate drop-shadow-md">
-                        {p.name || p.userId}
-                    </span>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 };
