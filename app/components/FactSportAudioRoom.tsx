@@ -10,13 +10,13 @@ import {
     useCallStateHooks, 
     useCall, 
     StreamTheme,
-    hasAudio // 👈 TypeScript fix imported here
+    hasAudio
 } from '@stream-io/video-react-sdk';
 import '@stream-io/video-react-sdk/dist/css/styles.css';
 import { Loader2, Radio, Hand, Mic, MicOff, CheckCircle, XCircle, Link as LinkIcon, Check, Play, Square } from 'lucide-react';
 
 // ==========================================
-// 🎨 CUSTOM AUDIO LAYOUT (Fixes the black box issue & TS Error)
+// 🎨 CUSTOM AUDIO LAYOUT 
 // ==========================================
 const CustomAudioLayout = () => {
     const { useParticipants } = useCallStateHooks();
@@ -25,7 +25,6 @@ const CustomAudioLayout = () => {
     return (
         <div className="flex flex-wrap items-center justify-center gap-6 py-6 w-full">
             {participants.map((p) => {
-                // 👈 FIX: Calculate muted state using Stream's built-in helper
                 const isMuted = !hasAudio(p); 
                 
                 return (
@@ -54,13 +53,16 @@ const CustomAudioLayout = () => {
 };
 
 // ==========================================
-// 🎛️ INTERACTIVE CONTROLS (Handles Roles)
+// 🎛️ INTERACTIVE CONTROLS 
 // ==========================================
 const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest' | 'anonymous', matchId: string }) => {
     const call = useCall();
-    const { useHasPermissions, useCallBackstage } = useCallStateHooks();
+    // 👈 FIX: useIsCallLive instead of useCallBackstage
+    const { useHasPermissions, useIsCallLive } = useCallStateHooks(); 
     const canSpeak = useHasPermissions('send-audio');
-    const isBackstage = useCallBackstage(); // Checks if the room is live or waiting
+    
+    const isLive = useIsCallLive();
+    const isBackstage = !isLive; // 👈 If it's not live, it's backstage
     
     const [handRaised, setHandRaised] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -116,10 +118,8 @@ const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest
 
     return (
         <div className="flex flex-col items-center w-full gap-4 mt-2">
-            {/* 👑 ADMIN UI */}
             {role === 'admin' && (
                 <div className="w-full flex flex-col items-center gap-4">
-                    {/* LIVE TOGGLE BUTTON */}
                     {isBackstage ? (
                         <button onClick={() => call.goLive()} className="flex items-center gap-2 px-8 py-3 rounded-full bg-green-600 hover:bg-green-500 text-white font-black tracking-widest uppercase shadow-[0_0_15px_rgba(34,197,94,0.5)] transition-all animate-pulse">
                             <Play size={18} fill="currentColor" /> Go Live to Public
@@ -154,7 +154,6 @@ const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest
                 </div>
             )}
             
-            {/* 🌟 GUEST UI */}
             {role === 'guest' && (
                 <div className="flex flex-col items-center gap-2 animate-in zoom-in">
                     <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest bg-purple-900/30 px-3 py-1 rounded-full border border-purple-500/30 shadow-md">VIP Guest Speaker</span>
@@ -162,7 +161,6 @@ const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest
                 </div>
             )}
             
-            {/* 🎧 PUBLIC LISTENER UI (Prompt to login) */}
             {role === 'anonymous' && (
                 <div className="flex flex-col items-center gap-3">
                     <Link href="/login" className="flex items-center gap-2 px-6 py-2 rounded-full bg-[#1A1A1A] border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white shadow-lg transition-all active:scale-95">
@@ -172,7 +170,6 @@ const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest
                 </div>
             )}
 
-            {/* 🙋 LOGGED IN FAN UI */}
             {role === 'user' && (
                 <div className="flex flex-col items-center gap-3">
                     {!canSpeak ? (
@@ -237,14 +234,12 @@ export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
                 const myCall = myClient.call('audio_room', matchId);
                 
                 try {
-                    // Admin creates the room and joins backstage automatically to check mic
                     if (data.role === 'admin') {
                         await myCall.join({ create: true });
                         if (!isMounted) return;
                         setClient(myClient);
                         setCall(myCall);
                     } else {
-                        // Everyone else tries to join
                         await myCall.join(); 
                         if (!isMounted) return;
                         setClient(myClient);
@@ -253,15 +248,12 @@ export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
                 } catch (joinErr: any) {
                     const errMsg = joinErr.message?.toLowerCase() || '';
                     
-                    // 🛡️ THE FAIL-PROOF WAITING ROOM LOGIC
                     if (errMsg.includes('joinbackstage') || errMsg.includes('notallowederror')) {
                         if (isMounted) setIsWaitingForHost(true);
                         
-                        // Silently poll the server every 4 seconds to see if the Admin went live
                         pollInterval = setInterval(async () => {
                             try {
                                 await myCall.join();
-                                // If successful, clear the interval and put them in the room!
                                 clearInterval(pollInterval);
                                 if (isMounted) {
                                     setIsWaitingForHost(false);
@@ -269,7 +261,7 @@ export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
                                     setCall(myCall);
                                 }
                             } catch (e) {
-                                // Still backstage, keep waiting silently...
+                                // Keep waiting
                             }
                         }, 4000);
 
@@ -297,7 +289,6 @@ export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
         };
     }, [matchId]);
 
-    // 🛑 ERROR SCREEN
     if (errorMsg) {
         return (
             <div className="w-full min-h-[150px] bg-[#0a1428] flex flex-col items-center justify-center border-b border-red-900/50 p-4">
@@ -307,7 +298,6 @@ export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
         );
     }
 
-    // ⏳ WAITING FOR HOST SCREEN
     if (isWaitingForHost) {
         return (
             <div className="w-full min-h-[200px] bg-[#0a1428] relative overflow-hidden border-b border-slate-800 flex flex-col items-center justify-center p-4 shadow-inner">
@@ -327,7 +317,6 @@ export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
         );
     }
 
-    // 🔄 TUNING IN (INITIAL LOAD)
     if (!client || !call) {
         return (
             <div className="w-full min-h-[150px] bg-[#0a1428] flex flex-col items-center justify-center border-b border-slate-800 p-4">
@@ -337,7 +326,6 @@ export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
         );
     }
 
-    // 📻 THE LIVE RADIO ROOM
     return (
         <div className="w-full bg-[#0a1428] relative overflow-hidden border-b border-slate-800 flex flex-col group p-4 min-h-[250px]">
             <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-10 blur-md pointer-events-none z-0"></div>
@@ -346,7 +334,6 @@ export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
                 <StreamVideo client={client}>
                     <StreamCall call={call}>
                         <div className="relative z-10 w-full flex flex-col gap-4">
-                            {/* HEADER */}
                             <div className="flex items-center justify-between border-b border-white/10 pb-2">
                                 <div className="flex items-center gap-2">
                                     <Radio className="text-red-500 w-5 h-5 animate-pulse drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
@@ -363,12 +350,10 @@ export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
                                 </span>
                             </div>
                             
-                            {/* SPEAKER AREA */}
                             <div className="min-h-[120px] bg-black/40 rounded-xl p-2 border border-white/5 flex flex-col items-center justify-center">
                                 <CustomAudioLayout />
                             </div>
 
-                            {/* CONTROLS */}
                             <InteractiveAudioUI role={role} matchId={matchId} />
                         </div>
                     </StreamCall>
