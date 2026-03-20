@@ -1,32 +1,28 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { StreamVideo, StreamVideoClient, StreamCall, SpeakerLayout, CallControls, Call, useCallStateHooks, useCall } from '@stream-io/video-react-sdk';
 import '@stream-io/video-react-sdk/dist/css/styles.css';
-import { Loader2, Radio, Headphones, Hand, Mic, CheckCircle, XCircle, Link as LinkIcon, Copy, Check } from 'lucide-react';
+import { Loader2, Radio, Hand, Mic, CheckCircle, XCircle, Link as LinkIcon, Check } from 'lucide-react';
 
-// 🟢 SUB-COMPONENT: Handles interactive logic, permissions, and Admin Link Generation
-const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest', matchId: string }) => {
+const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest' | 'anonymous', matchId: string }) => {
     const call = useCall();
     const { useHasPermissions } = useCallStateHooks();
-    
     const canSpeak = useHasPermissions('send-audio');
     
     const [handRaised, setHandRaised] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [copied, setCopied] = useState(false);
-    
     const [permissionRequests, setPermissionRequests] = useState<any[]>([]);
 
     useEffect(() => {
         if (!call || role !== 'admin') return;
-        
         const unsubscribe = call.on('call.permission_request', (event: any) => {
             setPermissionRequests((prev) => {
                 if (prev.some(req => req.user.id === event.user.id)) return prev;
                 return [...prev, event];
             });
         });
-
         return () => unsubscribe();
     }, [call, role]);
 
@@ -34,11 +30,10 @@ const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest
 
     const requestToSpeak = async () => {
         try {
-            // 🟢 THE FIX: Stream SDK requires an array of specific permissions
             await call.requestPermissions({ permissions: ['send-audio'] });
             setHandRaised(true);
         } catch (err) {
-            console.error("Failed to request permission", err);
+            console.error("Permission request failed", err);
         }
     };
 
@@ -48,28 +43,19 @@ const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest
     };
 
     const handleDeny = async (userId: string) => {
-        // We just clear them from the queue if we deny them
         setPermissionRequests((prev) => prev.filter(req => req.user.id !== userId));
     };
 
     const generateVIPLink = async () => {
         setIsGenerating(true);
         try {
-            const res = await fetch('/api/stream/token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ matchId })
-            });
-            
+            const res = await fetch('/api/stream/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ matchId }) });
             if (!res.ok) throw new Error("Failed to generate link");
-            
             const data = await res.json();
-            
             await navigator.clipboard.writeText(data.inviteLink);
             setCopied(true);
             setTimeout(() => setCopied(false), 3000);
         } catch (error) {
-            console.error(error);
             alert("Could not generate link. Are you sure you are an Admin?");
         } finally {
             setIsGenerating(false);
@@ -78,26 +64,13 @@ const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest
 
     return (
         <div className="flex flex-col items-center w-full gap-4 mt-2">
-            
-            {/* 👑 ADMIN UI */}
             {role === 'admin' && (
                 <div className="w-full flex flex-col items-center gap-4">
-                    <div className="flex items-center gap-4">
-                        <CallControls />
-                    </div>
-                    
-                    <button 
-                        onClick={generateVIPLink}
-                        disabled={isGenerating}
-                        className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-blue-500/30 bg-blue-900/20 text-blue-400 hover:bg-blue-900/40 transition-all active:scale-95 shadow-sm"
-                    >
-                        {isGenerating ? <Loader2 size={14} className="animate-spin" /> : 
-                         copied ? <Check size={14} className="text-green-400" /> : <LinkIcon size={14} />}
-                        <span className="text-[10px] font-bold tracking-widest uppercase">
-                            {copied ? 'Link Copied!' : 'Copy VIP Guest Link'}
-                        </span>
+                    <div className="flex items-center gap-4"><CallControls /></div>
+                    <button onClick={generateVIPLink} disabled={isGenerating} className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-blue-500/30 bg-blue-900/20 text-blue-400 hover:bg-blue-900/40 transition-all active:scale-95 shadow-sm">
+                        {isGenerating ? <Loader2 size={14} className="animate-spin" /> : copied ? <Check size={14} className="text-green-400" /> : <LinkIcon size={14} />}
+                        <span className="text-[10px] font-bold tracking-widest uppercase">{copied ? 'Link Copied!' : 'Copy VIP Guest Link'}</span>
                     </button>
-                    
                     {permissionRequests.length > 0 && (
                         <div className="w-full max-w-sm bg-slate-900/80 border border-blue-500/30 rounded-lg p-2 flex flex-col gap-2 shadow-lg mt-2">
                             <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest border-b border-white/10 pb-1">Caller Requests</span>
@@ -114,36 +87,35 @@ const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest
                     )}
                 </div>
             )}
-
-            {/* 🌟 VIP GUEST UI */}
+            
             {role === 'guest' && (
                 <div className="flex flex-col items-center gap-2 animate-in zoom-in">
-                    <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest bg-purple-900/30 px-3 py-1 rounded-full border border-purple-500/30 shadow-md">
-                        VIP Guest Speaker
-                    </span>
+                    <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest bg-purple-900/30 px-3 py-1 rounded-full border border-purple-500/30 shadow-md">VIP Guest Speaker</span>
                     <CallControls />
                 </div>
             )}
+            
+            {/* 🟢 Public Listener UI (Prompt to login) */}
+            {role === 'anonymous' && (
+                <div className="flex flex-col items-center gap-3">
+                    <Link href="/login" className="flex items-center gap-2 px-6 py-2 rounded-full bg-[#1A1A1A] border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white shadow-lg transition-all active:scale-95">
+                        <Mic size={14} />
+                        <span className="text-[11px] font-bold tracking-wide uppercase">Login to Call In</span>
+                    </Link>
+                </div>
+            )}
 
-            {/* 🎧 FAN UI */}
+            {/* 🎧 Logged In FAN UI */}
             {role === 'user' && (
                 <div className="flex flex-col items-center gap-3">
                     {!canSpeak ? (
-                        <button 
-                            onClick={requestToSpeak}
-                            disabled={handRaised}
-                            className={`flex items-center gap-2 px-6 py-2 rounded-full border shadow-lg transition-all active:scale-95 ${handRaised ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-500' : 'bg-slate-800 border-slate-600 text-white hover:bg-slate-700'}`}
-                        >
+                        <button onClick={requestToSpeak} disabled={handRaised} className={`flex items-center gap-2 px-6 py-2 rounded-full border shadow-lg transition-all active:scale-95 ${handRaised ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-500' : 'bg-slate-800 border-slate-600 text-white hover:bg-slate-700'}`}>
                             <Hand size={16} className={handRaised ? "animate-bounce" : ""} />
-                            <span className="text-[11px] font-bold tracking-wide">
-                                {handRaised ? 'Hand Raised (Waiting for Host...)' : 'Raise Hand to Call In'}
-                            </span>
+                            <span className="text-[11px] font-bold tracking-wide">{handRaised ? 'Hand Raised (Waiting for Host...)' : 'Raise Hand to Call In'}</span>
                         </button>
                     ) : (
                         <div className="flex flex-col items-center gap-2 animate-in fade-in zoom-in">
-                            <span className="text-[10px] font-bold text-green-400 uppercase tracking-widest bg-green-900/30 px-3 py-1 rounded-full border border-green-500/30">
-                                You are Live on Air
-                            </span>
+                            <span className="text-[10px] font-bold text-green-400 uppercase tracking-widest bg-green-900/30 px-3 py-1 rounded-full border border-green-500/30">You are Live on Air</span>
                             <CallControls onLeave={() => call.revokePermissions(call.currentUserId!, ['send-audio'])} />
                         </div>
                     )}
@@ -156,42 +128,81 @@ const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest
 export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
     const [client, setClient] = useState<StreamVideoClient | null>(null);
     const [call, setCall] = useState<Call | null>(null);
-    const [role, setRole] = useState<'admin' | 'user' | 'guest'>('user');
+    const [role, setRole] = useState<'admin' | 'user' | 'guest' | 'anonymous'>('anonymous');
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     useEffect(() => {
+        let isMounted = true;
+
         const initAudioRoom = async () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const guestToken = urlParams.get('guest');
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const guestToken = urlParams.get('guest');
 
-            const apiUrl = `/api/stream/token?match_id=${matchId}${guestToken ? `&guest=${guestToken}` : ''}`;
-            
-            const res = await fetch(apiUrl);
-            const data = await res.json();
+                const apiUrl = `/api/stream/token?match_id=${matchId}${guestToken ? `&guest=${guestToken}` : ''}`;
+                
+                const res = await fetch(apiUrl);
+                const data = await res.json();
 
-            if (!res.ok) {
-                setErrorMsg(data.error || "Could not join radio room.");
-                return; 
+                if (!res.ok) {
+                    setErrorMsg(data.error || "Could not join radio room.");
+                    return; 
+                }
+
+                if (!data.apiKey || !data.token) {
+                    setErrorMsg("Stream Server configuration missing.");
+                    return;
+                }
+                
+                if (!isMounted) return;
+                setRole(data.role);
+
+                const myClient = new StreamVideoClient({
+                    apiKey: data.apiKey,
+                    user: { id: data.userId, name: data.username, image: data.image },
+                    token: data.token,
+                });
+
+                const myCall = myClient.call('audio_room', matchId);
+                
+                try {
+                    // Admins and Guests CREATE the room. Everyone else just joins.
+                    if (data.role === 'admin' || data.role === 'guest') {
+                        await myCall.join({ create: true });
+                    } else {
+                        await myCall.join(); 
+                    }
+                    
+                    if (!isMounted) return;
+                    setClient(myClient);
+                    setCall(myCall);
+
+                } catch (joinErr: any) {
+                    console.error("Stream Join Error:", joinErr);
+                    
+                    // 🟢 Bulletproof error matching
+                    const errMsg = joinErr.message?.toLowerCase() || '';
+                    
+                    if (errMsg.includes('not found') || errMsg.includes('does not exist') || errMsg.includes("can't find call") || errMsg.includes("code 16")) {
+                        setErrorMsg("The host hasn't started this live broadcast yet. Please wait.");
+                    } else if (errMsg.includes('permission') || errMsg.includes('notallowederror')) {
+                        setErrorMsg("Browser blocked microphone access. Please allow mic permissions.");
+                    } else {
+                        const cleanError = joinErr.message?.replace('CONNECTION ERROR: STREAM ERROR CODE ', 'Error ') || "Failed to connect.";
+                        setErrorMsg(cleanError);
+                    }
+                }
+
+            } catch (err: any) {
+                console.error("Stream Connection Error:", err);
+                if (isMounted) setErrorMsg("Failed to connect to the broadcast server.");
             }
-            
-            setRole(data.role);
-
-            const myClient = new StreamVideoClient({
-                apiKey: data.apiKey,
-                user: { id: data.userId, name: data.username, image: data.image },
-                token: data.token,
-            });
-
-            const myCall = myClient.call('audio_room', matchId);
-            await myCall.join();
-
-            setClient(myClient);
-            setCall(myCall);
         };
 
         initAudioRoom();
 
         return () => {
+            isMounted = false;
             call?.leave();
             client?.disconnectUser();
         };
@@ -201,7 +212,7 @@ export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
         return (
             <div className="w-full min-h-[150px] bg-[#0a1428] flex flex-col items-center justify-center border-b border-red-900/50 p-4">
                 <XCircle className="text-red-500 mb-2" size={24} />
-                <span className="text-[10px] font-black uppercase text-red-400 tracking-widest text-center">{errorMsg}</span>
+                <span className="text-[10px] font-black uppercase text-red-400 tracking-widest text-center max-w-[80%]">{errorMsg}</span>
             </div>
         );
     }
@@ -234,7 +245,7 @@ export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
                                 role === 'guest' ? 'bg-purple-600/20 text-purple-400 border-purple-500/30' : 
                                 'bg-slate-800 text-slate-400 border-slate-700'
                             }`}>
-                                {role === 'admin' ? 'Host Mode' : role === 'guest' ? 'VIP Guest' : 'Listener'}
+                                {role === 'admin' ? 'Host Mode' : role === 'guest' ? 'VIP Guest' : role === 'anonymous' ? 'Public Listener' : 'Listener'}
                             </span>
                         </div>
                         

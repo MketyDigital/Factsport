@@ -11,8 +11,6 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
   
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
 
-  if (mediaUrl === 'streamio') return <FactSportAudioRoom matchId={matchId} />;
-
   const isYouTube = mediaUrl.includes('youtube.com') || mediaUrl.includes('youtu.be');
   const isRawMedia = mediaUrl.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
   const isRawAudio = mediaUrl.match(/\.(mp3|wav)$/i);
@@ -46,6 +44,7 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
     else if (document.fullscreenElement) document.exitFullscreen();
   };
 
+  // 🟢 THE FIX: The Upcoming check MUST run before we mount the Stream.io room!
   if (isUpcoming) {
       return (
           <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative flex flex-col items-center justify-center overflow-hidden border-b border-slate-800 shadow-inner group`}>
@@ -66,6 +65,9 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
           </div>
       );
   }
+
+  // Streamio check goes here, after the countdown check!
+  if (mediaUrl === 'streamio') return <FactSportAudioRoom matchId={matchId} />;
 
   const renderYouTube = () => {
     let videoId = '';
