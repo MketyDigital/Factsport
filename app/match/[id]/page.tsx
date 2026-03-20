@@ -17,9 +17,7 @@ import HeadToHeadStats from '@/app/components/HeadToHeadStats';
 import GoalRush from '@/app/components/GoalRush'; 
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
-
-import { getExternalData } from '@/app/lib/matchService';
-import { getTeamForm } from '@/app/lib/teamForm';
+import BettingPromo from '@/app/components/BettingPromo'; // 🟢 ADDED: Betting Promo Component
 
 const sanitizeUrl = (url: string | null | undefined) => {
     if (!url) return null;
@@ -96,7 +94,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const activeAudioUrl = sanitizeUrl(dbData.audio_url);
   const hasWidget = !!dbData.widget_id; 
 
-  // 🟢 FULLY RESTORED SEO JSON-LD BLOCK
   const jsonLd = {
       '@context': 'https://schema.org',
       '@type': 'SportsEvent',
@@ -119,7 +116,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       ]
   };
 
-  // 🟢 LOGIC CHECK: Only show the guest banner if there's an active media URL AND the game isn't finished.
   const showGuestBanner = (activeVideoUrl || activeAudioUrl) && !isFinished;
 
   return (
@@ -190,20 +186,9 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                       <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
                   </div>
 
-                  <div className="bg-[#1A1A1A] rounded-lg p-2.5 shadow-sm border border-slate-800 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 bg-blue-600 text-white text-[9px] font-black rounded flex items-center justify-center italic">1X</div>
-                          <div>
-                              <div className="text-white font-black text-[10px] leading-none">1xBet Partner</div>
-                              <div className="text-[7px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                                  Code: <span className="text-yellow-400 font-black">FACTSPORT</span>
-                              </div>
-                          </div>
-                      </div>
-                      <a href={sanitizeUrl(dbData.affiliate_link) || "#"} target="_blank" className="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest px-3 py-1.5 rounded shadow text-[8px] flex items-center gap-1 active:scale-95">
-                          Bet <LinkIcon className="w-2.5 h-2.5" />
-                      </a>
-                  </div>
+                  {/* 🟢 REPLACED: Now uses the global BettingPromo component */}
+                  <BettingPromo affiliateLink={sanitizeUrl(dbData.affiliate_link) || null} />
+                  
               </div>
           )}
 
