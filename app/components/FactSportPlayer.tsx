@@ -1,373 +1,179 @@
 'use client';
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { 
-    StreamVideo, 
-    StreamVideoClient, 
-    StreamCall, 
-    CallControls, 
-    Call, 
-    useCallStateHooks, 
-    useCall, 
-    StreamTheme 
-} from '@stream-io/video-react-sdk';
-import '@stream-io/video-react-sdk/dist/css/styles.css';
-import { Loader2, Radio, Hand, Mic, MicOff, CheckCircle, XCircle, Link as LinkIcon, Check, Play, Square } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Radio, Loader2, Clock, Tv } from 'lucide-react';
+import FactSportAudioRoom from './FactSportAudioRoom';
 
-// ==========================================
-// 🎨 CUSTOM AUDIO LAYOUT (Fixes the black box issue)
-// ==========================================
-const CustomAudioLayout = () => {
-    const { useParticipants } = useCallStateHooks();
-    const participants = useParticipants();
+export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isUpcoming = false, isFinished = false }: { mediaUrl: string, matchId: string, mode?: 'video' | 'audio', isUpcoming?: boolean, isFinished?: boolean }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [isBuffering, setIsBuffering] = useState(false);
+  
+  const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
 
-    return (
-        <div className="flex flex-wrap items-center justify-center gap-6 py-6 w-full">
-            {participants.map((p) => (
-                <div key={p.sessionId} className="flex flex-col items-center gap-3 animate-in fade-in zoom-in">
-                    <div className={`relative w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center border-4 bg-slate-800 transition-all duration-300 ${
-                        p.isSpeaking ? 'border-green-500 shadow-[0_0_25px_rgba(34,197,94,0.4)] scale-110' : 'border-slate-700'
-                    }`}>
-                        {p.image ? (
-                            <img src={p.image} alt={p.name} className="w-full h-full rounded-full object-cover" />
-                        ) : (
-                            <span className="text-2xl font-black text-white">{p.name?.charAt(0) || 'U'}</span>
-                        )}
-                        
-                        <div className="absolute -bottom-2 -right-2 bg-[#0a1428] p-1.5 rounded-full border border-slate-600 shadow-md">
-                            {p.isMuted ? <MicOff size={12} className="text-red-500" /> : <Mic size={12} className="text-green-400" />}
-                        </div>
-                    </div>
-                    <span className="text-[11px] text-white font-bold w-24 text-center truncate drop-shadow-md">
-                        {p.name || p.userId}
-                    </span>
-                </div>
-            ))}
-        </div>
-    );
-};
+  const isYouTube = mediaUrl.includes('youtube.com') || mediaUrl.includes('youtu.be');
+  const isRawMedia = mediaUrl.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
+  const isRawAudio = mediaUrl.match(/\.(mp3|wav)$/i);
 
-// ==========================================
-// 🎛️ INTERACTIVE CONTROLS (Handles Roles)
-// ==========================================
-const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest' | 'anonymous', matchId: string }) => {
-    const call = useCall();
-    const { useHasPermissions, useCallBackstage } = useCallStateHooks();
-    const canSpeak = useHasPermissions('send-audio');
-    const isBackstage = useCallBackstage(); // Checks if the room is live or waiting
-    
-    const [handRaised, setHandRaised] = useState(false);
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [copied, setCopied] = useState(false);
-    const [permissionRequests, setPermissionRequests] = useState<any[]>([]);
+  const togglePlay = () => {
+    if (mediaRef.current) {
+      if (isPlaying) mediaRef.current.pause();
+      else mediaRef.current.play();
+      setIsPlaying(!isPlaying);
+    }
+  };
 
-    useEffect(() => {
-        if (!call || role !== 'admin') return;
-        const unsubscribe = call.on('call.permission_request', (event: any) => {
-            setPermissionRequests((prev) => {
-                if (prev.some(req => req.user.id === event.user.id)) return prev;
-                return [...prev, event];
-            });
-        });
-        return () => unsubscribe();
-    }, [call, role]);
+  const toggleMute = () => {
+    if (mediaRef.current) {
+      mediaRef.current.muted = !isMuted;
+      setIsMuted(!isMuted);
+    }
+  };
 
-    if (!call) return null;
+  const handleTimeUpdate = () => {
+    if (mediaRef.current) {
+      const current = mediaRef.current.currentTime;
+      const total = mediaRef.current.duration || 1; 
+      setProgress((current / total) * 100);
+    }
+  };
 
-    const requestToSpeak = async () => {
-        try {
-            await call.requestPermissions({ permissions: ['send-audio'] });
-            setHandRaised(true);
-        } catch (err) {
-            console.error("Permission request failed", err);
-        }
-    };
+  const handleFullscreen = () => {
+    const container = document.getElementById('fs-player-wrapper');
+    if (container && !document.fullscreenElement) container.requestFullscreen();
+    else if (document.fullscreenElement) document.exitFullscreen();
+  };
 
-    const handleApprove = async (userId: string) => {
-        await call.grantPermissions(userId, ['send-audio']);
-        setPermissionRequests((prev) => prev.filter(req => req.user.id !== userId));
-    };
+  // 🟢 THE FIX: The Upcoming check MUST run before we mount the Stream.io room!
+  if (isUpcoming) {
+      return (
+          <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative flex flex-col items-center justify-center overflow-hidden border-b border-slate-800 shadow-inner group`}>
+              <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-md grayscale"></div>
+              <div className="relative z-10 flex flex-col items-center gap-2">
+                  <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10 shadow-lg backdrop-blur-sm">
+                     <Clock className="text-slate-400 w-4 h-4" />
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                      <span className="text-white font-black uppercase tracking-widest text-[9px] md:text-[10px] text-center drop-shadow-md">
+                          {mode === 'audio' ? 'Live Radio Broadcast' : 'Live Match Stream'}
+                      </span>
+                      <span className="text-blue-400 font-bold uppercase tracking-widest text-[7px] md:text-[8px] bg-blue-900/40 px-2 py-0.5 rounded-full border border-blue-500/30">
+                          Available 5 mins to Kick-off
+                      </span>
+                  </div>
+              </div>
+          </div>
+      );
+  }
 
-    const handleDeny = async (userId: string) => {
-        setPermissionRequests((prev) => prev.filter(req => req.user.id !== userId));
-    };
+  // Streamio check goes here, after the countdown check!
+  if (mediaUrl === 'streamio') return <FactSportAudioRoom matchId={matchId} />;
 
-    const generateVIPLink = async () => {
-        setIsGenerating(true);
-        try {
-            const res = await fetch('/api/stream/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ matchId }) });
-            if (!res.ok) throw new Error("Failed to generate link");
-            const data = await res.json();
-            await navigator.clipboard.writeText(data.inviteLink);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 3000);
-        } catch (error) {
-            alert("Could not generate link. Are you sure you are an Admin?");
-        } finally {
-            setIsGenerating(false);
-        }
-    };
+  const renderYouTube = () => {
+    let videoId = '';
+    if (mediaUrl.includes('v=')) videoId = mediaUrl.split('v=')[1]?.split('&')[0];
+    else if (mediaUrl.includes('.be/')) videoId = mediaUrl.split('.be/')[1];
+    else if (mediaUrl.includes('embed/')) videoId = mediaUrl.split('embed/')[1];
 
-    return (
-        <div className="flex flex-col items-center w-full gap-4 mt-2">
-            {/* 👑 ADMIN UI */}
-            {role === 'admin' && (
-                <div className="w-full flex flex-col items-center gap-4">
-                    {/* LIVE TOGGLE BUTTON */}
-                    {isBackstage ? (
-                        <button onClick={() => call.goLive()} className="flex items-center gap-2 px-8 py-3 rounded-full bg-green-600 hover:bg-green-500 text-white font-black tracking-widest uppercase shadow-[0_0_15px_rgba(34,197,94,0.5)] transition-all animate-pulse">
-                            <Play size={18} fill="currentColor" /> Go Live to Public
-                        </button>
-                    ) : (
-                        <button onClick={() => call.stopLive()} className="flex items-center gap-2 px-6 py-2 rounded-full bg-red-900/50 hover:bg-red-600 border border-red-500 text-white font-bold tracking-widest uppercase transition-all">
-                            <Square size={14} fill="currentColor" /> End Broadcast
-                        </button>
-                    )}
-
-                    <div className="flex items-center gap-4"><CallControls /></div>
-                    
-                    <button onClick={generateVIPLink} disabled={isGenerating} className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-blue-500/30 bg-blue-900/20 text-blue-400 hover:bg-blue-900/40 transition-all active:scale-95 shadow-sm">
-                        {isGenerating ? <Loader2 size={14} className="animate-spin" /> : copied ? <Check size={14} className="text-green-400" /> : <LinkIcon size={14} />}
-                        <span className="text-[10px] font-bold tracking-widest uppercase">{copied ? 'Link Copied!' : 'Copy VIP Guest Link'}</span>
-                    </button>
-
-                    {permissionRequests.length > 0 && (
-                        <div className="w-full max-w-sm bg-slate-900/80 border border-blue-500/30 rounded-lg p-2 flex flex-col gap-2 shadow-lg mt-2">
-                            <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest border-b border-white/10 pb-1">Caller Requests</span>
-                            {permissionRequests.map((req) => (
-                                <div key={req.user.id} className="flex items-center justify-between bg-black/50 px-2 py-1.5 rounded">
-                                    <span className="text-xs text-white font-medium truncate max-w-[120px]">{req.user.name || req.user.id}</span>
-                                    <div className="flex items-center gap-2">
-                                        <button onClick={() => handleApprove(req.user.id)} className="text-green-400 hover:scale-110 transition"><CheckCircle size={16} /></button>
-                                        <button onClick={() => handleDeny(req.user.id)} className="text-red-400 hover:scale-110 transition"><XCircle size={16} /></button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-            
-            {/* 🌟 GUEST UI */}
-            {role === 'guest' && (
-                <div className="flex flex-col items-center gap-2 animate-in zoom-in">
-                    <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest bg-purple-900/30 px-3 py-1 rounded-full border border-purple-500/30 shadow-md">VIP Guest Speaker</span>
-                    <CallControls />
-                </div>
-            )}
-            
-            {/* 🎧 PUBLIC LISTENER UI (Prompt to login) */}
-            {role === 'anonymous' && (
-                <div className="flex flex-col items-center gap-3">
-                    <Link href="/login" className="flex items-center gap-2 px-6 py-2 rounded-full bg-[#1A1A1A] border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white shadow-lg transition-all active:scale-95">
-                        <Mic size={14} />
-                        <span className="text-[11px] font-bold tracking-wide uppercase">Login to Call In</span>
-                    </Link>
-                </div>
-            )}
-
-            {/* 🙋 LOGGED IN FAN UI */}
-            {role === 'user' && (
-                <div className="flex flex-col items-center gap-3">
-                    {!canSpeak ? (
-                        <button onClick={requestToSpeak} disabled={handRaised} className={`flex items-center gap-2 px-6 py-2 rounded-full border shadow-lg transition-all active:scale-95 ${handRaised ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-500' : 'bg-slate-800 border-slate-600 text-white hover:bg-slate-700'}`}>
-                            <Hand size={16} className={handRaised ? "animate-bounce" : ""} />
-                            <span className="text-[11px] font-bold tracking-wide">{handRaised ? 'Hand Raised (Waiting for Host...)' : 'Raise Hand to Call In'}</span>
-                        </button>
-                    ) : (
-                        <div className="flex flex-col items-center gap-2 animate-in fade-in zoom-in">
-                            <span className="text-[10px] font-bold text-green-400 uppercase tracking-widest bg-green-900/30 px-3 py-1 rounded-full border border-green-500/30">You are Live on Air</span>
-                            <CallControls onLeave={() => call.revokePermissions(call.currentUserId!, ['send-audio'])} />
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
-
-// ==========================================
-// 🚀 MAIN ROOM COMPONENT
-// ==========================================
-export default function FactSportAudioRoom({ matchId }: { matchId: string }) {
-    const [client, setClient] = useState<StreamVideoClient | null>(null);
-    const [call, setCall] = useState<Call | null>(null);
-    const [role, setRole] = useState<'admin' | 'user' | 'guest' | 'anonymous'>('anonymous');
-    const [errorMsg, setErrorMsg] = useState<string | null>(null);
-    const [isWaitingForHost, setIsWaitingForHost] = useState(false);
-
-    useEffect(() => {
-        let isMounted = true;
-        let pollInterval: NodeJS.Timeout;
-
-        const initAudioRoom = async () => {
-            try {
-                const urlParams = new URLSearchParams(window.location.search);
-                const guestToken = urlParams.get('guest');
-
-                const apiUrl = `/api/stream/token?match_id=${matchId}${guestToken ? `&guest=${guestToken}` : ''}`;
-                const res = await fetch(apiUrl);
-                const data = await res.json();
-
-                if (!res.ok) {
-                    setErrorMsg(data.error || "Could not join radio room.");
-                    return; 
-                }
-
-                if (!data.apiKey || !data.token) {
-                    setErrorMsg("Stream Server configuration missing.");
-                    return;
-                }
-                
-                if (!isMounted) return;
-                setRole(data.role);
-
-                const myClient = new StreamVideoClient({
-                    apiKey: data.apiKey,
-                    user: { id: data.userId, name: data.username, image: data.image },
-                    token: data.token,
-                });
-
-                const myCall = myClient.call('audio_room', matchId);
-                
-                try {
-                    // Admin creates the room and joins backstage automatically to check mic
-                    if (data.role === 'admin') {
-                        await myCall.join({ create: true });
-                        if (!isMounted) return;
-                        setClient(myClient);
-                        setCall(myCall);
-                    } else {
-                        // Everyone else tries to join
-                        await myCall.join(); 
-                        if (!isMounted) return;
-                        setClient(myClient);
-                        setCall(myCall);
-                    }
-                } catch (joinErr: any) {
-                    const errMsg = joinErr.message?.toLowerCase() || '';
-                    
-                    // 🛡️ THE FAIL-PROOF WAITING ROOM LOGIC
-                    if (errMsg.includes('joinbackstage') || errMsg.includes('notallowederror')) {
-                        if (isMounted) setIsWaitingForHost(true);
-                        
-                        // Silently poll the server every 4 seconds to see if the Admin went live
-                        pollInterval = setInterval(async () => {
-                            try {
-                                await myCall.join();
-                                // If successful, clear the interval and put them in the room!
-                                clearInterval(pollInterval);
-                                if (isMounted) {
-                                    setIsWaitingForHost(false);
-                                    setClient(myClient);
-                                    setCall(myCall);
-                                }
-                            } catch (e) {
-                                // Still backstage, keep waiting silently...
-                            }
-                        }, 4000);
-
-                    } else if (errMsg.includes('not found') || errMsg.includes("can't find call")) {
-                        setErrorMsg("The host hasn't started this live broadcast yet. Please wait.");
-                    } else {
-                        const cleanError = joinErr.message?.replace('CONNECTION ERROR: STREAM ERROR CODE ', 'Error ') || "Failed to connect.";
-                        setErrorMsg(cleanError);
-                    }
-                }
-
-            } catch (err: any) {
-                console.error("Stream Connection Error:", err);
-                if (isMounted) setErrorMsg("Failed to connect to the broadcast server.");
-            }
-        };
-
-        initAudioRoom();
-
-        return () => {
-            isMounted = false;
-            if (pollInterval) clearInterval(pollInterval);
-            call?.leave();
-            client?.disconnectUser();
-        };
-    }, [matchId]);
-
-    // 🛑 ERROR SCREEN
-    if (errorMsg) {
-        return (
-            <div className="w-full min-h-[150px] bg-[#0a1428] flex flex-col items-center justify-center border-b border-red-900/50 p-4">
-                <XCircle className="text-red-500 mb-2" size={24} />
-                <span className="text-[10px] font-black uppercase text-red-400 tracking-widest text-center max-w-[80%]">{errorMsg}</span>
+    if (mode === 'audio') {
+      return (
+        <div className="w-full h-[100px] md:h-[120px] bg-[#0a1428] relative overflow-hidden border-b border-slate-800 flex items-center justify-center shadow-inner">
+            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-10 blur-sm pointer-events-none"></div>
+            <Radio className="absolute left-6 text-red-500 w-8 h-8 animate-pulse drop-shadow-[0_0_10px_rgba(239,68,68,0.5)] z-10 pointer-events-none" />
+            <div className="absolute top-3 left-16 z-10 pointer-events-none">
+                <span className="text-white text-[9px] font-black tracking-widest uppercase bg-black/60 px-2 py-0.5 rounded shadow-md border border-white/10 flex items-center gap-1.5">
+                    <span className="w-1 h-1 bg-red-500 rounded-full animate-pulse"></span> Radio Station
+                </span>
             </div>
-        );
+            <div className="relative z-20 w-[80px] h-[60px] overflow-hidden rounded-lg shadow-[0_0_20px_rgba(0,0,0,0.8)] border border-white/20 ml-12 bg-black scale-90 md:scale-100">
+                <iframe src={`https://www.youtube.com/embed/${videoId}?playsinline=1`} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '320px', height: '240px' }} frameBorder="0" allow="autoplay; encrypted-media"></iframe>
+            </div>
+        </div>
+      );
     }
 
-    // ⏳ WAITING FOR HOST SCREEN
-    if (isWaitingForHost) {
-        return (
-            <div className="w-full min-h-[200px] bg-[#0a1428] relative overflow-hidden border-b border-slate-800 flex flex-col items-center justify-center p-4 shadow-inner">
-                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-10 blur-sm pointer-events-none z-0"></div>
-                <div className="relative z-10 flex flex-col items-center">
-                    <Radio className="text-yellow-500 w-10 h-10 mb-3 animate-pulse drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
-                    <h3 className="text-white text-sm md:text-base font-black uppercase tracking-widest mb-2 shadow-md">Host is Backstage</h3>
-                    <p className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-widest text-center max-w-[85%] leading-relaxed">
-                        Checking microphones... You will be connected automatically when the broadcast goes live.
-                    </p>
-                    <div className="mt-5 flex items-center gap-2 text-yellow-500 bg-yellow-900/30 px-4 py-1.5 rounded-full border border-yellow-500/30 shadow-lg">
-                        <Loader2 size={14} className="animate-spin" />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Waiting for signal</span>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // 🔄 TUNING IN (INITIAL LOAD)
-    if (!client || !call) {
-        return (
-            <div className="w-full min-h-[150px] bg-[#0a1428] flex flex-col items-center justify-center border-b border-slate-800 p-4">
-                <Loader2 className="animate-spin text-blue-500 mb-2" size={24} />
-                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Tuning in...</span>
-            </div>
-        );
-    }
-
-    // 📻 THE LIVE RADIO ROOM
     return (
-        <div className="w-full bg-[#0a1428] relative overflow-hidden border-b border-slate-800 flex flex-col group p-4 min-h-[250px]">
-            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-10 blur-md pointer-events-none z-0"></div>
-            
-            <StreamTheme className="stream-theme-custom w-full">
-                <StreamVideo client={client}>
-                    <StreamCall call={call}>
-                        <div className="relative z-10 w-full flex flex-col gap-4">
-                            {/* HEADER */}
-                            <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                                <div className="flex items-center gap-2">
-                                    <Radio className="text-red-500 w-5 h-5 animate-pulse drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
-                                    <span className="text-white text-xs md:text-sm font-black tracking-widest uppercase shadow-md">
-                                        FactSport Live
-                                    </span>
-                                </div>
-                                <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded border shadow-sm ${
-                                    role === 'admin' ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 
-                                    role === 'guest' ? 'bg-purple-600/20 text-purple-400 border-purple-500/30' : 
-                                    'bg-slate-800 text-slate-400 border-slate-700'
-                                }`}>
-                                    {role === 'admin' ? 'Host Mode' : role === 'guest' ? 'VIP Guest' : role === 'anonymous' ? 'Public Listener' : 'Listener'}
-                                </span>
-                            </div>
-                            
-                            {/* SPEAKER AREA */}
-                            <div className="min-h-[120px] bg-black/40 rounded-xl p-2 border border-white/5 flex flex-col items-center justify-center">
-                                <CustomAudioLayout />
-                            </div>
-
-                            {/* CONTROLS */}
-                            <InteractiveAudioUI role={role} matchId={matchId} />
-                        </div>
-                    </StreamCall>
-                </StreamVideo>
-            </StreamTheme>
+      <div className="w-full aspect-video bg-black relative overflow-hidden border-b border-slate-800 shadow-inner group">
+        <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-[#0a1428] via-[#0a1428]/80 to-transparent z-10 pointer-events-none"></div>
+        <div className="absolute top-2 left-2 z-20 pointer-events-none flex items-center gap-1.5">
+            <span className={`${isFinished ? 'bg-slate-800' : 'bg-red-600'} text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg uppercase tracking-widest flex items-center gap-1`}>
+                {!isFinished && <span className="w-1 h-1 bg-white rounded-full animate-pulse"></span>}
+                {isFinished ? 'HIGHLIGHTS' : 'LIVE'}
+            </span>
+            <span className="bg-black/80 backdrop-blur-md text-white text-[8px] font-black px-1.5 py-0.5 rounded border border-white/10 shadow-lg uppercase tracking-widest flex items-center gap-1">
+                <Tv size={8} className="text-blue-400"/> FactSport TV
+            </span>
         </div>
+        <iframe src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&iv_load_policy=3&controls=1&playsinline=1&fs=1`} className="w-full h-full scale-[1.03]" allowFullScreen></iframe>
+      </div>
     );
+  };
+
+  const renderRawPlayer = () => {
+    return (
+      <div id="fs-player-wrapper" className={`w-full ${mode === 'audio' || isRawAudio ? 'h-[120px]' : 'aspect-video'} bg-black relative group overflow-hidden border-b border-slate-800 shadow-xl`}>
+        {(mode === 'audio' || isRawAudio) && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a1428]">
+                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-sm"></div>
+                <Radio className="text-red-500 w-12 h-12 animate-pulse drop-shadow-lg mb-2 z-10" />
+                <span className="text-white text-xs font-black tracking-widest uppercase z-10 bg-black/50 px-3 py-1 rounded">FactSport Audio</span>
+            </div>
+        )}
+
+        {mode === 'audio' || isRawAudio ? (
+             <audio ref={mediaRef as React.RefObject<HTMLAudioElement>} src={mediaUrl} autoPlay onTimeUpdate={handleTimeUpdate} onWaiting={() => setIsBuffering(true)} onPlaying={() => setIsBuffering(false)} />
+        ) : (
+             <video ref={mediaRef as React.RefObject<HTMLVideoElement>} src={mediaUrl} className="w-full h-full object-contain" autoPlay onClick={togglePlay} onTimeUpdate={handleTimeUpdate} onWaiting={() => setIsBuffering(true)} onPlaying={() => setIsBuffering(false)} />
+        )}
+
+        {isBuffering && <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"><Loader2 className="text-white animate-spin w-10 h-10 drop-shadow-lg" /></div>}
+
+        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/90 to-transparent px-4 py-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30">
+          <div className="w-full h-1.5 bg-white/20 rounded-full mb-3 cursor-pointer overflow-hidden backdrop-blur-sm">
+            <div className="h-full bg-blue-600 transition-all duration-100" style={{ width: `${progress}%` }}></div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button onClick={togglePlay} className="text-white hover:text-blue-500 transition">
+                {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
+              </button>
+              <button onClick={toggleMute} className="text-white hover:text-slate-300 transition">
+                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+              </button>
+              <span className="text-white text-[10px] font-bold tracking-widest"><span className="text-red-600 animate-pulse">●</span> FACTSPORT PLAYER</span>
+            </div>
+            {!(mode === 'audio' || isRawAudio) && (
+                <button onClick={handleFullscreen} className="text-white hover:text-blue-500 transition"><Maximize size={20} /></button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderGenericIframe = () => {
+    return (
+      <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative border-b border-slate-800 overflow-hidden shadow-xl`}>
+         {mode === 'audio' && (
+             <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-sm pointer-events-none"></div>
+         )}
+         
+         <iframe src={mediaUrl} className="relative z-10 w-full h-full" frameBorder="0" scrolling="no" sandbox="allow-scripts allow-same-origin" allowFullScreen></iframe>
+         
+         <div className="absolute bottom-0 left-0 w-full h-[30px] bg-[#0a1428] border-t border-slate-800 z-40 flex items-center justify-between px-3 pointer-events-none">
+             <div className="flex items-center gap-1.5">
+                 <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_red]"></div>
+                 <span className="text-[9px] font-black text-white uppercase tracking-widest">{mode === 'audio' ? 'Live Radio' : 'Match Tracker'}</span>
+             </div>
+             <div className="text-[8px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
+                 Powered by <span className="text-white">FactSport</span>
+             </div>
+         </div>
+      </div>
+    );
+  };
+
+  if (isRawMedia) return renderRawPlayer();
+  if (isYouTube) return renderYouTube();
+  return renderGenericIframe();
 }
