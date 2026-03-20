@@ -17,7 +17,11 @@ import HeadToHeadStats from '@/app/components/HeadToHeadStats';
 import GoalRush from '@/app/components/GoalRush'; 
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
-import BettingPromo from '@/app/components/BettingPromo'; // 🟢 ADDED: Betting Promo Component
+import BettingPromo from '@/app/components/BettingPromo'; 
+
+// 🟢 RESTORED: These were the missing imports causing the build failure!
+import { getExternalData } from '@/app/lib/matchService';
+import { getTeamForm } from '@/app/lib/teamForm';
 
 const sanitizeUrl = (url: string | null | undefined) => {
     if (!url) return null;
@@ -186,7 +190,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                       <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
                   </div>
 
-                  {/* 🟢 REPLACED: Now uses the global BettingPromo component */}
+                  {/* 🟢 Betting Promo Component */}
                   <BettingPromo affiliateLink={sanitizeUrl(dbData.affiliate_link) || null} />
                   
               </div>
