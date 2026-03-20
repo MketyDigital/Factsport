@@ -3,12 +3,30 @@ export const revalidate = 3;
 
 import { createClient } from '@supabase/supabase-js'; 
 import Link from 'next/link';
+import { Metadata } from 'next';
 import { Video, Mic, Calendar, ChevronLeft, Radio, Trophy, Activity, PlayCircle, ArrowRight } from 'lucide-react';
 import LiveScoreLabel from '@/app/components/LiveScoreLabel'; 
 import BettingPromo from '@/app/components/BettingPromo';
-import AutoRefresh from '@/app/components/AutoRefresh'; // 🟢 RESTORED
+import AutoRefresh from '@/app/components/AutoRefresh'; 
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
+
+// 🟢 ENHANCED SEO: OpenGraph & Twitter Cards
+export const metadata: Metadata = {
+    title: 'Live Football Scores, Video & Audio Broadcasts | FactSport',
+    description: 'Follow live football matches with real-time scores, live audio commentary, and video broadcasts. Don\'t miss a minute of the action.',
+    openGraph: {
+        title: 'Live Football Scores, Video & Audio Broadcasts | FactSport',
+        description: 'Follow live football matches with real-time scores, live audio commentary, and video broadcasts. Don\'t miss a minute of the action.',
+        type: 'website',
+        siteName: 'FactSport',
+    },
+    twitter: {
+        card: 'summary_large_image',
+        title: 'Live Football Scores, Video & Audio Broadcasts | FactSport',
+        description: 'Follow live football matches with real-time scores, live audio commentary, and video broadcasts.',
+    }
+};
 
 export default async function LiveMediaPage() {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
@@ -31,10 +49,20 @@ export default async function LiveMediaPage() {
     ? new Date(nextUpcomingMatch.match_date).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : "a later date";
 
+  // 🟢 JSON-LD SCHEMA FOR LIVE COVERAGE PAGE
+  const jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: 'Live Football Scores, Video & Audio Broadcasts | FactSport',
+      description: 'Follow live football matches with real-time scores, live audio commentary, and video broadcasts.',
+      url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://factsport.com'}/live`
+  };
+
   return (
     <div className="min-h-screen bg-[#0a1428] pb-20 font-sans text-white selection:bg-red-500">
+      {/* Inject JSON-LD Schema */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       
-      {/* 🟢 ONLY ON THE LIVE PAGE: Pulls in new matches when they kick off! */}
       <AutoRefresh interval={60000} />
       
       <div className="bg-[#0f1c3a] border-b border-white/10 text-white p-4 sticky top-0 z-50 shadow-2xl flex items-center gap-4 backdrop-blur-lg">
