@@ -1,12 +1,14 @@
 export const runtime = 'edge';
 export const revalidate = 3; 
 
-import { createClient } from '@supabase/supabase-js'; 
+import { createClient as createPublicClient } from '@supabase/supabase-js'; 
+import { createClient as createServerClient } from '@/app/lib/supabase/server'; 
+
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Metadata, ResolvingMetadata } from 'next';
 import { cache } from 'react'; 
-import { ChevronLeft, Zap, LinkIcon, RadioTower } from 'lucide-react';
+import { ChevronLeft, Zap } from 'lucide-react';
 
 import FactSportPlayer from '@/app/components/FactSportPlayer';
 import MatchHeaderClient from '@/app/components/MatchHeaderClient'; 
@@ -19,7 +21,6 @@ import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 import BettingPromo from '@/app/components/BettingPromo'; 
 
-// 🟢 RESTORED: These were the missing imports causing the build failure!
 import { getExternalData } from '@/app/lib/matchService';
 import { getTeamForm } from '@/app/lib/teamForm';
 
@@ -33,7 +34,7 @@ const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
 const getSupabaseData = cache(async (id: string) => {
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const supabase = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     const { data, error } = await supabase.from('matches').select('*').eq('id', id).single();
     if (error) return null;
     return data;
@@ -59,21 +60,27 @@ export async function generateMetadata({ params }: { params: { id: string } }, p
     }
 
     const previousImages = (await parent).openGraph?.images || [];
-    return { title, description, openGraph: { title, description, type: 'website', images: match.home_logo && match.away_logo ? [match.home_logo, ...previousImages] : previousImages }, twitter: { card: 'summary_large_image', title, description } };
+    return { 
+        title, 
+        description, 
+        openGraph: { title, description, type: 'website', images: match.home_logo && match.away_logo ? [match.home_logo, ...previousImages] : previousImages }, 
+        twitter: { card: 'summary_large_image', title, description } 
+    };
 }
 
 export default async function MatchDetailsPage({ params }: { params: { id: string } }) {
   const resolvedParams = await params;
   if (!resolvedParams?.id) return notFound();
 
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-  const { data: authData } = await supabase.auth.getUser();
-  const currentUser = authData?.user || null;
+  const supabaseServer = createServerClient();
+  await supabaseServer.auth.getUser();
 
   const dbData = await getSupabaseData(resolvedParams.id);
   if (!dbData) return notFound();
 
-  const { data: otherLiveMatches } = await supabase
+  const supabasePublic = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+
+  const { data: otherLiveMatches } = await supabasePublic
       .from('matches')
       .select('id, espn_id, home_team, away_team, home_score, away_score, status, displayClock')
       .in('status', ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'P', 'PENALTIES'])
@@ -120,15 +127,12 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       ]
   };
 
-  const showGuestBanner = (activeVideoUrl || activeAudioUrl) && !isFinished;
-
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       {!hasWidget ? (
           <div className="w-full">
-              {/* 1. HEADER */}
               <div className="bg-[#0a1428]">
                   <div className="text-white px-2 py-1.5 flex items-center justify-between border-b border-white/5 max-w-4xl mx-auto">
                       <Link href="/matches" className="p-1 bg-white/10 rounded-full hover:bg-white/20 transition"><ChevronLeft size={16} /></Link>
@@ -138,29 +142,16 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                   <MatchHeaderClient matchId={dbData.id} initialData={data} dbData={dbData} />
               </div>
 
-              {/* 2. HEAD TO HEAD */}
               <div className="w-full bg-white border-b border-slate-200">
                   <HeadToHeadStats dbData={data} />
               </div>
 
-              {/* 3. MEDIA PLAYER & GUEST BANNER */}
               {(activeVideoUrl || activeAudioUrl) && (
                   <div className="w-full bg-black">
                       {activeVideoUrl ? (
                           <FactSportPlayer mediaUrl={activeVideoUrl} matchId={dbData.id} mode="video" isUpcoming={isUpcomingMatch} isFinished={isFinished} />
                       ) : (
                           <FactSportPlayer mediaUrl={activeAudioUrl!} matchId={dbData.id} mode="audio" isUpcoming={isUpcomingMatch} isFinished={isFinished} />
-                      )}
-
-                      {/* 4. CONDITIONAL GUEST BROADCASTER BANNER */}
-                      {showGuestBanner && (
-                          <div className="w-full bg-gradient-to-r from-yellow-500 to-amber-500 px-3 py-2 flex items-center justify-between text-black shadow-inner">
-                              <div className="flex items-center gap-1.5">
-                                  <RadioTower size={12} className="animate-pulse" />
-                                  <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest">Studio</span>
-                              </div>
-                              <span className="text-[9px] md:text-[10px] font-bold">Want to have your say on air? <a href="#" className="underline font-black decoration-black/50 underline-offset-2">Click Here</a></span>
-                          </div>
                       )}
                   </div>
               )}
@@ -173,10 +164,9 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
           </div>
       )}
 
-      {/* 5. MOBILE HUB (Tabs) */}
       <div className="max-w-4xl mx-auto mt-3 px-2">
           {!hasWidget ? (
-              <MatchMobileHub matchId={dbData.id} espnId={dbData.espn_id} currentUser={currentUser} initialData={data} dbData={dbData} />
+              <MatchMobileHub matchId={dbData.id} espnId={dbData.espn_id} initialData={data} dbData={dbData} />
           ) : (
               <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={sanitizeUrl(dbData.affiliate_link) || undefined} />
           )}
@@ -189,10 +179,8 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                       </h3>
                       <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
                   </div>
-
-                  {/* 🟢 Betting Promo Component */}
-                  <BettingPromo affiliateLink={sanitizeUrl(dbData.affiliate_link) || null} />
                   
+                  <BettingPromo affiliateLink={sanitizeUrl(dbData.affiliate_link) || null} />
               </div>
           )}
 
