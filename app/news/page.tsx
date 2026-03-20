@@ -3,6 +3,7 @@ export const revalidate = 180;
 
 import { createClient } from '@supabase/supabase-js'; 
 import Link from 'next/link';
+import { Metadata } from 'next';
 import { Calendar, ChevronRight, Zap, Trophy, Youtube, Newspaper, ArrowRight, Flame, Radio, BarChart2, ChevronLeft } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
@@ -12,10 +13,21 @@ import BettingPromo from '@/app/components/BettingPromo';
 const CATEGORIES = ['All', 'Football', 'Transfers', 'Sports Update', 'Champions League', 'Euros', 'World Cup', 'AFCON', 'Copa America'];
 const ITEMS_PER_PAGE = 12;
 
-// 🔥 SEO METADATA ADDED
-export const metadata = {
+// 🔥 ENHANCED SEO METADATA
+export const metadata: Metadata = {
   title: 'Breaking Sports News & Football Updates | FactSport',
   description: 'Read the latest football news, transfer rumors, and breaking sports updates from around the globe.',
+  openGraph: {
+      title: 'Breaking Sports News & Football Updates | FactSport',
+      description: 'Read the latest football news, transfer rumors, and breaking sports updates.',
+      type: 'website',
+      siteName: 'FactSport',
+  },
+  twitter: {
+      card: 'summary_large_image',
+      title: 'Breaking Sports News & Football Updates | FactSport',
+      description: 'Read the latest football news, transfer rumors, and breaking sports updates.',
+  }
 };
 
 export default async function NewsListingPage({ searchParams }: { searchParams: { category?: string, page?: string } }) {
@@ -41,14 +53,23 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
   const featured = isFirstPage ? (news?.find(n => n.is_headline) || news?.[0]) : null;
   const rest = featured ? (news?.filter(n => n.id !== featured.id) || []) : (news || []);
 
-  // 🟢 Split the grid to insert the ad in the middle
   const midIndex = Math.floor(rest.length / 2);
   const firstHalf = rest.slice(0, midIndex);
   const secondHalf = rest.slice(midIndex);
 
+  // 🟢 JSON-LD Schema
+  const jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: 'Breaking Sports News & Football Updates | FactSport',
+      description: 'Read the latest football news, transfer rumors, and breaking sports updates.',
+      url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://factsport.com'}/news`
+  };
+
   return (
     <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans text-slate-900">
-      
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+
       {/* HEADER */}
       <div className="bg-[#0a1428] text-white pt-8 pb-12 px-6 relative overflow-hidden shadow-lg border-b border-blue-900/30">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
@@ -59,7 +80,6 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
              </h1>
              <p className="text-slate-400 font-medium tracking-wide mt-2 mb-6 text-sm max-w-md">Breaking stories, tactical Football analysis, and the latest from the world of Sport.</p>
              
-             {/* 1. 🟢 THE TOP BILLBOARD (Under News Page Title) */}
              <div className="mt-2">
                  <AdsterraStandardBanner />
              </div>
@@ -84,12 +104,10 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
 
       <div className="px-4 mt-6 relative z-20 max-w-7xl mx-auto">
 
-        {/* 2. 🟢 SLIM BETTING PROMO (Before the News List/Featured Card) */}
         <div className="mb-8 w-full max-w-3xl mx-auto overflow-hidden rounded-xl bg-white border border-slate-200 shadow-sm max-h-[90px]">
             <BettingPromo affiliateLink={null} />
         </div>
 
-        {/* FEATURED CARD (Only Page 1) */}
         {featured && (
             <Link href={`/news/${featured.slug}`} className="block group mb-8">
                 <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 flex flex-col md:flex-row transition-transform duration-500 hover:shadow-2xl hover:-translate-y-1">
@@ -112,10 +130,8 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
             </Link>
         )}
 
-        {/* NEWS GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             
-            {/* Render First Half of News Grid */}
             {firstHalf.map((item) => (
                 <Link key={item.id} href={`/news/${item.slug}`} className="group bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col h-full">
                     <div className="aspect-[16/10] relative overflow-hidden bg-slate-900 border-b border-slate-100">
@@ -133,14 +149,12 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
                 </Link>
             ))}
 
-            {/* 3. 🟢 NATIVE BANNER INJECTED MID-GRID */}
             {rest.length > 0 && (
                 <div className="col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-4 my-2 border-y border-slate-200 py-4">
                     <AdsterraNativeBanner />
                 </div>
             )}
 
-            {/* Render Second Half of News Grid */}
             {secondHalf.map((item) => (
                 <Link key={item.id} href={`/news/${item.slug}`} className="group bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col h-full">
                     <div className="aspect-[16/10] relative overflow-hidden bg-slate-900 border-b border-slate-100">
@@ -187,13 +201,11 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
             </div>
         )}
 
-        {/* 4. 🟢 END-OF-LIST NATIVE BANNER (Before Quick Actions) */}
         <div className="mt-12 mb-4">
             <AdsterraNativeBanner />
         </div>
       </div>
 
-      {/* QUICK ACTIONS FOOTER */}
       <div className="max-w-7xl mx-auto px-4 mt-8 mb-8">
           <div className="bg-[#0a1428] rounded-3xl p-8 shadow-2xl relative overflow-hidden border border-slate-800">
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600 rounded-full blur-[100px] opacity-20"></div>

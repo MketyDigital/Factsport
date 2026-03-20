@@ -3,6 +3,7 @@ export const revalidate = 60;
 
 import { createClient } from '@supabase/supabase-js'; 
 import Link from "next/link";
+import { Metadata } from 'next';
 import { PlayCircle, Calendar, ArrowLeft, Tv, ShieldCheck, Trophy, ArrowRight, ChevronRight, ChevronLeft } from "lucide-react";
 import BettingPromo from '@/app/components/BettingPromo';
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
@@ -10,9 +11,21 @@ import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
 const ITEMS_PER_PAGE = 12;
 
-export const metadata = {
+// 🟢 ENHANCED SEO: OpenGraph & Twitter Cards
+export const metadata: Metadata = {
   title: 'Football Highlights & Goal Replays | FactSport',
   description: 'Watch the latest football highlights, goal replays, and match recaps from the top leagues worldwide.',
+  openGraph: {
+      title: 'Football Highlights & Goal Replays | FactSport',
+      description: 'Watch the latest football highlights, goal replays, and match recaps from the top leagues worldwide.',
+      type: 'website',
+      siteName: 'FactSport',
+  },
+  twitter: {
+      card: 'summary_large_image',
+      title: 'Football Highlights & Goal Replays | FactSport',
+      description: 'Watch the latest football highlights, goal replays, and match recaps from the top leagues worldwide.',
+  }
 };
 
 export default async function HighlightsPage({ searchParams }: { searchParams: { league?: string, page?: string } }) {
@@ -51,13 +64,23 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
   const safeHighlights = highlights || [];
   const totalPages = count ? Math.ceil(count / ITEMS_PER_PAGE) : 1;
 
-  // 🟢 Split the grid for mid-page ad injection
   const midIndex = Math.floor(safeHighlights.length / 2);
   const firstHalf = safeHighlights.slice(0, midIndex);
   const secondHalf = safeHighlights.slice(midIndex);
 
+  // 🟢 JSON-LD SCHEMA FOR COLLECTION PAGE
+  const jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: 'Football Highlights & Goal Replays | FactSport',
+      description: 'Watch the latest football highlights, goal replays, and match recaps from the top leagues worldwide.',
+      url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://factsport.com'}/highlights`
+  };
+
   return (
     <div className="min-h-screen bg-[#0a1428] text-white font-sans pb-16 overflow-x-hidden selection:bg-red-500">
+      {/* Inject JSON-LD Schema */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       
       <div className="bg-[#0f1c3a] border-b border-white/10 sticky top-0 z-40 shadow-2xl backdrop-blur-lg">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -95,7 +118,6 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
 
       <div className="max-w-7xl mx-auto px-4 mt-6">
         
-        {/* 1. 🟢 STANDARD BANNER (Top of page content) */}
         <AdsterraStandardBanner />
 
         <div className="max-w-xl mx-auto mb-8 mt-4">
@@ -105,10 +127,8 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
         {safeHighlights.length > 0 ? (
             <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-                    {/* Render First Half */}
                     {firstHalf.map((item) => (
                         <Link href={`/match/${item.id}`} key={item.id} className="group flex flex-col bg-slate-900 rounded-2xl shadow-xl border border-slate-800 overflow-hidden hover:shadow-2xl hover:border-blue-500/50 transition-all duration-500 hover:-translate-y-1">
-                            {/* ... (Existing Highlights Card Content) ... */}
                             <div className="relative aspect-video bg-black overflow-hidden border-b border-slate-800">
                                 <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 group-hover:scale-110 transition-transform duration-700 ease-out"></div>
                                 <div className="absolute inset-0 flex items-center justify-center gap-6 opacity-90 group-hover:opacity-50 transition-opacity duration-500">
@@ -144,14 +164,12 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
                         </Link>
                     ))}
                     
-                    {/* 2. 🟢 MID-PAGE NATIVE BANNER */}
                     {safeHighlights.length > 0 && (
                         <div className="col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-4 py-4">
                             <AdsterraNativeBanner />
                         </div>
                     )}
 
-                    {/* Render Second Half */}
                     {secondHalf.map((item) => (
                         <Link href={`/match/${item.id}`} key={item.id} className="group flex flex-col bg-slate-900 rounded-2xl shadow-xl border border-slate-800 overflow-hidden hover:shadow-2xl hover:border-blue-500/50 transition-all duration-500 hover:-translate-y-1">
                              <div className="relative aspect-video bg-black overflow-hidden border-b border-slate-800">
@@ -208,7 +226,6 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
                     </div>
                 )}
 
-                {/* 3. 🟢 END OF PAGE NATIVE BANNER */}
                 <AdsterraNativeBanner />
 
                 <div className="mt-10 max-w-3xl mx-auto bg-[#0f1c3a] rounded-2xl p-4 md:p-5 border border-yellow-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden group">

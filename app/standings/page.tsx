@@ -2,6 +2,7 @@ export const runtime = 'edge';
 export const revalidate = 300; 
 
 import Link from 'next/link';
+import { Metadata } from 'next';
 import { ChevronLeft, BarChart2, AlertTriangle } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js'; 
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
@@ -16,12 +17,27 @@ const LEAGUE_MAP: Record<string, string> = {
     'Champions League': 'CL'
 };
 
-export async function generateMetadata({ searchParams }: { searchParams: { league?: string } }) {
+// 🟢 ENHANCED SEO: OpenGraph & Twitter Cards added
+export async function generateMetadata({ searchParams }: { searchParams: { league?: string } }): Promise<Metadata> {
     const resolvedParams = await searchParams;
     const league = resolvedParams?.league || 'Premier League';
+    const title = `${league} Table & Standings | FactSport`;
+    const description = `Check the latest ${league} table, points, and current team form. Live updates on the title race and relegation battles.`;
+    
     return {
-        title: `${league} Table & Standings | FactSport`,
-        description: `Check the latest ${league} table, points, and current team form. Live updates on the title race and relegation battles.`
+        title,
+        description,
+        openGraph: {
+            title,
+            description,
+            type: 'website',
+            siteName: 'FactSport',
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title,
+            description,
+        }
     }
 }
 
@@ -123,8 +139,20 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
     const hasFormData = standings.some((entry: any) => entry.form && entry.form.length > 0);
     const ALL_LEAGUES = Object.keys(LEAGUE_MAP);
 
+    // 🟢 JSON-LD SCHEMA FOR STANDINGS
+    const jsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'WebPage',
+        name: `${validLeague} Table & Standings | FactSport`,
+        description: `Check the latest ${validLeague} table, points, and current team form.`,
+        url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://factsport.com'}/standings?league=${encodeURIComponent(validLeague)}`
+    };
+
     return (
         <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-20 font-sans">
+            {/* Inject JSON-LD Schema */}
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+
             <div className="bg-[#0a1428] text-white p-3 md:p-4 flex items-center gap-3 md:gap-4 sticky top-0 z-50 shadow-lg">
                 <Link href="/matches" className="p-1.5 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-sm">
                     <ChevronLeft size={20}/>
@@ -151,7 +179,6 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
 
             <div className="p-1.5 md:p-4 max-w-5xl mx-auto mt-2">
                 
-                {/* 1. 🟢 STANDARD BANNER (Immediately visible below the sticky league selector) */}
                 <AdsterraStandardBanner />
 
                 {error && (
@@ -256,7 +283,6 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                     </div>
                 )}
 
-                {/* 2. 🟢 NATIVE BANNER (End of Page) */}
                 <AdsterraNativeBanner />
             </div>
         </div>

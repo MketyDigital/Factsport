@@ -86,6 +86,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   
   const currentStatus = (dbData.status || '').toUpperCase();
   const isFinished = FINISHED_STATUSES.includes(currentStatus);
+  const isLive = !SCHEDULED_STATUSES.includes(currentStatus) && !isFinished;
   
   const matchDateMs = new Date(dbData.match_date).getTime();
   const minutesToKick = (matchDateMs - Date.now()) / 60000;
@@ -95,7 +96,28 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const activeAudioUrl = sanitizeUrl(dbData.audio_url);
   const hasWidget = !!dbData.widget_id; 
 
-  const jsonLd = { /* ... keep your existing jsonLd block here ... */ };
+  // 🟢 FULLY RESTORED SEO JSON-LD BLOCK
+  const jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'SportsEvent',
+      name: `${dbData.home_team} vs ${dbData.away_team}`,
+      description: `Live scores, H2H stats, and predictions for ${dbData.home_team} vs ${dbData.away_team} in the ${dbData.league}.`,
+      startDate: new Date(dbData.match_date).toISOString(),
+      eventStatus: isFinished ? 'https://schema.org/EventScheduled' : (isLive ? 'https://schema.org/EventLive' : 'https://schema.org/EventScheduled'),
+      sport: 'Soccer',
+      competitor: [
+          {
+              '@type': 'SportsTeam',
+              name: dbData.home_team,
+              image: sanitizeUrl(dbData.home_logo) || undefined
+          },
+          {
+              '@type': 'SportsTeam',
+              name: dbData.away_team,
+              image: sanitizeUrl(dbData.away_logo) || undefined
+          }
+      ]
+  };
 
   // 🟢 LOGIC CHECK: Only show the guest banner if there's an active media URL AND the game isn't finished.
   const showGuestBanner = (activeVideoUrl || activeAudioUrl) && !isFinished;
