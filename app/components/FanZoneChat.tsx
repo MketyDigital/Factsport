@@ -2,9 +2,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, MessageCircle, ShieldAlert, Zap, Reply, X, ArrowDown } from 'lucide-react';
 import Link from 'next/link';
-import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
+import { createClient } from '@/app/lib/supabase/client'; // 🟢 Added Supabase client
 
-export default function FanZoneChat({ matchId, espnId, user }: { matchId: string, espnId?: string, user: any }) {
+// 🟢 Removed `user` from props, the component will now fetch it securely itself!
+export default function FanZoneChat({ matchId, espnId }: { matchId: string, espnId?: string }) {
     const [messages, setMessages] = useState<any[]>([]);
     const [officialEvents, setOfficialEvents] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState("");
@@ -14,8 +15,31 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
     const [replyTo, setReplyTo] = useState<{user: string, text: string} | null>(null);
     const [showScrollBottom, setShowScrollBottom] = useState(false);
     
+    // 🟢 NEW: Self-Contained User State
+    const [user, setUser] = useState<any>(null);
+    const [isUserLoaded, setIsUserLoaded] = useState(false);
+    
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const CHAT_WORKER_URL = "https://chatworkerjs.mkpoikankes.workers.dev"; 
+
+    // 🟢 NEW: Fetch user directly from the browser session (Zero database cost)
+    useEffect(() => {
+        const supabase = createClient();
+        
+        const checkUser = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            setUser(session?.user || null);
+            setIsUserLoaded(true);
+        };
+        checkUser();
+
+        // Listen for instant login/logout changes
+        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+            setUser(session?.user || null);
+        });
+
+        return () => { authListener.subscription.unsubscribe(); };
+    }, []);
 
     const handleScroll = () => {
         if (scrollContainerRef.current) {
@@ -121,7 +145,6 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
 
-    // 🟢 NEW: Bulletproof logic to ALWAYS find the newest match event
     const getMinute = (timeStr: string) => {
         if (!timeStr) return 0;
         const parts = timeStr.replace("'", "").split('+');
@@ -130,7 +153,6 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
         return total;
     };
 
-    // Sorts all events by their actual match minute, and pins the highest one to the ticker
     const latestEvent = officialEvents.length > 0 
         ? [...officialEvents].sort((a, b) => getMinute(b.time) - getMinute(a.time))[0] 
         : null;
@@ -154,7 +176,6 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
     return (
         <div className="w-full bg-white flex flex-col h-[65vh] min-h-[450px] border-t border-slate-200 relative">
             
-            {/* 🟢 STICKY "LATEST EVENT" TICKER */}
             {latestEvent && (
                 <div className="bg-slate-900 text-white px-3 py-2 flex items-center justify-between border-b border-slate-800 shrink-0 shadow-md relative z-20">
                     <div className="flex items-center gap-2 overflow-hidden">
@@ -238,7 +259,10 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
                 )}
                 
                 <div className="p-2 md:p-3">
-                    {user ? (
+                    {/* 🟢 Skeleton loader while checking auth state */}
+                    {!isUserLoaded ? (
+                         <div className="h-10 w-full bg-slate-100 rounded-full animate-pulse border border-slate-200"></div>
+                    ) : user ? (
                         <form onSubmit={handleSendMessage} className="relative flex items-center">
                             <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Have your say..." className="w-full bg-[#F0F2F5] border border-slate-200 rounded-full pl-4 pr-12 py-2 md:py-2.5 text-[11px] md:text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition shadow-inner" maxLength={200} />
                             <button type="submit" disabled={!newMessage.trim() || isSending} className="absolute right-1 p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 transition shadow-md"><Send size={14} /></button>

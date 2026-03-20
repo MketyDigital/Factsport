@@ -3,6 +3,7 @@ export const revalidate = 5;
 
 import { createClient } from '@supabase/supabase-js'; 
 import Link from 'next/link';
+import { Metadata } from 'next';
 import { ChevronLeft, X, Search } from 'lucide-react';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner'; 
 import LeagueMatchGroup from '@/app/components/LeagueMatchGroup'; 
@@ -13,10 +14,21 @@ import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 import { getTeamForm } from '@/app/lib/teamForm';
 import { getTeamQueryFilter } from '@/app/lib/teamAliases';
 
-// 🔥 SEO METADATA ADDED
-export const metadata = {
+// 🔥 ENHANCED SEO METADATA
+export const metadata: Metadata = {
   title: 'Football Fixtures, Live Scores & Results | FactSport',
   description: 'View today\'s football fixtures, live scores, and recent match results from the Premier League, Champions League, La Liga, WorldCup and more.',
+  openGraph: {
+      title: 'Football Fixtures, Live Scores & Results | FactSport',
+      description: 'View today\'s football fixtures, live scores, and recent match results from the top leagues.',
+      type: 'website',
+      siteName: 'FactSport',
+  },
+  twitter: {
+      card: 'summary_large_image',
+      title: 'Football Fixtures, Live Scores & Results | FactSport',
+      description: 'View today\'s football fixtures, live scores, and recent match results.',
+  }
 };
 
 const PRIORITY_LEAGUES = [
@@ -56,11 +68,21 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
   const { data: matches } = await query;
   const validMatches = matches || [];
 
+  // 🟢 JSON-LD Schema
+  const jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      name: 'Football Fixtures, Live Scores & Results | FactSport',
+      description: 'View today\'s football fixtures, live scores, and recent match results.',
+      url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://factsport.com'}/matches`
+  };
+
   if (teamFilter) {
       const teamFormArray = await getTeamForm(teamFilter);
 
       return (
         <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-20 font-sans">
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
             <div className="bg-[#0a1428] text-white p-4 flex items-center justify-between sticky top-0 z-50 shadow-md">
                 <div className="flex items-center gap-4">
                     <Link href="/" className="p-1 rounded-full hover:bg-white/10 transition"><ChevronLeft /></Link>
@@ -176,6 +198,7 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-20 font-sans">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       
       <div className="bg-[#0a1428] text-white p-4 flex items-center gap-4 sticky top-0 z-50 shadow-md">
           <Link href="/" className="p-1 rounded-full hover:bg-white/10 transition"><ChevronLeft /></Link>
@@ -187,7 +210,6 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
 
       <LeagueNavigator leagues={activeLeagues} />
 
-      {/* 1. 🟢 STANDARD BANNER (Under Navigator) */}
       <AdsterraStandardBanner />
 
       <div className="p-3 space-y-6">
@@ -235,7 +257,6 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
             </div>
         )}
 
-        {/* 2. 🟢 NATIVE BANNER (End of List) */}
         <AdsterraNativeBanner />
       </div>
     </div>
