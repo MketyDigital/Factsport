@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, MessageCircle, ShieldAlert, Zap, Reply, X, ArrowDown } from 'lucide-react';
 import Link from 'next/link';
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
 export default function FanZoneChat({ matchId, espnId, user }: { matchId: string, espnId?: string, user: any }) {
     const [messages, setMessages] = useState<any[]>([]);
@@ -19,7 +20,6 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
     const handleScroll = () => {
         if (scrollContainerRef.current) {
             const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
-            // If user scrolled up more than 150px, show the "Jump to Latest" button
             setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 150);
         }
     };
@@ -66,7 +66,7 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
                         player: e.player,
                         created_at: new Date(Date.now() - (index * 60000)).toISOString() 
                     }));
-                    setOfficialEvents(formattedEvents.reverse());
+                    setOfficialEvents(formattedEvents);
                     setTimeout(() => scrollToBottom(false), 100);
                 }
             } catch (e) {}
@@ -82,10 +82,9 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
 
         setIsSending(true);
         
-        // 🟢 Format the message if replying to someone
         let finalMessageStr = newMessage;
         if (replyTo) {
-            const safeQuote = replyTo.text.replace(/\[Reply @.*?\]/g, '').substring(0, 40); // Prevent quote-ception
+            const safeQuote = replyTo.text.replace(/\[Reply @.*?\]/g, '').substring(0, 40); 
             finalMessageStr = `[Reply @${replyTo.user}: "${safeQuote}..."] ${newMessage}`;
         }
 
@@ -99,7 +98,7 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
 
         setMessages(prev => [...prev, tempMsg]);
         setNewMessage("");
-        setReplyTo(null); // Clear reply state
+        setReplyTo(null); 
         setTimeout(() => scrollToBottom(true), 50);
 
         try {
@@ -122,11 +121,22 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
 
-    const latestEvent = officialEvents.length > 0 ? officialEvents[0] : null;
+    // 🟢 NEW: Bulletproof logic to ALWAYS find the newest match event
+    const getMinute = (timeStr: string) => {
+        if (!timeStr) return 0;
+        const parts = timeStr.replace("'", "").split('+');
+        let total = parseInt(parts[0]) || 0;
+        if (parts.length > 1) total += parseInt(parts[1]) || 0;
+        return total;
+    };
 
-    // Helper to render quoted text
+    // Sorts all events by their actual match minute, and pins the highest one to the ticker
+    const latestEvent = officialEvents.length > 0 
+        ? [...officialEvents].sort((a, b) => getMinute(b.time) - getMinute(a.time))[0] 
+        : null;
+
     const renderMessageContent = (text: string) => {
-        const quoteMatch = text.match(/^\[Reply @(.*?): "(.*?)"\] (.*)$/s);
+        const quoteMatch = text.match(/^\[Reply @([^:]*?): "([\s\S]*?)"\] ([\s\S]*)$/);
         if (quoteMatch) {
             return (
                 <div className="flex flex-col gap-1">
@@ -144,10 +154,11 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
     return (
         <div className="w-full bg-white flex flex-col h-[65vh] min-h-[450px] border-t border-slate-200 relative">
             
+            {/* 🟢 STICKY "LATEST EVENT" TICKER */}
             {latestEvent && (
                 <div className="bg-slate-900 text-white px-3 py-2 flex items-center justify-between border-b border-slate-800 shrink-0 shadow-md relative z-20">
                     <div className="flex items-center gap-2 overflow-hidden">
-                        <span className="bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow">{latestEvent.time}</span>
+                        <span className="bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow shrink-0">{latestEvent.time}</span>
                         <span className="text-[10px] md:text-xs font-bold truncate tracking-wide text-slate-100">
                             {latestEvent.text} {latestEvent.player && <span className="text-yellow-400 font-black ml-1">- {latestEvent.player}</span>}
                         </span>
@@ -209,7 +220,6 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
                 )}
             </div>
 
-            {/* 🟢 FLOATING "JUMP TO LATEST" BUTTON */}
             {showScrollBottom && (
                 <button onClick={() => scrollToBottom(true)} className="absolute bottom-[70px] right-4 bg-blue-600 text-white p-2 rounded-full shadow-[0_4px_15px_rgba(0,0,0,0.3)] animate-bounce active:scale-95 flex items-center justify-center z-40">
                     <ArrowDown size={16} />
@@ -217,7 +227,6 @@ export default function FanZoneChat({ matchId, espnId, user }: { matchId: string
             )}
 
             <div className="bg-white border-t border-slate-200 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] z-10 shrink-0 flex flex-col">
-                {/* 🟢 REPLY UI PREVIEW */}
                 {replyTo && (
                     <div className="bg-slate-50 border-b border-slate-200 px-3 py-1.5 flex items-center justify-between">
                         <div className="flex items-center gap-1.5 overflow-hidden">

@@ -89,7 +89,6 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
 
   const homeTeamName = dbData?.home_team || initialData?.home?.name || '';
   const awayTeamName = dbData?.away_team || initialData?.away?.name || '';
-  
   const formattedDate = dbData?.match_date ? new Date(dbData.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
   
   let refName = null;
@@ -97,9 +96,12 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
       refName = typeof initialData.referees[0] === 'string' ? initialData.referees[0] : initialData.referees[0].name;
   }
 
+  // Extract Form
+  const homeForm = initialData?.home_form || [];
+  const awayForm = initialData?.away_form || [];
+
   return (
     <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
-        {/* 🟢 ENHANCED BACKGROUND: Higher opacity, lighter gradient so the stadium is highly visible */}
         <div className="absolute inset-0 z-0 pointer-events-none">
             <img src={leagueData.bg} alt="Stadium" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen" />
             <div className="absolute inset-0 bg-gradient-to-b from-[#0a1428]/60 via-[#0a1428]/50 to-[#0a1428]/90" />
@@ -107,13 +109,26 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
 
         <div className="relative z-10 px-2 py-3 md:py-4">
             <div className="flex justify-between items-center max-w-lg mx-auto">
+                
+                {/* HOME TEAM */}
                 <Link href={`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center w-[30%] group active:scale-95 transition-transform">
                     <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
                         {dbData?.home_logo && <img src={dbData.home_logo} className="w-full h-full object-contain" alt="" />}
                     </div>
                     <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{homeTeamName}</h2>
+                    {/* 🟢 ULTRA-TINY HOME FORM */}
+                    {homeForm.length > 0 && (
+                        <div className="flex items-center gap-[2px] mt-1 drop-shadow-md">
+                            {homeForm.map((f: string, i: number) => (
+                                <span key={i} className={`w-2 h-2 md:w-2.5 md:h-2.5 flex items-center justify-center text-[5px] md:text-[6px] font-black text-white rounded-sm ${f === 'W' ? 'bg-green-500' : f === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>
+                                    {f}
+                                </span>
+                            ))}
+                        </div>
+                    )}
                 </Link>
                 
+                {/* SCORES */}
                 <div className="flex flex-col items-center justify-center w-[40%] drop-shadow-lg">
                     {isLive && (
                         <div className="flex items-center gap-1 bg-red-600/90 text-white text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded-sm animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.5)] mb-1">
@@ -137,15 +152,27 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                     )}
                 </div>
 
+                {/* AWAY TEAM */}
                 <Link href={`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center w-[30%] group active:scale-95 transition-transform">
                     <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
                         {dbData?.away_logo && <img src={dbData.away_logo} className="w-full h-full object-contain" alt="" />}
                     </div>
                     <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{awayTeamName}</h2>
+                    {/* 🟢 ULTRA-TINY AWAY FORM */}
+                    {awayForm.length > 0 && (
+                        <div className="flex items-center gap-[2px] mt-1 drop-shadow-md">
+                            {awayForm.map((f: string, i: number) => (
+                                <span key={i} className={`w-2 h-2 md:w-2.5 md:h-2.5 flex items-center justify-center text-[5px] md:text-[6px] font-black text-white rounded-sm ${f === 'W' ? 'bg-green-500' : f === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>
+                                    {f}
+                                </span>
+                            ))}
+                        </div>
+                    )}
                 </Link>
             </div>
         </div>
 
+        {/* Info Bar */}
         <div className="relative z-10 w-full bg-black/40 backdrop-blur-sm border-t border-white/5 py-1.5 px-2 flex justify-center items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide text-[7px] md:text-[8px] font-bold text-slate-300 uppercase tracking-widest whitespace-nowrap drop-shadow-md">
             {formattedDate && <span className="flex items-center gap-1"><Calendar size={9} className="text-blue-400"/> {formattedDate}</span>}
             {initialData?.venue && <span className="flex items-center gap-1"><MapPin size={9} className="text-red-400"/> {initialData.venue}</span>}
