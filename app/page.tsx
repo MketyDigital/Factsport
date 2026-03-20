@@ -3,6 +3,7 @@ export const revalidate = 5;
 
 import { createClient } from '@supabase/supabase-js'; 
 import Link from "next/link";
+import { Metadata } from 'next';
 import { ArrowRight, Youtube, Newspaper, TrendingUp, Calendar, Award, Trophy } from "lucide-react";
 
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
@@ -22,16 +23,20 @@ const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'E
 const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
-export const metadata = {
+// 🔥 ENHANCED SEO METADATA
+export const metadata: Metadata = {
   title: 'FactSport | Live Football, Sport News & Predictions',
   description: 'The #1 Platform for sports | football predictions, live scores, and breaking news.',
-  other: {
-      "application/ld+json": JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "WebSite",
-          "name": "FactSport",
-          "url": "https://factsport.com/"
-      })
+  openGraph: {
+      title: 'FactSport | Live Football, Sport News & Predictions',
+      description: 'The #1 Platform for sports | football predictions, live scores, and breaking news.',
+      type: 'website',
+      siteName: 'FactSport',
+  },
+  twitter: {
+      card: 'summary_large_image',
+      title: 'FactSport | Live Football, Sport News & Predictions',
+      description: 'The #1 Platform for sports | football predictions, live scores, and breaking news.',
   }
 };
 
@@ -210,8 +215,22 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const displayMatches = matches.filter(m => !heroMatches.some(h => h.id === m.id));
   const groupedMatches = groupByDate(displayMatches);
 
+  // 🟢 JSON-LD SCHEMA FOR HOME PAGE
+  const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "FactSport",
+      "url": "https://factsport.com/",
+      "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://factsport.com/news?category={search_term_string}",
+          "query-input": "required name=search_term_string"
+      }
+  };
+
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-0 overflow-x-hidden">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       
       <NewsTicker tickerNews={tickerNews} />
       <AdsterraStandardBanner />

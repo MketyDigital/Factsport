@@ -25,29 +25,31 @@ export default function StickyAffiliateBanner() {
     };
 
     return (
-        <div className="fixed bottom-3 left-3 right-3 z-[100] max-w-2xl mx-auto animate-slide-up pointer-events-none">
+        <div className="fixed bottom-4 left-0 right-0 z-[100] w-full flex justify-center px-4 pointer-events-none animate-slide-up">
             
-            {/* 🟢 Completely Transparent Wrapper - Only inner items catch pointer events */}
-            <div className="relative overflow-visible w-full flex items-center justify-between gap-2 px-1">
+            {/* 🟢 REDUCED WIDTH: max-w-[420px] makes it compact and centered */}
+            <div className="w-full max-w-[420px] pointer-events-auto relative">
                 
-                {/* Floating Close Button */}
+                {/* Close Button overlapping slightly on the top right */}
                 <button 
                     onClick={() => setIsVisible(false)}
-                    className="absolute -top-4 -right-1 text-slate-400 hover:text-slate-600 bg-white/50 backdrop-blur rounded-full p-0.5 z-20 pointer-events-auto transition-colors shadow-sm"
+                    className="absolute -top-3 -right-2 bg-slate-800 text-slate-400 hover:text-white border border-slate-600 rounded-full p-1 transition-colors shadow-xl z-20"
                     aria-label="Close"
                 >
                     <X size={14} />
                 </button>
 
-                <div className="flex items-center gap-2 flex-1 pointer-events-auto">
-                    {/* Floating Icon */}
-                    <div className="w-10 h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center shrink-0 shadow-[0_4px_15px_rgba(0,0,0,0.3)] relative">
-                        <Gift className="text-[#1562a3] w-5 h-5 md:w-6 md:h-6 animate-pulse" />
+                {/* 🟢 THE UNIFIED SHIELD: A heavily shadowed, dark frosted pill */}
+                <div className="bg-[#0a1428]/95 backdrop-blur-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.9)] rounded-full p-1.5 flex items-center justify-between gap-2 w-full">
+                    
+                    {/* Icon */}
+                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0 shadow-inner">
+                        <Gift className="text-[#1562a3] w-5 h-5 animate-pulse" />
                     </div>
                     
-                    {/* Floating Text with Heavy Shadows for visibility */}
-                    <div className="flex flex-col flex-1 overflow-hidden drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-                        <span className="font-black text-white text-xs md:text-sm uppercase tracking-tight truncate">
+                    {/* Text Block */}
+                    <div className="flex flex-col flex-1 overflow-hidden">
+                        <span className="font-black text-white text-[11px] md:text-xs uppercase tracking-tight truncate drop-shadow-md">
                             300% Welcome Bonus!
                         </span>
                         
@@ -62,26 +64,26 @@ export default function StickyAffiliateBanner() {
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Floating Buttons */}
-                <div className="flex items-center gap-2 shrink-0 pointer-events-auto">
-                    <button 
-                        onClick={copyToClipboard}
-                        className={`flex items-center justify-center w-8 h-8 rounded-full transition-all shadow-[0_4px_10px_rgba(0,0,0,0.4)] ${copied ? 'bg-white text-[#6ae045]' : 'bg-[#1562a3] text-white hover:bg-[#0d477a]'}`}
-                        title="Copy Promo Code"
-                    >
-                        {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
-                    </button>
+                    {/* Buttons */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        <button 
+                            onClick={copyToClipboard}
+                            className={`flex items-center justify-center w-8 h-8 rounded-full transition-all shadow-[0_4px_10px_rgba(0,0,0,0.4)] ${copied ? 'bg-white text-[#6ae045]' : 'bg-[#1562a3] text-white hover:bg-[#0d477a]'}`}
+                            title="Copy Promo Code"
+                        >
+                            {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                        </button>
 
-                    <a 
-                        href={AFFILIATE_LINK}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="bg-[#6ae045] hover:bg-[#5bc23a] text-[#052b4d] px-4 py-2 rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest flex items-center gap-1 shadow-[0_4px_15px_rgba(106,224,69,0.5)] active:scale-95 transition-transform"
-                    >
-                        Claim <ArrowRight size={12} className="hidden sm:block" />
-                    </a>
+                        <a 
+                            href={AFFILIATE_LINK}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-[#6ae045] hover:bg-[#5bc23a] text-[#052b4d] px-3.5 py-2 rounded-full font-black text-[10px] uppercase tracking-widest flex items-center gap-1 shadow-[0_4px_15px_rgba(106,224,69,0.5)] active:scale-95 transition-transform"
+                        >
+                            Claim <ArrowRight size={12} className="hidden sm:block" />
+                        </a>
+                    </div>
                 </div>
             </div>
 
