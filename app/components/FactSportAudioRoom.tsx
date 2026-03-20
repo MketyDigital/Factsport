@@ -15,16 +15,13 @@ const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest
     const [isGenerating, setIsGenerating] = useState(false);
     const [copied, setCopied] = useState(false);
     
-    // 🟢 NEW: Storing incoming caller requests in state
     const [permissionRequests, setPermissionRequests] = useState<any[]>([]);
 
     useEffect(() => {
         if (!call || role !== 'admin') return;
         
-        // 🟢 NEW: Listen to the live WebSocket event when a fan raises their hand
         const unsubscribe = call.on('call.permission_request', (event: any) => {
             setPermissionRequests((prev) => {
-                // Prevent duplicate requests from the same user filling up the screen
                 if (prev.some(req => req.user.id === event.user.id)) return prev;
                 return [...prev, event];
             });
@@ -37,19 +34,21 @@ const InteractiveAudioUI = ({ role, matchId }: { role: 'admin' | 'user' | 'guest
 
     const requestToSpeak = async () => {
         try {
-            await call.requestPermissions({ audio: true });
+            // 🟢 THE FIX: Stream SDK requires an array of specific permissions
+            await call.requestPermissions({ permissions: ['send-audio'] });
             setHandRaised(true);
-        } catch (err) {}
+        } catch (err) {
+            console.error("Failed to request permission", err);
+        }
     };
 
-    // 🟢 Action: Grant mic access and clear from queue
     const handleApprove = async (userId: string) => {
         await call.grantPermissions(userId, ['send-audio']);
         setPermissionRequests((prev) => prev.filter(req => req.user.id !== userId));
     };
 
-    // 🟢 Action: Deny access and clear from queue
     const handleDeny = async (userId: string) => {
+        // We just clear them from the queue if we deny them
         setPermissionRequests((prev) => prev.filter(req => req.user.id !== userId));
     };
 
