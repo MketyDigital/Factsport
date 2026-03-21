@@ -72,7 +72,12 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
         try {
             const urlParams = new URLSearchParams(window.location.search);
             const guestToken = urlParams.get('guest');
-            const apiUrl = `/api/stream/token?match_id=${matchId}${guestToken ? \`&guest=\${guestToken}\` : ''}`;
+            
+            // 🟢 THE FIX: Clean string concatenation instead of nested template literals
+            let apiUrl = '/api/stream/token?match_id=' + matchId;
+            if (guestToken) {
+                apiUrl += '&guest=' + guestToken;
+            }
             
             const res = await fetch(apiUrl);
             const text = await res.text();
