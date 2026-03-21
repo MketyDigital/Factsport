@@ -5,17 +5,24 @@ import { Bell, BellRing } from 'lucide-react';
 export default function GoalAlertToggler({ matchId, homeTeam, awayTeam, currentHomeScore, currentAwayScore, status }: any) {
     const [isSubscribed, setIsSubscribed] = useState(false);
     const [permission, setPermission] = useState('default');
+    const [isSupported, setIsSupported] = useState(true); // 🟢 Safety Check
 
     useEffect(() => {
+        // 🟢 SAFELY CHECK IF BROWSER SUPPORTS NOTIFICATIONS BEFORE TOUCHING IT
         if (typeof window !== 'undefined') {
-            setPermission(Notification.permission);
+            if ('Notification' in window) {
+                setPermission(Notification.permission);
+                const subbed = localStorage.getItem(`alerts_${matchId}`);
+                if (subbed === 'true') setIsSubscribed(true);
+            } else {
+                setIsSupported(false); // Hide the button if not supported
+            }
         }
-        const subbed = localStorage.getItem(`alerts_${matchId}`);
-        if (subbed === 'true') setIsSubscribed(true);
     }, [matchId]);
 
     useEffect(() => {
-        if (!isSubscribed || permission !== 'granted') return;
+        if (!isSupported || !isSubscribed || permission !== 'granted') return;
+        if (!('Notification' in window)) return;
         
         const isLive = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'P'].includes((status || '').toUpperCase());
         if (!isLive) return;
@@ -26,12 +33,15 @@ export default function GoalAlertToggler({ matchId, homeTeam, awayTeam, currentH
         const newAway = parseInt(currentAwayScore || '0');
 
         if (newHome > lastHome || newAway > lastAway) {
-            // 🟢 FIX: Added "as any" to bypass TypeScript's strict DOM checks
-            new Notification(`🚨 GOAL ALERT!`, {
-                body: `${homeTeam} ${newHome} - ${newAway} ${awayTeam}`,
-                icon: '/logo.png',
-                vibrate: [200, 100, 200]
-            } as any);
+            try {
+                new Notification(`🚨 GOAL ALERT!`, {
+                    body: `${homeTeam} ${newHome} - ${newAway} ${awayTeam}`,
+                    icon: '/logo.png',
+                    vibrate: [200, 100, 200]
+                } as any);
+            } catch (e) {
+                console.error("Notification failed", e);
+            }
             
             localStorage.setItem(`home_score_${matchId}`, newHome.toString());
             localStorage.setItem(`away_score_${matchId}`, newAway.toString());
@@ -39,25 +49,34 @@ export default function GoalAlertToggler({ matchId, homeTeam, awayTeam, currentH
             localStorage.setItem(`home_score_${matchId}`, '0');
             localStorage.setItem(`away_score_${matchId}`, '0');
         }
-    }, [currentHomeScore, currentAwayScore, status, isSubscribed, permission, matchId, homeTeam, awayTeam]);
+    }, [currentHomeScore, currentAwayScore, status, isSubscribed, permission, matchId, homeTeam, awayTeam, isSupported]);
 
     const toggleAlerts = async () => {
+        if (!('Notification' in window)) return;
+
         if (!isSubscribed) {
             if (permission !== 'granted') {
-                const req = await Notification.requestPermission();
-                setPermission(req);
-                if (req !== 'granted') {
-                    alert("Please allow notifications in your browser settings to receive live goal alerts!");
+                try {
+                    const req = await Notification.requestPermission();
+                    setPermission(req);
+                    if (req !== 'granted') {
+                        alert("Please allow notifications in your browser settings to receive live goal alerts!");
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Permission request failed", e);
                     return;
                 }
             }
             setIsSubscribed(true);
             localStorage.setItem(`alerts_${matchId}`, 'true');
             
-            new Notification("✅ Goal Alerts Activated!", {
-                body: `You will be notified instantly when ${homeTeam} or ${awayTeam} scores.`,
-                icon: '/logo.png'
-            });
+            try {
+                new Notification("✅ Goal Alerts Activated!", {
+                    body: `You will be notified instantly when ${homeTeam} or ${awayTeam} scores.`,
+                    icon: '/logo.png'
+                });
+            } catch (e) {}
         } else {
             setIsSubscribed(false);
             localStorage.removeItem(`alerts_${matchId}`);
@@ -65,7 +84,9 @@ export default function GoalAlertToggler({ matchId, homeTeam, awayTeam, currentH
     };
 
     const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'].includes((status || '').toUpperCase());
-    if (isFinished) return null; 
+    
+    // 🟢 Don't render the button if the match is finished OR if the phone doesn't support alerts
+    if (isFinished || !isSupported) return null; 
 
     return (
         <button 
