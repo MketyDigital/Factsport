@@ -51,7 +51,8 @@ async function generateDailyPreview() {
         briefingData += `\n${league}:\n`;
         games.forEach(g => {
             const time = new Date(g.match_date).toLocaleTimeString('en-GB', {timeZone: 'UTC', hour: '2-digit', minute:'2-digit'});
-            briefingData += `- ${g.home_team} vs ${g.away_team} at ${time} GMT | EXACT LINK TO USE: [Match Center](/match/${g.id})\n`;
+            // 🟢 CHANGED: We now pass a shortcode instead of a URL link
+            briefingData += `- ${g.home_team} vs ${g.away_team} at ${time} GMT | EXACT SHORTCODE TO USE: [MATCH_WIDGET:${g.id}]\n`;
         });
     }
 
@@ -67,11 +68,12 @@ async function generateDailyPreview() {
         STRICT FACTUAL GUIDELINES:
         1. TIME AWARENESS: It is currently 2026. 
         2. ZERO HALLUCINATIONS: Do NOT invent or name any specific players or managers. Focus on the clubs, their current form, and the importance of the fixture.
-        3. EXACT MATCH LINKS: When you mention a match, you MUST copy and paste the "EXACT LINK TO USE" provided in the schedule above. Do not try to write the URL yourself.
+        3. EMBEDDING MATCHES: When you finish analyzing a specific match, you MUST paste its "EXACT SHORTCODE TO USE" on a brand new, empty line. NEVER attach commas, periods, or other words to the shortcode.
         4. Headline: Punchy and narrative-driven. Under 10 words. Do not use asterisks (*).
         5. Tone: Insightful, opinionated, and highly engaging. 
         6. Length: 400-600 words. Plain text only.
-        7. FACEBOOK SUMMARY: At the very end of your entire response, skip a line and write the exact text "FB_POST:" followed by a comprehensive, exciting Facebook post. You MUST mention EVERY specific match listed in the schedule above so fans know exactly what is playing today. Make it highly engaging and use emojis. Do not use hashtags.
+        7. FACEBOOK SUMMARY: At the very end of your entire response, skip a line and write the exact text "FB_POST:" followed by a comprehensive Facebook post. You MUST mention EVERY specific match listed in the schedule above so fans know exactly what is playing today. Make it highly engaging. 
+        8. NO EMOJIS: Do NOT use a single emoji anywhere in the article or the Facebook post. Keep it entirely text-based and professional.
     `;
 
     try {

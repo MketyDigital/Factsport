@@ -4,7 +4,32 @@ import Link from 'next/link';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget'; 
 import { getLeagueAssets } from '@/app/lib/league-assets';
 import MatchTime from '@/app/components/MatchTime';
-import { MapPin, Trophy, Calendar, Percent, Flag } from 'lucide-react';
+import { MapPin, Trophy, Calendar, Percent, Flag, Zap } from 'lucide-react';
+
+// 🟢 HELPER: Group multiple goals by the same player (e.g., "Saka 14', 45' (PEN)")
+const formatGoals = (goals: any[]) => {
+    const grouped: Record<string, string[]> = {};
+    goals.forEach(g => {
+        // 1. Clean the player name (removes the "(Assist: ...)" part)
+        let cleanName = g.player.split('(')[0].trim(); 
+        
+        // Fallback just in case the shredder missed the name
+        if (cleanName === 'Goal Confirmed') cleanName = 'Unknown Player';
+
+        // 2. Clean the time string
+        let cleanTime = g.time.replace("'", ""); 
+        
+        // 3. Add Google/ESPN style tags for Own Goals and Penalties
+        if (g.text === 'Own Goal') cleanTime += ' (OG)';
+        if (g.text === 'Penalty Goal') cleanTime += ' (PEN)';
+
+        if (!grouped[cleanName]) grouped[cleanName] = [];
+        grouped[cleanName].push(cleanTime);
+    });
+    
+    // 4. Format them together perfectly
+    return Object.entries(grouped).map(([name, times]) => `${name} ${times.join("', ")}'`);
+};
 
 export default function MatchHeaderClient({ matchId, initialData, dbData }: any) {
   const [data, setData] = useState(initialData);
@@ -96,9 +121,13 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
       refName = typeof initialData.referees[0] === 'string' ? initialData.referees[0] : initialData.referees[0].name;
   }
 
-  // Extract Form
+  // Extract Form & Goals
   const homeForm = initialData?.home_form || [];
   const awayForm = initialData?.away_form || [];
+  const events = initialData?.events || data?.events || [];
+  
+  const homeGoals = events.filter((e: any) => e.type === 'goal' && e.team === 'home');
+  const awayGoals = events.filter((e: any) => e.type === 'goal' && e.team === 'away');
 
   return (
     <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
@@ -108,28 +137,41 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
         </div>
 
         <div className="relative z-10 px-2 py-3 md:py-4">
-            <div className="flex justify-between items-center max-w-lg mx-auto">
+            <div className="flex justify-between items-start max-w-lg mx-auto">
                 
                 {/* HOME TEAM */}
-                <Link href={`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center w-[30%] group active:scale-95 transition-transform">
-                    <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
-                        {dbData?.home_logo && <img src={dbData.home_logo} className="w-full h-full object-contain" alt="" />}
-                    </div>
-                    <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{homeTeamName}</h2>
-                    {/* 🟢 ULTRA-TINY HOME FORM */}
-                    {homeForm.length > 0 && (
-                        <div className="flex items-center gap-[2px] mt-1 drop-shadow-md">
-                            {homeForm.map((f: string, i: number) => (
-                                <span key={i} className={`w-2 h-2 md:w-2.5 md:h-2.5 flex items-center justify-center text-[5px] md:text-[6px] font-black text-white rounded-sm ${f === 'W' ? 'bg-green-500' : f === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>
-                                    {f}
+                <div className="flex flex-col items-center w-[30%]">
+                    <Link href={`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center group active:scale-95 transition-transform w-full">
+                        <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
+                            {dbData?.home_logo && <img src={dbData.home_logo} className="w-full h-full object-contain" alt="" />}
+                        </div>
+                        <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{homeTeamName}</h2>
+                        
+                        {homeForm.length > 0 && (
+                            <div className="flex items-center gap-[2px] mt-1 drop-shadow-md">
+                                {homeForm.map((f: string, i: number) => (
+                                    <span key={i} className={`w-2 h-2 md:w-2.5 md:h-2.5 flex items-center justify-center text-[5px] md:text-[6px] font-black text-white rounded-sm ${f === 'W' ? 'bg-green-500' : f === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>
+                                        {f}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </Link>
+
+                    {/* 🟢 ESPN STYLE GOAL SCORERS (HOME) */}
+                    {isFinished && homeGoals.length > 0 && (
+                        <div className="mt-2 flex flex-col items-center gap-0.5 max-w-full px-1">
+                            {formatGoals(homeGoals).map((txt, i) => (
+                                <span key={i} className="text-[6.5px] md:text-[7.5px] text-slate-300 font-bold leading-tight flex items-center gap-0.5 text-center drop-shadow-md break-words max-w-full">
+                                    <Zap size={6} className="text-yellow-400 fill-yellow-400 shrink-0"/> {txt}
                                 </span>
                             ))}
                         </div>
                     )}
-                </Link>
+                </div>
                 
                 {/* SCORES */}
-                <div className="flex flex-col items-center justify-center w-[40%] drop-shadow-lg">
+                <div className="flex flex-col items-center justify-start pt-2 w-[40%] drop-shadow-lg">
                     {isLive && (
                         <div className="flex items-center gap-1 bg-red-600/90 text-white text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded-sm animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.5)] mb-1">
                             <span className="w-1 h-1 bg-white rounded-full"></span> {isHT ? 'HT' : 'LIVE'} {data?.displayClock && !isHT && <span className="text-red-200 ml-0.5">{data.displayClock}</span>}
@@ -153,22 +195,35 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                 </div>
 
                 {/* AWAY TEAM */}
-                <Link href={`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center w-[30%] group active:scale-95 transition-transform">
-                    <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
-                        {dbData?.away_logo && <img src={dbData.away_logo} className="w-full h-full object-contain" alt="" />}
-                    </div>
-                    <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{awayTeamName}</h2>
-                    {/* 🟢 ULTRA-TINY AWAY FORM */}
-                    {awayForm.length > 0 && (
-                        <div className="flex items-center gap-[2px] mt-1 drop-shadow-md">
-                            {awayForm.map((f: string, i: number) => (
-                                <span key={i} className={`w-2 h-2 md:w-2.5 md:h-2.5 flex items-center justify-center text-[5px] md:text-[6px] font-black text-white rounded-sm ${f === 'W' ? 'bg-green-500' : f === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>
-                                    {f}
+                <div className="flex flex-col items-center w-[30%]">
+                    <Link href={`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center group active:scale-95 transition-transform w-full">
+                        <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
+                            {dbData?.away_logo && <img src={dbData.away_logo} className="w-full h-full object-contain" alt="" />}
+                        </div>
+                        <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{awayTeamName}</h2>
+                        
+                        {awayForm.length > 0 && (
+                            <div className="flex items-center gap-[2px] mt-1 drop-shadow-md">
+                                {awayForm.map((f: string, i: number) => (
+                                    <span key={i} className={`w-2 h-2 md:w-2.5 md:h-2.5 flex items-center justify-center text-[5px] md:text-[6px] font-black text-white rounded-sm ${f === 'W' ? 'bg-green-500' : f === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>
+                                        {f}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </Link>
+
+                    {/* 🟢 ESPN STYLE GOAL SCORERS (AWAY) */}
+                    {isFinished && awayGoals.length > 0 && (
+                        <div className="mt-2 flex flex-col items-center gap-0.5 max-w-full px-1">
+                            {formatGoals(awayGoals).map((txt, i) => (
+                                <span key={i} className="text-[6.5px] md:text-[7.5px] text-slate-300 font-bold leading-tight flex items-center gap-0.5 text-center drop-shadow-md break-words max-w-full">
+                                    <Zap size={6} className="text-yellow-400 fill-yellow-400 shrink-0"/> {txt}
                                 </span>
                             ))}
                         </div>
                     )}
-                </Link>
+                </div>
             </div>
         </div>
 
