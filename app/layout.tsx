@@ -5,7 +5,8 @@ import AuthProvider from "@/app/components/AuthProvider";
 import Footer from '@/app/components/Footer'; 
 import SiteHeader from '@/app/components/SiteHeader'; 
 import StickyAffiliateBanner from '@/app/components/StickyAffiliateBanner'; 
-import CustomVignette from '@/app/components/CustomVignette'; // 🟢 INJECTED THE NEW SMART MODAL
+import CustomVignette from '@/app/components/CustomVignette'; 
+import { GlobalMediaProvider } from '@/app/providers/GlobalMediaProvider'; // 🟢 NEW GLOBAL PROVIDER
 
 export const runtime = 'edge';
 
@@ -68,23 +69,26 @@ export default function RootLayout({
       <head></head>
       <body className={`${inter.className} bg-[#F0F2F5] text-slate-900`}>
         
-        <AuthProvider>
-          <div className="flex flex-col min-h-screen">
-            <SiteHeader /> 
-            
-            <main className="flex-grow">
-              {children}
-            </main>
-            
-            <Footer />
-          </div>
-        </AuthProvider>
+        {/* 🟢 THE GLOBAL WRAPPER ENCOMPASSING EVERYTHING */}
+        <GlobalMediaProvider>
+            <AuthProvider>
+            <div className="flex flex-col min-h-screen">
+                <SiteHeader /> 
+                
+                <main className="flex-grow">
+                {children}
+                </main>
+                
+                <Footer />
+            </div>
+            </AuthProvider>
 
-        {/* 🟢 THE CUSTOM SMART VIGNETTE (Pops up after 5 seconds) */}
-        <CustomVignette />
+            {/* 🟢 THE CUSTOM SMART VIGNETTE (Pops up after 5 seconds) */}
+            <CustomVignette />
 
-        {/* 🟢 THE GLOBAL STICKY AFFILIATE BANNER (Stays at the bottom) */}
-        <StickyAffiliateBanner />
+            {/* 🟢 THE GLOBAL STICKY AFFILIATE BANNER (Stays at the bottom, acts as PiP) */}
+            <StickyAffiliateBanner />
+        </GlobalMediaProvider>
 
         {/* SERVICE WORKER REGISTRATION */}
         <script

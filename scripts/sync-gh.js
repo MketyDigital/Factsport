@@ -135,6 +135,25 @@ async function run() {
           const safeHomeLogo = await getSafeLogo(m.homeTeam.shortName || m.homeTeam.name, m.homeTeam.crest);
           const safeAwayLogo = await getSafeLogo(m.awayTeam.shortName || m.awayTeam.name, m.awayTeam.crest);
 
+          // 🟢 SMART STATUS EVALUATOR (Fixes TBD, Postponed, and World Cup Edge Cases)
+          let finalStatus = 'SCHEDULED';
+          
+          if (m.status === 'FINISHED' || m.status === 'AWARDED') {
+              finalStatus = 'FT';
+          } else if (m.status === 'IN_PLAY' || m.status === 'PAUSED') {
+              finalStatus = m.status;
+          } else if (m.status === 'POSTPONED' || m.status === 'CANCELLED' || m.status === 'SUSPENDED') {
+              finalStatus = 'POSTPONED';
+          } else if (m.status === 'SCHEDULED' && m.utcDate.endsWith('T00:00:00Z')) {
+              // The time is not officially confirmed yet. Safe to mark as TBD.
+              finalStatus = 'TBD';
+          } else if (m.status === 'TIMED') {
+              // The time IS confirmed (even if it's genuinely midnight). Normalize for your UI.
+              finalStatus = 'SCHEDULED';
+          } else {
+              finalStatus = m.status; // Safe fallback
+          }
+
           matches.push({
             api_id: m.id,
             league: league.name,
@@ -143,7 +162,7 @@ async function run() {
             home_score: m.score.fullTime.home ?? 0,
             away_score: m.score.fullTime.away ?? 0,
             match_date: m.utcDate,
-            status: (m.status === 'FINISHED' || m.status === 'AWARDED') ? 'FT' : 'SCHEDULED', 
+            status: finalStatus, // 🟢 Injecting the smart status here
             home_logo: safeHomeLogo, 
             away_logo: safeAwayLogo, 
             updated_at: new Date().toISOString(),

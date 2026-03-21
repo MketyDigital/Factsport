@@ -1,5 +1,10 @@
 'use server'; 
 
+import { cookies } from 'next/headers';
+
+// ====================================================
+// ACTION 1: YOUR EXISTING AUDIT TRIGGER
+// ====================================================
 export async function triggerAuditAction() {
     const CRON_KEY = process.env.CRON_KEY;
     // Fallback directly to your live URL just in case the env variable is missing
@@ -34,4 +39,33 @@ export async function triggerAuditAction() {
     } catch (error: any) {
         return { success: false, error: error.message || "Failed to reach the audit server." };
     }
+}
+
+// ====================================================
+// ACTION 2: THE NEW GLOBAL VAULT UNLOCKER
+// ====================================================
+export async function verifyAdminPin(pin: string) {
+    // 1. Get the actual secret PIN from your hidden .env file
+    const correctPin = process.env.ADMIN_PIN;
+
+    // 2. Fail-safe: If no PIN is set in .env, block access entirely to be safe
+    if (!correctPin) {
+        return { success: false, error: 'System configuration error. Vault sealed.' };
+    }
+
+    // 3. Check if the input matches
+    if (pin === correctPin) {
+        // 4. Issue an HTTP-Only, Secure cookie valid for 12 hours. 
+        // JavaScript CANNOT read this cookie, making it completely secure.
+        cookies().set('admin_vault_unlocked', 'true', {
+            secure: process.env.NODE_ENV === 'production',
+            httpOnly: true,
+            path: '/admin',
+            maxAge: 60 * 60 * 12 // 12 hours
+        });
+        
+        return { success: true };
+    }
+
+    return { success: false, error: 'Incorrect PIN.' };
 }
