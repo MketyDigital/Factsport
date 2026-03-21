@@ -45,7 +45,8 @@ export default function MatchMobileHub({ matchId, espnId, currentUser, initialDa
 
                 {/* Tab Content */}
                 {activeTab === 'chat' && <FanZoneChat matchId={matchId} espnId={espnId} />}
-                {activeTab === 'stats' && <div className="p-2 md:p-4 bg-white"><StatsLineupsTabs matchId={matchId} initialData={initialData} /></div>}
+                {/* 🟢 PASSED dbData TO THE STATS TAB */}
+                {activeTab === 'stats' && <div className="p-2 md:p-4 bg-white"><StatsLineupsTabs matchId={matchId} initialData={initialData} dbData={dbData} /></div>}
                 {activeTab === 'pro' && <div className="p-3 md:p-6 bg-slate-900"><ProBettingSlipLock homeTeam={dbData.home_team} awayTeam={dbData.away_team} status={dbData.status} proAnalysis={dbData.pro_analysis} /></div>}
             </div>
         </div>

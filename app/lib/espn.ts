@@ -51,7 +51,7 @@ export async function fetchEspnDetails(gameId: string) {
     const homeTeamName = homeCompetitor.team.displayName;
     const awayTeamName = awayCompetitor.team.displayName;
 
-    // 🟢 1. NEW: EXTRACT VENUE & REFEREES & PREDICTOR
+    // 🟢 1. EXTRACT VENUE & REFEREES & PREDICTOR
     const venue = data.gameInfo?.venue?.fullName || null;
     const referees = data.gameInfo?.officials?.map((o: any) => o.displayName || o.fullName) || [];
     
@@ -64,7 +64,7 @@ export async function fetchEspnDetails(gameId: string) {
         };
     }
 
-    // 🟢 2. PARSE STATS (Upgraded to catch all shot variations)
+    // 🟢 2. PARSE STATS
     const boxscore = data.boxscore;
     const stats: any = { home: {}, away: {} };
     if (boxscore?.teams) {
@@ -147,6 +147,7 @@ export async function fetchEspnDetails(gameId: string) {
                 let player = '';
                 let matchedPlayerName = '';
                 let matchedTeamName = '';
+                let matchedSide = ''; // 🟢 ADDED TO TRACK HOME VS AWAY GOALS
 
                 // --- 1. THE TRIPLE-LOCK CLASSIFIER ---
                 if (lowerText.includes('var decision') || lowerText.includes('overturned') || lowerText.includes('disallowed') || lowerText.includes('no goal') || metaType.includes('var')) {
@@ -181,10 +182,15 @@ export async function fetchEspnDetails(gameId: string) {
                 // --- LAYER 1: THE HIDDEN METADATA ---
                 if (c.play?.participants?.length > 0) {
                     matchedPlayerName = c.play.participants[0]?.athlete?.displayName || '';
+                    const teamMatch = rosterDict.find(r => r.name === matchedPlayerName);
+                    if (teamMatch) {
+                        matchedTeamName = teamMatch.teamName;
+                        matchedSide = teamMatch.side; // 🟢 EXTRACT SIDE
+                    }
+
                     if (type === 'sub' && c.play.participants.length > 1) {
                         const p1 = c.play.participants[0]?.athlete?.displayName;
                         const p2 = c.play.participants[1]?.athlete?.displayName;
-                        const teamMatch = rosterDict.find(r => r.name === p1);
                         if (p1 && p2) {
                             player = teamMatch ? `${p1} (In) / ${p2} (Out) (${teamMatch.teamName})` : `${p1} (In) / ${p2} (Out)`;
                         }
@@ -200,8 +206,10 @@ export async function fetchEspnDetails(gameId: string) {
                         
                         if (matched.length >= 2) {
                             player = `${matched[0].name} (In) / ${matched[1].name} (Out) (${matched[0].teamName})`;
+                            matchedSide = matched[0].side; // 🟢 EXTRACT SIDE
                         } else if (matched.length === 1) {
                             player = `${matched[0].name} (${matched[0].teamName})`;
+                            matchedSide = matched[0].side; // 🟢 EXTRACT SIDE
                         }
                     } else {
                         if (!matchedPlayerName) {
@@ -209,10 +217,8 @@ export async function fetchEspnDetails(gameId: string) {
                             if (match) {
                                 matchedPlayerName = match.name;
                                 matchedTeamName = match.teamName;
+                                matchedSide = match.side; // 🟢 EXTRACT SIDE
                             }
-                        } else {
-                            const match = rosterDict.find(r => r.name === matchedPlayerName);
-                            if (match) matchedTeamName = match.teamName;
                         }
 
                         if (matchedPlayerName) {
@@ -253,7 +259,7 @@ export async function fetchEspnDetails(gameId: string) {
                     time: time,
                     type: type,
                     text: actionName,
-                    team: '', 
+                    team: matchedSide, // 🟢 NOW PASSING 'home' OR 'away'
                     player: player
                 };
             });
@@ -265,9 +271,9 @@ export async function fetchEspnDetails(gameId: string) {
         events, 
         stats, 
         lineups, 
-        venue,        // 🔥 Passed to frontend!
-        referees,     // 🔥 Passed to frontend!
-        predictor     // 🔥 Passed to frontend!
+        venue,        
+        referees,     
+        predictor     
     };
 
   } catch (err) { return null; }

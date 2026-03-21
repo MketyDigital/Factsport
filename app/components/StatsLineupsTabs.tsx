@@ -1,8 +1,10 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { BarChart2, Users } from 'lucide-react';
+import PitchLineup from './PitchLineup'; // 🟢 NEW: Importing our beautiful 2D pitch!
 
-export default function StatsLineupsTabs({ matchId, initialData }: { matchId: string, initialData: any }) {
+// Need to pass dbData into this component now so the pitch knows the team names!
+export default function StatsLineupsTabs({ matchId, initialData, dbData }: { matchId: string, initialData: any, dbData?: any }) {
   const [activeTab, setActiveTab] = useState<'stats' | 'lineups'>('stats');
 
   const [liveData, setLiveData] = useState({
@@ -92,17 +94,7 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
   const showTargetStats = parseInt(homeShotsOn) > 0 || parseInt(awayShotsOn) > 0 || parseInt(homeShotsOff) > 0 || parseInt(awayShotsOff) > 0;
   const hasStats = stats?.home?.possession || getSafeShots(stats?.home) !== '0' || stats?.home?.corners;
 
-  const getSortedLineup = (players: any[]) => {
-      if (!players || !Array.isArray(players)) return [];
-      const hasStarterInfo = players.some((p: any) => p.is_starter);
-      if (hasStarterInfo) {
-          return [...players].sort((a: any, b: any) => (a.is_starter === b.is_starter) ? 0 : a.is_starter ? -1 : 1);
-      }
-      return players;
-  };
-  
-  const homePlayers = getSortedLineup(lineups?.home);
-  const awayPlayers = getSortedLineup(lineups?.away);
+  // 🟢 We no longer need getSortedLineup because PitchLineup handles all the parsing!
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full flex flex-col">
@@ -136,31 +128,12 @@ export default function StatsLineupsTabs({ matchId, initialData }: { matchId: st
             </div>
         )}
         
+        {/* 🟢 THE UPGRADED LINEUPS TAB */}
         {activeTab === 'lineups' && (
-            <>
-                {!hasLineups ? <div className="text-center py-10 opacity-50 bg-slate-50 rounded-xl border border-dashed border-slate-300"><Users className="mx-auto mb-2 text-slate-400" size={24} /><p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Waiting for team sheets...</p></div> : 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <div className="bg-slate-100 py-1 px-2 rounded mb-2 text-center flex flex-col items-center">
-                                <h4 className="text-[10px] font-black uppercase text-slate-500">Home</h4>
-                                {lineups.formations?.home && <span className="text-[8px] font-bold text-blue-500 bg-white px-1 mt-0.5 rounded shadow-sm">{lineups.formations.home}</span>}
-                            </div>
-                            <ul className="space-y-1">
-                                {homePlayers.map((p:any, i:number) => <li key={i} className={`text-xs flex items-center gap-2 py-1 border-b border-slate-50 ${!p.is_starter && i>10 ? 'opacity-50' : 'text-slate-800'}`}><span className="font-mono text-slate-400 w-5 text-right font-bold shrink-0">{p.number}</span> <span className={`${p.is_starter?'font-bold':''} truncate`}>{p.name}</span></li>)}
-                            </ul>
-                        </div>
-                        <div>
-                            <div className="bg-slate-100 py-1 px-2 rounded mb-2 text-center flex flex-col items-center">
-                                <h4 className="text-[10px] font-black uppercase text-slate-500">Away</h4>
-                                {lineups.formations?.away && <span className="text-[8px] font-bold text-red-500 bg-white px-1 mt-0.5 rounded shadow-sm">{lineups.formations.away}</span>}
-                            </div>
-                            <ul className="space-y-1">
-                                {awayPlayers.map((p:any, i:number) => <li key={i} className={`text-xs flex items-center gap-2 justify-end py-1 border-b border-slate-50 ${!p.is_starter && i>10 ? 'opacity-50' : 'text-slate-800'}`}><span className={`${p.is_starter?'font-bold':''} truncate text-right`}>{p.name}</span> <span className="font-mono text-slate-400 w-5 text-left font-bold shrink-0">{p.number}</span></li>)}
-                            </ul>
-                        </div>
-                    </div>
-                }
-            </>
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 -m-4">
+                {/* We use negative margins to make the pitch fill the container beautifully */}
+                <PitchLineup data={{ lineups: liveData.lineups }} dbData={dbData} />
+            </div>
         )}
       </div>
     </div>
