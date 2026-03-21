@@ -1,5 +1,6 @@
 'use client';
-import { History } from 'lucide-react';
+import { useState } from 'react';
+import { History, CalendarDays, ChevronDown, ChevronUp } from 'lucide-react';
 
 const sanitizeUrl = (url: string | null | undefined) => {
     if (!url) return null;
@@ -8,6 +9,8 @@ const sanitizeUrl = (url: string | null | undefined) => {
 };
 
 export default function HeadToHeadStats({ dbData }: { dbData: any }) {
+    const [isExpanded, setIsExpanded] = useState(false); // 🟢 The Toggle State
+
     let parsedH2h = dbData?.h2h;
     if (typeof parsedH2h === 'string') {
         try { parsedH2h = JSON.parse(parsedH2h); } catch (e) { parsedH2h = {}; }
@@ -68,18 +71,19 @@ export default function HeadToHeadStats({ dbData }: { dbData: any }) {
     const drawPct = (h2hDraws / barTotal) * 100;
     const awayPct = (h2hAwayWins / barTotal) * 100;
 
+    const recentMeetings = matchesArray
+        .filter((m: any) => m.status === 'FINISHED' || m.status === 'AWARDED')
+        .slice(0, 5);
+
     return (
-        <div className="w-full bg-white border-b border-slate-200 px-3 py-2.5 flex flex-col gap-2 shadow-sm">
+        <div className="w-full bg-white border-b border-slate-200 px-3 py-3 md:py-4 flex flex-col gap-3 shadow-sm">
             
-            <div className="flex items-center gap-1.5 mb-0.5">
-                <History size={12} className="text-blue-600" />
+            <div className="flex items-center gap-1.5">
+                <History size={14} className="text-blue-600" />
                 <span className="text-[10px] md:text-xs font-black uppercase text-slate-800 tracking-wider">H2H (LAST {h2hTotal})</span>
             </div>
             
-            {/* 🟢 THE PIXEL-PERFECT LAYOUT ROW */}
             <div className="flex items-center justify-between text-[11px] md:text-xs font-black px-1">
-                
-                {/* Left: Home Logo, Name, and Blue Score */}
                 <div className="flex items-center justify-between w-[33%] pr-2">
                     <div className="flex items-center gap-1.5">
                         {dbData?.home_logo && <img src={sanitizeUrl(dbData.home_logo) || undefined} className="w-4 h-4 md:w-5 md:h-5 object-contain" alt="" />}
@@ -88,13 +92,11 @@ export default function HeadToHeadStats({ dbData }: { dbData: any }) {
                     <span className="text-blue-600 text-sm md:text-base">{h2hHomeWins}</span>
                 </div>
                 
-                {/* Center: Draw and Grey Score */}
                 <div className="w-[33%] flex items-center justify-center gap-1.5 text-center">
                     <span className="text-slate-400 text-[9px] md:text-[10px] uppercase">DRAW</span>
                     <span className="text-slate-600 text-sm md:text-base">{h2hDraws}</span>
                 </div>
                 
-                {/* Right: Red Score, Away Name, Logo */}
                 <div className="flex items-center justify-between w-[33%] pl-2">
                     <span className="text-red-500 text-sm md:text-base">{h2hAwayWins}</span>
                     <div className="flex items-center gap-1.5">
@@ -104,12 +106,52 @@ export default function HeadToHeadStats({ dbData }: { dbData: any }) {
                 </div>
             </div>
 
-            {/* Progress Bar */}
-            <div className="flex w-full h-2 rounded-full overflow-hidden bg-slate-200 mt-0.5">
+            <div className="flex w-full h-2 rounded-full overflow-hidden bg-slate-200 mt-1">
                 <div style={{ width: `${homePct}%` }} className="bg-blue-600 transition-all duration-1000"></div>
                 <div style={{ width: `${drawPct}%` }} className="bg-slate-300 transition-all duration-1000"></div>
                 <div style={{ width: `${awayPct}%` }} className="bg-red-500 transition-all duration-1000"></div>
             </div>
+
+            {/* 🟢 THE DROPDOWN TOGGLE */}
+            {recentMeetings.length > 0 && (
+                <div className="mt-1 flex flex-col">
+                    <button 
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="flex items-center justify-between w-full py-2 px-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
+                    >
+                        <span>Recent Meetings</span>
+                        {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
+
+                    {isExpanded && (
+                        <div className="flex flex-col gap-1.5 mt-1 animate-in fade-in slide-in-from-top-2 duration-300">
+                            {recentMeetings.map((match: any, idx: number) => {
+                                const mDate = new Date(match.utcDate || match.match_date);
+                                const formattedDate = mDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+                                const hName = match.homeTeam?.shortName || match.homeTeam?.name || 'Home';
+                                const aName = match.awayTeam?.shortName || match.awayTeam?.name || 'Away';
+                                const hScore = match.score?.fullTime?.home ?? match.score?.regularTime?.home ?? '-';
+                                const aScore = match.score?.fullTime?.away ?? match.score?.regularTime?.away ?? '-';
+
+                                return (
+                                    <div key={idx} className="flex items-center justify-between bg-slate-50 hover:bg-slate-100 transition-colors p-2 rounded-lg text-[10px] md:text-xs">
+                                        <div className="w-[20%] text-slate-400 font-bold flex items-center gap-1">
+                                            <CalendarDays size={10} /> <span className="hidden md:inline">{formattedDate}</span><span className="md:hidden">{formattedDate.replace(/ /g, '/')}</span>
+                                        </div>
+                                        <div className="w-[30%] text-right font-bold text-slate-700 truncate pr-2">{hName}</div>
+                                        <div className="w-[15%] flex justify-center">
+                                            <div className="bg-slate-800 text-white font-black px-2 py-0.5 rounded shadow-sm tracking-widest text-[9px] md:text-[10px]">
+                                                {hScore} - {aScore}
+                                            </div>
+                                        </div>
+                                        <div className="w-[30%] text-left font-bold text-slate-700 truncate pl-2">{aName}</div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
