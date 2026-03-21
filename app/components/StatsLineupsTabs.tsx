@@ -4,6 +4,7 @@ import { BarChart2, Users } from 'lucide-react';
 import PitchLineup from './PitchLineup';
 import MatchMomentum from './MatchMomentum';
 import MatchTimeline from './MatchTimeline';
+import PlayerRatingsWidget from './PlayerRatingsWidget'; // 🟢 IMPORT RATINGS
 
 export default function StatsLineupsTabs({ matchId, initialData, dbData }: { matchId: string, initialData: any, dbData?: any }) {
   const [activeTab, setActiveTab] = useState<'stats' | 'lineups'>('stats');
@@ -82,7 +83,6 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
   const homeShotsOn = stats?.home?.shotsOnTarget || stats?.home?.shots_on_target || '0';
   const awayShotsOn = stats?.away?.shotsOnTarget || stats?.away?.shots_on_target || '0';
   
-  // 🟢 Simplified logic: Only show "Shots on Target" if there are any
   const showTargetStats = parseInt(homeShotsOn) > 0 || parseInt(awayShotsOn) > 0;
   const hasStats = stats?.home?.possession || getSafeShots(stats?.home) !== '0' || stats?.home?.corners;
 
@@ -122,6 +122,15 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
         {activeTab === 'lineups' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 -m-4">
                 <PitchLineup data={{ lineups: liveData.lineups }} dbData={dbData} />
+                
+                {/* 🟢 FAN RATINGS INJECTED HERE (Only shows if match is finished) */}
+                <div className="p-4 bg-white border-t border-slate-100">
+                    <PlayerRatingsWidget 
+                        matchId={matchId} 
+                        lineups={liveData.lineups} 
+                        status={liveData.stats?.status || initialData?.status} 
+                    />
+                </div>
             </div>
         )}
       </div>
