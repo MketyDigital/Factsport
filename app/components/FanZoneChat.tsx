@@ -1,10 +1,15 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { Send, MessageCircle, ShieldAlert, Zap, Reply, X, ArrowDown } from 'lucide-react';
+import { Send, MessageCircle, ShieldAlert, Zap, Reply, X, ArrowDown, Pin, Settings, Megaphone } from 'lucide-react';
 import Link from 'next/link';
-import { createClient } from '@/app/lib/supabase/client'; // 🟢 Added Supabase client
+import { createClient } from '@/app/lib/supabase/client'; 
 
-// 🟢 Removed `user` from props, the component will now fetch it securely itself!
+const ADMIN_EMAILS = [
+    'mkposcosunday@gmail.com', 
+    'factsportlive@gmail.com', 
+    'fact@factsport.com'
+];
+
 export default function FanZoneChat({ matchId, espnId }: { matchId: string, espnId?: string }) {
     const [messages, setMessages] = useState<any[]>([]);
     const [officialEvents, setOfficialEvents] = useState<any[]>([]);
@@ -15,31 +20,77 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
     const [replyTo, setReplyTo] = useState<{user: string, text: string} | null>(null);
     const [showScrollBottom, setShowScrollBottom] = useState(false);
     
-    // 🟢 NEW: Self-Contained User State
+    // 🟢 User & Security States
     const [user, setUser] = useState<any>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
     const [isUserLoaded, setIsUserLoaded] = useState(false);
+    const [lastMsgTime, setLastMsgTime] = useState(0); 
     
+    // 🟢 Admin Feature States
+    const [pinnedMessage, setPinnedMessage] = useState<{text: string, link: string | null} | null>(null);
+    const [showPinUI, setShowPinUI] = useState(false);
+    const [pinTextInput, setPinTextInput] = useState("");
+    const [pinLinkInput, setPinLinkInput] = useState("");
+    const [isAnnouncement, setIsAnnouncement] = useState(false); 
+
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const CHAT_WORKER_URL = "https://chatworkerjs.mkpoikankes.workers.dev"; 
 
-    // 🟢 NEW: Fetch user directly from the browser session (Zero database cost)
+    // 1. Fetch User & Determine Admin Status
     useEffect(() => {
         const supabase = createClient();
         
         const checkUser = async () => {
             const { data: { session } } = await supabase.auth.getSession();
-            setUser(session?.user || null);
+            const currentUser = session?.user || null;
+            setUser(currentUser);
+            
+            if (currentUser) {
+                const userEmail = currentUser.email?.toLowerCase() || '';
+                const hasAdminPrivilege = ADMIN_EMAILS.includes(userEmail) || currentUser.user_metadata?.is_admin === true;
+                setIsAdmin(hasAdminPrivilege);
+            } else {
+                setIsAdmin(false);
+            }
             setIsUserLoaded(true);
         };
         checkUser();
 
-        // Listen for instant login/logout changes
         const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-            setUser(session?.user || null);
+            const currentUser = session?.user || null;
+            setUser(currentUser);
+            if (currentUser) {
+                const userEmail = currentUser.email?.toLowerCase() || '';
+                setIsAdmin(ADMIN_EMAILS.includes(userEmail) || currentUser.user_metadata?.is_admin === true);
+            } else {
+                setIsAdmin(false);
+            }
         });
 
         return () => { authListener.subscription.unsubscribe(); };
     }, []);
+
+    // 2. Fetch Pinned Message (Shielded via API + Visibility Check)
+    useEffect(() => {
+        const fetchPin = async () => {
+            if (document.hidden) return; // 🛡️ VISIBILITY SHIELD
+
+            try {
+                const res = await fetch(`/api/match/pin?match_id=${matchId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.chat_pin_text || data.chat_pin_link) {
+                        setPinnedMessage({ text: data.chat_pin_text, link: data.chat_pin_link });
+                    } else {
+                        setPinnedMessage(null);
+                    }
+                }
+            } catch (e) {}
+        };
+        fetchPin();
+        const interval = setInterval(fetchPin, 10000); 
+        return () => clearInterval(interval);
+    }, [matchId]);
 
     const handleScroll = () => {
         if (scrollContainerRef.current) {
@@ -58,8 +109,11 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
         }
     };
 
+    // 3. Fetch Live Chat (Cloudflare D1 + Visibility Check)
     useEffect(() => {
         const fetchChat = async () => {
+            if (document.hidden) return; // 🛡️ VISIBILITY SHIELD
+
             try {
                 const res = await fetch(`${CHAT_WORKER_URL}/messages?match_id=${matchId}&t=${Date.now()}`);
                 if (res.ok) {
@@ -70,13 +124,18 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
             } catch (e) {}
         };
         fetchChat();
-        const interval = setInterval(fetchChat, 3000);
+        
+        // 🟢 SET TO 6 SECONDS (6000ms) TO SAVE CLOUDFLARE LIMITS
+        const interval = setInterval(fetchChat, 6000);
         return () => clearInterval(interval);
     }, [matchId]);
 
+    // 4. Fetch ESPN Match Events (Cloudflare Worker + Visibility Check)
     useEffect(() => {
         if (!espnId) return;
         const fetchEvents = async () => {
+            if (document.hidden) return; // 🛡️ VISIBILITY SHIELD
+
             try {
                 const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${espnId}&t=${Date.now()}`);
                 if (res.ok) {
@@ -96,20 +155,67 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
             } catch (e) {}
         };
         fetchEvents();
+        
+        // 🟢 EVENTS STAY AT 5 SECONDS (5000ms)
         const interval = setInterval(fetchEvents, 5000);
         return () => clearInterval(interval);
     }, [espnId]);
 
+    // 🟢 ADMIN FUNCTION: Save Pinned Message
+    const handleSetPin = async () => {
+        const supabase = createClient();
+        await supabase.from('matches').update({
+            chat_pin_text: pinTextInput,
+            chat_pin_link: pinLinkInput || null
+        }).eq('id', matchId);
+        setPinnedMessage({ text: pinTextInput, link: pinLinkInput || null });
+        setShowPinUI(false);
+    };
+
+    // 🟢 ADMIN FUNCTION: Clear Pinned Message
+    const handleClearPin = async () => {
+        const supabase = createClient();
+        await supabase.from('matches').update({
+            chat_pin_text: null,
+            chat_pin_link: null
+        }).eq('id', matchId);
+        setPinnedMessage(null);
+        setPinTextInput("");
+        setPinLinkInput("");
+        setShowPinUI(false);
+    };
+
+    // 5. Send Chat Message
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim() || !user || isSending) return;
+        let messageText = newMessage.trim();
+        if (!messageText || !user || isSending) return;
 
+        // 🛡️ SECURITY: SPAM & LINK PROTECTION FOR NORMAL USERS
+        if (!isAdmin) {
+            const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/i;
+            if (urlRegex.test(messageText)) {
+                alert("Security Alert: Only admins are allowed to share links in the chat.");
+                return;
+            }
+            if (Date.now() - lastMsgTime < 3000) {
+                alert("You are sending messages too fast. Please wait a moment.");
+                return;
+            }
+        }
+        setLastMsgTime(Date.now());
         setIsSending(true);
         
-        let finalMessageStr = newMessage;
-        if (replyTo) {
-            const safeQuote = replyTo.text.replace(/\[Reply @.*?\]/g, '').substring(0, 40); 
-            finalMessageStr = `[Reply @${replyTo.user}: "${safeQuote}..."] ${newMessage}`;
+        messageText = messageText.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+        let finalMessageStr = messageText;
+        
+        // 📣 Admin Announcement / Reply Logic
+        if (isAdmin && isAnnouncement) {
+            finalMessageStr = `[ADMIN_ALERT] ${messageText}`;
+        } else if (replyTo) {
+            const safeQuote = replyTo.text.replace(/\[Reply @.*?\]/g, '').replace(/\[ADMIN_ALERT\]/g, '').substring(0, 40); 
+            finalMessageStr = `[Reply @${replyTo.user}: "${safeQuote}..."] ${messageText}`;
         }
 
         const tempMsg = {
@@ -123,6 +229,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
         setMessages(prev => [...prev, tempMsg]);
         setNewMessage("");
         setReplyTo(null); 
+        setIsAnnouncement(false); 
         setTimeout(() => scrollToBottom(true), 50);
 
         try {
@@ -176,6 +283,33 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
     return (
         <div className="w-full bg-white flex flex-col h-[65vh] min-h-[450px] border-t border-slate-200 relative">
             
+            {/* ADMIN PINNED BANNER */}
+            {pinnedMessage && (
+                <div className="bg-[#0a1428] px-3 py-2.5 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-blue-900 shrink-0 shadow-lg relative z-20 gap-3">
+                    <div className="flex items-center gap-2 overflow-hidden w-full">
+                        <span className="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow shrink-0 flex items-center gap-1 animate-pulse">
+                            <Pin size={10} fill="currentColor" /> PINNED
+                        </span>
+                        <span className="text-[10px] md:text-xs font-bold text-white pr-2 whitespace-normal break-words">
+                            {pinnedMessage.text}
+                        </span>
+                    </div>
+                    
+                    {pinnedMessage.link && (
+                        user ? (
+                            <a href={pinnedMessage.link} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto text-center bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black px-4 py-2 rounded-lg shadow-[0_0_15px_rgba(37,99,235,0.4)] transition active:scale-95 shrink-0 uppercase tracking-widest border border-blue-500">
+                                Click to Join
+                            </a>
+                        ) : (
+                            <Link href="/login" className="w-full sm:w-auto text-center bg-slate-800 text-slate-300 border border-slate-600 text-[9px] font-black px-4 py-2 rounded-lg shadow-sm hover:text-white hover:bg-slate-700 transition active:scale-95 shrink-0 uppercase tracking-widest">
+                                Login to Access
+                            </Link>
+                        )
+                    )}
+                </div>
+            )}
+
+            {/* OFFICIAL ESPN MATCH EVENT BANNER */}
             {latestEvent && (
                 <div className="bg-slate-900 text-white px-3 py-2 flex items-center justify-between border-b border-slate-800 shrink-0 shadow-md relative z-20">
                     <div className="flex items-center gap-2 overflow-hidden">
@@ -188,6 +322,25 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                 </div>
             )}
 
+            {/* ADMIN PIN MANAGEMENT UI */}
+            {isAdmin && showPinUI && (
+                <div className="bg-slate-50 border-b border-slate-200 p-3 shrink-0 shadow-inner z-20">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Manage Pinned Message</span>
+                        <button onClick={() => setShowPinUI(false)} className="text-slate-400 hover:text-red-500"><X size={14}/></button>
+                    </div>
+                    <div className="space-y-2">
+                        <input type="text" placeholder="Announcement text..." value={pinTextInput} onChange={(e)=>setPinTextInput(e.target.value)} className="w-full text-xs p-2 border border-slate-300 rounded focus:outline-none focus:border-blue-500" />
+                        <input type="text" placeholder="Optional Link (e.g. StreamYard URL)..." value={pinLinkInput} onChange={(e)=>setPinLinkInput(e.target.value)} className="w-full text-xs p-2 border border-slate-300 rounded focus:outline-none focus:border-blue-500" />
+                        <div className="flex gap-2 pt-1">
+                            <button onClick={handleSetPin} className="flex-1 bg-blue-600 text-white text-[10px] font-black py-2 rounded uppercase tracking-widest active:scale-95">Pin Message</button>
+                            <button onClick={handleClearPin} className="flex-1 bg-red-100 text-red-600 text-[10px] font-black py-2 rounded uppercase tracking-widest active:scale-95">Remove Pin</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* THE SCROLLING CHAT FEED */}
             <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 md:p-4 space-y-4 bg-[#F0F2F5] scrollbar-hide scroll-smooth relative">
                 {combinedFeed.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center opacity-40">
@@ -215,24 +368,34 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                             );
                         }
 
+                        const isAlert = msg.message.startsWith('[ADMIN_ALERT] ');
+                        const displayMessage = isAlert ? msg.message.replace('[ADMIN_ALERT] ', '') : msg.message;
+
                         return (
-                            <div key={msg.id} className="flex gap-2 animate-in fade-in slide-in-from-bottom-1 pr-8 group">
+                            <div key={msg.id} className={`flex gap-2 animate-in fade-in slide-in-from-bottom-1 pr-8 group ${isAlert ? 'my-3' : ''}`}>
                                 {msg.avatar_url ? (
                                     <img src={msg.avatar_url} className="w-6 h-6 md:w-8 md:h-8 rounded-full object-cover border border-slate-200 shrink-0" alt="" />
                                 ) : (
-                                    <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shrink-0 shadow-sm">
-                                        <span className="text-white font-black text-[9px] md:text-[10px]">{msg.username.charAt(0).toUpperCase()}</span>
+                                    <div className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm ${isAlert ? 'bg-red-600' : 'bg-gradient-to-br from-blue-500 to-blue-700'}`}>
+                                        {isAlert ? <ShieldAlert size={12} className="text-white"/> : <span className="text-white font-black text-[9px] md:text-[10px]">{msg.username.charAt(0).toUpperCase()}</span>}
                                     </div>
                                 )}
                                 <div className="max-w-full flex flex-col items-start">
                                     <div className="flex items-center gap-2 mb-0.5">
-                                        <span className="text-[9px] md:text-[10px] font-black text-slate-800 truncate">{msg.username}</span>
-                                        <button onClick={() => setReplyTo({user: msg.username, text: msg.message})} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition active:scale-95">
+                                        <span className={`text-[9px] md:text-[10px] font-black truncate ${isAlert ? 'text-red-600' : 'text-slate-800'}`}>
+                                            {msg.username} {isAlert && '(Admin)'}
+                                        </span>
+                                        <button onClick={() => setReplyTo({user: msg.username, text: displayMessage})} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition active:scale-95">
                                             <Reply size={12} />
                                         </button>
                                     </div>
-                                    <div className="text-[11px] md:text-xs font-medium text-slate-700 leading-relaxed bg-white px-3 py-2 rounded-2xl rounded-tl-sm border border-slate-200 shadow-sm break-words">
-                                        {renderMessageContent(msg.message)}
+                                    
+                                    <div className={`text-[11px] md:text-xs font-medium leading-relaxed px-3 py-2 rounded-2xl rounded-tl-sm border shadow-sm break-words ${
+                                        isAlert 
+                                        ? 'bg-red-50 text-red-900 border-red-200 shadow-[0_4px_15px_rgba(239,68,68,0.2)] font-bold' 
+                                        : 'bg-white text-slate-700 border-slate-200'
+                                    }`}>
+                                        {renderMessageContent(displayMessage)}
                                     </div>
                                 </div>
                             </div>
@@ -247,6 +410,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                 </button>
             )}
 
+            {/* INPUT AREA */}
             <div className="bg-white border-t border-slate-200 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] z-10 shrink-0 flex flex-col">
                 {replyTo && (
                     <div className="bg-slate-50 border-b border-slate-200 px-3 py-1.5 flex items-center justify-between">
@@ -258,21 +422,43 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                     </div>
                 )}
                 
-                <div className="p-2 md:p-3">
-                    {/* 🟢 Skeleton loader while checking auth state */}
-                    {!isUserLoaded ? (
-                         <div className="h-10 w-full bg-slate-100 rounded-full animate-pulse border border-slate-200"></div>
-                    ) : user ? (
-                        <form onSubmit={handleSendMessage} className="relative flex items-center">
-                            <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Have your say..." className="w-full bg-[#F0F2F5] border border-slate-200 rounded-full pl-4 pr-12 py-2 md:py-2.5 text-[11px] md:text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition shadow-inner" maxLength={200} />
-                            <button type="submit" disabled={!newMessage.trim() || isSending} className="absolute right-1 p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 transition shadow-md"><Send size={14} /></button>
-                        </form>
-                    ) : (
-                        <div className="flex items-center justify-between bg-[#F0F2F5] rounded-full p-1 pl-4 shadow-inner border border-slate-200">
-                            <div className="flex items-center gap-1.5 text-slate-500"><ShieldAlert size={12} /><span className="text-[9px] font-bold uppercase tracking-widest">Login to chat</span></div>
-                            <Link href="/login" className="bg-[#0a1428] text-white px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest shadow-md hover:bg-slate-800 transition active:scale-95">Sign In</Link>
+                <div className="p-2 md:p-3 flex items-center gap-2">
+                    
+                    {isAdmin && (
+                        <div className="flex items-center bg-slate-100 rounded-full border border-slate-200 p-1 shrink-0">
+                            <button onClick={() => setShowPinUI(!showPinUI)} className={`p-1.5 rounded-full transition ${showPinUI ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`} title="Manage Pinned Message">
+                                <Settings size={14} />
+                            </button>
+                            <button onClick={() => setIsAnnouncement(!isAnnouncement)} className={`p-1.5 rounded-full transition ${isAnnouncement ? 'bg-red-500 text-white shadow-sm' : 'text-slate-500 hover:text-red-500'}`} title="Send as Official Announcement">
+                                <Megaphone size={14} />
+                            </button>
                         </div>
                     )}
+
+                    <div className="flex-1">
+                        {!isUserLoaded ? (
+                             <div className="h-10 w-full bg-slate-100 rounded-full animate-pulse border border-slate-200"></div>
+                        ) : user ? (
+                            <form onSubmit={handleSendMessage} className="relative flex items-center">
+                                <input 
+                                    type="text" 
+                                    value={newMessage} 
+                                    onChange={(e) => setNewMessage(e.target.value)} 
+                                    placeholder={isAnnouncement ? "Type official announcement..." : "Have your say..."} 
+                                    className={`w-full border rounded-full pl-4 pr-12 py-2 md:py-2.5 text-[11px] md:text-xs font-medium focus:outline-none transition shadow-inner ${isAnnouncement ? 'bg-red-50 border-red-200 text-red-900 focus:ring-1 focus:ring-red-500 placeholder:text-red-300' : 'bg-[#F0F2F5] border-slate-200 text-slate-800 focus:ring-1 focus:ring-blue-500'}`} 
+                                    maxLength={200} 
+                                />
+                                <button type="submit" disabled={!newMessage.trim() || isSending} className={`absolute right-1 p-1.5 text-white rounded-full disabled:opacity-50 transition shadow-md ${isAnnouncement ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                                    <Send size={14} />
+                                </button>
+                            </form>
+                        ) : (
+                            <div className="flex items-center justify-between bg-[#F0F2F5] rounded-full p-1 pl-4 shadow-inner border border-slate-200">
+                                <div className="flex items-center gap-1.5 text-slate-500"><ShieldAlert size={12} /><span className="text-[9px] font-bold uppercase tracking-widest">Login to chat</span></div>
+                                <Link href="/login" className="bg-[#0a1428] text-white px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest shadow-md hover:bg-slate-800 transition active:scale-95">Sign In</Link>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
