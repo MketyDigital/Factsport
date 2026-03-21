@@ -1,15 +1,15 @@
+export const runtime = 'edge'; 
+
 import { NextResponse } from 'next/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { createClient } from '@/app/lib/supabase/server'; 
+import { cookies } from 'next/headers'; // 🟢 Added to read the Vault Cookie
 
 const ADMIN_EMAILS = [
     'mkposcosunday@gmail.com', 
     'factsportlive@gmail.com', 
     'fact@factsport.com'
 ];
-
-// 🔒 Strict security: Pulls PIN from your Cloudflare/Vercel environment variables
-const MASTER_ADMIN_PIN = process.env.ADMIN_PIN; 
 
 export async function POST(request: Request) {
     try {
@@ -21,15 +21,17 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Unauthorized Access. Incident Logged.' }, { status: 403 });
         }
 
-        // 2. Parse Request
-        const body = await request.json();
-        const { userId, isVip, action, pin } = body;
+        // 🟢 2. THE VAULT CHECK: Look for the secure cookie instead of a manual PIN!
+        const cookieStore = cookies();
+        const isVaultUnlocked = cookieStore.get('admin_vault_unlocked')?.value === 'true';
 
-        // 3. THE EXTRA PADLOCK: Check the PIN!
-        // If MASTER_ADMIN_PIN is not set in .env, it defaults to blocking everyone to be safe.
-        if (!MASTER_ADMIN_PIN || pin !== MASTER_ADMIN_PIN) {
-            return NextResponse.json({ error: 'Invalid Master PIN. Intrusion logged.' }, { status: 401 });
+        if (!isVaultUnlocked) {
+            return NextResponse.json({ error: 'Vault is locked. Please unlock the dashboard first.' }, { status: 401 });
         }
+
+        // 3. Parse Request (Notice we don't extract 'pin' anymore!)
+        const body = await request.json();
+        const { userId, isVip, action } = body;
 
         if (!userId || !action) {
             return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });

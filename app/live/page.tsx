@@ -10,8 +10,8 @@ import BettingPromo from '@/app/components/BettingPromo';
 import AutoRefresh from '@/app/components/AutoRefresh'; 
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
+import FactSportMediaRoom from '@/app/components/FactSportMediaRoom'; // 🟢 THE UNIFIED ROOM
 
-// 🟢 ENHANCED SEO: OpenGraph & Twitter Cards
 export const metadata: Metadata = {
     title: 'Live Football Scores, Video & Audio Broadcasts | FactSport',
     description: 'Follow live football matches with real-time scores, live audio commentary, and video broadcasts. Don\'t miss a minute of the action.',
@@ -49,7 +49,17 @@ export default async function LiveMediaPage() {
     ? new Date(nextUpcomingMatch.match_date).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : "a later date";
 
-  // 🟢 JSON-LD SCHEMA FOR LIVE COVERAGE PAGE
+  // 🟢 FETCH THE DEDICATED GLOBAL STUDIO SETTINGS
+  const { data: studioData } = await supabase
+      .from('global_studio')
+      .select('*')
+      .eq('id', 1)
+      .single();
+
+  const isStudioActive = studioData?.is_active;
+  const globalMediaUrl = studioData?.video_url || studioData?.audio_url || null;
+  const studioTitle = studioData?.title || "Goal Rush Studio";
+
   const jsonLd = {
       '@context': 'https://schema.org',
       '@type': 'CollectionPage',
@@ -60,7 +70,6 @@ export default async function LiveMediaPage() {
 
   return (
     <div className="min-h-screen bg-[#0a1428] pb-20 font-sans text-white selection:bg-red-500">
-      {/* Inject JSON-LD Schema */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       
       <AutoRefresh interval={60000} />
@@ -81,6 +90,17 @@ export default async function LiveMediaPage() {
         <div className="max-w-2xl mx-auto">
             <BettingPromo affiliateLink={null} />
         </div>
+
+        {/* 🟢 THE GLOBAL STUDIO (Only mounts if 'is_active' is true AND a URL exists in the table) */}
+        {isStudioActive && globalMediaUrl && (
+            <div className="mb-8">
+                <FactSportMediaRoom 
+                    matchId="global-goal-rush" 
+                    mediaUrl={globalMediaUrl} 
+                    title={studioTitle} 
+                />
+            </div>
+        )}
 
         {coveredMatches.length === 0 && liveUncoveredMatches.length === 0 ? (
             <div className="text-center py-20 bg-white/5 rounded-3xl border border-white/10 p-6 backdrop-blur-sm">
