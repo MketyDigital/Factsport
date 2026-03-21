@@ -48,19 +48,31 @@ export async function GET(request: Request) {
             const compCode = m.competition?.code;
             if (!TARGET_LEAGUES.includes(compCode)) continue;
             
-            if (!['IN_PLAY', 'PAUSED', 'FINISHED', 'AWARDED'].includes(m.status)) continue; 
+            // 🟢 SMART STATUS EVALUATOR (Replaced the strict LIVE/FT check to catch postponements!)
+            let fdStatusMapped = 'SCHEDULED';
+            if (['FINISHED', 'AWARDED'].includes(m.status)) {
+                fdStatusMapped = 'FT';
+            } else if (['IN_PLAY', 'PAUSED'].includes(m.status)) {
+                fdStatusMapped = m.status === 'PAUSED' ? 'HT' : 'LIVE';
+            } else if (['POSTPONED', 'CANCELLED', 'SUSPENDED'].includes(m.status)) {
+                fdStatusMapped = 'POSTPONED';
+            } else if (m.status === 'SCHEDULED' && m.utcDate && m.utcDate.endsWith('T00:00:00Z')) {
+                fdStatusMapped = 'TBD';
+            } else if (m.status === 'TIMED') {
+                fdStatusMapped = 'SCHEDULED';
+            } else {
+                fdStatusMapped = m.status; // Safe fallback
+            }
             
             const { data: dbMatch } = await supabase.from('matches').select('id, status, updated_at, home_score, away_score, espn_id').eq('api_id', m.id).single();
             if (!dbMatch) continue;
 
-            const isFdFinished = ['FINISHED', 'AWARDED'].includes(m.status);
-            const fdStatusMapped = isFdFinished ? 'FT' : (m.status === 'PAUSED' ? 'HT' : 'LIVE');
-            const fdHomeScore = m.score.fullTime.home ?? 0;
-            const fdAwayScore = m.score.fullTime.away ?? 0;
+            const fdHomeScore = m.score?.fullTime?.home ?? 0;
+            const fdAwayScore = m.score?.fullTime?.away ?? 0;
             let shouldUpdate = false;
 
-            if (isFdFinished) {
-                // If it wasn't FT in our DB yet, it JUST finished!
+            // Update Logic for Finished Matches
+            if (fdStatusMapped === 'FT') {
                 if (dbMatch.status !== 'FT') {
                     shouldUpdate = true;
                     leaguesNeedingStandingsUpdate.add(compCode); 
@@ -69,11 +81,16 @@ export async function GET(request: Request) {
                     leaguesNeedingStandingsUpdate.add(compCode); 
                 }
             } 
+            // Update Logic for Everything Else (Postponements, Live, TBD)
             else {
-                const minutesSinceLastUpdate = (Date.now() - new Date(dbMatch.updated_at).getTime()) / 60000;
-                if (dbMatch.status === 'SCHEDULED' || minutesSinceLastUpdate > 10 || !dbMatch.espn_id) {
-                    if (dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore || dbMatch.status !== fdStatusMapped) {
-                        shouldUpdate = true;
+                if (dbMatch.status !== fdStatusMapped) {
+                    shouldUpdate = true; // Catches sudden Postponements or TBDs!
+                } else {
+                    const minutesSinceLastUpdate = (Date.now() - new Date(dbMatch.updated_at).getTime()) / 60000;
+                    if (dbMatch.status === 'SCHEDULED' || minutesSinceLastUpdate > 10 || !dbMatch.espn_id) {
+                        if (dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
+                            shouldUpdate = true;
+                        }
                     }
                 }
             }

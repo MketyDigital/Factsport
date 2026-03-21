@@ -124,9 +124,13 @@ export async function POST(req: Request) {
             .setExpirationTime(exp)
             .sign(secretKey);
 
-        // 4. Return the full link (Corrected from /matches/ to /match/)
+        // 4. Return the full link 
         const domain = process.env.NEXT_PUBLIC_SITE_URL || 'https://factsport.com';
-        const inviteLink = `${domain}/match/${matchId}?guest=${guestToken}`;
+        
+        // 🟢 FIX: If the admin is generating a link for the Goal Rush studio, point them to the /live page, not a /match/ page!
+        const inviteLink = matchId === 'global-goal-rush'
+            ? `${domain}/live?guest=${guestToken}`
+            : `${domain}/match/${matchId}?guest=${guestToken}`;
 
         return NextResponse.json({ inviteLink });
 

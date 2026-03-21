@@ -1,7 +1,8 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Radio, Loader2, Clock, Tv } from 'lucide-react';
-import FactSportAudioRoom from './FactSportAudioRoom';
+import FactSportMediaRoom from './FactSportMediaRoom';
+import { useGlobalMedia } from '@/app/providers/GlobalMediaProvider';
 
 export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isUpcoming = false, isFinished = false }: { mediaUrl: string, matchId: string, mode?: 'video' | 'audio', isUpcoming?: boolean, isFinished?: boolean }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -10,10 +11,17 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
   const [isBuffering, setIsBuffering] = useState(false);
   
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
+  
+  const { activeMatchId, tuneInVideo, setIsPageActive } = useGlobalMedia();
 
   const isYouTube = mediaUrl.includes('youtube.com') || mediaUrl.includes('youtu.be');
   const isRawMedia = mediaUrl.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
   const isRawAudio = mediaUrl.match(/\.(mp3|wav)$/i);
+
+  useEffect(() => {
+      if (activeMatchId === matchId) setIsPageActive(true);
+      return () => setIsPageActive(false);
+  }, [activeMatchId, matchId, setIsPageActive]);
 
   const togglePlay = () => {
     if (mediaRef.current) {
@@ -44,7 +52,7 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
     else if (document.fullscreenElement) document.exitFullscreen();
   };
 
-  // 🟢 THE FIX: The Upcoming check MUST run before we mount the Stream.io room!
+  // 🟢 YOUR EXACT UPCOMING CHECK PRESERVED
   if (isUpcoming) {
       return (
           <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative flex flex-col items-center justify-center overflow-hidden border-b border-slate-800 shadow-inner group`}>
@@ -66,15 +74,19 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
       );
   }
 
-  // Streamio check goes here, after the countdown check!
-  if (mediaUrl === 'streamio') return <FactSportAudioRoom matchId={matchId} />;
+  // 🟢 WEBRTC AUDIO ROOM HANDOFF
+  if (mediaUrl === 'streamio') return <FactSportMediaRoom matchId={matchId} mediaUrl="streamio" />;
 
+  // 🟢 YOUR EXACT YOUTUBE BLOCK (Modified purely to trigger PiP for Live TV)
   const renderYouTube = () => {
     let videoId = '';
     if (mediaUrl.includes('v=')) videoId = mediaUrl.split('v=')[1]?.split('&')[0];
     else if (mediaUrl.includes('.be/')) videoId = mediaUrl.split('.be/')[1];
     else if (mediaUrl.includes('embed/')) videoId = mediaUrl.split('embed/')[1];
 
+    const embedUrl = `https://www.youtube.com/embed/${videoId}`;
+
+    // If it's AUDIO mode (YouTube URL pasted in audio_url field), we render your custom audio-wrapper
     if (mode === 'audio') {
       return (
         <div className="w-full h-[100px] md:h-[120px] bg-[#0a1428] relative overflow-hidden border-b border-slate-800 flex items-center justify-center shadow-inner">
@@ -86,12 +98,25 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
                 </span>
             </div>
             <div className="relative z-20 w-[80px] h-[60px] overflow-hidden rounded-lg shadow-[0_0_20px_rgba(0,0,0,0.8)] border border-white/20 ml-12 bg-black scale-90 md:scale-100">
-                <iframe src={`https://www.youtube.com/embed/${videoId}?playsinline=1`} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '320px', height: '240px' }} frameBorder="0" allow="autoplay; encrypted-media"></iframe>
+                <iframe src={`${embedUrl}?playsinline=1`} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '320px', height: '240px' }} frameBorder="0" allow="autoplay; encrypted-media"></iframe>
             </div>
         </div>
       );
     }
 
+    // IF IT'S LIVE TV AND NOT CURRENTLY PLAYING: Show Tune-In Gate
+    if (!isFinished && activeMatchId !== matchId) {
+        return (
+            <div className="w-full aspect-video bg-[#0a1428] relative flex flex-col items-center justify-center border-b border-slate-800">
+                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-sm"></div>
+                <button onClick={() => tuneInVideo(matchId, embedUrl)} className="relative z-10 flex items-center gap-2 px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-black tracking-widest uppercase rounded-full shadow-lg transition-all active:scale-95">
+                    <Play size={18} fill="currentColor" /> Watch Live TV
+                </button>
+            </div>
+        );
+    }
+
+    // YOUR EXACT YOUTUBE IFRAME (For highlights, or if activeMatchId matches)
     return (
       <div className="w-full aspect-video bg-black relative overflow-hidden border-b border-slate-800 shadow-inner group">
         <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-[#0a1428] via-[#0a1428]/80 to-transparent z-10 pointer-events-none"></div>
@@ -104,11 +129,12 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
                 <Tv size={8} className="text-blue-400"/> FactSport TV
             </span>
         </div>
-        <iframe src={`https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&iv_load_policy=3&controls=1&playsinline=1&fs=1`} className="w-full h-full scale-[1.03]" allowFullScreen></iframe>
+        <iframe src={`${embedUrl}?autoplay=1&modestbranding=1&rel=0&iv_load_policy=3&controls=1&playsinline=1&fs=1`} className="w-full h-full scale-[1.03]" allowFullScreen></iframe>
       </div>
     );
   };
 
+  // 🟢 YOUR EXACT RAW MEDIA PLAYER (100% Unchanged)
   const renderRawPlayer = () => {
     return (
       <div id="fs-player-wrapper" className={`w-full ${mode === 'audio' || isRawAudio ? 'h-[120px]' : 'aspect-video'} bg-black relative group overflow-hidden border-b border-slate-800 shadow-xl`}>
@@ -151,6 +177,7 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
     );
   };
 
+  // 🟢 YOUR EXACT GENERIC IFRAME
   const renderGenericIframe = () => {
     return (
       <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative border-b border-slate-800 overflow-hidden shadow-xl`}>

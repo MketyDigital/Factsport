@@ -1,42 +1,30 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Crown, Shield, User, Loader2, CheckCircle, Lock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Crown, Shield, User, Loader2, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function UsersClient({ initialUsers }: { initialUsers: any[] }) {
     const [users, setUsers] = useState(initialUsers);
     const [search, setSearch] = useState('');
     const [loadingId, setLoadingId] = useState<string | null>(null);
-    
-    // 🔒 Lock Screen State
-    const [isUnlocked, setIsUnlocked] = useState(false);
-    const [pinInput, setPinInput] = useState('');
 
     // 📄 Pagination State
     const [currentPage, setCurrentPage] = useState(1);
     const usersPerPage = 12;
 
-    // 1. Filter the users based on the search bar
     const filteredUsers = users.filter(u => 
         (u.email || '').toLowerCase().includes(search.toLowerCase()) || 
         (u.full_name || '').toLowerCase().includes(search.toLowerCase())
     );
 
-    // 2. Slice the filtered users for the current page
     const totalPages = Math.ceil(filteredUsers.length / usersPerPage) || 1;
     const indexOfLastUser = currentPage * usersPerPage;
     const indexOfFirstUser = indexOfLastUser - usersPerPage;
     const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
 
-    // 3. Handle Search (Reset to page 1 when typing)
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearch(e.target.value);
         setCurrentPage(1); 
-    };
-
-    const handleUnlock = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (pinInput.length > 0) setIsUnlocked(true);
     };
 
     const toggleVip = async (userId: string, currentStatus: boolean) => {
@@ -48,8 +36,8 @@ export default function UsersClient({ initialUsers }: { initialUsers: any[] }) {
                 body: JSON.stringify({ 
                     userId: userId, 
                     isVip: !currentStatus, 
-                    action: 'toggle_vip',
-                    pin: pinInput 
+                    action: 'toggle_vip' 
+                    // PIN removed! Protected globally now.
                 })
             });
 
@@ -58,7 +46,6 @@ export default function UsersClient({ initialUsers }: { initialUsers: any[] }) {
             } else {
                 const data = await res.json();
                 alert(`Error: ${data.error}`);
-                if (res.status === 401) setIsUnlocked(false); 
             }
         } catch (error) {
             alert("Failed to connect to server.");
@@ -66,38 +53,9 @@ export default function UsersClient({ initialUsers }: { initialUsers: any[] }) {
         setLoadingId(null);
     };
 
-    // 🔒 RENDER THE LOCK SCREEN IF NOT UNLOCKED
-    if (!isUnlocked) {
-        return (
-            <div className="flex flex-col items-center justify-center py-20 px-4">
-                <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-200 w-full max-w-sm text-center">
-                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-50">
-                        <Lock className="text-red-500" size={24} />
-                    </div>
-                    <h2 className="text-lg font-black text-slate-800 uppercase tracking-widest mb-1">Vault Locked</h2>
-                    <p className="text-xs text-slate-500 font-bold mb-6">Enter Master PIN to access users.</p>
-                    
-                    <form onSubmit={handleUnlock} className="space-y-3">
-                        <input 
-                            type="password" 
-                            value={pinInput}
-                            onChange={(e) => setPinInput(e.target.value)}
-                            className="w-full text-center text-2xl tracking-[0.5em] font-black border-2 border-slate-200 rounded-xl bg-slate-50 py-3 focus:outline-none focus:border-red-500 transition-colors"
-                            placeholder="••••"
-                            autoFocus
-                        />
-                        <button type="submit" className="w-full bg-[#0a1428] text-white font-black uppercase tracking-widest py-3 rounded-xl shadow-md active:scale-95 transition-all text-sm">
-                            Unlock
-                        </button>
-                    </form>
-                </div>
-            </div>
-        );
-    }
-
-    // 🔓 RENDER THE PAGINATED USER LIST ONCE UNLOCKED
+    // 🔓 RENDER THE DASHBOARD DIRECTLY
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 animate-in fade-in duration-300">
             
             {/* SEARCH BAR */}
             <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex items-center gap-3 sticky top-[60px] z-10">
@@ -121,7 +79,7 @@ export default function UsersClient({ initialUsers }: { initialUsers: any[] }) {
                 </span>
             </div>
 
-            {/* USERS GRID (Only shows current page!) */}
+            {/* USERS GRID */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {currentUsers.map((user) => (
                     <div key={user.id} className={`bg-white rounded-xl p-4 shadow-sm border transition-all ${user.is_vip ? 'border-yellow-300 bg-gradient-to-br from-white to-yellow-50/30' : 'border-slate-100'}`}>
