@@ -4,19 +4,67 @@ import { Play, Pause, Volume2, VolumeX, Maximize, Radio, Loader2, Clock, Tv } fr
 import FactSportMediaRoom from './FactSportMediaRoom';
 import { useGlobalMedia } from '@/app/providers/GlobalMediaProvider';
 
-export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isUpcoming = false, isFinished = false }: { mediaUrl: string, matchId: string, mode?: 'video' | 'audio', isUpcoming?: boolean, isFinished?: boolean }) {
+export default function FactSportPlayer({ 
+  mediaUrl, 
+  matchId, 
+  mode = 'video', 
+  isUpcoming = false, 
+  isFinished = false,
+  matchDate // 🟢 NEW: We need the match date to calculate the smart countdown!
+}: { 
+  mediaUrl: string, 
+  matchId: string, 
+  mode?: 'video' | 'audio', 
+  isUpcoming?: boolean, 
+  isFinished?: boolean,
+  matchDate?: string 
+}) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
   
-  const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
+  // 🟢 SMART TIME-LOCK STATE
+  const [isTimeLocked, setIsTimeLocked] = useState(isUpcoming);
   
+  const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
   const { activeMatchId, tuneInVideo, setIsPageActive } = useGlobalMedia();
 
   const isYouTube = mediaUrl.includes('youtube.com') || mediaUrl.includes('youtu.be');
   const isRawMedia = mediaUrl.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
   const isRawAudio = mediaUrl.match(/\.(mp3|wav)$/i);
+
+  // 🟢 THE SMART COUNTDOWN ENGINE
+  useEffect(() => {
+      // If the match is already finished, never lock it (show highlights)
+      if (isFinished) {
+          setIsTimeLocked(false);
+          return;
+      }
+
+      if (!matchDate) return;
+
+      const checkTimeLock = () => {
+          const kickoffTime = new Date(matchDate).getTime();
+          const now = Date.now();
+          // Calculate exactly 5 minutes before kickoff
+          const fiveMinutesBefore = kickoffTime - (5 * 60 * 1000);
+
+          // If right now is BEFORE the 5-minute warning, keep it locked
+          if (now < fiveMinutesBefore) {
+              setIsTimeLocked(true);
+          } else {
+              setIsTimeLocked(false);
+          }
+      };
+
+      checkTimeLock(); // Check immediately on load
+      
+      // Re-check every 10 seconds. This means if a user is staring at the "Available in 5 mins" screen,
+      // it will automatically reveal the player when the time comes without them refreshing!
+      const interval = setInterval(checkTimeLock, 10000);
+      return () => clearInterval(interval);
+  }, [matchDate, isFinished]);
 
   useEffect(() => {
       if (activeMatchId === matchId) setIsPageActive(true);
@@ -52,20 +100,20 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
     else if (document.fullscreenElement) document.exitFullscreen();
   };
 
-  // 🟢 YOUR EXACT UPCOMING CHECK PRESERVED
-  if (isUpcoming) {
+  // 🟢 THE TIME-LOCK SHIELD UI (Will show if isTimeLocked is true)
+  if (isTimeLocked) {
       return (
           <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative flex flex-col items-center justify-center overflow-hidden border-b border-slate-800 shadow-inner group`}>
               <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-md grayscale"></div>
-              <div className="relative z-10 flex flex-col items-center gap-2">
+              <div className="relative z-10 flex flex-col items-center gap-2 animate-in fade-in zoom-in duration-500">
                   <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10 shadow-lg backdrop-blur-sm">
-                     <Clock className="text-slate-400 w-4 h-4" />
+                     <Clock className="text-slate-400 w-4 h-4 animate-pulse" />
                   </div>
                   <div className="flex flex-col items-center gap-1">
                       <span className="text-white font-black uppercase tracking-widest text-[9px] md:text-[10px] text-center drop-shadow-md">
                           {mode === 'audio' ? 'Live Radio Broadcast' : 'Live Match Stream'}
                       </span>
-                      <span className="text-blue-400 font-bold uppercase tracking-widest text-[7px] md:text-[8px] bg-blue-900/40 px-2 py-0.5 rounded-full border border-blue-500/30">
+                      <span className="text-blue-400 font-bold uppercase tracking-widest text-[7px] md:text-[8px] bg-blue-900/40 px-2 py-0.5 rounded-full border border-blue-500/30 shadow-md">
                           Available 5 mins to Kick-off
                       </span>
                   </div>
@@ -74,10 +122,10 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
       );
   }
 
-  // 🟢 WEBRTC AUDIO ROOM HANDOFF
+  // WEBRTC AUDIO ROOM HANDOFF
   if (mediaUrl === 'streamio') return <FactSportMediaRoom matchId={matchId} mediaUrl="streamio" />;
 
-  // 🟢 YOUR EXACT YOUTUBE BLOCK (Modified purely to trigger PiP for Live TV)
+  // YOUTUBE BLOCK
   const renderYouTube = () => {
     let videoId = '';
     if (mediaUrl.includes('v=')) videoId = mediaUrl.split('v=')[1]?.split('&')[0];
@@ -86,7 +134,6 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
 
     const embedUrl = `https://www.youtube.com/embed/${videoId}`;
 
-    // If it's AUDIO mode (YouTube URL pasted in audio_url field), we render your custom audio-wrapper
     if (mode === 'audio') {
       return (
         <div className="w-full h-[100px] md:h-[120px] bg-[#0a1428] relative overflow-hidden border-b border-slate-800 flex items-center justify-center shadow-inner">
@@ -104,10 +151,9 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
       );
     }
 
-    // IF IT'S LIVE TV AND NOT CURRENTLY PLAYING: Show Tune-In Gate
     if (!isFinished && activeMatchId !== matchId) {
         return (
-            <div className="w-full aspect-video bg-[#0a1428] relative flex flex-col items-center justify-center border-b border-slate-800">
+            <div className="w-full aspect-video bg-[#0a1428] relative flex flex-col items-center justify-center border-b border-slate-800 animate-in fade-in duration-500">
                 <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-sm"></div>
                 <button onClick={() => tuneInVideo(matchId, embedUrl)} className="relative z-10 flex items-center gap-2 px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-black tracking-widest uppercase rounded-full shadow-lg transition-all active:scale-95">
                     <Play size={18} fill="currentColor" /> Watch Live TV
@@ -116,7 +162,6 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
         );
     }
 
-    // YOUR EXACT YOUTUBE IFRAME (For highlights, or if activeMatchId matches)
     return (
       <div className="w-full aspect-video bg-black relative overflow-hidden border-b border-slate-800 shadow-inner group">
         <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-[#0a1428] via-[#0a1428]/80 to-transparent z-10 pointer-events-none"></div>
@@ -134,7 +179,6 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
     );
   };
 
-  // 🟢 YOUR EXACT RAW MEDIA PLAYER (100% Unchanged)
   const renderRawPlayer = () => {
     return (
       <div id="fs-player-wrapper" className={`w-full ${mode === 'audio' || isRawAudio ? 'h-[120px]' : 'aspect-video'} bg-black relative group overflow-hidden border-b border-slate-800 shadow-xl`}>
@@ -177,10 +221,9 @@ export default function FactSportPlayer({ mediaUrl, matchId, mode = 'video', isU
     );
   };
 
-  // 🟢 YOUR EXACT GENERIC IFRAME
   const renderGenericIframe = () => {
     return (
-      <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative border-b border-slate-800 overflow-hidden shadow-xl`}>
+      <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative border-b border-slate-800 overflow-hidden shadow-xl animate-in fade-in duration-500`}>
          {mode === 'audio' && (
              <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-sm pointer-events-none"></div>
          )}
