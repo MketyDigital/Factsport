@@ -144,9 +144,17 @@ function StatRow({ label, home, away }: any) {
     const total = hVal + aVal || 1;
     const hWidth = (hVal / total) * 100;
     return (
-        <div>
-            <div className="flex justify-between text-[10px] font-bold text-slate-600 mb-1"><span>{home}</span><span className="text-slate-400 uppercase tracking-widest">{label}</span><span>{away}</span></div>
-            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden flex"><div style={{ width: `${hWidth}%` }} className="bg-blue-600 h-full"></div><div className="flex-1 bg-red-500 h-full"></div></div>
+        <div className="py-1"> {/* Reduced vertical padding */}
+            <div className="flex justify-between text-[9px] font-bold text-slate-600 mb-0.5 uppercase tracking-tight">
+                <span>{home}</span>
+                <span className="text-slate-400 font-medium">{label}</span>
+                <span>{away}</span>
+            </div>
+            {/* Thinner 3px bar instead of 6px */}
+            <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                <div style={{ width: `${hWidth}%` }} className="bg-blue-600 h-full"></div>
+                <div className="flex-1 bg-red-500 h-full"></div>
+            </div>
         </div>
     );
 }
