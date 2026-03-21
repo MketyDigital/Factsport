@@ -59,7 +59,8 @@ async function generateDailySummaries() {
     for (const [leagueName, leagueMatches] of Object.entries(leagues)) {
         matchSummaries += `\n### ${leagueName}:\n`;
         leagueMatches.forEach(m => {
-            matchSummaries += `- ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} | EXACT LINK TO USE: [View Match Stats](/match/${m.id})\n`;
+            // 🟢 CHANGED: Shortcode format
+            matchSummaries += `- ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} | EXACT SHORTCODE TO USE: [MATCH_WIDGET:${m.id}]\n`;
         });
     }
 
@@ -75,10 +76,11 @@ async function generateDailySummaries() {
 
         STRICT FACTUAL GUIDELINES:
         1. ZERO HALLUCINATIONS: Do NOT invent or name any specific goalscorers, players, or managers. Focus entirely on the team performance, the final scoreline, and the tactical battle.
-        2. EXACT MATCH LINKS: When you mention a match, you MUST copy and paste the "EXACT LINK TO USE" provided in the data above. Do not try to write the URL yourself.
+        2. EMBEDDING MATCHES: When you finish discussing a match result, you MUST paste its "EXACT SHORTCODE TO USE" on a brand new, empty line. NEVER attach commas, periods, or other words to the shortcode.
         3. Headline: Catchy and dramatic, covering the global day of football. Under 10 words. Do not use asterisks (*).
         4. Length: 500-800 words. Plain text only.
-        5. FACEBOOK SUMMARY: At the very end, skip a line and write the exact text "FB_POST:" followed by a comprehensive Facebook post. You MUST mention ALL the major results and scorelines across every league provided. Make it highly engaging, use emojis, and tease the full article. Do not use hashtags.
+        5. FACEBOOK SUMMARY: At the very end, skip a line and write the exact text "FB_POST:" followed by a comprehensive Facebook post. You MUST mention ALL the major results and scorelines across every league provided. 
+        6. NO EMOJIS: Do NOT use a single emoji anywhere in the article or the Facebook post. Keep it entirely text-based and professional.
     `;
 
     try {
