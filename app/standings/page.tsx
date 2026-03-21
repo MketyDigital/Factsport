@@ -7,6 +7,7 @@ import { ChevronLeft, BarChart2, AlertTriangle } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js'; 
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
+import LeagueLeaders from '@/app/components/LeagueLeaders'; // 🟢 NEW IMPORT
 
 const LEAGUE_MAP: Record<string, string> = {
     'Premier League': 'PL',
@@ -139,7 +140,6 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
     const hasFormData = standings.some((entry: any) => entry.form && entry.form.length > 0);
     const ALL_LEAGUES = Object.keys(LEAGUE_MAP);
 
-    // 🟢 JSON-LD SCHEMA FOR STANDINGS
     const jsonLd = {
         '@context': 'https://schema.org',
         '@type': 'WebPage',
@@ -150,7 +150,6 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
 
     return (
         <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-20 font-sans">
-            {/* Inject JSON-LD Schema */}
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
             <div className="bg-[#0a1428] text-white p-3 md:p-4 flex items-center gap-3 md:gap-4 sticky top-0 z-50 shadow-lg">
@@ -218,7 +217,6 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                                     const formArray = rawForm ? (rawForm.includes(',') ? rawForm.split(',') : rawForm.split('')) : [];
                                     
                                     const teamName = entry.team.shortName || entry.team.name;
-                                    
                                     const safeUrlName = teamName.replace(/['"]/g, '');
 
                                     return (
@@ -277,10 +275,15 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                 </div>
                 
                 {standings.length > 0 && validLeague !== 'Champions League' && (
-                    <div className="flex justify-center gap-3 md:gap-4 mt-3 md:mt-4 text-[8px] md:text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                    <div className="flex justify-center gap-3 md:gap-4 mt-3 md:mt-4 text-[8px] md:text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-8">
                         <div className="flex items-center gap-1 md:gap-1.5"><span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-blue-500"></span> Champions League</div>
                         <div className="flex items-center gap-1 md:gap-1.5"><span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-red-500"></span> Relegation</div>
                     </div>
+                )}
+
+                {/* 🟢 TOP SCORERS / ASSISTS WIDGET INJECTED HERE */}
+                {standings.length > 0 && (
+                    <LeagueLeaders leagueName={validLeague} />
                 )}
 
                 <AdsterraNativeBanner />

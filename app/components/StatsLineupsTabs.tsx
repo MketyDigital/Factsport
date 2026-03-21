@@ -1,15 +1,18 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { BarChart2, Users } from 'lucide-react';
-import PitchLineup from './PitchLineup'; // 🟢 NEW: Importing our beautiful 2D pitch!
+import PitchLineup from './PitchLineup';
+import MatchMomentum from './MatchMomentum';
+import MatchTimeline from './MatchTimeline';
+import PlayerRatingsWidget from './PlayerRatingsWidget'; // 🟢 IMPORT RATINGS
 
-// Need to pass dbData into this component now so the pitch knows the team names!
 export default function StatsLineupsTabs({ matchId, initialData, dbData }: { matchId: string, initialData: any, dbData?: any }) {
   const [activeTab, setActiveTab] = useState<'stats' | 'lineups'>('stats');
 
   const [liveData, setLiveData] = useState({
       stats: initialData?.stats || { home: {}, away: {} },
-      lineups: initialData?.lineups || { home: [], away: [], formations: { home: null, away: null } }
+      lineups: initialData?.lineups || { home: [], away: [], formations: { home: null, away: null } },
+      events: initialData?.events || [] 
   });
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -19,17 +22,16 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
       if (!hasFetchedLive.current) {
           setLiveData({
               stats: initialData?.stats || { home: {}, away: {} },
-              lineups: initialData?.lineups || { home: [], away: [], formations: { home: null, away: null } }
+              lineups: initialData?.lineups || { home: [], away: [], formations: { home: null, away: null } },
+              events: initialData?.events || []
           });
       }
   }, [initialData]);
 
   useEffect(() => {
     let isMounted = true;
-
     const fetchStatsData = async () => {
       if (document.visibilityState !== 'visible' || !isMounted) return;
-
       try {
           let res;
           if (initialData?.espn_id) {
@@ -37,18 +39,15 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
           } else {
               res = await fetch(`/api/match-data?id=${matchId}&t=${Date.now()}`);
           }
-          
           if (!res.ok) return;
           const payload = await res.json();
-          
           if (payload && !payload.error && isMounted) {
               hasFetchedLive.current = true;
-
               setLiveData(prev => ({
                   stats: payload.stats || prev.stats,
-                  lineups: payload.lineups || prev.lineups
+                  lineups: payload.lineups || prev.lineups,
+                  events: payload.events || prev.events 
               }));
-
               if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
                   if (intervalRef.current) clearInterval(intervalRef.current);
               }
@@ -57,14 +56,11 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
     };
 
     fetchStatsData();
-
     if (!['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(initialData?.status)) {
         intervalRef.current = setInterval(fetchStatsData, 3000); 
     }
 
-    const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible') fetchStatsData();
-    };
+    const handleVisibilityChange = () => { if (document.visibilityState === 'visible') fetchStatsData(); };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
@@ -74,27 +70,21 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
     };
   }, [matchId, initialData?.status, initialData?.espn_id]);
 
-  const { stats, lineups } = liveData;
-  const hasLineups = lineups?.home?.length > 0 || lineups?.away?.length > 0;
+  const { stats, lineups, events } = liveData;
 
   const getSafeShots = (teamStats: any) => {
       if (!teamStats) return '0';
       if (teamStats.shots && parseInt(teamStats.shots) > 0) return teamStats.shots.toString();
       const onTarget = parseInt(teamStats.shotsOnTarget || teamStats.shots_on_target || 0) || 0;
       const offTarget = parseInt(teamStats.shotsOffTarget || teamStats.shots_off_target || 0) || 0;
-      const total = onTarget + offTarget;
-      return total > 0 ? total.toString() : '0';
+      return (onTarget + offTarget) > 0 ? (onTarget + offTarget).toString() : '0';
   };
 
   const homeShotsOn = stats?.home?.shotsOnTarget || stats?.home?.shots_on_target || '0';
   const awayShotsOn = stats?.away?.shotsOnTarget || stats?.away?.shots_on_target || '0';
-  const homeShotsOff = stats?.home?.shotsOffTarget || stats?.home?.shots_off_target || '0';
-  const awayShotsOff = stats?.away?.shotsOffTarget || stats?.away?.shots_off_target || '0';
   
-  const showTargetStats = parseInt(homeShotsOn) > 0 || parseInt(awayShotsOn) > 0 || parseInt(homeShotsOff) > 0 || parseInt(awayShotsOff) > 0;
+  const showTargetStats = parseInt(homeShotsOn) > 0 || parseInt(awayShotsOn) > 0;
   const hasStats = stats?.home?.possession || getSafeShots(stats?.home) !== '0' || stats?.home?.corners;
-
-  // 🟢 We no longer need getSortedLineup because PitchLineup handles all the parsing!
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full flex flex-col">
@@ -110,29 +100,37 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
       <div className="p-4 min-h-[250px] bg-white">
         {activeTab === 'stats' && (
             <div className="space-y-4">
+                <MatchMomentum events={events} />
+
                 {!hasStats ? <div className="text-center py-10 opacity-50"><p className="text-xs font-bold tracking-widest uppercase">Stats updating...</p></div> : <>
                     <StatRow label="Possession" home={stats?.home?.possession || '50%'} away={stats?.away?.possession || '50%'} />
                     <StatRow label="Total Shots" home={getSafeShots(stats?.home)} away={getSafeShots(stats?.away)} />
                     
                     {showTargetStats && (
-                        <>
-                            <StatRow label="Shots on Target" home={homeShotsOn} away={awayShotsOn} />
-                            <StatRow label="Shots off Target" home={homeShotsOff} away={awayShotsOff} />
-                        </>
+                        <StatRow label="Shots on Target" home={homeShotsOn} away={awayShotsOn} />
                     )}
-
+                    
                     <StatRow label="Corners" home={stats?.home?.corners || '0'} away={stats?.away?.corners || '0'} />
                     <StatRow label="Fouls" home={stats?.home?.fouls || '0'} away={stats?.away?.fouls || '0'} />
                     <StatRow label="Saves" home={stats?.home?.saves || '0'} away={stats?.away?.saves || '0'} />
                 </>}
+                
+                <MatchTimeline events={events} />
             </div>
         )}
         
-        {/* 🟢 THE UPGRADED LINEUPS TAB */}
         {activeTab === 'lineups' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 -m-4">
-                {/* We use negative margins to make the pitch fill the container beautifully */}
                 <PitchLineup data={{ lineups: liveData.lineups }} dbData={dbData} />
+                
+                {/* 🟢 FAN RATINGS INJECTED HERE (Only shows if match is finished) */}
+                <div className="p-4 bg-white border-t border-slate-100">
+                    <PlayerRatingsWidget 
+                        matchId={matchId} 
+                        lineups={liveData.lineups} 
+                        status={liveData.stats?.status || initialData?.status} 
+                    />
+                </div>
             </div>
         )}
       </div>
