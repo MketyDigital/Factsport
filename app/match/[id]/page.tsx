@@ -149,9 +149,9 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
               {(activeVideoUrl || activeAudioUrl) && (
                   <div className="w-full bg-black">
                       {activeVideoUrl ? (
-                          <FactSportPlayer mediaUrl={activeVideoUrl} matchId={dbData.id} mode="video" isUpcoming={isUpcomingMatch} isFinished={isFinished} />
+                          <FactSportPlayer mediaUrl={activeVideoUrl} matchId={dbData.id} mode="video" isUpcoming={isUpcomingMatch} isFinished={isFinished} matchDate={dbData.match_date} />
                       ) : (
-                          <FactSportPlayer mediaUrl={activeAudioUrl!} matchId={dbData.id} mode="audio" isUpcoming={isUpcomingMatch} isFinished={isFinished} />
+                          <FactSportPlayer mediaUrl={activeAudioUrl!} matchId={dbData.id} mode="audio" isUpcoming={isUpcomingMatch} isFinished={isFinished} matchDate={dbData.match_date} />
                       )}
                   </div>
               )}

@@ -30,6 +30,13 @@ const parseTime = (t: any) => {
     return (parseInt(parts[0]) || 0) * 100 + (parseInt(parts[1]) || 0); 
 };
 
+// 🟢 SMART HASHTAG GENERATOR (Uses DB TLA if available, else falls back to first 3 letters)
+const getMatchHashtag = (home: string, away: string, homeTla?: string, awayTla?: string) => {
+    const cleanH = homeTla || home.replace(/ fc| cf| united| city/ig, '').replace(/[^a-zA-Z]/g, '').substring(0, 3);
+    const cleanA = awayTla || away.replace(/ fc| cf| united| city/ig, '').replace(/[^a-zA-Z]/g, '').substring(0, 3);
+    return `#${cleanH.toUpperCase()}${cleanA.toUpperCase()} #FactSportLive`;
+};
+
 export async function POST(request: Request) {
     const authHeader = request.headers.get('Authorization');
     if (authHeader !== `Bearer ${process.env.CRON_KEY}`) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -39,8 +46,12 @@ export async function POST(request: Request) {
     const oldState = body.old_record || { home_score: 0, away_score: 0, status: 'PRE_MATCH', lineups: { home: [], away: [] }, match_events: [] };
     if (!newState) return NextResponse.json({ message: "No record found" });
 
-    const strictlyFinishedStatuses = ['FT', 'FINISHED', 'ABD', 'AET'];
-    if (strictlyFinishedStatuses.includes(oldState.status) && strictlyFinishedStatuses.includes(newState.status)) {
+    // Normalize statuses for aggressive matching
+    const oldStatus = String(oldState.status).toUpperCase();
+    const newStatus = String(newState.status).toUpperCase();
+
+    const strictlyFinishedStatuses = ['FT', 'FINISHED', 'ABD', 'AET', 'AWARDED'];
+    if (strictlyFinishedStatuses.includes(oldStatus) && strictlyFinishedStatuses.includes(newStatus)) {
         return NextResponse.json({ message: "Match already finished. Ignoring late correction." });
     }
 
@@ -59,6 +70,9 @@ export async function POST(request: Request) {
     const frontendUrl = 'https://factsport.com'; 
     const imageUrl = 'https://factsport.com'; 
     const matchUrl = `${frontendUrl}/match/${newState.id}`; 
+    // Uses the 3-letter abbreviation if your DB has it, otherwise falls back smoothly
+    const hashtags = getMatchHashtag(newState.home_team, newState.away_team, newState.home_tla, newState.away_tla); 
+    
     let payload: SocialPayload = {}; 
 
     const oldTotal = (oldState.home_score || 0) + (oldState.away_score || 0);
@@ -74,14 +88,19 @@ export async function POST(request: Request) {
     const oldWasIncomplete = oldValidH.length < 11 || oldValidA.length < 11;
     const newIsComplete = newValidH.length >= 11 && newValidA.length >= 11;
 
-    const htStatuses = ['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME'];
+    // 🟢 AGGRESSIVE STATUS MATCHING ARRAYS (Fixes the FB1 missing posts)
+    const preStatuses = ['PRE_MATCH', 'SCHEDULED', 'PRE', 'NS', 'UPCOMING', 'TBD'];
+    const live1HStatuses = ['IN_PLAY', 'LIVE', '1H', 'FIRST_HALF', 'FIRST HALF'];
+    const htStatuses = ['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME', 'PAUSED'];
+    const live2HStatuses = ['2H', 'SECOND_HALF', 'SECOND HALF'];
 
     if (newTotal < oldTotal) {
         payload.fb1Message = `❌ VAR DECISION: OVERTURNED - Previous G/Event has been canceled.\n\nThe score returns to:\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
+        payload.xMessage = `❌ VAR DECISION: OVERTURNED\n\nScore remains:\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}\n\n${hashtags}`;
     } 
     else if (newTotal > oldTotal || newGoalsList.length > oldGoalsList.length) {
         if (newGoalsList.length < newTotal) return NextResponse.json({ message: "Facts data lagging behind scoreboard. Waiting for next ping." });
-        let statusText = ['IN_PLAY', 'LIVE', '1H', '2H'].includes(newState.status) ? '' : ` (${newState.status})`;
+        let statusText = live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus) ? '' : ` (${newState.status})`;
         let scorerText = "";
         
         if (newGoalsList.length > 0) {
@@ -93,10 +112,13 @@ export async function POST(request: Request) {
         } 
         if (!scorerText.trim()) scorerText = `\n⚽ GOAL - Confirmed! Tap the link below for full details and stats! 👇\n`;
 
-        if (['PEN', 'PEN_SHOOT_OUT'].includes(newState.status)) {
+        if (['PEN', 'PEN_SHOOT_OUT'].includes(newStatus)) {
             payload.fb1Message = `🥅 PENALTY SCORED!\n\nShootout Update: ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
+            payload.xMessage = `🥅 PENALTY SCORED!\n\nShootout: ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}\n\n${hashtags}`;
         } else {
             payload.fb1Message = `🚨 GOAL ALERT!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\n${matchUrl}`;
+            // 🟢 SHORT X TEXT WITH TAGS
+            payload.xMessage = `🚨 GOAL ALERT!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\n👇\n${matchUrl}\n\n${hashtags}`;
         }
     } 
     else if (newTotal === oldTotal && newPenaltiesList.length > oldPenaltiesList.length) {
@@ -104,27 +126,53 @@ export async function POST(request: Request) {
         const latestPen = sortedPens[0];
         const time = latestPen.time || latestPen.minute ? `${latestPen.time || latestPen.minute}'` : '';
         payload.fb1Message = `⚠️ PENALTY AWARDED - (Confirmed by Referee/VAR) ${time}\n\nMassive moment in the match! Will they convert it?\n\n👇\n${matchUrl}`;
+        payload.xMessage = `⚠️ PENALTY AWARDED! ${time}\n\nMassive moment in the match.\n\n👇\n${matchUrl}\n\n${hashtags}`;
     }
     else if (oldWasIncomplete && newIsComplete) {
-        const hXI = newValidH.slice(0, 11).join(', '); const aXI = newValidA.slice(0, 11).join(', ');
+        const hXI = newValidH.slice(0, 11).join(', '); 
+        const aXI = newValidA.slice(0, 11).join(', ');
+        
         payload.fb1Message = `📋 STARTING XI ANNOUNCED!\n\n${newState.home_team} vs ${newState.away_team}\n\nHome: ${hXI}\n\nAway: ${aXI}\n\n👇\n${matchUrl}`;
-        payload.xMessage = `🚨 TEAM NEWS IS IN!\n\nA massive clash ahead: ${newState.home_team} vs ${newState.away_team}. Full lineups and bench here:`;
-        const lineupOg = { type: 'versus', label: 'STARTING XI', home: newState.home_team, away: newState.away_team, homeXI: hXI, awayXI: aXI };
+        
+        // 🟢 ULTRA-SHORT X TEXT TO PROTECT LIMITS
+        payload.xMessage = `🚨 TEAM NEWS IS IN!\n\nFull XI & Subs here:\n👇\n${matchUrl}\n\n${hashtags}`;
+        
+        // Passing the 'pitch' type to the OG route
+        const lineupOg = { 
+            type: 'pitch', 
+            label: 'STARTING XI', 
+            home: newState.home_team, 
+            away: newState.away_team, 
+            homeFormation: newState.lineups?.formations?.home || '4-3-3',
+            awayFormation: newState.lineups?.formations?.away || '4-3-3',
+            homeXI: newValidH.slice(0, 11),
+            awayXI: newValidA.slice(0, 11)
+        };
         const lineupBase64 = encodeURIComponent(Buffer.from(JSON.stringify(lineupOg)).toString('base64'));
         payload.xImageUrl = `${imageUrl}/api/og?data=${lineupBase64}&ext=.png`;
     } 
     else if (oldWasIncomplete && !newIsComplete && (newValidH.length > 0 || newValidA.length > 0)) {
         return NextResponse.json({ message: "Lineups still incomplete." });
     } 
-    else if (['PRE_MATCH', 'SCHEDULED', 'PRE', 'NS'].includes(oldState.status) && ['IN_PLAY', 'LIVE', '1H'].includes(newState.status)) {
+    // 🟢 1H KICK-OFF
+    else if (preStatuses.includes(oldStatus) && live1HStatuses.includes(newStatus)) {
         payload.fb1Message = `⏱️ KICK-OFF!\n\nWe are officially underway: ${newState.home_team} vs ${newState.away_team}.\n\nFollow live updates here:\n👇\n${matchUrl}`;
+        payload.xMessage = `⏱️ KICK-OFF!\n\nWe are officially underway.\n\n👇 Live updates:\n${matchUrl}\n\n${hashtags}`;
     }
-    else if (!htStatuses.includes(oldState.status) && htStatuses.includes(newState.status)) {
+    // 🟢 HALF-TIME (FB1 ONLY - Saves Make.com Limits!)
+    else if (!htStatuses.includes(oldStatus) && htStatuses.includes(newStatus)) {
         payload.fb1Message = `⏸️ HALF TIME.\n\nHow do you rate the first half performance?\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇 Match Stats so far:\n${matchUrl}`;
     }
-    else if (!strictlyFinishedStatuses.includes(oldState.status) && strictlyFinishedStatuses.includes(newState.status)) {
+    // 🟢 2H KICK-OFF (FB1 ONLY - Saves Make.com Limits!)
+    else if (htStatuses.includes(oldStatus) && (live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus))) {
+        payload.fb1Message = `⏱️ SECOND HALF KICK-OFF!\n\nWe are back underway: ${newState.home_team} vs ${newState.away_team}.\n\nFollow the action here:\n👇\n${matchUrl}`;
+    }
+    // 🟢 FULL TIME
+    else if (!strictlyFinishedStatuses.includes(oldStatus) && strictlyFinishedStatuses.includes(newStatus)) {
         payload.fb1Message = `⏹️ FULL TIME!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\nMatch stats and ratings available now:\n👇\n${matchUrl}`;
-        payload.xMessage = `⏹️ FULL TIME.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}. Rate the performance!`;
+        
+        payload.xMessage = `⏹️ FULL TIME.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}.\n\n👇 Stats:\n${matchUrl}\n\n${hashtags}`;
+        
         const ftOg = { type: 'versus', label: 'FULL TIME', home: newState.home_team, away: newState.away_team, hScore: newState.home_score, aScore: newState.away_score };
         const ftBase64 = encodeURIComponent(Buffer.from(JSON.stringify(ftOg)).toString('base64'));
         payload.xImageUrl = `${imageUrl}/api/og?data=${ftBase64}&ext=.png`;
@@ -135,7 +183,7 @@ export async function POST(request: Request) {
     // Post to Facebook & Twitter
     await postToSocials(payload);
 
-    // 🟢 NEW: INSTANT GOOGLE INDEXING PING
+    // INSTANT GOOGLE INDEXING PING
     try {
         await fetch(`${frontendUrl}/api/index-url`, {
             method: 'POST',
