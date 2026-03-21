@@ -4,22 +4,17 @@ import Link from 'next/link';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget'; 
 import { getLeagueAssets } from '@/app/lib/league-assets';
 import MatchTime from '@/app/components/MatchTime';
-import { MapPin, Trophy, Calendar, Percent, Flag, Zap } from 'lucide-react';
+import { MapPin, Trophy, Calendar, Flag, Zap } from 'lucide-react';
+import SocialShareButton from './SocialShareButton';
+import GoalAlertToggler from './GoalAlertToggler';
 
-// 🟢 HELPER: Group multiple goals by the same player (e.g., "Saka 14', 45' (PEN)")
 const formatGoals = (goals: any[]) => {
     const grouped: Record<string, string[]> = {};
     goals.forEach(g => {
-        // 1. Clean the player name (removes the "(Assist: ...)" part)
         let cleanName = g.player.split('(')[0].trim(); 
-        
-        // Fallback just in case the shredder missed the name
         if (cleanName === 'Goal Confirmed') cleanName = 'Unknown Player';
 
-        // 2. Clean the time string
-        let cleanTime = g.time.replace("'", ""); 
-        
-        // 3. Add Google/ESPN style tags for Own Goals and Penalties
+        let cleanTime = g.time?.replace("'", "") || ""; 
         if (g.text === 'Own Goal') cleanTime += ' (OG)';
         if (g.text === 'Penalty Goal') cleanTime += ' (PEN)';
 
@@ -27,7 +22,6 @@ const formatGoals = (goals: any[]) => {
         grouped[cleanName].push(cleanTime);
     });
     
-    // 4. Format them together perfectly
     return Object.entries(grouped).map(([name, times]) => `${name} ${times.join("', ")}'`);
 };
 
@@ -37,7 +31,6 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   
   const hasFetchedLive = useRef(false);
-
   const [homeFlash, setHomeFlash] = useState(false);
   const [awayFlash, setAwayFlash] = useState(false);
   const prevHomeScore = useRef(initialData?.home_score || 0);
@@ -78,8 +71,8 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                   status: payload.status, 
                   home_score: payload.home_score, 
                   away_score: payload.away_score,
-                  widget_id: payload.widget_id || prev.widget_id,
-                  displayClock: payload.displayClock
+                  displayClock: payload.displayClock,
+                  events: payload.events || prev.events
               }));
 
               if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
@@ -121,13 +114,12 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
       refName = typeof initialData.referees[0] === 'string' ? initialData.referees[0] : initialData.referees[0].name;
   }
 
-  // Extract Form & Goals
   const homeForm = initialData?.home_form || [];
   const awayForm = initialData?.away_form || [];
-  const events = initialData?.events || data?.events || [];
+  const events = data?.events || initialData?.events || [];
   
-  const homeGoals = events.filter((e: any) => e.type === 'goal' && e.team === 'home');
-  const awayGoals = events.filter((e: any) => e.type === 'goal' && e.team === 'away');
+  const homeGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'home' || e.player?.includes(homeTeamName)));
+  const awayGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'away' || e.player?.includes(awayTeamName)));
 
   return (
     <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
@@ -138,27 +130,20 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
 
         <div className="relative z-10 px-2 py-3 md:py-4">
             <div className="flex justify-between items-start max-w-lg mx-auto">
-                
-                {/* HOME TEAM */}
                 <div className="flex flex-col items-center w-[30%]">
                     <Link href={`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center group active:scale-95 transition-transform w-full">
                         <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
                             {dbData?.home_logo && <img src={dbData.home_logo} className="w-full h-full object-contain" alt="" />}
                         </div>
                         <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{homeTeamName}</h2>
-                        
                         {homeForm.length > 0 && (
                             <div className="flex items-center gap-[2px] mt-1 drop-shadow-md">
                                 {homeForm.map((f: string, i: number) => (
-                                    <span key={i} className={`w-2 h-2 md:w-2.5 md:h-2.5 flex items-center justify-center text-[5px] md:text-[6px] font-black text-white rounded-sm ${f === 'W' ? 'bg-green-500' : f === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>
-                                        {f}
-                                    </span>
+                                    <span key={i} className={`w-2 h-2 flex items-center justify-center text-[5px] font-black text-white rounded-sm ${f === 'W' ? 'bg-green-500' : f === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>{f}</span>
                                 ))}
                             </div>
                         )}
                     </Link>
-
-                    {/* 🟢 ESPN STYLE GOAL SCORERS (HOME) */}
                     {isFinished && homeGoals.length > 0 && (
                         <div className="mt-2 flex flex-col items-center gap-0.5 max-w-full px-1">
                             {formatGoals(homeGoals).map((txt, i) => (
@@ -170,7 +155,6 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                     )}
                 </div>
                 
-                {/* SCORES */}
                 <div className="flex flex-col items-center justify-start pt-2 w-[40%] drop-shadow-lg">
                     {isLive && (
                         <div className="flex items-center gap-1 bg-red-600/90 text-white text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded-sm animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.5)] mb-1">
@@ -194,26 +178,20 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                     )}
                 </div>
 
-                {/* AWAY TEAM */}
                 <div className="flex flex-col items-center w-[30%]">
                     <Link href={`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center group active:scale-95 transition-transform w-full">
                         <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
                             {dbData?.away_logo && <img src={dbData.away_logo} className="w-full h-full object-contain" alt="" />}
                         </div>
                         <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{awayTeamName}</h2>
-                        
                         {awayForm.length > 0 && (
                             <div className="flex items-center gap-[2px] mt-1 drop-shadow-md">
                                 {awayForm.map((f: string, i: number) => (
-                                    <span key={i} className={`w-2 h-2 md:w-2.5 md:h-2.5 flex items-center justify-center text-[5px] md:text-[6px] font-black text-white rounded-sm ${f === 'W' ? 'bg-green-500' : f === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>
-                                        {f}
-                                    </span>
+                                    <span key={i} className={`w-2 h-2 flex items-center justify-center text-[5px] font-black text-white rounded-sm ${f === 'W' ? 'bg-green-500' : f === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>{f}</span>
                                 ))}
                             </div>
                         )}
                     </Link>
-
-                    {/* 🟢 ESPN STYLE GOAL SCORERS (AWAY) */}
                     {isFinished && awayGoals.length > 0 && (
                         <div className="mt-2 flex flex-col items-center gap-0.5 max-w-full px-1">
                             {formatGoals(awayGoals).map((txt, i) => (
@@ -227,13 +205,26 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
             </div>
         </div>
 
-        {/* Info Bar */}
-        <div className="relative z-10 w-full bg-black/40 backdrop-blur-sm border-t border-white/5 py-1.5 px-2 flex justify-center items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide text-[7px] md:text-[8px] font-bold text-slate-300 uppercase tracking-widest whitespace-nowrap drop-shadow-md">
-            {formattedDate && <span className="flex items-center gap-1"><Calendar size={9} className="text-blue-400"/> {formattedDate}</span>}
-            {initialData?.venue && <span className="flex items-center gap-1"><MapPin size={9} className="text-red-400"/> {initialData.venue}</span>}
-            {initialData?.stage && <span className="flex items-center gap-1"><Trophy size={9} className="text-yellow-500"/> {initialData.stage.replace(/_/g, ' ')}</span>}
-            {refName && <span className="flex items-center gap-1"><Flag size={9} className="text-slate-400"/> {refName}</span>}
-            {initialData?.predictor && <span className="flex items-center gap-1 text-green-400"><Percent size={9}/> {parseFloat(String(initialData.predictor.home)).toFixed(0)}% / {parseFloat(String(initialData.predictor.away)).toFixed(0)}%</span>}
+        <div className="relative z-10 w-full bg-black/40 backdrop-blur-sm border-t border-white/5 py-1.5 px-2 flex justify-between items-center drop-shadow-md">
+            <div className="flex items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide text-[7px] md:text-[8px] font-bold text-slate-300 uppercase tracking-widest whitespace-nowrap">
+                {formattedDate && <span className="flex items-center gap-1"><Calendar size={9} className="text-blue-400"/> {formattedDate}</span>}
+                {initialData?.venue && <span className="flex items-center gap-1"><MapPin size={9} className="text-red-400"/> {initialData.venue}</span>}
+                {initialData?.stage && <span className="flex items-center gap-1"><Trophy size={9} className="text-yellow-500"/> {initialData.stage.replace(/_/g, ' ')}</span>}
+                {refName && <span className="flex items-center gap-1"><Flag size={9} className="text-slate-400"/> {refName}</span>}
+            </div>
+            
+            {/* 🟢 ALERTS AND SHARE BUTTONS RIGHT HERE */}
+            <div className="pl-2 border-l border-white/10 shrink-0 flex items-center gap-1.5 md:gap-2">
+                <GoalAlertToggler 
+                    matchId={matchId} 
+                    homeTeam={homeTeamName} 
+                    awayTeam={awayTeamName} 
+                    currentHomeScore={data?.home_score} 
+                    currentAwayScore={data?.away_score} 
+                    status={data?.status} 
+                />
+                <SocialShareButton matchData={{ ...data, id: matchId, home_team: homeTeamName, away_team: awayTeamName }} />
+            </div>
         </div>
     </div>
   );
