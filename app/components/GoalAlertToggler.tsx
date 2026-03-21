@@ -26,11 +26,12 @@ export default function GoalAlertToggler({ matchId, homeTeam, awayTeam, currentH
         const newAway = parseInt(currentAwayScore || '0');
 
         if (newHome > lastHome || newAway > lastAway) {
+            // 🟢 FIX: Added "as any" to bypass TypeScript's strict DOM checks
             new Notification(`🚨 GOAL ALERT!`, {
                 body: `${homeTeam} ${newHome} - ${newAway} ${awayTeam}`,
                 icon: '/logo.png',
                 vibrate: [200, 100, 200]
-            });
+            } as any);
             
             localStorage.setItem(`home_score_${matchId}`, newHome.toString());
             localStorage.setItem(`away_score_${matchId}`, newAway.toString());
