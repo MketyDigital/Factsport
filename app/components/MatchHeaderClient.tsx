@@ -10,16 +10,10 @@ import { MapPin, Trophy, Calendar, Percent, Flag, Zap } from 'lucide-react';
 const formatGoals = (goals: any[]) => {
     const grouped: Record<string, string[]> = {};
     goals.forEach(g => {
-        // 1. Clean the player name (removes the "(Assist: ...)" part)
         let cleanName = g.player.split('(')[0].trim(); 
-        
-        // Fallback just in case the shredder missed the name
         if (cleanName === 'Goal Confirmed') cleanName = 'Unknown Player';
 
-        // 2. Clean the time string
-        let cleanTime = g.time.replace("'", ""); 
-        
-        // 3. Add Google/ESPN style tags for Own Goals and Penalties
+        let cleanTime = g.time?.replace("'", "") || ""; 
         if (g.text === 'Own Goal') cleanTime += ' (OG)';
         if (g.text === 'Penalty Goal') cleanTime += ' (PEN)';
 
@@ -27,7 +21,6 @@ const formatGoals = (goals: any[]) => {
         grouped[cleanName].push(cleanTime);
     });
     
-    // 4. Format them together perfectly
     return Object.entries(grouped).map(([name, times]) => `${name} ${times.join("', ")}'`);
 };
 
@@ -79,7 +72,8 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                   home_score: payload.home_score, 
                   away_score: payload.away_score,
                   widget_id: payload.widget_id || prev.widget_id,
-                  displayClock: payload.displayClock
+                  displayClock: payload.displayClock,
+                  events: payload.events || prev.events // 🟢 Safely merge live events
               }));
 
               if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
@@ -121,13 +115,13 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
       refName = typeof initialData.referees[0] === 'string' ? initialData.referees[0] : initialData.referees[0].name;
   }
 
-  // Extract Form & Goals
   const homeForm = initialData?.home_form || [];
   const awayForm = initialData?.away_form || [];
-  const events = initialData?.events || data?.events || [];
+  const events = data?.events || initialData?.events || [];
   
-  const homeGoals = events.filter((e: any) => e.type === 'goal' && e.team === 'home');
-  const awayGoals = events.filter((e: any) => e.type === 'goal' && e.team === 'away');
+  // 🟢 BULLETPROOF FILTER: Checks e.team OR checks if the player string contains the team name
+  const homeGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'home' || e.player?.includes(homeTeamName)));
+  const awayGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'away' || e.player?.includes(awayTeamName)));
 
   return (
     <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
@@ -158,7 +152,6 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                         )}
                     </Link>
 
-                    {/* 🟢 ESPN STYLE GOAL SCORERS (HOME) */}
                     {isFinished && homeGoals.length > 0 && (
                         <div className="mt-2 flex flex-col items-center gap-0.5 max-w-full px-1">
                             {formatGoals(homeGoals).map((txt, i) => (
@@ -213,7 +206,6 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                         )}
                     </Link>
 
-                    {/* 🟢 ESPN STYLE GOAL SCORERS (AWAY) */}
                     {isFinished && awayGoals.length > 0 && (
                         <div className="mt-2 flex flex-col items-center gap-0.5 max-w-full px-1">
                             {formatGoals(awayGoals).map((txt, i) => (
@@ -227,13 +219,11 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
             </div>
         </div>
 
-        {/* Info Bar */}
         <div className="relative z-10 w-full bg-black/40 backdrop-blur-sm border-t border-white/5 py-1.5 px-2 flex justify-center items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide text-[7px] md:text-[8px] font-bold text-slate-300 uppercase tracking-widest whitespace-nowrap drop-shadow-md">
             {formattedDate && <span className="flex items-center gap-1"><Calendar size={9} className="text-blue-400"/> {formattedDate}</span>}
             {initialData?.venue && <span className="flex items-center gap-1"><MapPin size={9} className="text-red-400"/> {initialData.venue}</span>}
             {initialData?.stage && <span className="flex items-center gap-1"><Trophy size={9} className="text-yellow-500"/> {initialData.stage.replace(/_/g, ' ')}</span>}
             {refName && <span className="flex items-center gap-1"><Flag size={9} className="text-slate-400"/> {refName}</span>}
-            {initialData?.predictor && <span className="flex items-center gap-1 text-green-400"><Percent size={9}/> {parseFloat(String(initialData.predictor.home)).toFixed(0)}% / {parseFloat(String(initialData.predictor.away)).toFixed(0)}%</span>}
         </div>
     </div>
   );
