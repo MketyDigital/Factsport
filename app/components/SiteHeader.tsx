@@ -47,7 +47,7 @@ export default function SiteHeader() {
             </Link>
         </div>
 
-        {/* BOTTOM ROW: ESPN-Style Scrollable App Menu */}
+        {/* BOTTOM ROW: Scrollable App Menu */}
         <div className="flex items-center overflow-x-auto px-3 py-2 gap-4 sm:gap-8 md:justify-center hide-scrollbar">
             
             <Link href="/news" className="shrink-0 flex flex-col items-center gap-1 min-w-[56px] text-slate-400 hover:text-white transition-colors group">
@@ -62,12 +62,12 @@ export default function SiteHeader() {
 
             <Link href="/highlights" className="shrink-0 flex flex-col items-center gap-1 min-w-[56px] text-slate-400 hover:text-white transition-colors group">
                 <PlayCircle size={18} className="group-hover:scale-110 transition-transform" />
-                <span className="text-[9px] font-bold uppercase tracking-wider">Video</span>
+                <span className="text-[9px] font-bold uppercase tracking-wider">Videos</span>
             </Link>
 
             <Link href="/vip/upgrade" className="shrink-0 flex flex-col items-center gap-1 min-w-[56px] text-slate-400 hover:text-white transition-colors group">
                 <Trophy size={18} className="text-yellow-500 group-hover:scale-110 transition-transform" />
-                <span className="text-[9px] font-bold uppercase tracking-wider text-yellow-500">Predict</span>
+                <span className="text-[9px] font-bold uppercase tracking-wider text-yellow-500">Predict & Win</span>
             </Link>
 
             {/* DYNAMIC ACCOUNT ITEM */}
