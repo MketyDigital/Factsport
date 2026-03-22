@@ -59,7 +59,6 @@ async function generateDailySummaries() {
     for (const [leagueName, leagueMatches] of Object.entries(leagues)) {
         matchSummaries += `\n### ${leagueName}:\n`;
         leagueMatches.forEach(m => {
-            // 🟢 CHANGED: Shortcode format
             matchSummaries += `- ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} | EXACT SHORTCODE TO USE: [MATCH_WIDGET:${m.id}]\n`;
         });
     }
@@ -76,7 +75,7 @@ async function generateDailySummaries() {
 
         STRICT FACTUAL GUIDELINES:
         1. ZERO HALLUCINATIONS: Do NOT invent or name any specific goalscorers, players, or managers. Focus entirely on the team performance, the final scoreline, and the tactical battle.
-        2. EMBEDDING MATCHES: When you finish discussing a match result, you MUST paste its "EXACT SHORTCODE TO USE" on a brand new, empty line. NEVER attach commas, periods, or other words to the shortcode.
+        2. EMBEDDING MATCHES: When you finish discussing a match result, you MUST paste its "EXACT SHORTCODE TO USE" on a brand new line all by itself. DO NOT add punctuation, bolding, or extra words to the shortcode. Just the raw code.
         3. Headline: Catchy and dramatic, covering the global day of football. Under 10 words. Do not use asterisks (*).
         4. Length: 500-800 words. Plain text only.
         5. FACEBOOK SUMMARY: At the very end, skip a line and write the exact text "FB_POST:" followed by a comprehensive Facebook post. You MUST mention ALL the major results and scorelines across every league provided. 
@@ -117,7 +116,6 @@ async function generateDailySummaries() {
             
             const articleUrl = `https://factsport.com/news/${reportSlug}`;
 
-            // 🟢 NEW: INSTANT GOOGLE INDEXING PING
             try {
                 const pingRes = await fetch('https://factsport.com/api/index-url', {
                     method: 'POST',
@@ -129,7 +127,7 @@ async function generateDailySummaries() {
                 });
                 if (pingRes.ok) console.log(`   🚀 Successfully pinged Google Indexing API`);
                 else console.error(`   ⚠️ Google Ping failed:`, pingRes.status);
-            } catch (pingError) {
+            } catch (pingError: any) {
                 console.error(`   ❌ Google Ping Network Error:`, pingError.message);
             }
 
@@ -145,7 +143,7 @@ async function generateDailySummaries() {
                 });
             }
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error(`   🔥 Gemini Error: ${e.message}`);
     }
 }
