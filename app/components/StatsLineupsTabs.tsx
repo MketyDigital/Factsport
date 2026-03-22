@@ -1,12 +1,10 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { BarChart2, Users } from 'lucide-react';
 import PitchLineup from './PitchLineup';
-import MatchMomentum from './MatchMomentum';
 import MatchTimeline from './MatchTimeline';
 import PlayerRatingsWidget from './PlayerRatingsWidget';
 
-// 🟢 BULLETPROOF EVENT PARSER
 const getSafeEvents = (dataEvs: any, initialEvs: any, dbEvs: any) => {
     let raw = dataEvs || initialEvs || dbEvs || [];
     if (typeof raw === 'string') {
@@ -21,7 +19,7 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
   const [liveData, setLiveData] = useState({
       stats: initialData?.stats || { home: {}, away: {} },
       lineups: initialData?.lineups || { home: [], away: [], formations: { home: null, away: null } },
-      events: getSafeEvents(null, initialData?.events || initialData?.match_events, dbData?.match_events)
+      rawEvents: initialData?.events || initialData?.match_events || dbData?.match_events || []
   });
   
   const hasFetchedLive = useRef(false);
@@ -32,7 +30,7 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
           setLiveData({
               stats: initialData?.stats || { home: {}, away: {} },
               lineups: initialData?.lineups || { home: [], away: [], formations: { home: null, away: null } },
-              events: getSafeEvents(null, initialData?.events || initialData?.match_events, dbData?.match_events)
+              rawEvents: initialData?.events || initialData?.match_events || dbData?.match_events || []
           });
       }
   }, [initialData, dbData]);
@@ -55,11 +53,32 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
               const payload = await res.json();
               if (payload && !payload.error && isMounted) {
                   hasFetchedLive.current = true;
-                  setLiveData(prev => ({
-                      stats: payload.stats || prev.stats,
-                      lineups: payload.lineups || prev.lineups,
-                      events: getSafeEvents(payload.events || payload.match_events, null, null)
-                  }));
+                  
+                  setLiveData(prev => {
+                      const oldHomePoss = prev.stats?.home?.possession;
+                      const newHomePoss = payload.stats?.home?.possession;
+                      const oldEventsLen = (prev.rawEvents || []).length;
+                      const newEventsLen = (payload.events || payload.match_events || []).length;
+                      const oldStatus = prev.stats?.status;
+                      const newStatus = payload.stats?.status;
+
+                      // 🟢 INJURY SWAP DETECTOR: Cheaply checks if the actual lineups changed.
+                      const oldLineupsStr = JSON.stringify(prev.lineups || {});
+                      const newLineupsStr = JSON.stringify(payload.lineups || {});
+                      const lineupsChanged = oldLineupsStr !== newLineupsStr;
+
+                      // If NOTHING changed, abort the re-render completely!
+                      if (oldHomePoss === newHomePoss && oldEventsLen === newEventsLen && oldStatus === newStatus && !lineupsChanged) {
+                          return prev; 
+                      }
+
+                      return {
+                          stats: payload.stats || prev.stats,
+                          lineups: lineupsChanged ? payload.lineups : prev.lineups, 
+                          rawEvents: payload.events || payload.match_events || prev.rawEvents 
+                      };
+                  });
+
                   if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
                       isFetching.current = false;
                       return; 
@@ -72,7 +91,8 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
       }
       
       if (isMounted) {
-          timeoutId = setTimeout(fetchStatsData, 5000); 
+          // 8 seconds is the sweet spot. Keeps stats updated without burning the phone's battery.
+          timeoutId = setTimeout(fetchStatsData, 8000); 
       }
     };
 
@@ -84,7 +104,8 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
     };
   }, [initialData?.status, initialData?.espn_id]);
 
-  const { stats, lineups, events } = liveData;
+  const { stats, lineups, rawEvents } = liveData;
+  const events = useMemo(() => getSafeEvents(rawEvents, null, null), [rawEvents]);
 
   const getSafeShots = (teamStats: any) => {
       if (!teamStats) return '0';
@@ -96,12 +117,11 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
 
   const homeShotsOn = stats?.home?.shotsOnTarget || stats?.home?.shots_on_target || '0';
   const awayShotsOn = stats?.away?.shotsOnTarget || stats?.away?.shots_on_target || '0';
-  
   const showTargetStats = parseInt(homeShotsOn) > 0 || parseInt(awayShotsOn) > 0;
   const hasStats = stats?.home?.possession || getSafeShots(stats?.home) !== '0' || stats?.home?.corners;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full flex flex-col">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full flex flex-col mt-4">
       <div className="flex border-b border-slate-200 bg-slate-50">
         <button onClick={() => setActiveTab('stats')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition-colors ${activeTab === 'stats' ? 'text-blue-600 bg-white border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-700'}`}>
             <BarChart2 size={14} /> Match Stats
@@ -114,8 +134,6 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
       <div className="p-4 min-h-[250px] bg-white">
         {activeTab === 'stats' && (
             <div className="space-y-4">
-                <MatchMomentum events={events || []} />
-
                 {!hasStats ? <div className="text-center py-10 opacity-50"><p className="text-xs font-bold tracking-widest uppercase">Stats updating...</p></div> : <>
                     <StatRow label="Possession" home={stats?.home?.possession || '50%'} away={stats?.away?.possession || '50%'} />
                     <StatRow label="Total Shots" home={getSafeShots(stats?.home)} away={getSafeShots(stats?.away)} />
@@ -124,11 +142,9 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
                     <StatRow label="Fouls" home={stats?.home?.fouls || '0'} away={stats?.away?.fouls || '0'} />
                     <StatRow label="Saves" home={stats?.home?.saves || '0'} away={stats?.away?.saves || '0'} />
                 </>}
-                
-                <MatchTimeline events={events || []} />
+                <MatchTimeline events={events} />
             </div>
         )}
-        
         {activeTab === 'lineups' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 -m-4">
                 <PitchLineup data={{ lineups: liveData.lineups }} dbData={dbData} />

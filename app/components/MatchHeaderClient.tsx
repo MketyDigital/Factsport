@@ -1,12 +1,10 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget'; 
 import { getLeagueAssets } from '@/app/lib/league-assets';
 import MatchTime from '@/app/components/MatchTime';
 import { MapPin, Trophy, Calendar, Flag, Zap } from 'lucide-react';
-import SocialShareButton from './SocialShareButton';
-import GoalAlertToggler from './GoalAlertToggler';
 
 const formatGoals = (goals: any[]) => {
     const grouped: Record<string, string[]> = {};
@@ -24,7 +22,6 @@ const formatGoals = (goals: any[]) => {
     return Object.entries(grouped).map(([name, times]) => `${name} ${times.join("', ")}'`);
 };
 
-// 🟢 BULLETPROOF EVENT PARSER
 const getSafeEvents = (dataEvs: any, initialEvs: any, dbEvs: any) => {
     let raw = dataEvs || initialEvs || dbEvs || [];
     if (typeof raw === 'string') {
@@ -53,7 +50,6 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
     let timeoutId: NodeJS.Timeout;
     
     const isFinishedInitially = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(initialData?.status);
-    
     if (isFinishedInitially || hasPremiumWidget || !initialData?.espn_id) return;
 
     const fetchHeaderData = async () => {
@@ -68,23 +64,43 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
               if (payload && !payload.error && isMounted) {
                   hasFetchedLive.current = true; 
                   
-                  if (payload.home_score > prevHomeScore.current) {
-                      setHomeFlash(true); setTimeout(() => setHomeFlash(false), 5000);
-                  }
-                  if (payload.away_score > prevAwayScore.current) {
-                      setAwayFlash(true); setTimeout(() => setAwayFlash(false), 5000);
-                  }
-                  prevHomeScore.current = payload.home_score;
-                  prevAwayScore.current = payload.away_score;
+                  // 🟢 THE MEMORY SHIELD: Prevents infinite re-renders
+                  setData((prev:any) => {
+                      const oldClock = prev.displayClock || '';
+                      const newClock = payload.displayClock || '';
+                      const oldStatus = prev.status || '';
+                      const newStatus = payload.status || '';
+                      const eventsChanged = (payload.events?.length || 0) !== (prev.events?.length || 0);
+                      
+                      const noChanges = 
+                          prev.home_score === payload.home_score && 
+                          prev.away_score === payload.away_score && 
+                          oldClock === newClock && 
+                          oldStatus === newStatus &&
+                          !eventsChanged;
 
-                  setData((prev:any) => ({ 
-                      ...prev, 
-                      status: payload.status, 
-                      home_score: payload.home_score, 
-                      away_score: payload.away_score,
-                      displayClock: payload.displayClock,
-                      events: payload.events || payload.match_events || prev.events
-                  }));
+                      // Abort re-render to save RAM!
+                      if (noChanges) return prev;
+
+                      if (payload.home_score > prevHomeScore.current) {
+                          setHomeFlash(true); setTimeout(() => setHomeFlash(false), 5000);
+                      }
+                      if (payload.away_score > prevAwayScore.current) {
+                          setAwayFlash(true); setTimeout(() => setAwayFlash(false), 5000);
+                      }
+                      
+                      prevHomeScore.current = payload.home_score;
+                      prevAwayScore.current = payload.away_score;
+
+                      return { 
+                          ...prev, 
+                          status: payload.status, 
+                          home_score: payload.home_score, 
+                          away_score: payload.away_score,
+                          displayClock: payload.displayClock,
+                          events: payload.events || payload.match_events || prev.events
+                      };
+                  });
 
                   if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
                       isFetching.current = false;
@@ -131,16 +147,15 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
   const homeForm = initialData?.home_form || [];
   const awayForm = initialData?.away_form || [];
   
-  // 🟢 SAFELY EXTRACT EVENTS (Checks Live State, Initial State, AND Database String)
-  const events = getSafeEvents(data?.events || data?.match_events, initialData?.events || initialData?.match_events, dbData?.match_events);
-  
-  const homeGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'home' || (e.player && e.player.toLowerCase().includes(homeTeamName.toLowerCase()))));
-  const awayGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'away' || (e.player && e.player.toLowerCase().includes(awayTeamName.toLowerCase()))));
+  const events = useMemo(() => getSafeEvents(data?.events || data?.match_events, initialData?.events || initialData?.match_events, dbData?.match_events), [data?.events, data?.match_events]);
+  const homeGoals = useMemo(() => events.filter((e: any) => e.type === 'goal' && (e.team === 'home' || (e.player && e.player.toLowerCase().includes(homeTeamName.toLowerCase())))), [events, homeTeamName]);
+  const awayGoals = useMemo(() => events.filter((e: any) => e.type === 'goal' && (e.team === 'away' || (e.player && e.player.toLowerCase().includes(awayTeamName.toLowerCase())))), [events, awayTeamName]);
 
   return (
     <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
         <div className="absolute inset-0 z-0 pointer-events-none">
-            <img src={leagueData.bg} alt="Stadium" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen" />
+            {/* 🟢 GPU FIX: Added decoding="async" and removed mix-blend mode */}
+            <img src={leagueData.bg} alt="Stadium" decoding="async" fetchPriority="high" loading="eager" className="absolute inset-0 w-full h-full object-cover opacity-20" />
             <div className="absolute inset-0 bg-gradient-to-b from-[#0a1428]/60 via-[#0a1428]/50 to-[#0a1428]/90" />
         </div>
 
@@ -160,7 +175,6 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                             </div>
                         )}
                     </Link>
-                    {/* 🟢 SCORERS WILL NOW ALWAYS RENDER IF THERE ARE GOALS */}
                     {(isFinished || isLive) && homeGoals.length > 0 && (
                         <div className="mt-2 flex flex-col items-center gap-0.5 max-w-full px-1">
                             {formatGoals(homeGoals).map((txt, i) => (
@@ -228,11 +242,6 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                 {initialData?.venue && <span className="flex items-center gap-1"><MapPin size={9} className="text-red-400"/> {initialData.venue}</span>}
                 {initialData?.stage && <span className="flex items-center gap-1"><Trophy size={9} className="text-yellow-500"/> {initialData.stage.replace(/_/g, ' ')}</span>}
                 {refName && <span className="flex items-center gap-1"><Flag size={9} className="text-slate-400"/> {refName}</span>}
-            </div>
-            
-            <div className="pl-2 border-l border-white/10 shrink-0 flex items-center gap-1.5 md:gap-2">
-                <GoalAlertToggler matchId={matchId} homeTeam={homeTeamName} awayTeam={awayTeamName} currentHomeScore={data?.home_score} currentAwayScore={data?.away_score} status={data?.status} />
-                <SocialShareButton matchData={{ ...data, id: matchId, home_team: homeTeamName, away_team: awayTeamName }} />
             </div>
         </div>
     </div>
