@@ -19,7 +19,7 @@ export default function LiveScoreLabel({
       }
   }, [initialStatus, homeScore, awayScore]);
 
-  // 🟢 RECURSIVE POLLING + WORKER ONLY
+  // 🟢 RECURSIVE POLLING + HEARTBEAT + WORKER ONLY
   useEffect(() => {
     let isMounted = true;
     let timeoutId: NodeJS.Timeout;
@@ -28,34 +28,47 @@ export default function LiveScoreLabel({
     if (FINISHED_STATUSES.includes(currentDataStatus) || !espnId) return;
 
     const fetchLiveScore = async () => {
-      if (isFetching.current || !isMounted || document.visibilityState !== 'visible') return;
-      isFetching.current = true;
+      if (!isMounted) return; // Completely dead if component unmounts
 
-      try {
-          const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${espnId}&t=${Date.now()}`);
-          if (res.ok) {
-              const matchData = await res.json();
-              if (matchData && !matchData.error && isMounted) {
-                  hasFetchedLive.current = true; 
-                  setData({ 
-                      status: matchData.status, 
-                      home: matchData.home_score, 
-                      away: matchData.away_score,
-                      clock: matchData.displayClock
-                  });
+      let matchFinished = false;
 
-                  if (FINISHED_STATUSES.includes((matchData.status || '').toUpperCase())) {
-                      isFetching.current = false;
-                      return; // Stop polling
+      // 🟢 HEARTBEAT FIX: Only fetch if visible, but NEVER 'return' and kill the loop!
+      if (document.visibilityState === 'visible' && !isFetching.current) {
+          isFetching.current = true;
+
+          try {
+              const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${espnId}&t=${Date.now()}`);
+              if (res.ok) {
+                  const matchData = await res.json();
+                  if (matchData && !matchData.error && isMounted) {
+                      hasFetchedLive.current = true; 
+                      
+                      // 🟢 O(1) SHALLOW DIFF: Only update React if numbers actually changed
+                      setData(prev => {
+                          if (prev.status === matchData.status && prev.home === matchData.home_score && prev.away === matchData.away_score && prev.clock === matchData.displayClock) {
+                              return prev; // Abort re-render to save CPU!
+                          }
+                          return { 
+                              status: matchData.status, 
+                              home: matchData.home_score, 
+                              away: matchData.away_score,
+                              clock: matchData.displayClock
+                          };
+                      });
+
+                      if (FINISHED_STATUSES.includes((matchData.status || '').toUpperCase())) {
+                          matchFinished = true; // Stop polling permanently
+                      }
                   }
               }
+          } catch (error) {}
+          finally {
+              isFetching.current = false;
           }
-      } catch (error) {}
-      finally {
-          isFetching.current = false;
       }
 
-      if (isMounted) {
+      // 🟢 THE HEARTBEAT: Always schedules the next check (every 5s) to keep it alive
+      if (isMounted && !matchFinished) {
           timeoutId = setTimeout(fetchLiveScore, 5000); 
       }
     };

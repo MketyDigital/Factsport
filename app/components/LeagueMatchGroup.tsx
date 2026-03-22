@@ -31,60 +31,64 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
         });
     }, [matches]);
 
-    // 🟢 HUGE OPTIMIZATION: ONLY poll matches that are actively playing right now.
+    // 🟢 HUGE OPTIMIZATION: ONLY poll active matches + HEARTBEAT RESTORED
     useEffect(() => {
         let isMounted = true;
         let timeoutId: NodeJS.Timeout;
 
         const fetchUpdates = async () => {
-            if (isFetching.current || !isMounted || document.visibilityState !== 'visible') return;
+            if (!isMounted) return;
 
             // Only grab matches that are actually live and have an ESPN ID
             const activeLiveMatches = liveMatches.filter(m => 
                 ['LIVE', 'IN_PLAY', 'HT', '1H', '2H', 'ET', 'P'].includes((m.status || '').toUpperCase()) && m.espn_id
             );
 
+            // If no games are playing, schedule a slower 30-second heartbeat and exit early.
             if (activeLiveMatches.length === 0) {
-                // If no games are playing, check again in 30 seconds instead of 5
                 if (isMounted) timeoutId = setTimeout(fetchUpdates, 30000);
                 return;
             }
 
-            isFetching.current = true;
-            try {
-                // Fetch updates for the live matches concurrently
-                const updatePromises = activeLiveMatches.map(async (m) => {
-                    try {
-                        const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${m.espn_id}&t=${Date.now()}`);
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (!data.error) return { id: m.id, status: data.status, home_score: data.home_score, away_score: data.away_score };
+            // 🟢 HEARTBEAT FIX: Only fetch if visible, but NEVER 'return' here!
+            if (document.visibilityState === 'visible' && !isFetching.current) {
+                isFetching.current = true;
+                try {
+                    // Fetch updates for the live matches concurrently
+                    const updatePromises = activeLiveMatches.map(async (m) => {
+                        try {
+                            const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${m.espn_id}&t=${Date.now()}`);
+                            if (res.ok) {
+                                const data = await res.json();
+                                if (!data.error) return { id: m.id, status: data.status, home_score: data.home_score, away_score: data.away_score };
+                            }
+                        } catch (e) {}
+                        return null;
+                    });
+
+                    const results = await Promise.all(updatePromises);
+                    
+                    let hasChanges = false;
+                    const newLiveMatches = liveMatches.map(m => {
+                        const update = results.find(r => r && r.id === m.id);
+                        if (update && (update.status !== m.status || update.home_score !== m.home_score || update.away_score !== m.away_score)) {
+                            hasChanges = true;
+                            return { ...m, status: update.status, home_score: update.home_score, away_score: update.away_score };
                         }
-                    } catch (e) {}
-                    return null;
-                });
+                        return m;
+                    });
 
-                const results = await Promise.all(updatePromises);
-                
-                let hasChanges = false;
-                const newLiveMatches = liveMatches.map(m => {
-                    const update = results.find(r => r && r.id === m.id);
-                    if (update && (update.status !== m.status || update.home_score !== m.home_score || update.away_score !== m.away_score)) {
-                        hasChanges = true;
-                        return { ...m, status: update.status, home_score: update.home_score, away_score: update.away_score };
-                    }
-                    return m;
-                });
+                    if (hasChanges && isMounted) setLiveMatches(newLiveMatches);
 
-                if (hasChanges && isMounted) setLiveMatches(newLiveMatches);
-
-            } catch(e) { } 
-            finally {
-                isFetching.current = false;
+                } catch(e) { } 
+                finally {
+                    isFetching.current = false;
+                }
             }
 
+            // 🟢 THE HEARTBEAT: Schedules the next active check (8 seconds is best for multiple matches)
             if (isMounted) {
-                timeoutId = setTimeout(fetchUpdates, 5000); 
+                timeoutId = setTimeout(fetchUpdates, 8000); 
             }
         };
 
