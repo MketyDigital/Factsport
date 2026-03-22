@@ -32,17 +32,46 @@ export default function StickyAffiliateBanner() {
     const showFloatingAudio = mediaType === 'audio' && !isPageActive;
     const showFloatingVideo = mediaType === 'video' && !isPageActive && videoUrl;
 
+    // Helper to ensure autoplay parameters are attached safely
+    const getAutoPlayUrl = (url: string) => {
+        if (!url) return '';
+        const separator = url.includes('?') ? '&' : '?';
+        // Removes any existing autoplay tag to prevent duplicates, then forces it ON with playsinline
+        return `${url.replace(/[?&]autoplay=0/, '')}${separator}autoplay=1&playsinline=1&mute=0`;
+    };
+
     return (
         <div className="fixed bottom-4 left-0 right-0 z-[100] w-full flex flex-col items-center justify-end px-4 pointer-events-none gap-3">
             
             {/* 🟢 THE FLOATING VIDEO MINI-PLAYER (Twitch Style) */}
             {showFloatingVideo && (
-                <div className="w-full max-w-[320px] md:max-w-[400px] aspect-video bg-black rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] border-2 border-blue-500/50 overflow-hidden pointer-events-auto relative animate-in slide-in-from-bottom-10 group self-end md:self-center">
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 z-20">
-                        <Link href={activeMatchId === 'global-goal-rush' ? '/live' : `/match/${activeMatchId}`} className="p-3 bg-blue-600 rounded-full text-white hover:scale-110 transition-transform shadow-lg"><Maximize2 size={20} /></Link>
-                        <button onClick={stopMedia} className="p-3 bg-red-600 rounded-full text-white hover:scale-110 transition-transform shadow-lg"><X size={20} /></button>
+                <div className="w-full max-w-[320px] md:max-w-[400px] aspect-video bg-black rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] border border-blue-500/50 overflow-hidden pointer-events-auto relative animate-in slide-in-from-bottom-10 group self-end md:self-center flex flex-col">
+                    
+                    {/* TOP-RIGHT CONTROLS: Placed out of the way of the center Play button! */}
+                    <div className="absolute top-0 left-0 w-full h-12 bg-gradient-to-b from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end gap-2 p-2 z-20 pointer-events-none">
+                        <Link 
+                            href={activeMatchId === 'global-goal-rush' ? '/live' : `/match/${activeMatchId}`} 
+                            className="p-1.5 bg-blue-600/80 backdrop-blur rounded text-white hover:bg-blue-600 hover:scale-105 transition-all shadow-lg pointer-events-auto"
+                            title="Expand to Full Page"
+                        >
+                            <Maximize2 size={16} />
+                        </Link>
+                        <button 
+                            onClick={stopMedia} 
+                            className="p-1.5 bg-red-600/80 backdrop-blur rounded text-white hover:bg-red-600 hover:scale-105 transition-all shadow-lg pointer-events-auto"
+                            title="Close Video"
+                        >
+                            <X size={16} />
+                        </button>
                     </div>
-                    <iframe src={`${videoUrl}?autoplay=1&mute=0`} className="w-full h-full pointer-events-none" allow="autoplay; encrypted-media" />
+
+                    {/* THE IFRAME: Removed pointer-events-none so users can tap the center to play! */}
+                    <iframe 
+                        src={getAutoPlayUrl(videoUrl)} 
+                        className="w-full h-full relative z-10" 
+                        allow="autoplay; encrypted-media; picture-in-picture; fullscreen" 
+                        allowFullScreen
+                    />
                 </div>
             )}
 
