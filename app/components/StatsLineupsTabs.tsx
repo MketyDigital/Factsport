@@ -43,55 +43,57 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
     if (isFinishedInitially || !initialData?.espn_id) return;
 
     const fetchStatsData = async () => {
-      if (isFetching.current || !isMounted || document.visibilityState !== 'visible') return;
+      if (!isMounted) return; 
 
-      isFetching.current = true;
-      try {
-          let res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}&t=${Date.now()}`);
-          
-          if (res.ok) {
-              const payload = await res.json();
-              if (payload && !payload.error && isMounted) {
-                  hasFetchedLive.current = true;
-                  
-                  setLiveData(prev => {
-                      const oldHomePoss = prev.stats?.home?.possession;
-                      const newHomePoss = payload.stats?.home?.possession;
-                      const oldEventsLen = (prev.rawEvents || []).length;
-                      const newEventsLen = (payload.events || payload.match_events || []).length;
-                      const oldStatus = prev.stats?.status;
-                      const newStatus = payload.stats?.status;
+      let matchFinished = false;
 
-                      // 🟢 INJURY SWAP DETECTOR: Cheaply checks if the actual lineups changed.
-                      const oldLineupsStr = JSON.stringify(prev.lineups || {});
-                      const newLineupsStr = JSON.stringify(payload.lineups || {});
-                      const lineupsChanged = oldLineupsStr !== newLineupsStr;
+      // 🟢 HEARTBEAT FIX: Bypasses fetching when hidden, but keeps scheduling the next loop!
+      if (document.visibilityState === 'visible' && !isFetching.current) {
+          isFetching.current = true;
+          try {
+              let res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}&t=${Date.now()}`);
+              
+              if (res.ok) {
+                  const payload = await res.json();
+                  if (payload && !payload.error && isMounted) {
+                      hasFetchedLive.current = true;
+                      
+                      setLiveData(prev => {
+                          const oldHomePoss = prev.stats?.home?.possession;
+                          const newHomePoss = payload.stats?.home?.possession;
+                          const oldEventsLen = (prev.rawEvents || []).length;
+                          const newEventsLen = (payload.events || payload.match_events || []).length;
+                          const oldStatus = prev.stats?.status;
+                          const newStatus = payload.stats?.status;
 
-                      // If NOTHING changed, abort the re-render completely!
-                      if (oldHomePoss === newHomePoss && oldEventsLen === newEventsLen && oldStatus === newStatus && !lineupsChanged) {
-                          return prev; 
+                          const oldLineupsStr = JSON.stringify(prev.lineups || {});
+                          const newLineupsStr = JSON.stringify(payload.lineups || {});
+                          const lineupsChanged = oldLineupsStr !== newLineupsStr;
+
+                          if (oldHomePoss === newHomePoss && oldEventsLen === newEventsLen && oldStatus === newStatus && !lineupsChanged) {
+                              return prev; 
+                          }
+
+                          return {
+                              stats: payload.stats || prev.stats,
+                              lineups: lineupsChanged ? payload.lineups : prev.lineups, 
+                              rawEvents: payload.events || payload.match_events || prev.rawEvents 
+                          };
+                      });
+
+                      if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
+                          matchFinished = true; // Match is over, we can finally stop polling.
                       }
-
-                      return {
-                          stats: payload.stats || prev.stats,
-                          lineups: lineupsChanged ? payload.lineups : prev.lineups, 
-                          rawEvents: payload.events || payload.match_events || prev.rawEvents 
-                      };
-                  });
-
-                  if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
-                      isFetching.current = false;
-                      return; 
                   }
               }
+          } catch (error) {
+          } finally {
+              isFetching.current = false;
           }
-      } catch (error) {
-      } finally {
-          isFetching.current = false;
       }
       
-      if (isMounted) {
-          // 8 seconds is the sweet spot. Keeps stats updated without burning the phone's battery.
+      // 🟢 THE HEARTBEAT: Re-fires every 8 seconds until the game is FT.
+      if (isMounted && !matchFinished) {
           timeoutId = setTimeout(fetchStatsData, 8000); 
       }
     };
