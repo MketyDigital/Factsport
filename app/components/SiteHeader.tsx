@@ -10,20 +10,29 @@ export default function SiteHeader() {
   const supabase = createClient();
 
   useEffect(() => {
+    let isMounted = true;
+
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
-      setIsLoaded(true);
+      if (isMounted) {
+          setUser(session?.user || null);
+          setIsLoaded(true);
+      }
     };
     checkUser();
 
     // Real-time listener in case they log in/out in another tab
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user || null);
+      if (isMounted) {
+          setUser(session?.user || null);
+      }
     });
 
-    return () => { authListener.subscription.unsubscribe(); };
-  }, [supabase]);
+    return () => { 
+        isMounted = false;
+        authListener.subscription.unsubscribe(); 
+    };
+  }, []); // 🟢 FIXED: Empty array stops the infinite loop!
 
   return (
     <header className="sticky top-0 z-50 bg-[#0a1428] text-white border-b border-white/10 shadow-lg font-sans">
