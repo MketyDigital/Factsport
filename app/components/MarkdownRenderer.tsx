@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { ExternalLink, Link as LinkIcon, Trophy, Calendar, ChevronRight } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
-// 🟢 NEW: THE EMBEDDED MATCH CARD COMPONENT
+// 🟢 THE EMBEDDED MATCH CARD COMPONENT
 function EmbeddedMatchCard({ matchId }: { matchId: string }) {
     const [match, setMatch] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -26,7 +26,7 @@ function EmbeddedMatchCard({ matchId }: { matchId: string }) {
         return <div className="w-full h-[120px] bg-slate-50 rounded-2xl border border-slate-100 animate-pulse my-6"></div>;
     }
 
-    if (!match) return null; // Failsafe if the AI hallucinates a bad ID
+    if (!match) return null; 
 
     const isLive = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'P'].includes(match.status);
     const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'].includes(match.status);
@@ -80,13 +80,29 @@ function EmbeddedMatchCard({ matchId }: { matchId: string }) {
     );
 }
 
-
 export default function MarkdownRenderer({ content }: { content: string }) {
+  // 🟢 1. THE BULLETPROOF PRE-PROCESSOR
+  // This finds the shortcode (even if the closing bracket is missing) and replaces it 
+  // with an invisible HTML div that we can catch perfectly inside ReactMarkdown.
+  const processedContent = content.replace(
+      /\[MATCH_WIDGET:([a-zA-Z0-9-]+)\]?/gi, 
+      '<div class="match-widget-embed" id="$1"></div>'
+  );
+
   return (
     <ReactMarkdown
       rehypePlugins={[rehypeRaw]} 
       components={{
-        // 1. CUSTOM LINK RENDERER
+        
+        // 2. INTERCEPT THE CUSTOM DIV TO RENDER THE MATCH CARD
+        div: ({ className, id, children, ...props }) => {
+            if (className === 'match-widget-embed' && id) {
+                return <EmbeddedMatchCard matchId={id} />;
+            }
+            return <div className={className} id={id} {...props}>{children}</div>;
+        },
+
+        // CUSTOM LINK RENDERER
         a: ({ href, children, ...props }) => {
           const isInternal = href?.startsWith('/');
           const buttonClasses = "inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-lg font-black text-xs uppercase tracking-wider hover:bg-blue-600 hover:text-white transition shadow-sm border border-blue-100 my-1 no-underline group active:scale-95";
@@ -114,7 +130,7 @@ export default function MarkdownRenderer({ content }: { content: string }) {
           );
         },
 
-        // 2. CUSTOM IMAGE RENDERER
+        // CUSTOM IMAGE RENDERER
         img: ({ src, alt, ...props }) => (
           <span className="block my-6 rounded-2xl overflow-hidden shadow-lg border border-slate-100 bg-slate-50">
             <img 
@@ -128,24 +144,8 @@ export default function MarkdownRenderer({ content }: { content: string }) {
           </span>
         ),
 
-        // 🟢 3. PARAGRAPH FIX & SHORTCODE INTERCEPTOR
+        // STANDARD PARAGRAPHS
         p: ({ children, ...props }) => {
-            // Check if the paragraph is exactly our shortcode
-            let textContent = '';
-            if (typeof children === 'string') {
-                textContent = children.trim();
-            } else if (Array.isArray(children) && children.length === 1 && typeof children[0] === 'string') {
-                textContent = children[0].trim();
-            }
-
-            const widgetMatch = textContent.match(/^\[MATCH_WIDGET:([a-zA-Z0-9-]+)\]$/);
-            
-            // If it IS a shortcode, render the beautiful card!
-            if (widgetMatch) {
-                return <EmbeddedMatchCard matchId={widgetMatch[1]} />;
-            }
-
-            // Otherwise, render a normal text paragraph
             return (
               <p className="mb-4 text-slate-700 leading-relaxed" {...props}>
                 {children}
@@ -153,7 +153,7 @@ export default function MarkdownRenderer({ content }: { content: string }) {
             );
         },
 
-        // 4. IFRAME RE-SIZER
+        // IFRAME RE-SIZER
         iframe: ({ node, ...props }) => (
             <div className="w-full overflow-hidden rounded-xl my-6 flex justify-center bg-slate-50 border border-slate-100">
                 <iframe {...props} className="max-w-full" />
@@ -161,7 +161,7 @@ export default function MarkdownRenderer({ content }: { content: string }) {
         )
       }}
     >
-      {content}
+      {processedContent}
     </ReactMarkdown>
   );
 }
