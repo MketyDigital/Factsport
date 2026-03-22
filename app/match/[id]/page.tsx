@@ -16,7 +16,6 @@ import MatchMobileHub from '@/app/components/MatchMobileHub';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
 import PredictionBoard from '@/app/components/PredictionBoard';
 import HeadToHeadStats from '@/app/components/HeadToHeadStats';
-import GoalRush from '@/app/components/GoalRush'; 
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 import BettingPromo from '@/app/components/BettingPromo'; 
@@ -40,7 +39,6 @@ const getSupabaseData = cache(async (id: string) => {
     return data;
 });
 
-// 🟢 METADATA WITH REAL-TIME CLOUDFLARE SHARING
 export async function generateMetadata({ params }: { params: { id: string } }, parent: ResolvingMetadata): Promise<Metadata> {
     const resolvedParams = await params;
     const match = await getSupabaseData(resolvedParams.id);
@@ -96,15 +94,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const dbData = await getSupabaseData(resolvedParams.id);
   if (!dbData) return notFound();
 
-  const supabasePublic = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-
-  const { data: otherLiveMatches } = await supabasePublic
-      .from('matches')
-      .select('id, espn_id, home_team, away_team, home_score, away_score, status, displayClock')
-      .in('status', ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'P', 'PENALTIES'])
-      .neq('id', resolvedParams.id) 
-      .limit(8);
-
   const rawData = await getExternalData(dbData);
   const data: any = rawData || {};
   
@@ -119,11 +108,8 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const minutesToKick = (matchDateMs - Date.now()) / 60000;
   
   // 🟢 UNIVERSAL KILL SWITCH (4 Hours = 240 mins)
-  // If the match is officially finished, OR it has been 4 hours since kickoff (in case API is stuck), it's completely dead.
   const isUniversallyFinished = isFinished || minutesToKick < -240;
 
-  // 🟢 STRICT MEDIA RULES
-  // Only allow highlights (video_url) after the match is dead. Completely nuke the livestream/audio links.
   const activeVideoUrl = sanitizeUrl(isUniversallyFinished ? dbData.video_url : dbData.livestream_url);
   const activeAudioUrl = sanitizeUrl(isUniversallyFinished ? null : dbData.audio_url);
 
@@ -173,7 +159,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                   <HeadToHeadStats dbData={data} />
               </div>
 
-              {/* 🟢 The entire player block won't even render if activeVideoUrl and activeAudioUrl are null! */}
               {(activeVideoUrl || activeAudioUrl) && (
                   <div className="w-full bg-black">
                       {activeVideoUrl ? (
@@ -214,12 +199,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
 
           <div className="mt-4"><AdsterraNativeBanner /></div>
           <div className="mt-4"><FreeTipsBanner /></div>
-
-          {otherLiveMatches && otherLiveMatches.length > 0 && (
-              <div className="mt-4 pb-4">
-                  <GoalRush initialMatches={otherLiveMatches} />
-              </div>
-          )}
       </div>
     </div>
   );
