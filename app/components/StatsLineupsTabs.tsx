@@ -6,13 +6,22 @@ import MatchMomentum from './MatchMomentum';
 import MatchTimeline from './MatchTimeline';
 import PlayerRatingsWidget from './PlayerRatingsWidget';
 
+// 🟢 BULLETPROOF EVENT PARSER
+const getSafeEvents = (dataEvs: any, initialEvs: any, dbEvs: any) => {
+    let raw = dataEvs || initialEvs || dbEvs || [];
+    if (typeof raw === 'string') {
+        try { raw = JSON.parse(raw); } catch(e) { raw = []; }
+    }
+    return Array.isArray(raw) ? raw : [];
+};
+
 export default function StatsLineupsTabs({ matchId, initialData, dbData }: { matchId: string, initialData: any, dbData?: any }) {
   const [activeTab, setActiveTab] = useState<'stats' | 'lineups'>('stats');
 
   const [liveData, setLiveData] = useState({
       stats: initialData?.stats || { home: {}, away: {} },
       lineups: initialData?.lineups || { home: [], away: [], formations: { home: null, away: null } },
-      events: initialData?.events || [] 
+      events: getSafeEvents(null, initialData?.events || initialData?.match_events, dbData?.match_events)
   });
   
   const hasFetchedLive = useRef(false);
@@ -23,48 +32,43 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
           setLiveData({
               stats: initialData?.stats || { home: {}, away: {} },
               lineups: initialData?.lineups || { home: [], away: [], formations: { home: null, away: null } },
-              events: initialData?.events || []
+              events: getSafeEvents(null, initialData?.events || initialData?.match_events, dbData?.match_events)
           });
       }
-  }, [initialData]);
+  }, [initialData, dbData]);
 
   useEffect(() => {
     let isMounted = true;
     let timeoutId: NodeJS.Timeout;
 
     const isFinishedInitially = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(initialData?.status);
-    
-    // 🟢 DO NOT POLL IF NO ESPN ID OR IF MATCH IS FINISHED
     if (isFinishedInitially || !initialData?.espn_id) return;
 
     const fetchStatsData = async () => {
-      if (isFetching.current || !isMounted) return;
+      if (isFetching.current || !isMounted || document.visibilityState !== 'visible') return;
 
-      if (document.visibilityState === 'visible') {
-          isFetching.current = true;
-          try {
-              // 🟢 STRICTLY FETCH FROM CLOUDFLARE WORKER
-              let res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}&t=${Date.now()}`);
-              
-              if (res.ok) {
-                  const payload = await res.json();
-                  if (payload && !payload.error && isMounted) {
-                      hasFetchedLive.current = true;
-                      setLiveData(prev => ({
-                          stats: payload.stats || prev.stats,
-                          lineups: payload.lineups || prev.lineups,
-                          events: payload.events || prev.events 
-                      }));
-                      if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
-                          isFetching.current = false;
-                          return; 
-                      }
+      isFetching.current = true;
+      try {
+          let res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}&t=${Date.now()}`);
+          
+          if (res.ok) {
+              const payload = await res.json();
+              if (payload && !payload.error && isMounted) {
+                  hasFetchedLive.current = true;
+                  setLiveData(prev => ({
+                      stats: payload.stats || prev.stats,
+                      lineups: payload.lineups || prev.lineups,
+                      events: getSafeEvents(payload.events || payload.match_events, null, null)
+                  }));
+                  if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
+                      isFetching.current = false;
+                      return; 
                   }
               }
-          } catch (error) {
-          } finally {
-              isFetching.current = false;
           }
+      } catch (error) {
+      } finally {
+          isFetching.current = false;
       }
       
       if (isMounted) {

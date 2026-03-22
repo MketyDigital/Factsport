@@ -6,6 +6,17 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { postToSocials } from '@/app/lib/socialService';
 
+// 🟢 CLOUDFLARE EDGE-SAFE ENCODER
+function encodeBase64Safe(obj: any) {
+    const str = JSON.stringify(obj);
+    const bytes = new TextEncoder().encode(str);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 export async function GET(request: Request) {
     const url = new URL(request.url);
     if (url.searchParams.get('key') !== process.env.CRON_KEY) {
@@ -15,7 +26,6 @@ export async function GET(request: Request) {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     const today = new Date().toISOString().split('T')[0];
 
-    // 🔒 THE SAFE LOCK (Using "-morning" so Evening Roundup doesn't get blocked!)
     const lockKey = `${today}-morning`;
     
     const { error: lockError } = await supabase.from('cron_logs').insert([{ run_date: lockKey }]);
@@ -30,20 +40,17 @@ export async function GET(request: Request) {
         .select('*')
         .gte('match_date', startOfDay)
         .lte('match_date', endOfDay)
-        .in('status', ['SCHEDULED', 'NS', 'PRE_MATCH', 'TIMED']) // Fetches unplayed games
+        .in('status', ['SCHEDULED', 'NS', 'PRE_MATCH', 'TIMED']) 
         .order('match_date', { ascending: true });
 
     if (error || !matches || matches.length === 0) {
-        // Remove lock if there's nothing to post so we can try again if games get added
         await supabase.from('cron_logs').delete().eq('run_date', lockKey);
         return NextResponse.json({ message: "No upcoming games found for today. Lock removed." });
     }
 
     const frontendUrl = 'https://factsport.com'; 
-    const imageUrl = 'https://factsport.com'; 
     const todayString = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
 
-    // 🏆 GROUP MATCHES BY LEAGUE
     const leagues: Record<string, any[]> = {};
     matches.forEach(m => {
         if (!leagues[m.league]) leagues[m.league] = [];
@@ -61,25 +68,23 @@ export async function GET(request: Request) {
     }
     fb1Text += `⏰ All kick-off times are in GMT.\nCatch all live scores and stats on: ${frontendUrl} 🏆`;
 
-    // 🖼️ BASE64 ENCRYPTION FOR IMAGE URL (Safe to pass up to 14 matches now!)
-    const topMatches = matches.slice(0, 14).map(m => ({
+    // 🖼️ TWITTER SCHEDULE GRID IMAGE
+    const topMatches = matches.slice(0, 10).map(m => ({
         home: m.home_team,
         away: m.away_team,
         time: new Date(m.match_date).toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute:'2-digit' })
     }));
     
-    const ogPayload = { type: 'schedule', label: 'MATCHDAY', matches: topMatches };
-    const safeBase64 = encodeURIComponent(Buffer.from(JSON.stringify(ogPayload)).toString('base64'));
-    const scheduleOgUrl = `${imageUrl}/api/og?data=${safeBase64}&ext=.png`;
+    const ogPayload = { type: 'schedule', label: 'MATCHDAY SCHEDULE', matches: topMatches };
+    const safeBase64 = encodeBase64Safe(ogPayload);
+    const scheduleOgUrl = `${frontendUrl}/api/og?data=${safeBase64}`;
     
-    // 🐦 DYNAMIC TWITTER TEXT
-    const dynamicXText = `📅 ${todayString} Matchday is here!\n\nWe have ${matches.length} massive games lined up today. Who are you backing? Drop your predictions below 👇`;
+    let dynamicXText = `📅 ${todayString} Matchday is here!\n\nWe have ${matches.length} massive games lined up today. Who are you backing? Drop your predictions below 👇`;
 
     try {
         await postToSocials({ fb1Message: fb1Text, xMessage: dynamicXText, xImageUrl: scheduleOgUrl }); 
         return NextResponse.json({ success: true, total_matches: matches.length });
     } catch (e) {
-        // 🚨 SELF-HEALING: If posting fails, delete the specific morning lock so we can try again!
         await supabase.from('cron_logs').delete().eq('run_date', lockKey);
         return NextResponse.json({ error: "Posting failed. Lock removed for retry." }, { status: 500 });
     }

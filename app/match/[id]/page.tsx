@@ -40,6 +40,7 @@ const getSupabaseData = cache(async (id: string) => {
     return data;
 });
 
+// 🟢 METADATA WITH REAL-TIME CLOUDFLARE SHARING
 export async function generateMetadata({ params }: { params: { id: string } }, parent: ResolvingMetadata): Promise<Metadata> {
     const resolvedParams = await params;
     const match = await getSupabaseData(resolvedParams.id);
@@ -48,15 +49,32 @@ export async function generateMetadata({ params }: { params: { id: string } }, p
     const status = (match.status || '').toUpperCase();
     const isLive = !SCHEDULED_STATUSES.includes(status) && !FINISHED_STATUSES.includes(status);
     const isFinished = FINISHED_STATUSES.includes(status);
+    
+    let hScore = match.home_score || 0;
+    let aScore = match.away_score || 0;
+
+    if (isLive && match.espn_id) {
+        try {
+            const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${match.espn_id}`, { next: { revalidate: 3 } });
+            if (res.ok) {
+                const liveData = await res.json();
+                if (!liveData.error) {
+                    hScore = liveData.home_score;
+                    aScore = liveData.away_score;
+                }
+            }
+        } catch (e) {}
+    }
+
     let title = `${match.home_team} vs ${match.away_team} Predictions, H2H & Live Score | FactSport`;
     let description = `Get expert predictions, pro betting analysis, starting lineups, and live updates for ${match.home_team} vs ${match.away_team} in the ${match.league}.`;
 
     if (isLive) {
-        title = `🔴 LIVE: ${match.home_team} ${match.home_score}-${match.away_score} ${match.away_team}`;
+        title = `🔴 LIVE: ${match.home_team} ${hScore}-${aScore} ${match.away_team}`;
         description = `Follow the live score, minute-by-minute text commentary, and live match stats for ${match.home_team} vs ${match.away_team}.`;
     } else if (isFinished) {
-        title = `${match.home_team} ${match.home_score}-${match.away_score} ${match.away_team} Result, Highlights & Match Stats`;
-        description = `Full time result: ${match.home_team} ${match.home_score}-${match.away_score} ${match.away_team}. Watch the highlights, review the pro analysis, and check the final match stats.`;
+        title = `${match.home_team} ${hScore}-${aScore} ${match.away_team} Result, Highlights & Match Stats`;
+        description = `Full time result: ${match.home_team} ${hScore}-${aScore} ${match.away_team}. Watch the highlights, review the pro analysis, and check the final match stats.`;
     }
 
     const previousImages = (await parent).openGraph?.images || [];
@@ -99,10 +117,27 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   
   const matchDateMs = new Date(dbData.match_date).getTime();
   const minutesToKick = (matchDateMs - Date.now()) / 60000;
-  const isUpcomingMatch = SCHEDULED_STATUSES.includes(currentStatus) && minutesToKick > 5;
   
-  const activeVideoUrl = sanitizeUrl(isFinished ? dbData.video_url : dbData.livestream_url);
-  const activeAudioUrl = sanitizeUrl(dbData.audio_url);
+  // 🟢 UNIVERSAL KILL SWITCH (4 Hours = 240 mins)
+  // If the match is officially finished, OR it has been 4 hours since kickoff (in case API is stuck), it's completely dead.
+  const isUniversallyFinished = isFinished || minutesToKick < -240;
+
+  // 🟢 STRICT MEDIA RULES
+  // Only allow highlights (video_url) after the match is dead. Completely nuke the livestream/audio links.
+  const activeVideoUrl = sanitizeUrl(isUniversallyFinished ? dbData.video_url : dbData.livestream_url);
+  const activeAudioUrl = sanitizeUrl(isUniversallyFinished ? null : dbData.audio_url);
+
+  let isServerLocked = true;
+  if (isUniversallyFinished) {
+      isServerLocked = false; 
+  } else if (isLive) {
+      isServerLocked = false;
+  } else {
+      if (minutesToKick <= 5 && minutesToKick > -240) {
+          isServerLocked = false; 
+      }
+  }
+
   const hasWidget = !!dbData.widget_id; 
 
   const jsonLd = {
@@ -111,19 +146,11 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       name: `${dbData.home_team} vs ${dbData.away_team}`,
       description: `Live scores, H2H stats, and predictions for ${dbData.home_team} vs ${dbData.away_team} in the ${dbData.league}.`,
       startDate: new Date(dbData.match_date).toISOString(),
-      eventStatus: isFinished ? 'https://schema.org/EventScheduled' : (isLive ? 'https://schema.org/EventLive' : 'https://schema.org/EventScheduled'),
+      eventStatus: isUniversallyFinished ? 'https://schema.org/EventScheduled' : (isLive ? 'https://schema.org/EventLive' : 'https://schema.org/EventScheduled'),
       sport: 'Soccer',
       competitor: [
-          {
-              '@type': 'SportsTeam',
-              name: dbData.home_team,
-              image: sanitizeUrl(dbData.home_logo) || undefined
-          },
-          {
-              '@type': 'SportsTeam',
-              name: dbData.away_team,
-              image: sanitizeUrl(dbData.away_logo) || undefined
-          }
+          { '@type': 'SportsTeam', name: dbData.home_team, image: sanitizeUrl(dbData.home_logo) || undefined },
+          { '@type': 'SportsTeam', name: dbData.away_team, image: sanitizeUrl(dbData.away_logo) || undefined }
       ]
   };
 
@@ -146,12 +173,13 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                   <HeadToHeadStats dbData={data} />
               </div>
 
+              {/* 🟢 The entire player block won't even render if activeVideoUrl and activeAudioUrl are null! */}
               {(activeVideoUrl || activeAudioUrl) && (
                   <div className="w-full bg-black">
                       {activeVideoUrl ? (
-                          <FactSportPlayer mediaUrl={activeVideoUrl} matchId={dbData.id} mode="video" isUpcoming={isUpcomingMatch} isFinished={isFinished} matchDate={dbData.match_date} />
+                          <FactSportPlayer mediaUrl={activeVideoUrl} matchId={dbData.id} mode="video" isLocked={isServerLocked} matchDate={dbData.match_date} isFinished={isUniversallyFinished} />
                       ) : (
-                          <FactSportPlayer mediaUrl={activeAudioUrl!} matchId={dbData.id} mode="audio" isUpcoming={isUpcomingMatch} isFinished={isFinished} matchDate={dbData.match_date} />
+                          <FactSportPlayer mediaUrl={activeAudioUrl!} matchId={dbData.id} mode="audio" isLocked={isServerLocked} matchDate={dbData.match_date} isFinished={isUniversallyFinished} />
                       )}
                   </div>
               )}

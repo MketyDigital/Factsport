@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, ArrowRight, Gift, Copy, CheckCircle2, Square, Maximize2 } from 'lucide-react';
 import { useGlobalMedia } from '@/app/providers/GlobalMediaProvider'; 
 import Link from 'next/link';
+import FactSportMediaRoom from './FactSportMediaRoom'; // 🟢 Needed for Streamio background play
 
 export default function StickyAffiliateBanner() {
     const [isVisible, setIsVisible] = useState(false);
@@ -28,26 +29,36 @@ export default function StickyAffiliateBanner() {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    // Determine if we need to show the Picture-in-Picture logic
-    const showFloatingAudio = mediaType === 'audio' && !isPageActive;
+    const showFloatingAudio = mediaType === 'audio' && !isPageActive && videoUrl;
     const showFloatingVideo = mediaType === 'video' && !isPageActive && videoUrl;
 
-    // Helper to ensure autoplay parameters are attached safely
+    const isYouTube = videoUrl?.includes('youtube.com') || videoUrl?.includes('youtu.be') || videoUrl?.includes('embed/');
+    const isRawMedia = videoUrl?.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
+    const isRawAudio = videoUrl?.match(/\.(mp3|wav)$/i);
+    const isStreamio = videoUrl === 'streamio';
+
     const getAutoPlayUrl = (url: string) => {
         if (!url) return '';
         const separator = url.includes('?') ? '&' : '?';
-        // Removes any existing autoplay tag to prevent duplicates, then forces it ON with playsinline
         return `${url.replace(/[?&]autoplay=0/, '')}${separator}autoplay=1&playsinline=1&mute=0`;
     };
 
     return (
         <div className="fixed bottom-4 left-0 right-0 z-[100] w-full flex flex-col items-center justify-end px-4 pointer-events-none gap-3">
             
-            {/* 🟢 THE FLOATING VIDEO MINI-PLAYER (Twitch Style) */}
+            {/* 🟢 UNIVERSAL BACKGROUND AUDIO PLAYER (Keeps Audio & Streamio playing across pages) */}
+            {showFloatingAudio && (
+                <div className="hidden">
+                    {isStreamio && <FactSportMediaRoom matchId={activeMatchId!} mediaUrl="streamio" />}
+                    {isRawAudio && <audio src={videoUrl!} autoPlay />}
+                    {isYouTube && <iframe src={getAutoPlayUrl(videoUrl!)} allow="autoplay" />}
+                </div>
+            )}
+
+            {/* 🟢 THE FLOATING VIDEO MINI-PLAYER */}
             {showFloatingVideo && (
                 <div className="w-full max-w-[320px] md:max-w-[400px] aspect-video bg-black rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] border border-blue-500/50 overflow-hidden pointer-events-auto relative animate-in slide-in-from-bottom-10 group self-end md:self-center flex flex-col">
                     
-                    {/* TOP-RIGHT CONTROLS: Placed out of the way of the center Play button! */}
                     <div className="absolute top-0 left-0 w-full h-12 bg-gradient-to-b from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end gap-2 p-2 z-20 pointer-events-none">
                         <Link 
                             href={activeMatchId === 'global-goal-rush' ? '/live' : `/match/${activeMatchId}`} 
@@ -65,17 +76,32 @@ export default function StickyAffiliateBanner() {
                         </button>
                     </div>
 
-                    {/* THE IFRAME: Removed pointer-events-none so users can tap the center to play! */}
-                    <iframe 
-                        src={getAutoPlayUrl(videoUrl)} 
-                        className="w-full h-full relative z-10" 
-                        allow="autoplay; encrypted-media; picture-in-picture; fullscreen" 
-                        allowFullScreen
-                    />
+                    {isYouTube ? (
+                        <iframe 
+                            src={getAutoPlayUrl(videoUrl!)} 
+                            className="w-full h-full relative z-10" 
+                            allow="autoplay; encrypted-media; picture-in-picture; fullscreen" 
+                            allowFullScreen
+                        />
+                    ) : isRawMedia ? (
+                        <video 
+                            src={videoUrl!} 
+                            className="w-full h-full object-contain relative z-10" 
+                            autoPlay 
+                            playsInline 
+                            controls={false}
+                        />
+                    ) : (
+                        <iframe 
+                            src={videoUrl!} 
+                            className="w-full h-full relative z-10" 
+                            allow="autoplay; encrypted-media; fullscreen" 
+                        />
+                    )}
                 </div>
             )}
 
-            {/* 🟢 DYNAMIC WIDTH: Expands when audio is playing */}
+            {/* 🟢 DYNAMIC AFFILIATE BANNER */}
             <div className={`w-full pointer-events-auto relative transition-all duration-300 ${showFloatingAudio ? 'max-w-[480px]' : 'max-w-[420px]'}`}>
                 
                 <button 
@@ -88,7 +114,6 @@ export default function StickyAffiliateBanner() {
 
                 <div className="bg-[#0a1428]/95 backdrop-blur-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.9)] rounded-full p-1.5 flex items-center justify-between gap-2 w-full h-[52px]">
                     
-                    {/* LEFT SIDE: Affiliate Banner */}
                     <div className={`flex items-center gap-2 h-full transition-all overflow-hidden ${showFloatingAudio ? 'w-[65%] border-r border-white/10 pr-2' : 'w-full'}`}>
                         <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0 shadow-inner">
                             <Gift className="text-[#1562a3] w-5 h-5 animate-pulse" />
@@ -131,7 +156,6 @@ export default function StickyAffiliateBanner() {
                         </div>
                     </div>
 
-                    {/* RIGHT SIDE: Mini Audio Player */}
                     {showFloatingAudio && (
                         <div className="flex shrink-0 w-[35%] items-center justify-between pl-2 pr-1 animate-in fade-in slide-in-from-right-4">
                             <Link href={activeMatchId === 'global-goal-rush' ? '/live' : `/match/${activeMatchId}`} className="flex flex-col hover:opacity-70 transition-opacity">
