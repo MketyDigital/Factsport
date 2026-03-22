@@ -51,7 +51,6 @@ async function generateDailyPreview() {
         briefingData += `\n${league}:\n`;
         games.forEach(g => {
             const time = new Date(g.match_date).toLocaleTimeString('en-GB', {timeZone: 'UTC', hour: '2-digit', minute:'2-digit'});
-            // 🟢 CHANGED: We now pass a shortcode instead of a URL link
             briefingData += `- ${g.home_team} vs ${g.away_team} at ${time} GMT | EXACT SHORTCODE TO USE: [MATCH_WIDGET:${g.id}]\n`;
         });
     }
@@ -68,7 +67,7 @@ async function generateDailyPreview() {
         STRICT FACTUAL GUIDELINES:
         1. TIME AWARENESS: It is currently 2026. 
         2. ZERO HALLUCINATIONS: Do NOT invent or name any specific players or managers. Focus on the clubs, their current form, and the importance of the fixture.
-        3. EMBEDDING MATCHES: When you finish analyzing a specific match, you MUST paste its "EXACT SHORTCODE TO USE" on a brand new, empty line. NEVER attach commas, periods, or other words to the shortcode.
+        3. EMBEDDING MATCHES: When you finish analyzing a specific match, you MUST paste its "EXACT SHORTCODE TO USE" on a brand new line all by itself. DO NOT add punctuation, bolding, or extra words to the shortcode. Just the raw code.
         4. Headline: Punchy and narrative-driven. Under 10 words. Do not use asterisks (*).
         5. Tone: Insightful, opinionated, and highly engaging. 
         6. Length: 400-600 words. Plain text only.
@@ -105,7 +104,6 @@ async function generateDailyPreview() {
             
             const articleUrl = `https://factsport.com/news/${reportSlug}`;
 
-            // 🟢 NEW: INSTANT GOOGLE INDEXING PING
             try {
                 const pingRes = await fetch('https://factsport.com/api/index-url', {
                     method: 'POST',
@@ -117,7 +115,7 @@ async function generateDailyPreview() {
                 });
                 if (pingRes.ok) console.log(`   🚀 Successfully pinged Google Indexing API`);
                 else console.error(`   ⚠️ Google Ping failed:`, pingRes.status);
-            } catch (pingError) {
+            } catch (pingError: any) {
                 console.error(`   ❌ Google Ping Network Error:`, pingError.message);
             }
 
@@ -131,7 +129,7 @@ async function generateDailyPreview() {
                 });
             }
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error(`   🔥 Gemini Error: ${e.message}`);
     }
 }
