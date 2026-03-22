@@ -24,6 +24,15 @@ const formatGoals = (goals: any[]) => {
     return Object.entries(grouped).map(([name, times]) => `${name} ${times.join("', ")}'`);
 };
 
+// 🟢 BULLETPROOF EVENT PARSER
+const getSafeEvents = (dataEvs: any, initialEvs: any, dbEvs: any) => {
+    let raw = dataEvs || initialEvs || dbEvs || [];
+    if (typeof raw === 'string') {
+        try { raw = JSON.parse(raw); } catch(e) { raw = []; }
+    }
+    return Array.isArray(raw) ? raw : [];
+};
+
 export default function MatchHeaderClient({ matchId, initialData, dbData }: any) {
   const [data, setData] = useState(initialData);
   const hasPremiumWidget = !!initialData?.widget_id;
@@ -45,51 +54,47 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
     
     const isFinishedInitially = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(initialData?.status);
     
-    // 🟢 IF NO ESPN ID OR MATCH IS FINISHED, DO NOT POLL AT ALL.
     if (isFinishedInitially || hasPremiumWidget || !initialData?.espn_id) return;
 
     const fetchHeaderData = async () => {
-      if (isFetching.current || !isMounted) return;
+      if (isFetching.current || !isMounted || document.visibilityState !== 'visible') return;
 
-      if (document.visibilityState === 'visible') {
-          isFetching.current = true;
-          try {
-              // 🟢 STRICTLY FETCH FROM CLOUDFLARE WORKER (NO SUPABASE)
-              let res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}&t=${Date.now()}`);
-              
-              if (res.ok) {
-                  const payload = await res.json();
-                  if (payload && !payload.error && isMounted) {
-                      hasFetchedLive.current = true; 
-                      
-                      if (payload.home_score > prevHomeScore.current) {
-                          setHomeFlash(true); setTimeout(() => setHomeFlash(false), 5000);
-                      }
-                      if (payload.away_score > prevAwayScore.current) {
-                          setAwayFlash(true); setTimeout(() => setAwayFlash(false), 5000);
-                      }
-                      prevHomeScore.current = payload.home_score;
-                      prevAwayScore.current = payload.away_score;
+      isFetching.current = true;
+      try {
+          let res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}&t=${Date.now()}`);
+          
+          if (res.ok) {
+              const payload = await res.json();
+              if (payload && !payload.error && isMounted) {
+                  hasFetchedLive.current = true; 
+                  
+                  if (payload.home_score > prevHomeScore.current) {
+                      setHomeFlash(true); setTimeout(() => setHomeFlash(false), 5000);
+                  }
+                  if (payload.away_score > prevAwayScore.current) {
+                      setAwayFlash(true); setTimeout(() => setAwayFlash(false), 5000);
+                  }
+                  prevHomeScore.current = payload.home_score;
+                  prevAwayScore.current = payload.away_score;
 
-                      setData((prev:any) => ({ 
-                          ...prev, 
-                          status: payload.status, 
-                          home_score: payload.home_score, 
-                          away_score: payload.away_score,
-                          displayClock: payload.displayClock,
-                          events: payload.events || prev.events
-                      }));
+                  setData((prev:any) => ({ 
+                      ...prev, 
+                      status: payload.status, 
+                      home_score: payload.home_score, 
+                      away_score: payload.away_score,
+                      displayClock: payload.displayClock,
+                      events: payload.events || payload.match_events || prev.events
+                  }));
 
-                      if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
-                          isFetching.current = false;
-                          return; // Stop polling forever
-                      }
+                  if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
+                      isFetching.current = false;
+                      return; 
                   }
               }
-          } catch (error) {
-          } finally {
-              isFetching.current = false;
           }
+      } catch (error) {
+      } finally {
+          isFetching.current = false;
       }
       
       if (isMounted) {
@@ -125,10 +130,12 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
 
   const homeForm = initialData?.home_form || [];
   const awayForm = initialData?.away_form || [];
-  const events = data?.events || initialData?.events || [];
   
-  const homeGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'home' || (e.player && e.player.includes(homeTeamName))));
-  const awayGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'away' || (e.player && e.player.includes(awayTeamName))));
+  // 🟢 SAFELY EXTRACT EVENTS (Checks Live State, Initial State, AND Database String)
+  const events = getSafeEvents(data?.events || data?.match_events, initialData?.events || initialData?.match_events, dbData?.match_events);
+  
+  const homeGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'home' || (e.player && e.player.toLowerCase().includes(homeTeamName.toLowerCase()))));
+  const awayGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'away' || (e.player && e.player.toLowerCase().includes(awayTeamName.toLowerCase()))));
 
   return (
     <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
@@ -153,7 +160,8 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                             </div>
                         )}
                     </Link>
-                    {isFinished && homeGoals.length > 0 && (
+                    {/* 🟢 SCORERS WILL NOW ALWAYS RENDER IF THERE ARE GOALS */}
+                    {(isFinished || isLive) && homeGoals.length > 0 && (
                         <div className="mt-2 flex flex-col items-center gap-0.5 max-w-full px-1">
                             {formatGoals(homeGoals).map((txt, i) => (
                                 <span key={i} className="text-[6.5px] md:text-[7.5px] text-slate-300 font-bold leading-tight flex items-center gap-0.5 text-center drop-shadow-md break-words max-w-full">
@@ -201,7 +209,7 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                             </div>
                         )}
                     </Link>
-                    {isFinished && awayGoals.length > 0 && (
+                    {(isFinished || isLive) && awayGoals.length > 0 && (
                         <div className="mt-2 flex flex-col items-center gap-0.5 max-w-full px-1">
                             {formatGoals(awayGoals).map((txt, i) => (
                                 <span key={i} className="text-[6.5px] md:text-[7.5px] text-slate-300 font-bold leading-tight flex items-center gap-0.5 text-center drop-shadow-md break-words max-w-full">

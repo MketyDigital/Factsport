@@ -30,17 +30,32 @@ const parseTime = (t: any) => {
     return (parseInt(parts[0]) || 0) * 100 + (parseInt(parts[1]) || 0); 
 };
 
-// SMART HASHTAG GENERATOR
 const getMatchHashtag = (home: string, away: string, homeTla?: string, awayTla?: string) => {
     const cleanH = homeTla || home.replace(/ fc| cf| united| city/ig, '').replace(/[^a-zA-Z]/g, '').substring(0, 3);
     const cleanA = awayTla || away.replace(/ fc| cf| united| city/ig, '').replace(/[^a-zA-Z]/g, '').substring(0, 3);
     return `#${cleanH.toUpperCase()}${cleanA.toUpperCase()} #FactSportLive`;
 };
 
-// 🟢 EDGE-SAFE BASE64 ENCODER
-const encodeBase64Safe = (obj: any) => {
+// 🟢 CLOUDFLARE EDGE-SAFE ENCODER
+function encodeBase64Safe(obj: any) {
     const str = JSON.stringify(obj);
-    return btoa(unescape(encodeURIComponent(str)));
+    const bytes = new TextEncoder().encode(str);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// 🟢 HELPER TO GENERATE MATCH IMAGES
+const getMatchImageUrl = (label: string, state: any, baseUrl: string) => {
+    const payload = { 
+        type: 'versus', label: label, 
+        home: state.home_team, away: state.away_team, 
+        hScore: state.home_score, aScore: state.away_score,
+        homeLogo: state.home_logo, awayLogo: state.away_logo
+    };
+    return `${baseUrl}/api/og?data=${encodeBase64Safe(payload)}`;
 };
 
 export async function POST(request: Request) {
@@ -73,7 +88,6 @@ export async function POST(request: Request) {
     }
 
     const frontendUrl = 'https://factsport.com'; 
-    const imageUrl = 'https://factsport.com'; 
     const matchUrl = `${frontendUrl}/match/${newState.id}`; 
     const hashtags = getMatchHashtag(newState.home_team, newState.away_team, newState.home_tla, newState.away_tla); 
     
@@ -97,10 +111,11 @@ export async function POST(request: Request) {
     const htStatuses = ['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME', 'PAUSED'];
     const live2HStatuses = ['2H', 'SECOND_HALF', 'SECOND HALF'];
 
+    // 🟢 1. VAR DECISIONS (FB Only, No Image)
     if (newTotal < oldTotal) {
         payload.fb1Message = `❌ VAR DECISION: OVERTURNED - Previous G/Event has been canceled.\n\nThe score returns to:\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
-        payload.xMessage = `❌ VAR DECISION: OVERTURNED\n\nScore remains:\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}\n\n${hashtags}`;
     } 
+    // 🟢 2. GOALS (FB Text Only. Twitter Text + GOAL Image)
     else if (newTotal > oldTotal || newGoalsList.length > oldGoalsList.length) {
         if (newGoalsList.length < newTotal) return NextResponse.json({ message: "Facts data lagging behind scoreboard. Waiting for next ping." });
         let statusText = live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus) ? '' : ` (${newState.status})`;
@@ -113,65 +128,72 @@ export async function POST(request: Request) {
             const time = latest.time || latest.minute ? `${latest.time || latest.minute}' ` : '';
             scorerText = `\n⚽ GOAL - ${player} (${time.trim()})\n`;
         } 
-        if (!scorerText.trim()) scorerText = `\n⚽ GOAL - Confirmed! Tap the link below for full details and stats! 👇\n`;
+        if (!scorerText.trim()) scorerText = `\n⚽ GOAL - Confirmed! Tap the link below for full details! 👇\n`;
 
         if (['PEN', 'PEN_SHOOT_OUT'].includes(newStatus)) {
             payload.fb1Message = `🥅 PENALTY SCORED!\n\nShootout Update: ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
             payload.xMessage = `🥅 PENALTY SCORED!\n\nShootout: ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}\n\n${hashtags}`;
+            payload.xImageUrl = getMatchImageUrl('PENALTY SCORED', newState, frontendUrl);
         } else {
             payload.fb1Message = `🚨 GOAL ALERT!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\n${matchUrl}`;
             payload.xMessage = `🚨 GOAL ALERT!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\n👇\n${matchUrl}\n\n${hashtags}`;
+            payload.xImageUrl = getMatchImageUrl('GOAL ALERT!', newState, frontendUrl); // X gets the Goal image!
         }
     } 
+    // 🟢 3. PENALTY AWARDED (FB Only, No Image)
     else if (newTotal === oldTotal && newPenaltiesList.length > oldPenaltiesList.length) {
         const sortedPens = [...newPenaltiesList].sort((a, b) => parseTime(b.time || b.minute) - parseTime(a.time || a.minute));
-        const latestPen = sortedPens[0];
-        const time = latestPen.time || latestPen.minute ? `${latestPen.time || latestPen.minute}'` : '';
+        const time = sortedPens[0].time || sortedPens[0].minute ? `${sortedPens[0].time || sortedPens[0].minute}'` : '';
         payload.fb1Message = `⚠️ PENALTY AWARDED - (Confirmed by Referee/VAR) ${time}\n\nMassive moment in the match! Will they convert it?\n\n👇\n${matchUrl}`;
-        payload.xMessage = `⚠️ PENALTY AWARDED! ${time}\n\nMassive moment in the match.\n\n👇\n${matchUrl}\n\n${hashtags}`;
     }
+    // 🟢 4. LINEUPS (FB + X + PITCH IMAGE for Both)
     else if (oldWasIncomplete && newIsComplete) {
-        const hXI = newValidH.slice(0, 11).join(', '); 
-        const aXI = newValidA.slice(0, 11).join(', ');
+        payload.fb1Message = `📋 STARTING XI ANNOUNCED!\n\n${newState.home_team} vs ${newState.away_team}\n\n👇 See the tactical setup & subs here!\n${matchUrl}`;
+        payload.xMessage = `🚨 STARTING XI: ${newState.home_team} vs ${newState.away_team}! 👇\n${matchUrl}\n\n${hashtags}`;
         
-        payload.fb1Message = `📋 STARTING XI ANNOUNCED!\n\n${newState.home_team} vs ${newState.away_team}\n\nHome: ${hXI}\n\nAway: ${aXI}\n\n👇\n${matchUrl}`;
-        payload.xMessage = `🚨 TEAM NEWS IS IN!\n\nFull XI & Subs here:\n👇\n${matchUrl}\n\n${hashtags}`;
-        
-        // 🟢 USING THE NEW ENCODER
         const lineupOg = { 
-            type: 'pitch', 
-            label: 'STARTING XI', 
-            home: newState.home_team, 
-            away: newState.away_team, 
+            type: 'pitch', label: 'STARTING XI', 
+            home: newState.home_team, away: newState.away_team, 
             homeFormation: newState.lineups?.formations?.home || '4-3-3',
             awayFormation: newState.lineups?.formations?.away || '4-3-3',
-            homeXI: newValidH.slice(0, 11),
-            awayXI: newValidA.slice(0, 11)
+            homeXI: newValidH.slice(0, 11), awayXI: newValidA.slice(0, 11)
         };
-        const safeBase64 = encodeBase64Safe(lineupOg);
-        payload.xImageUrl = `${imageUrl}/api/og?data=${encodeURIComponent(safeBase64)}&ext=.png`;
+        const finalUrl = `${frontendUrl}/api/og?data=${encodeBase64Safe(lineupOg)}`;
+        
+        payload.xImageUrl = finalUrl;
+        payload.fb1ImageUrl = finalUrl;
+        payload.fbImageUrl = finalUrl; 
     } 
     else if (oldWasIncomplete && !newIsComplete && (newValidH.length > 0 || newValidA.length > 0)) {
         return NextResponse.json({ message: "Lineups still incomplete." });
     } 
+    // 🟢 5. KICK OFF (FB + X + KICK-OFF IMAGE for Both)
     else if (preStatuses.includes(oldStatus) && live1HStatuses.includes(newStatus)) {
         payload.fb1Message = `⏱️ KICK-OFF!\n\nWe are officially underway: ${newState.home_team} vs ${newState.away_team}.\n\nFollow live updates here:\n👇\n${matchUrl}`;
         payload.xMessage = `⏱️ KICK-OFF!\n\nWe are officially underway.\n\n👇 Live updates:\n${matchUrl}\n\n${hashtags}`;
+        
+        const kickoffUrl = getMatchImageUrl('KICK-OFF', newState, frontendUrl);
+        payload.xImageUrl = kickoffUrl;
+        payload.fb1ImageUrl = kickoffUrl;
+        payload.fbImageUrl = kickoffUrl;
     }
+    // 🟢 6. HALF TIME (FB Only, No Image)
     else if (!htStatuses.includes(oldStatus) && htStatuses.includes(newStatus)) {
         payload.fb1Message = `⏸️ HALF TIME.\n\nHow do you rate the first half performance?\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇 Match Stats so far:\n${matchUrl}`;
     }
+    // 🟢 7. SECOND HALF (FB Only, No Image)
     else if (htStatuses.includes(oldStatus) && (live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus))) {
         payload.fb1Message = `⏱️ SECOND HALF KICK-OFF!\n\nWe are back underway: ${newState.home_team} vs ${newState.away_team}.\n\nFollow the action here:\n👇\n${matchUrl}`;
     }
+    // 🟢 8. FULL TIME (FB + X + FT IMAGE for Both)
     else if (!strictlyFinishedStatuses.includes(oldStatus) && strictlyFinishedStatuses.includes(newStatus)) {
         payload.fb1Message = `⏹️ FULL TIME!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\nMatch stats and ratings available now:\n👇\n${matchUrl}`;
         payload.xMessage = `⏹️ FULL TIME.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}.\n\n👇 Stats:\n${matchUrl}\n\n${hashtags}`;
         
-        // 🟢 USING THE NEW ENCODER
-        const ftOg = { type: 'versus', label: 'FULL TIME', home: newState.home_team, away: newState.away_team, hScore: newState.home_score, aScore: newState.away_score };
-        const safeBase64 = encodeBase64Safe(ftOg);
-        payload.xImageUrl = `${imageUrl}/api/og?data=${encodeURIComponent(safeBase64)}&ext=.png`;
+        const ftUrl = getMatchImageUrl('FULL TIME', newState, frontendUrl);
+        payload.xImageUrl = ftUrl;
+        payload.fb1ImageUrl = ftUrl; 
+        payload.fbImageUrl = ftUrl;
     }
 
     if (!payload.fb1Message && !payload.xMessage) return NextResponse.json({ message: "No postable event occurred." });
@@ -181,10 +203,7 @@ export async function POST(request: Request) {
     try {
         await fetch(`${frontendUrl}/api/index-url`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.CRON_KEY}`
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
             body: JSON.stringify({ url: matchUrl, type: 'URL_UPDATED' })
         });
     } catch (e) {}
