@@ -1,18 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { Trophy, ChevronUp, ChevronDown, Minus } from 'lucide-react';
 
 const LEAGUE_MAP: Record<string, string> = {
-    'Premier League': 'PL',
-    'La Liga': 'PD',
-    'Bundesliga': 'BL1',
-    'Serie A': 'SA',
-    'Ligue 1': 'FL1',
-    'Champions League': 'CL'
+    'Premier League': 'PL', 'La Liga': 'PD', 'Bundesliga': 'BL1',
+    'Serie A': 'SA', 'Ligue 1': 'FL1', 'Champions League': 'CL'
 };
 
-// 🟢 Uses your exact normalizer to guarantee team matching!
 const normalizeName = (name: string) => {
     if (!name) return "";
     return name.toLowerCase()
@@ -28,24 +22,27 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        let isMounted = true;
         const fetchStandings = async () => {
             const leagueCode = LEAGUE_MAP[leagueName];
             if (!leagueCode) {
-                setIsLoading(false);
-                return; // Cup matches or unsupported leagues won't show a table
+                if (isMounted) setIsLoading(false);
+                return;
             }
 
-            const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-            const { data } = await supabase
-                .from('standings')
-                .select('*')
-                .eq('league_code', leagueCode)
-                .order('position', { ascending: true });
-
-            if (data) setStandings(data);
-            setIsLoading(false);
+            try {
+                // 🟢 FETCHES FROM YOUR EDGE CACHE
+                const res = await fetch(`/api/cache/standings?league=${leagueCode}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (isMounted) setStandings(data);
+                }
+            } catch (e) {}
+            
+            if (isMounted) setIsLoading(false);
         };
         fetchStandings();
+        return () => { isMounted = false; };
     }, [leagueName]);
 
     if (isLoading) {
@@ -59,15 +56,12 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
     if (standings.length === 0) {
         return (
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-[150px] flex items-center justify-center">
-                <div className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Table not available for this competition</div>
+                <div className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Table not available</div>
             </div>
         );
     }
 
-    // Only apply live math if the match is actively playing. If FT, the DB is already correct.
     const isLive = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'P'].includes(status?.toUpperCase());
-
-    // 🟢 THE LIVE MATH ENGINE
     let liveTable = [...standings].map(team => ({ ...team, original_position: team.position }));
 
     const normHome = normalizeName(homeTeam);
@@ -81,15 +75,11 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
         const awayRef = liveTable.find(t => normalizeName(t.team_short_name || t.team_name) === normAway || normalizeName(t.team_name).includes(normAway));
 
         if (homeRef && awayRef) {
-            // Update Played Games
             homeRef.played_games += 1;
             awayRef.played_games += 1;
-
-            // Update Goal Difference
             homeRef.goal_difference += (hScore - aScore);
             awayRef.goal_difference += (aScore - hScore);
 
-            // Update Points & W/D/L
             if (hScore > aScore) {
                 homeRef.points += 3; homeRef.won += 1; awayRef.lost += 1;
             } else if (aScore > hScore) {
@@ -101,18 +91,15 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
         }
     }
 
-    // Re-sort the table based on live points and goal difference
     liveTable.sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points;
         return b.goal_difference - a.goal_difference;
     });
 
-    // Re-assign live positions
     liveTable.forEach((team, index) => {
         team.live_position = index + 1;
     });
 
-    // Find our teams to slice the table down to a snippet
     const homeIndex = liveTable.findIndex(t => normalizeName(t.team_short_name || t.team_name) === normHome || normalizeName(t.team_name).includes(normHome));
     const awayIndex = liveTable.findIndex(t => normalizeName(t.team_short_name || t.team_name) === normAway || normalizeName(t.team_name).includes(normAway));
     
@@ -121,12 +108,9 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
         const minIdx = Math.min(homeIndex, awayIndex);
         const maxIdx = Math.max(homeIndex, awayIndex);
         
-        // Snippet Logic: Keep them together if close, otherwise show top of table or a wider range
         if (maxIdx - minIdx > 6) {
-             // If teams are far apart (e.g. 1st vs 18th), just show the top 8
              displayTable = liveTable.slice(0, 8); 
         } else {
-             // Show their neighborhood
              const start = Math.max(0, minIdx - 2);
              const end = Math.min(liveTable.length, maxIdx + 3);
              displayTable = liveTable.slice(start, end);
@@ -160,8 +144,6 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
                     <tbody>
                         {displayTable.map((team) => {
                             const isPlaying = normalizeName(team.team_short_name || team.team_name) === normHome || normalizeName(team.team_short_name || team.team_name) === normAway;
-                            
-                            // Calculate if they moved up or down due to the live score
                             const posChange = team.original_position - team.live_position;
 
                             return (

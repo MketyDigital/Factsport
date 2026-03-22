@@ -12,7 +12,6 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
     const awayStarters = lineups?.away?.filter((p: any) => p.is_starter) || [];
     const allStarters = [...homeStarters, ...awayStarters];
 
-    // Your worker URL
     const WORKER_URL = 'https://fse.mkpoikankes.workers.dev/api/motm';
 
     useEffect(() => {
@@ -25,10 +24,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
     const fetchVotes = async () => {
         try {
             const res = await fetch(`${WORKER_URL}?matchId=${matchId}`);
-            if (res.ok) {
-                const data = await res.json();
-                setVoteData(data);
-            }
+            if (res.ok) setVoteData(await res.json());
         } catch (e) {}
     };
 
@@ -37,7 +33,6 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
         setIsVoting(true);
 
         try {
-            // 🟢 Send the vote directly to your Cloudflare Worker!
             await fetch(WORKER_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -46,72 +41,66 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
 
             localStorage.setItem(`motm_voted_${matchId}`, 'true');
             setHasVoted(true);
-            fetchVotes(); // Refresh bars
+            fetchVotes(); 
         } catch (e) {}
-        
         setIsVoting(false);
     };
 
     if (!lineups || (!lineups.home && !lineups.away)) return null;
-
     const totalVotes = voteData.reduce((acc, curr) => acc + curr.votes, 0) || 1; 
 
     return (
-        <div className="w-full bg-[#0a1428] rounded-xl p-4 md:p-5 shadow-lg border border-slate-800 mb-4 text-white relative overflow-hidden">
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-yellow-500/20 rounded-full blur-3xl pointer-events-none"></div>
-
-            <div className="flex items-center gap-2 mb-4 relative z-10">
-                <Star size={18} className="text-yellow-400 fill-yellow-400" />
-                <h3 className="font-black uppercase tracking-widest text-[11px] md:text-xs">Man of the Match</h3>
-            </div>
-
+        // 🟢 ULTRA-SLIM STYLING: Max-width 85%, tiny padding, flex-row alignment
+        <div className="w-[90%] md:max-w-md mx-auto bg-[#0a1428] rounded border border-slate-800 mb-3 text-white relative overflow-hidden py-1.5 px-2.5 shadow-sm flex flex-col justify-center">
+            
             {!hasVoted ? (
-                <div className="relative z-10 flex flex-col gap-3">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Who is your standout player today?</p>
-                    <div className="flex gap-2">
-                        <select 
-                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg text-xs font-bold p-2.5 text-white outline-none focus:border-yellow-500 transition-colors"
-                            value={selectedPlayer}
-                            onChange={(e) => setSelectedPlayer(e.target.value)}
-                        >
-                            <option value="">Select a player...</option>
-                            {allStarters.map((p, i) => (
-                                <option key={i} value={p.name}>{p.name}</option>
-                            ))}
-                        </select>
-                        <button 
-                            onClick={handleVote}
-                            disabled={!selectedPlayer || isVoting}
-                            className="bg-yellow-500 hover:bg-yellow-400 text-black font-black text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isVoting ? '...' : 'Vote'}
-                        </button>
+                <div className="relative z-10 flex items-center justify-between gap-1.5 w-full">
+                    <div className="flex items-center gap-1 shrink-0">
+                        <Star size={10} className="text-yellow-400 fill-yellow-400" />
+                        <span className="text-[8px] font-black uppercase tracking-widest text-slate-300 hidden sm:inline">MOTM</span>
                     </div>
+                    <select 
+                        className="flex-1 bg-slate-900 border border-slate-700 rounded text-[8px] font-bold px-1.5 py-1 text-white outline-none focus:border-yellow-500 h-5"
+                        value={selectedPlayer}
+                        onChange={(e) => setSelectedPlayer(e.target.value)}
+                    >
+                        <option value="">Select player...</option>
+                        {allStarters.map((p, i) => (
+                            <option key={i} value={p.name}>{p.name}</option>
+                        ))}
+                    </select>
+                    <button 
+                        onClick={handleVote}
+                        disabled={!selectedPlayer || isVoting}
+                        className="bg-yellow-500 hover:bg-yellow-400 text-black font-black text-[8px] uppercase tracking-widest px-2 rounded disabled:opacity-50 disabled:cursor-not-allowed h-5 shrink-0 flex items-center justify-center"
+                    >
+                        {isVoting ? '...' : 'Vote'}
+                    </button>
                 </div>
             ) : (
-                <div className="relative z-10 flex flex-col gap-3 animate-in fade-in duration-500">
-                    <div className="flex items-center gap-1.5 mb-1">
-                        <CheckCircle size={14} className="text-green-400" />
-                        <span className="text-[10px] text-green-400 font-black uppercase tracking-widest">Vote Casted</span>
+                <div className="relative z-10 flex flex-col gap-1 w-full">
+                    <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-1">
+                            <CheckCircle size={8} className="text-green-400" />
+                            <span className="text-[7px] text-green-400 font-black uppercase tracking-widest">Vote Cast</span>
+                        </div>
                     </div>
                     
-                    {voteData.slice(0, 3).map((vote, idx) => {
-                        const percentage = ((vote.votes / totalVotes) * 100).toFixed(0);
-                        return (
-                            <div key={idx} className="w-full">
-                                <div className="flex justify-between text-[10px] font-bold mb-1">
-                                    <span className="text-slate-200 truncate pr-2">{vote.player_name}</span>
-                                    <span className="text-yellow-400">{percentage}%</span>
+                    {/* Very thin progress bars */}
+                    <div className="flex flex-col gap-[2px] w-full">
+                        {voteData.slice(0, 2).map((vote, idx) => {
+                            const percentage = ((vote.votes / totalVotes) * 100).toFixed(0);
+                            return (
+                                <div key={idx} className="w-full flex items-center justify-between">
+                                    <span className="text-slate-300 text-[7px] font-bold w-[35%] truncate pr-1">{vote.player_name}</span>
+                                    <div className="flex-1 bg-slate-800 h-1 rounded-full overflow-hidden flex items-center mx-1">
+                                        <div className="h-full bg-yellow-500 transition-all duration-1000 ease-out" style={{ width: `${percentage}%` }}></div>
+                                    </div>
+                                    <span className="text-yellow-400 text-[7px] font-bold w-[12%] text-right">{percentage}%</span>
                                 </div>
-                                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                                    <div 
-                                        className="h-full bg-yellow-500 transition-all duration-1000 ease-out"
-                                        style={{ width: `${percentage}%` }}
-                                    ></div>
-                                </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        })}
+                    </div>
                 </div>
             )}
         </div>

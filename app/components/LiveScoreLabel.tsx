@@ -6,25 +6,12 @@ const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'ET', 'EXTRA TIME', 
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
 export default function LiveScoreLabel({ 
-    matchId, 
-    espnId, 
-    initialStatus, 
-    homeScore, 
-    awayScore, 
-    matchDate,
-    variant = 'small', 
-    homeTeam,
-    awayTeam 
+    matchId, espnId, initialStatus, homeScore, awayScore, matchDate, variant = 'small', homeTeam, awayTeam 
 }: any) {
-  const [data, setData] = useState({ 
-      status: initialStatus, 
-      home: homeScore, 
-      away: awayScore, 
-      clock: '' 
-  });
+  const [data, setData] = useState({ status: initialStatus, home: homeScore, away: awayScore, clock: '' });
   
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasFetchedLive = useRef(false);
+  const isFetching = useRef(false);
 
   useEffect(() => {
       if (!hasFetchedLive.current) {
@@ -32,59 +19,54 @@ export default function LiveScoreLabel({
       }
   }, [initialStatus, homeScore, awayScore]);
 
+  // 🟢 RECURSIVE POLLING + WORKER ONLY
   useEffect(() => {
     let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
+
+    const currentDataStatus = (initialStatus || '').toUpperCase();
+    if (FINISHED_STATUSES.includes(currentDataStatus) || !espnId) return;
 
     const fetchLiveScore = async () => {
-      if (document.visibilityState !== 'visible' || !isMounted) return;
+      if (isFetching.current || !isMounted || document.visibilityState !== 'visible') return;
+      isFetching.current = true;
+
       try {
-          let res;
-          if (espnId) {
-              res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${espnId}&t=${Date.now()}`);
-          } else {
-              res = await fetch(`/api/match-data?id=${matchId}&t=${Date.now()}`);
-          }
-          
-          if (!res.ok) return;
-          const matchData = await res.json();
+          const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${espnId}&t=${Date.now()}`);
+          if (res.ok) {
+              const matchData = await res.json();
+              if (matchData && !matchData.error && isMounted) {
+                  hasFetchedLive.current = true; 
+                  setData({ 
+                      status: matchData.status, 
+                      home: matchData.home_score, 
+                      away: matchData.away_score,
+                      clock: matchData.displayClock
+                  });
 
-          if (matchData && !matchData.error && isMounted) {
-            hasFetchedLive.current = true; 
-
-            setData((prevData) => {
-                const currentStatus = (matchData.status || '').toUpperCase();
-                if (FINISHED_STATUSES.includes(currentStatus)) {
-                    if (intervalRef.current) clearInterval(intervalRef.current);
-                }
-                return { 
-                    status: matchData.status, 
-                    home: matchData.home_score, 
-                    away: matchData.away_score,
-                    clock: matchData.displayClock
-                };
-            });
+                  if (FINISHED_STATUSES.includes((matchData.status || '').toUpperCase())) {
+                      isFetching.current = false;
+                      return; // Stop polling
+                  }
+              }
           }
       } catch (error) {}
+      finally {
+          isFetching.current = false;
+      }
+
+      if (isMounted) {
+          timeoutId = setTimeout(fetchLiveScore, 5000); 
+      }
     };
 
     fetchLiveScore();
 
-    const currentDataStatus = (initialStatus || '').toUpperCase();
-    if (!FINISHED_STATUSES.includes(currentDataStatus)) {
-        intervalRef.current = setInterval(fetchLiveScore, 3000); // 🟢 3 SECONDS
-    }
-
-    const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible') fetchLiveScore();
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
     return () => {
         isMounted = false;
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        clearTimeout(timeoutId);
     };
-  }, [matchId, espnId, initialStatus]); 
+  }, [espnId, initialStatus]); 
 
   const userTime = new Date(matchDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
   const cleanStatus = (data.status || '').toUpperCase();

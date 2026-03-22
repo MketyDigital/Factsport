@@ -5,24 +5,20 @@ import { Bell, BellRing } from 'lucide-react';
 export default function GoalAlertToggler({ matchId, homeTeam, awayTeam, currentHomeScore, currentAwayScore, status }: any) {
     const [isSubscribed, setIsSubscribed] = useState(false);
     const [permission, setPermission] = useState('default');
-    const [isSupported, setIsSupported] = useState(true); // 🟢 Safety Check
+    const [isSupported, setIsSupported] = useState(false);
 
     useEffect(() => {
-        // 🟢 SAFELY CHECK IF BROWSER SUPPORTS NOTIFICATIONS BEFORE TOUCHING IT
-        if (typeof window !== 'undefined') {
-            if ('Notification' in window) {
-                setPermission(Notification.permission);
-                const subbed = localStorage.getItem(`alerts_${matchId}`);
-                if (subbed === 'true') setIsSubscribed(true);
-            } else {
-                setIsSupported(false); // Hide the button if not supported
-            }
+        // 🟢 SAFELY CHECK BROWSER SUPPORT TO PREVENT IOS CRASHES
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            setIsSupported(true);
+            setPermission(Notification.permission);
+            const subbed = localStorage.getItem(`alerts_${matchId}`);
+            if (subbed === 'true') setIsSubscribed(true);
         }
     }, [matchId]);
 
     useEffect(() => {
         if (!isSupported || !isSubscribed || permission !== 'granted') return;
-        if (!('Notification' in window)) return;
         
         const isLive = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'P'].includes((status || '').toUpperCase());
         if (!isLive) return;
@@ -39,9 +35,7 @@ export default function GoalAlertToggler({ matchId, homeTeam, awayTeam, currentH
                     icon: '/logo.png',
                     vibrate: [200, 100, 200]
                 } as any);
-            } catch (e) {
-                console.error("Notification failed", e);
-            }
+            } catch (e) { console.error(e); }
             
             localStorage.setItem(`home_score_${matchId}`, newHome.toString());
             localStorage.setItem(`away_score_${matchId}`, newAway.toString());
@@ -49,33 +43,27 @@ export default function GoalAlertToggler({ matchId, homeTeam, awayTeam, currentH
             localStorage.setItem(`home_score_${matchId}`, '0');
             localStorage.setItem(`away_score_${matchId}`, '0');
         }
-    }, [currentHomeScore, currentAwayScore, status, isSubscribed, permission, matchId, homeTeam, awayTeam, isSupported]);
+    }, [currentHomeScore, currentAwayScore, status, isSubscribed, isSupported, permission, matchId, homeTeam, awayTeam]);
 
     const toggleAlerts = async () => {
-        if (!('Notification' in window)) return;
+        if (!isSupported) {
+            alert("Goal alerts are not supported on this browser.");
+            return;
+        }
 
         if (!isSubscribed) {
-            if (permission !== 'granted') {
-                try {
+            try {
+                if (permission !== 'granted') {
                     const req = await Notification.requestPermission();
                     setPermission(req);
                     if (req !== 'granted') {
-                        alert("Please allow notifications in your browser settings to receive live goal alerts!");
+                        alert("Please allow notifications to receive alerts!");
                         return;
                     }
-                } catch (e) {
-                    console.error("Permission request failed", e);
-                    return;
                 }
-            }
-            setIsSubscribed(true);
-            localStorage.setItem(`alerts_${matchId}`, 'true');
-            
-            try {
-                new Notification("✅ Goal Alerts Activated!", {
-                    body: `You will be notified instantly when ${homeTeam} or ${awayTeam} scores.`,
-                    icon: '/logo.png'
-                });
+                setIsSubscribed(true);
+                localStorage.setItem(`alerts_${matchId}`, 'true');
+                new Notification("✅ Alerts Activated", { icon: '/logo.png' });
             } catch (e) {}
         } else {
             setIsSubscribed(false);
@@ -84,19 +72,10 @@ export default function GoalAlertToggler({ matchId, homeTeam, awayTeam, currentH
     };
 
     const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'].includes((status || '').toUpperCase());
-    
-    // 🟢 Don't render the button if the match is finished OR if the phone doesn't support alerts
     if (isFinished || !isSupported) return null; 
 
     return (
-        <button 
-            onClick={toggleAlerts}
-            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm border ${
-                isSubscribed 
-                ? 'bg-blue-600/20 text-blue-400 border-blue-500/30 hover:bg-blue-600/30' 
-                : 'bg-white/10 text-white border-white/10 hover:bg-white/20 backdrop-blur-sm'
-            }`}
-        >
+        <button onClick={toggleAlerts} className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm border ${isSubscribed ? 'bg-blue-600/20 text-blue-400 border-blue-500/30 hover:bg-blue-600/30' : 'bg-white/10 text-white border-white/10 hover:bg-white/20 backdrop-blur-sm'}`}>
             {isSubscribed ? <BellRing size={12} className="animate-pulse" /> : <Bell size={12} />}
             <span className="hidden md:inline">{isSubscribed ? 'Alerts On' : 'Get Alerts'}</span>
             <span className="md:hidden">{isSubscribed ? 'On' : 'Alerts'}</span>

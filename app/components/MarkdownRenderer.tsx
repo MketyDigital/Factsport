@@ -5,28 +5,33 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw'; 
 import Link from 'next/link';
 import { ExternalLink, Link as LinkIcon, Trophy, Calendar, ChevronRight } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
 
-// 🟢 THE EMBEDDED MATCH CARD COMPONENT
+// 🟢 FETCHES FROM CACHE INSTEAD OF SUPABASE
 function EmbeddedMatchCard({ matchId }: { matchId: string }) {
     const [match, setMatch] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        let isMounted = true;
         const fetchMatch = async () => {
-            const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-            const { data } = await supabase.from('matches').select('*').eq('id', matchId).single();
-            if (data) setMatch(data);
-            setIsLoading(false);
+            try {
+                const res = await fetch(`/api/cache/match-widget?id=${matchId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (isMounted) setMatch(data);
+                }
+            } catch (e) {}
+            if (isMounted) setIsLoading(false);
         };
         fetchMatch();
+        return () => { isMounted = false; };
     }, [matchId]);
 
     if (isLoading) {
         return <div className="w-full h-[120px] bg-slate-50 rounded-2xl border border-slate-100 animate-pulse my-6"></div>;
     }
 
-    if (!match) return null; 
+    if (!match || match.error) return null; 
 
     const isLive = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'P'].includes(match.status);
     const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'].includes(match.status);
@@ -81,9 +86,6 @@ function EmbeddedMatchCard({ matchId }: { matchId: string }) {
 }
 
 export default function MarkdownRenderer({ content }: { content: string }) {
-  // 🟢 1. THE BULLETPROOF PRE-PROCESSOR
-  // This finds the shortcode (even if the closing bracket is missing) and replaces it 
-  // with an invisible HTML div that we can catch perfectly inside ReactMarkdown.
   const processedContent = content.replace(
       /\[MATCH_WIDGET:([a-zA-Z0-9-]+)\]?/gi, 
       '<div class="match-widget-embed" id="$1"></div>'
@@ -93,16 +95,12 @@ export default function MarkdownRenderer({ content }: { content: string }) {
     <ReactMarkdown
       rehypePlugins={[rehypeRaw]} 
       components={{
-        
-        // 2. INTERCEPT THE CUSTOM DIV TO RENDER THE MATCH CARD
         div: ({ className, id, children, ...props }) => {
             if (className === 'match-widget-embed' && id) {
                 return <EmbeddedMatchCard matchId={id} />;
             }
             return <div className={className} id={id} {...props}>{children}</div>;
         },
-
-        // CUSTOM LINK RENDERER
         a: ({ href, children, ...props }) => {
           const isInternal = href?.startsWith('/');
           const buttonClasses = "inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-lg font-black text-xs uppercase tracking-wider hover:bg-blue-600 hover:text-white transition shadow-sm border border-blue-100 my-1 no-underline group active:scale-95";
@@ -117,43 +115,20 @@ export default function MarkdownRenderer({ content }: { content: string }) {
           }
 
           return (
-            <a 
-              href={href} 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className={buttonClasses}
-              {...props}
-            >
-              {children} 
-              <ExternalLink size={12} className="group-hover:text-white text-blue-500 transition" />
+            <a href={href} target="_blank" rel="noopener noreferrer" className={buttonClasses} {...props}>
+              {children} <ExternalLink size={12} className="group-hover:text-white text-blue-500 transition" />
             </a>
           );
         },
-
-        // CUSTOM IMAGE RENDERER
         img: ({ src, alt, ...props }) => (
           <span className="block my-6 rounded-2xl overflow-hidden shadow-lg border border-slate-100 bg-slate-50">
-            <img 
-              src={src} 
-              alt={alt || 'Article Image'} 
-              className="w-full h-auto object-cover m-0" 
-              loading="lazy"
-              {...props} 
-            />
+            <img src={src} alt={alt || 'Article Image'} className="w-full h-auto object-cover m-0" loading="lazy" {...props} />
             {alt && <span className="block text-center text-[10px] font-bold text-slate-400 p-2 bg-slate-50 uppercase tracking-widest">{alt}</span>}
           </span>
         ),
-
-        // STANDARD PARAGRAPHS
         p: ({ children, ...props }) => {
-            return (
-              <p className="mb-4 text-slate-700 leading-relaxed" {...props}>
-                {children}
-              </p>
-            );
+            return <p className="mb-4 text-slate-700 leading-relaxed" {...props}>{children}</p>;
         },
-
-        // IFRAME RE-SIZER
         iframe: ({ node, ...props }) => (
             <div className="w-full overflow-hidden rounded-xl my-6 flex justify-center bg-slate-50 border border-slate-100">
                 <iframe {...props} className="max-w-full" />

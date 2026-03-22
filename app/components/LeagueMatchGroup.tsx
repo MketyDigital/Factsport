@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Calendar, Zap, Ticket, ExternalLink, BarChart2, ChevronRight, Clock, CheckCircle, Trophy } from 'lucide-react';
 import MatchTime from '@/app/components/MatchTime';
@@ -20,6 +20,7 @@ const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&s
 export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: string, matches: any[] }) {
     const [activeTab, setActiveTab] = useState<'fixtures' | 'results'>('fixtures');
     const [liveMatches, setLiveMatches] = useState(matches);
+    const isFetching = useRef(false);
 
     useEffect(() => {
         setLiveMatches(prev => {
@@ -30,35 +31,69 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
         });
     }, [matches]);
 
+    // 🟢 HUGE OPTIMIZATION: ONLY poll matches that are actively playing right now.
     useEffect(() => {
-        const fetchUpdates = async () => {
-            const updated = await Promise.all(liveMatches.map(async (m) => {
-                if (['FT', 'FINISHED', 'ABD'].includes((m.status || '').toUpperCase())) return m;
-                try {
-                    let res;
-                    if (m.espn_id) {
-                        res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${m.espn_id}&t=${Date.now()}`);
-                    } else {
-                        res = await fetch(`/api/match-data?id=${m.id}&t=${Date.now()}`);
-                    }
+        let isMounted = true;
+        let timeoutId: NodeJS.Timeout;
 
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (!data.error) {
-                            return { ...m, status: data.status, home_score: data.home_score, away_score: data.away_score };
+        const fetchUpdates = async () => {
+            if (isFetching.current || !isMounted || document.visibilityState !== 'visible') return;
+
+            // Only grab matches that are actually live and have an ESPN ID
+            const activeLiveMatches = liveMatches.filter(m => 
+                ['LIVE', 'IN_PLAY', 'HT', '1H', '2H', 'ET', 'P'].includes((m.status || '').toUpperCase()) && m.espn_id
+            );
+
+            if (activeLiveMatches.length === 0) {
+                // If no games are playing, check again in 30 seconds instead of 5
+                if (isMounted) timeoutId = setTimeout(fetchUpdates, 30000);
+                return;
+            }
+
+            isFetching.current = true;
+            try {
+                // Fetch updates for the live matches concurrently
+                const updatePromises = activeLiveMatches.map(async (m) => {
+                    try {
+                        const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${m.espn_id}&t=${Date.now()}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (!data.error) return { id: m.id, status: data.status, home_score: data.home_score, away_score: data.away_score };
                         }
+                    } catch (e) {}
+                    return null;
+                });
+
+                const results = await Promise.all(updatePromises);
+                
+                let hasChanges = false;
+                const newLiveMatches = liveMatches.map(m => {
+                    const update = results.find(r => r && r.id === m.id);
+                    if (update && (update.status !== m.status || update.home_score !== m.home_score || update.away_score !== m.away_score)) {
+                        hasChanges = true;
+                        return { ...m, status: update.status, home_score: update.home_score, away_score: update.away_score };
                     }
-                } catch(e) { }
-                return m;
-            }));
-            
-            if (JSON.stringify(updated) !== JSON.stringify(liveMatches)) {
-                setLiveMatches(updated);
+                    return m;
+                });
+
+                if (hasChanges && isMounted) setLiveMatches(newLiveMatches);
+
+            } catch(e) { } 
+            finally {
+                isFetching.current = false;
+            }
+
+            if (isMounted) {
+                timeoutId = setTimeout(fetchUpdates, 5000); 
             }
         };
 
-        const interval = setInterval(fetchUpdates, 5000); // 🟢 5 SECONDS
-        return () => clearInterval(interval);
+        fetchUpdates();
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timeoutId);
+        };
     }, [liveMatches]);
 
     const fixtures = liveMatches
