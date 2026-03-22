@@ -111,11 +111,11 @@ export async function POST(request: Request) {
     const htStatuses = ['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME', 'PAUSED'];
     const live2HStatuses = ['2H', 'SECOND_HALF', 'SECOND HALF'];
 
-    // 🟢 1. VAR DECISIONS (FB Only, No Image)
+    // 🟢 1. VAR DECISIONS
     if (newTotal < oldTotal) {
         payload.fb1Message = `❌ VAR DECISION: OVERTURNED - Previous G/Event has been canceled.\n\nThe score returns to:\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
     } 
-    // 🟢 2. GOALS (FB Text Only. Twitter Text + GOAL Image)
+    // 🟢 2. GOALS 
     else if (newTotal > oldTotal || newGoalsList.length > oldGoalsList.length) {
         if (newGoalsList.length < newTotal) return NextResponse.json({ message: "Facts data lagging behind scoreboard. Waiting for next ping." });
         let statusText = live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus) ? '' : ` (${newState.status})`;
@@ -137,16 +137,16 @@ export async function POST(request: Request) {
         } else {
             payload.fb1Message = `🚨 GOAL ALERT!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\n${matchUrl}`;
             payload.xMessage = `🚨 GOAL ALERT!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\n👇\n${matchUrl}\n\n${hashtags}`;
-            payload.xImageUrl = getMatchImageUrl('GOAL ALERT!', newState, frontendUrl); // X gets the Goal image!
+            payload.xImageUrl = getMatchImageUrl('GOAL ALERT!', newState, frontendUrl); 
         }
     } 
-    // 🟢 3. PENALTY AWARDED (FB Only, No Image)
+    // 🟢 3. PENALTY AWARDED
     else if (newTotal === oldTotal && newPenaltiesList.length > oldPenaltiesList.length) {
         const sortedPens = [...newPenaltiesList].sort((a, b) => parseTime(b.time || b.minute) - parseTime(a.time || a.minute));
         const time = sortedPens[0].time || sortedPens[0].minute ? `${sortedPens[0].time || sortedPens[0].minute}'` : '';
         payload.fb1Message = `⚠️ PENALTY AWARDED - (Confirmed by Referee/VAR) ${time}\n\nMassive moment in the match! Will they convert it?\n\n👇\n${matchUrl}`;
     }
-    // 🟢 4. LINEUPS (FB + X + PITCH IMAGE for Both)
+    // 🟢 4. LINEUPS (FB1 and X Image attached!)
     else if (oldWasIncomplete && newIsComplete) {
         payload.fb1Message = `📋 STARTING XI ANNOUNCED!\n\n${newState.home_team} vs ${newState.away_team}\n\n👇 See the tactical setup & subs here!\n${matchUrl}`;
         payload.xMessage = `🚨 STARTING XI: ${newState.home_team} vs ${newState.away_team}! 👇\n${matchUrl}\n\n${hashtags}`;
@@ -161,31 +161,29 @@ export async function POST(request: Request) {
         const finalUrl = `${frontendUrl}/api/og?data=${encodeBase64Safe(lineupOg)}`;
         
         payload.xImageUrl = finalUrl;
-        payload.fb1ImageUrl = finalUrl;
-        payload.fbImageUrl = finalUrl; 
+        payload.fb1ImageUrl = finalUrl; 
     } 
     else if (oldWasIncomplete && !newIsComplete && (newValidH.length > 0 || newValidA.length > 0)) {
         return NextResponse.json({ message: "Lineups still incomplete." });
     } 
-    // 🟢 5. KICK OFF (FB + X + KICK-OFF IMAGE for Both)
+    // 🟢 5. KICK OFF (FB1 and X Image attached!)
     else if (preStatuses.includes(oldStatus) && live1HStatuses.includes(newStatus)) {
         payload.fb1Message = `⏱️ KICK-OFF!\n\nWe are officially underway: ${newState.home_team} vs ${newState.away_team}.\n\nFollow live updates here:\n👇\n${matchUrl}`;
         payload.xMessage = `⏱️ KICK-OFF!\n\nWe are officially underway.\n\n👇 Live updates:\n${matchUrl}\n\n${hashtags}`;
         
         const kickoffUrl = getMatchImageUrl('KICK-OFF', newState, frontendUrl);
         payload.xImageUrl = kickoffUrl;
-        payload.fb1ImageUrl = kickoffUrl;
-        payload.fbImageUrl = kickoffUrl;
+        payload.fb1ImageUrl = kickoffUrl; 
     }
-    // 🟢 6. HALF TIME (FB Only, No Image)
+    // 🟢 6. HALF TIME
     else if (!htStatuses.includes(oldStatus) && htStatuses.includes(newStatus)) {
         payload.fb1Message = `⏸️ HALF TIME.\n\nHow do you rate the first half performance?\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇 Match Stats so far:\n${matchUrl}`;
     }
-    // 🟢 7. SECOND HALF (FB Only, No Image)
+    // 🟢 7. SECOND HALF
     else if (htStatuses.includes(oldStatus) && (live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus))) {
         payload.fb1Message = `⏱️ SECOND HALF KICK-OFF!\n\nWe are back underway: ${newState.home_team} vs ${newState.away_team}.\n\nFollow the action here:\n👇\n${matchUrl}`;
     }
-    // 🟢 8. FULL TIME (FB + X + FT IMAGE for Both)
+    // 🟢 8. FULL TIME (FB1 and X Image attached!)
     else if (!strictlyFinishedStatuses.includes(oldStatus) && strictlyFinishedStatuses.includes(newStatus)) {
         payload.fb1Message = `⏹️ FULL TIME!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\nMatch stats and ratings available now:\n👇\n${matchUrl}`;
         payload.xMessage = `⏹️ FULL TIME.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}.\n\n👇 Stats:\n${matchUrl}\n\n${hashtags}`;
@@ -193,7 +191,6 @@ export async function POST(request: Request) {
         const ftUrl = getMatchImageUrl('FULL TIME', newState, frontendUrl);
         payload.xImageUrl = ftUrl;
         payload.fb1ImageUrl = ftUrl; 
-        payload.fbImageUrl = ftUrl;
     }
 
     if (!payload.fb1Message && !payload.xMessage) return NextResponse.json({ message: "No postable event occurred." });
