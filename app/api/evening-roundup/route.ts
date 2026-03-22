@@ -6,6 +6,17 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { postToSocials } from '@/app/lib/socialService';
 
+// 🟢 CLOUDFLARE EDGE-SAFE ENCODER
+function encodeBase64Safe(obj: any) {
+    const str = JSON.stringify(obj);
+    const bytes = new TextEncoder().encode(str);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 export async function GET(request: Request) {
     const url = new URL(request.url);
     if (url.searchParams.get('key') !== process.env.CRON_KEY) {
@@ -15,14 +26,11 @@ export async function GET(request: Request) {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     
     const now = new Date();
-    // 🛡️ DATE-DRIFT CHECK: Handles midnight/early morning runs perfectly
     if (now.getUTCHours() < 6) {
         now.setUTCDate(now.getUTCDate() - 1);
     }
     const targetDate = now.toISOString().split('T')[0];
-
-    // 🔒 THE LOCK (Now using the existing cron_logs table safely!)
-    const lockKey = `${targetDate}-evening`; // Example: "2026-03-06-evening"
+    const lockKey = `${targetDate}-evening`; 
     
     const { error: lockError } = await supabase.from('cron_logs').insert([{ run_date: lockKey }]);
     
@@ -43,14 +51,12 @@ export async function GET(request: Request) {
         .order('match_date', { ascending: true });
 
     if (error || !matches || matches.length === 0) {
-        // 🚨 SELF-HEALING: Remove the exact evening lock if no games are found
         await supabase.from('cron_logs').delete().eq('run_date', lockKey);
         return NextResponse.json({ message: "No finished games found. Lock removed." });
     }
 
     const frontendUrl = 'https://factsport.com'; 
 
-    // 🏆 GROUP BY LEAGUE
     const leagues: Record<string, any[]> = {};
     matches.forEach(m => {
         if (!leagues[m.league]) leagues[m.league] = [];
@@ -73,12 +79,21 @@ export async function GET(request: Request) {
     });
     xText += `\nFull stats & news: ${frontendUrl}`;
 
+    // 🖼️ TWITTER RESULTS GRID IMAGE
+    const topMatches = matches.slice(0, 10).map(m => ({
+        home: m.home_team,
+        away: m.away_team,
+        score: `${m.home_score} - ${m.away_score}`
+    }));
+    
+    const ogPayload = { type: 'schedule', label: 'FULL TIME RESULTS', matches: topMatches };
+    const safeBase64 = encodeBase64Safe(ogPayload);
+    const resultsOgUrl = `${frontendUrl}/api/og?data=${safeBase64}`;
+
     try {
-        await postToSocials({ fb1Message: fb1Text, xMessage: xText }); 
+        await postToSocials({ fb1Message: fb1Text, xMessage: xText, xImageUrl: resultsOgUrl }); 
         return NextResponse.json({ success: true, total_matches: matches.length });
     } catch (e) {
-        // 🚨 SELF-HEALING: Remove the exact evening lock if posting fails
-        console.error("Posting Error:", e);
         await supabase.from('cron_logs').delete().eq('run_date', lockKey);
         return NextResponse.json({ error: "Posting failed. Lock removed for retry." }, { status: 500 });
     }

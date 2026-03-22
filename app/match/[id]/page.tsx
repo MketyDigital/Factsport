@@ -40,6 +40,7 @@ const getSupabaseData = cache(async (id: string) => {
     return data;
 });
 
+// 🟢 METADATA WITH REAL-TIME CLOUDFLARE SHARING
 export async function generateMetadata({ params }: { params: { id: string } }, parent: ResolvingMetadata): Promise<Metadata> {
     const resolvedParams = await params;
     const match = await getSupabaseData(resolvedParams.id);
@@ -48,15 +49,33 @@ export async function generateMetadata({ params }: { params: { id: string } }, p
     const status = (match.status || '').toUpperCase();
     const isLive = !SCHEDULED_STATUSES.includes(status) && !FINISHED_STATUSES.includes(status);
     const isFinished = FINISHED_STATUSES.includes(status);
+    
+    let hScore = match.home_score || 0;
+    let aScore = match.away_score || 0;
+
+    // 🟢 FIX: If the match is live, fetch the real score from the Worker so WhatsApp/X shares the right score!
+    if (isLive && match.espn_id) {
+        try {
+            const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${match.espn_id}`, { next: { revalidate: 3 } });
+            if (res.ok) {
+                const liveData = await res.json();
+                if (!liveData.error) {
+                    hScore = liveData.home_score;
+                    aScore = liveData.away_score;
+                }
+            }
+        } catch (e) {}
+    }
+
     let title = `${match.home_team} vs ${match.away_team} Predictions, H2H & Live Score | FactSport`;
     let description = `Get expert predictions, pro betting analysis, starting lineups, and live updates for ${match.home_team} vs ${match.away_team} in the ${match.league}.`;
 
     if (isLive) {
-        title = `🔴 LIVE: ${match.home_team} ${match.home_score}-${match.away_score} ${match.away_team}`;
+        title = `🔴 LIVE: ${match.home_team} ${hScore}-${aScore} ${match.away_team}`;
         description = `Follow the live score, minute-by-minute text commentary, and live match stats for ${match.home_team} vs ${match.away_team}.`;
     } else if (isFinished) {
-        title = `${match.home_team} ${match.home_score}-${match.away_score} ${match.away_team} Result, Highlights & Match Stats`;
-        description = `Full time result: ${match.home_team} ${match.home_score}-${match.away_score} ${match.away_team}. Watch the highlights, review the pro analysis, and check the final match stats.`;
+        title = `${match.home_team} ${hScore}-${aScore} ${match.away_team} Result, Highlights & Match Stats`;
+        description = `Full time result: ${match.home_team} ${hScore}-${aScore} ${match.away_team}. Watch the highlights, review the pro analysis, and check the final match stats.`;
     }
 
     const previousImages = (await parent).openGraph?.images || [];
@@ -97,9 +116,17 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const isFinished = FINISHED_STATUSES.includes(currentStatus);
   const isLive = !SCHEDULED_STATUSES.includes(currentStatus) && !isFinished;
   
-  const matchDateMs = new Date(dbData.match_date).getTime();
-  const minutesToKick = (matchDateMs - Date.now()) / 60000;
-  const isUpcomingMatch = SCHEDULED_STATUSES.includes(currentStatus) && minutesToKick > 5;
+  // 🟢 SMART LOCK LOGIC (Stops Delayed/Postponed games from unlocking early)
+  let isServerLocked = true;
+  if (isLive || isFinished) {
+      isServerLocked = false;
+  } else {
+      const matchDateMs = new Date(dbData.match_date).getTime();
+      const minutesToKick = (matchDateMs - Date.now()) / 60000;
+      if (minutesToKick <= 5 && minutesToKick > -120) {
+          isServerLocked = false; // Unlock if within 5 mins of kickoff
+      }
+  }
   
   const activeVideoUrl = sanitizeUrl(isFinished ? dbData.video_url : dbData.livestream_url);
   const activeAudioUrl = sanitizeUrl(dbData.audio_url);
@@ -114,16 +141,8 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       eventStatus: isFinished ? 'https://schema.org/EventScheduled' : (isLive ? 'https://schema.org/EventLive' : 'https://schema.org/EventScheduled'),
       sport: 'Soccer',
       competitor: [
-          {
-              '@type': 'SportsTeam',
-              name: dbData.home_team,
-              image: sanitizeUrl(dbData.home_logo) || undefined
-          },
-          {
-              '@type': 'SportsTeam',
-              name: dbData.away_team,
-              image: sanitizeUrl(dbData.away_logo) || undefined
-          }
+          { '@type': 'SportsTeam', name: dbData.home_team, image: sanitizeUrl(dbData.home_logo) || undefined },
+          { '@type': 'SportsTeam', name: dbData.away_team, image: sanitizeUrl(dbData.away_logo) || undefined }
       ]
   };
 
@@ -149,9 +168,9 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
               {(activeVideoUrl || activeAudioUrl) && (
                   <div className="w-full bg-black">
                       {activeVideoUrl ? (
-                          <FactSportPlayer mediaUrl={activeVideoUrl} matchId={dbData.id} mode="video" isUpcoming={isUpcomingMatch} isFinished={isFinished} matchDate={dbData.match_date} />
+                          <FactSportPlayer mediaUrl={activeVideoUrl} matchId={dbData.id} mode="video" isLocked={isServerLocked} matchDate={dbData.match_date} isFinished={isFinished} />
                       ) : (
-                          <FactSportPlayer mediaUrl={activeAudioUrl!} matchId={dbData.id} mode="audio" isUpcoming={isUpcomingMatch} isFinished={isFinished} matchDate={dbData.match_date} />
+                          <FactSportPlayer mediaUrl={activeAudioUrl!} matchId={dbData.id} mode="audio" isLocked={isServerLocked} matchDate={dbData.match_date} isFinished={isFinished} />
                       )}
                   </div>
               )}

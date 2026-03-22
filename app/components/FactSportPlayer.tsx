@@ -8,14 +8,14 @@ export default function FactSportPlayer({
   mediaUrl, 
   matchId, 
   mode = 'video', 
-  isUpcoming = false, 
+  isLocked = false, 
   isFinished = false,
   matchDate 
 }: { 
   mediaUrl: string, 
   matchId: string, 
   mode?: 'video' | 'audio', 
-  isUpcoming?: boolean, 
+  isLocked?: boolean, 
   isFinished?: boolean,
   matchDate?: string 
 }) {
@@ -24,15 +24,9 @@ export default function FactSportPlayer({
   const [progress, setProgress] = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
   
-  // 🟢 SMART INITIALIZATION: Do the math immediately so the video never "flashes" or leaks
-  const [isTimeLocked, setIsTimeLocked] = useState(() => {
-      if (isFinished || !matchDate) return false;
-      const kickoffTime = new Date(matchDate).getTime();
-      const unlockTime = kickoffTime - (5 * 60 * 1000); // 5 mins before
-      return Date.now() < unlockTime;
-  });
-
-  const [coverageTimeText, setCoverageTimeText] = useState('Available 5 mins to Kick-off');
+  // Inherit strict lock state from the server
+  const [isTimeLocked, setIsTimeLocked] = useState(isLocked);
+  const [coverageTimeText, setCoverageTimeText] = useState('Coverage starts 5 mins to Kick-off');
   
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
   const { activeMatchId, tuneInVideo, setIsPageActive } = useGlobalMedia();
@@ -41,34 +35,29 @@ export default function FactSportPlayer({
   const isRawMedia = mediaUrl.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
   const isRawAudio = mediaUrl.match(/\.(mp3|wav)$/i);
 
-  // 🟢 THE BULLETPROOF COUNTDOWN ENGINE
   useEffect(() => {
-      if (isFinished || !matchDate) {
-          setIsTimeLocked(false);
-          return;
+      // Re-sync if the server lock state changes
+      setIsTimeLocked(isLocked);
+      if (matchDate && isLocked) {
+          const timeStr = new Date(matchDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          setCoverageTimeText(`Coverage begins at ${timeStr}`);
       }
+  }, [isLocked, matchDate]);
 
-      const checkTimeLock = () => {
+  useEffect(() => {
+      // Auto-unlock precisely 5 minutes before kickoff
+      if (!isTimeLocked || isFinished || !matchDate) return;
+
+      const checkUnlock = () => {
           const kickoffTime = new Date(matchDate).getTime();
-          const now = Date.now();
-          const unlockTime = kickoffTime - (5 * 60 * 1000); 
-
-          if (now < unlockTime) {
-              setIsTimeLocked(true);
-              // Format the exact local time for the user (e.g., "14:30")
-              const timeStr = new Date(matchDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-              setCoverageTimeText(`Coverage begins at ${timeStr}`);
-          } else {
+          if (Date.now() >= kickoffTime - (5 * 60 * 1000)) {
               setIsTimeLocked(false);
           }
       };
 
-      checkTimeLock(); 
-      
-      // Re-check every 5 seconds to auto-unlock exactly when it's time
-      const interval = setInterval(checkTimeLock, 5000);
+      const interval = setInterval(checkUnlock, 5000);
       return () => clearInterval(interval);
-  }, [matchDate, isFinished]);
+  }, [isTimeLocked, matchDate, isFinished]);
 
   useEffect(() => {
       if (activeMatchId === matchId) setIsPageActive(true);
@@ -104,8 +93,7 @@ export default function FactSportPlayer({
     else if (document.fullscreenElement) document.exitFullscreen();
   };
 
-  // 🟢 THE TIME-LOCK SHIELD UI
-  // If this returns, absolutely nothing below it (Streamio, YouTube, Audio) can render!
+  // 🟢 THE STRICT SHIELD UI
   if (isTimeLocked) {
       return (
           <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative flex flex-col items-center justify-center overflow-hidden border-b border-slate-800 shadow-inner group`}>
@@ -127,10 +115,8 @@ export default function FactSportPlayer({
       );
   }
 
-  // WEBRTC AUDIO ROOM HANDOFF
   if (mediaUrl === 'streamio') return <FactSportMediaRoom matchId={matchId} mediaUrl="streamio" />;
 
-  // YOUTUBE BLOCK
   const renderYouTube = () => {
     let videoId = '';
     if (mediaUrl.includes('v=')) videoId = mediaUrl.split('v=')[1]?.split('&')[0];
