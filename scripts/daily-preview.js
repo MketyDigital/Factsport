@@ -115,7 +115,7 @@ async function generateDailyPreview() {
                 });
                 if (pingRes.ok) console.log(`   🚀 Successfully pinged Google Indexing API`);
                 else console.error(`   ⚠️ Google Ping failed:`, pingRes.status);
-            } catch (pingError: any) {
+            } catch (pingError) { // 🟢 FIX: Removed ": any"
                 console.error(`   ❌ Google Ping Network Error:`, pingError.message);
             }
 
@@ -129,7 +129,7 @@ async function generateDailyPreview() {
                 });
             }
         }
-    } catch (e: any) {
+    } catch (e) { // 🟢 FIX: Removed ": any"
         console.error(`   🔥 Gemini Error: ${e.message}`);
     }
 }
