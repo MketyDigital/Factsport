@@ -10,7 +10,7 @@ export default function FactSportPlayer({
   mode = 'video', 
   isUpcoming = false, 
   isFinished = false,
-  matchDate // 🟢 NEW: We need the match date to calculate the smart countdown!
+  matchDate 
 }: { 
   mediaUrl: string, 
   matchId: string, 
@@ -24,8 +24,15 @@ export default function FactSportPlayer({
   const [progress, setProgress] = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
   
-  // 🟢 SMART TIME-LOCK STATE
-  const [isTimeLocked, setIsTimeLocked] = useState(isUpcoming);
+  // 🟢 SMART INITIALIZATION: Do the math immediately so the video never "flashes" or leaks
+  const [isTimeLocked, setIsTimeLocked] = useState(() => {
+      if (isFinished || !matchDate) return false;
+      const kickoffTime = new Date(matchDate).getTime();
+      const unlockTime = kickoffTime - (5 * 60 * 1000); // 5 mins before
+      return Date.now() < unlockTime;
+  });
+
+  const [coverageTimeText, setCoverageTimeText] = useState('Available 5 mins to Kick-off');
   
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
   const { activeMatchId, tuneInVideo, setIsPageActive } = useGlobalMedia();
@@ -34,35 +41,32 @@ export default function FactSportPlayer({
   const isRawMedia = mediaUrl.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
   const isRawAudio = mediaUrl.match(/\.(mp3|wav)$/i);
 
-  // 🟢 THE SMART COUNTDOWN ENGINE
+  // 🟢 THE BULLETPROOF COUNTDOWN ENGINE
   useEffect(() => {
-      // If the match is already finished, never lock it (show highlights)
-      if (isFinished) {
+      if (isFinished || !matchDate) {
           setIsTimeLocked(false);
           return;
       }
 
-      if (!matchDate) return;
-
       const checkTimeLock = () => {
           const kickoffTime = new Date(matchDate).getTime();
           const now = Date.now();
-          // Calculate exactly 5 minutes before kickoff
-          const fiveMinutesBefore = kickoffTime - (5 * 60 * 1000);
+          const unlockTime = kickoffTime - (5 * 60 * 1000); 
 
-          // If right now is BEFORE the 5-minute warning, keep it locked
-          if (now < fiveMinutesBefore) {
+          if (now < unlockTime) {
               setIsTimeLocked(true);
+              // Format the exact local time for the user (e.g., "14:30")
+              const timeStr = new Date(matchDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              setCoverageTimeText(`Coverage begins at ${timeStr}`);
           } else {
               setIsTimeLocked(false);
           }
       };
 
-      checkTimeLock(); // Check immediately on load
+      checkTimeLock(); 
       
-      // Re-check every 10 seconds. This means if a user is staring at the "Available in 5 mins" screen,
-      // it will automatically reveal the player when the time comes without them refreshing!
-      const interval = setInterval(checkTimeLock, 10000);
+      // Re-check every 5 seconds to auto-unlock exactly when it's time
+      const interval = setInterval(checkTimeLock, 5000);
       return () => clearInterval(interval);
   }, [matchDate, isFinished]);
 
@@ -100,7 +104,8 @@ export default function FactSportPlayer({
     else if (document.fullscreenElement) document.exitFullscreen();
   };
 
-  // 🟢 THE TIME-LOCK SHIELD UI (Will show if isTimeLocked is true)
+  // 🟢 THE TIME-LOCK SHIELD UI
+  // If this returns, absolutely nothing below it (Streamio, YouTube, Audio) can render!
   if (isTimeLocked) {
       return (
           <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative flex flex-col items-center justify-center overflow-hidden border-b border-slate-800 shadow-inner group`}>
@@ -109,12 +114,12 @@ export default function FactSportPlayer({
                   <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10 shadow-lg backdrop-blur-sm">
                      <Clock className="text-slate-400 w-4 h-4 animate-pulse" />
                   </div>
-                  <div className="flex flex-col items-center gap-1">
+                  <div className="flex flex-col items-center gap-1 px-4">
                       <span className="text-white font-black uppercase tracking-widest text-[9px] md:text-[10px] text-center drop-shadow-md">
                           {mode === 'audio' ? 'Live Radio Broadcast' : 'Live Match Stream'}
                       </span>
-                      <span className="text-blue-400 font-bold uppercase tracking-widest text-[7px] md:text-[8px] bg-blue-900/40 px-2 py-0.5 rounded-full border border-blue-500/30 shadow-md">
-                          Available 5 mins to Kick-off
+                      <span className="text-blue-400 font-bold uppercase tracking-widest text-[8px] md:text-[9px] bg-blue-900/40 px-3 py-1 rounded-full border border-blue-500/30 shadow-md text-center">
+                          {coverageTimeText}
                       </span>
                   </div>
               </div>

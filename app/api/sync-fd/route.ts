@@ -9,12 +9,10 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     
-    // Security Check
     if (searchParams.get('key') !== process.env.CRON_KEY) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Admin Override (Updates all tables regardless of finished matches)
     const forceSync = searchParams.get('force') === 'true';
 
     const supabase = createClient(
@@ -30,7 +28,7 @@ export async function GET(request: Request) {
     try {
         const today = new Date();
         const fromDate = new Date(today); 
-        fromDate.setDate(today.getDate() - 2); // Look back 2 days
+        fromDate.setDate(today.getDate() - 2); 
         const toDate = new Date(today); 
         const fromStr = fromDate.toISOString().split('T')[0];
         const toStr = toDate.toISOString().split('T')[0];
@@ -40,7 +38,6 @@ export async function GET(request: Request) {
         let logs: string[] = [];
         const leaguesNeedingStandingsUpdate = new Set<string>();
 
-        // 🟢 PHASE 1: Fetch all matches from the last 2 days
         const res = await fetch(`https://api.football-data.org/v4/matches?dateFrom=${fromStr}&dateTo=${toStr}`, { 
             headers: { 'X-Auth-Token': API_KEY } 
         });
@@ -52,7 +49,6 @@ export async function GET(request: Request) {
                 const compCode = m.competition?.code;
                 if (!TARGET_LEAGUES.includes(compCode)) continue;
                 
-                // Map the Football-Data Status
                 let fdStatusMapped = 'SCHEDULED';
                 if (['FINISHED', 'AWARDED'].includes(m.status)) {
                     fdStatusMapped = 'FT';
@@ -66,36 +62,40 @@ export async function GET(request: Request) {
                 
                 const { data: dbMatch } = await supabase
                     .from('matches')
-                    .select('id, status, home_score, away_score')
+                    .select('id, status, home_score, away_score, espn_id')
                     .eq('api_id', m.id)
                     .single();
 
                 if (!dbMatch) continue;
 
-                // 🛑 THE SHIELD: If the match is LIVE or HT in our DB, we SKIP it.
-                // This prevents the "Time Travel" bug (delayed API overwriting live ESPN scores).
-                const isCurrentlyLiveInDB = ['LIVE', 'HT', '1H', '2H', 'ET', 'P'].includes(dbMatch.status);
-                if (isCurrentlyLiveInDB && fdStatusMapped !== 'FT') {
-                    continue; // Do nothing, let ESPN Worker handle it
-                }
-
+                const isDbLive = ['LIVE', 'HT', '1H', '2H', 'ET', 'P'].includes(dbMatch.status);
+                const hasEspnId = !!dbMatch.espn_id;
+                
                 const fdHomeScore = m.score?.fullTime?.home ?? 0;
                 const fdAwayScore = m.score?.fullTime?.away ?? 0;
                 let shouldUpdateMatch = false;
 
-                // 🟢 THE ORIGINAL FINISHED MATCH LOGIC
+                // 🟢 THE MASTER SHIELD LOGIC
                 if (fdStatusMapped === 'FT') {
-                    if (dbMatch.status !== 'FT') {
+                    // 1. Always audit and confirm FT scores
+                    if (dbMatch.status !== 'FT' || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
                         shouldUpdateMatch = true;
-                        leaguesNeedingStandingsUpdate.add(compCode); // Trigger table update
-                    } else if (dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
-                        shouldUpdateMatch = true; // Score correction/audit
-                        leaguesNeedingStandingsUpdate.add(compCode); // Retrigger table update for accuracy
+                        leaguesNeedingStandingsUpdate.add(compCode); 
                     }
                 } 
-                // Handle Postponements or TBD updates only if match isn't live
-                else if (fdStatusMapped === 'POSTPONED' || fdStatusMapped === 'SCHEDULED') {
-                    if (dbMatch.status !== fdStatusMapped && !isCurrentlyLiveInDB) {
+                else if (hasEspnId && (fdStatusMapped === 'LIVE' || fdStatusMapped === 'HT' || isDbLive)) {
+                    // 2. If it has an ESPN ID and is currently playing, HANDS OFF! ESPN Worker handles it.
+                    continue; 
+                } 
+                else if (!hasEspnId && ['LIVE', 'HT'].includes(fdStatusMapped)) {
+                    // 3. THE FALLBACK: Match is live but you forgot the ESPN ID. Update from Football-Data.
+                    if (dbMatch.status !== fdStatusMapped || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
+                        shouldUpdateMatch = true;
+                    }
+                }
+                else if (['POSTPONED', 'SCHEDULED'].includes(fdStatusMapped)) {
+                    // 4. Handle postponements securely
+                    if (dbMatch.status !== fdStatusMapped && !isDbLive) {
                         shouldUpdateMatch = true;
                     }
                 }
@@ -109,22 +109,20 @@ export async function GET(request: Request) {
                     }).eq('api_id', m.id);
                     
                     matchesFinalized++; 
-                    logs.push(`Verified FT: Match ${m.id} (${compCode}) finalized at ${fdHomeScore}-${fdAwayScore}`);
+                    logs.push(`Cron Sync: ${m.id} (${compCode}) -> ${fdStatusMapped} ${fdHomeScore}-${fdAwayScore}`);
                 }
             }
         }
 
-        // 🟢 THE ADMIN OVERRIDE
         if (forceSync) {
             TARGET_LEAGUES.forEach(league => leaguesNeedingStandingsUpdate.add(league));
             logs.push("Admin forced a full standings sync.");
         }
 
-        // 🟢 PHASE 2: STANDINGS SYNC (Only for leagues where a match just finished)
+        // 🟢 STANDINGS SYNC (Safe and delayed)
         for (const leagueId of Array.from(leaguesNeedingStandingsUpdate)) {
             if (leagueId === 'EC' || leagueId === 'WC') continue; 
 
-            // 1.5s delay to avoid API Rate Limits
             await new Promise(resolve => setTimeout(resolve, 1500)); 
 
             const standRes = await fetch(`https://api.football-data.org/v4/competitions/${leagueId}/standings`, { 

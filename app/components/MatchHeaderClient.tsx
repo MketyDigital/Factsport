@@ -11,7 +11,7 @@ import GoalAlertToggler from './GoalAlertToggler';
 const formatGoals = (goals: any[]) => {
     const grouped: Record<string, string[]> = {};
     goals.forEach(g => {
-        let cleanName = g.player.split('(')[0].trim(); 
+        let cleanName = (g.player || 'Unknown Player').split('(')[0].trim(); 
         if (cleanName === 'Goal Confirmed') cleanName = 'Unknown Player';
 
         let cleanTime = g.time?.replace("'", "") || ""; 
@@ -21,16 +21,15 @@ const formatGoals = (goals: any[]) => {
         if (!grouped[cleanName]) grouped[cleanName] = [];
         grouped[cleanName].push(cleanTime);
     });
-    
     return Object.entries(grouped).map(([name, times]) => `${name} ${times.join("', ")}'`);
 };
 
 export default function MatchHeaderClient({ matchId, initialData, dbData }: any) {
   const [data, setData] = useState(initialData);
   const hasPremiumWidget = !!initialData?.widget_id;
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   
   const hasFetchedLive = useRef(false);
+  const isFetching = useRef(false); 
   const [homeFlash, setHomeFlash] = useState(false);
   const [awayFlash, setAwayFlash] = useState(false);
   const prevHomeScore = useRef(initialData?.home_score || 0);
@@ -42,59 +41,69 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
 
   useEffect(() => {
     let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
+    
+    const isFinishedInitially = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(initialData?.status);
+    
+    // 🟢 IF NO ESPN ID OR MATCH IS FINISHED, DO NOT POLL AT ALL.
+    if (isFinishedInitially || hasPremiumWidget || !initialData?.espn_id) return;
+
     const fetchHeaderData = async () => {
-      if (document.visibilityState !== 'visible' || !isMounted) return;
-      try {
-          let res;
-          if (initialData?.espn_id) {
-              res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}&t=${Date.now()}`);
-          } else {
-              res = await fetch(`/api/match-data?id=${matchId}&t=${Date.now()}`);
-          }
-          if (!res.ok) return;
-          const payload = await res.json();
-          
-          if (payload && !payload.error && isMounted) {
-              hasFetchedLive.current = true; 
+      if (isFetching.current || !isMounted) return;
+
+      if (document.visibilityState === 'visible') {
+          isFetching.current = true;
+          try {
+              // 🟢 STRICTLY FETCH FROM CLOUDFLARE WORKER (NO SUPABASE)
+              let res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}&t=${Date.now()}`);
               
-              if (payload.home_score > prevHomeScore.current) {
-                  setHomeFlash(true); setTimeout(() => setHomeFlash(false), 5000);
-              }
-              if (payload.away_score > prevAwayScore.current) {
-                  setAwayFlash(true); setTimeout(() => setAwayFlash(false), 5000);
-              }
-              prevHomeScore.current = payload.home_score;
-              prevAwayScore.current = payload.away_score;
+              if (res.ok) {
+                  const payload = await res.json();
+                  if (payload && !payload.error && isMounted) {
+                      hasFetchedLive.current = true; 
+                      
+                      if (payload.home_score > prevHomeScore.current) {
+                          setHomeFlash(true); setTimeout(() => setHomeFlash(false), 5000);
+                      }
+                      if (payload.away_score > prevAwayScore.current) {
+                          setAwayFlash(true); setTimeout(() => setAwayFlash(false), 5000);
+                      }
+                      prevHomeScore.current = payload.home_score;
+                      prevAwayScore.current = payload.away_score;
 
-              setData((prev:any) => ({ 
-                  ...prev, 
-                  status: payload.status, 
-                  home_score: payload.home_score, 
-                  away_score: payload.away_score,
-                  displayClock: payload.displayClock,
-                  events: payload.events || prev.events
-              }));
+                      setData((prev:any) => ({ 
+                          ...prev, 
+                          status: payload.status, 
+                          home_score: payload.home_score, 
+                          away_score: payload.away_score,
+                          displayClock: payload.displayClock,
+                          events: payload.events || prev.events
+                      }));
 
-              if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
-                  if (intervalRef.current) clearInterval(intervalRef.current);
+                      if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
+                          isFetching.current = false;
+                          return; // Stop polling forever
+                      }
+                  }
               }
+          } catch (error) {
+          } finally {
+              isFetching.current = false;
           }
-      } catch (error) {}
+      }
+      
+      if (isMounted) {
+          timeoutId = setTimeout(fetchHeaderData, 4000);
+      }
     };
 
     fetchHeaderData();
-    if (!['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(initialData?.status)) {
-        intervalRef.current = setInterval(fetchHeaderData, 3000);
-    }
-    const handleVisibilityChange = () => { if (document.visibilityState === 'visible') fetchHeaderData(); };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
         isMounted = false;
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        clearTimeout(timeoutId);
     };
-  }, [matchId, initialData?.status, initialData?.espn_id]);
+  }, [initialData?.status, initialData?.espn_id, hasPremiumWidget]);
 
   if (hasPremiumWidget) return <ScoreAxisWidget matchId={initialData.widget_id} />;
 
@@ -118,8 +127,8 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
   const awayForm = initialData?.away_form || [];
   const events = data?.events || initialData?.events || [];
   
-  const homeGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'home' || e.player?.includes(homeTeamName)));
-  const awayGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'away' || e.player?.includes(awayTeamName)));
+  const homeGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'home' || (e.player && e.player.includes(homeTeamName))));
+  const awayGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'away' || (e.player && e.player.includes(awayTeamName))));
 
   return (
     <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
@@ -128,11 +137,11 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
             <div className="absolute inset-0 bg-gradient-to-b from-[#0a1428]/60 via-[#0a1428]/50 to-[#0a1428]/90" />
         </div>
 
-        <div className="relative z-10 px-2 py-3 md:py-4">
+        <div className="relative z-10 px-2 py-2 md:py-3">
             <div className="flex justify-between items-start max-w-lg mx-auto">
                 <div className="flex flex-col items-center w-[30%]">
                     <Link href={`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center group active:scale-95 transition-transform w-full">
-                        <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
+                        <div className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
                             {dbData?.home_logo && <img src={dbData.home_logo} className="w-full h-full object-contain" alt="" />}
                         </div>
                         <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{homeTeamName}</h2>
@@ -170,9 +179,9 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                     {isUpcoming ? (
                          <div className="text-xl md:text-2xl font-black text-white/30 italic">VS</div>
                     ) : (
-                        <div className="text-3xl md:text-4xl font-black tracking-tighter flex gap-1 items-center drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
+                        <div className="text-2xl md:text-3xl font-black tracking-tighter flex gap-1 items-center drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
                             <span className={`transition-all duration-300 ${homeFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{data?.home_score ?? 0}</span>
-                            <span className="text-white/40 text-2xl md:text-3xl pb-1">-</span>
+                            <span className="text-white/40 text-xl md:text-2xl pb-1">-</span>
                             <span className={`transition-all duration-300 ${awayFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{data?.away_score ?? 0}</span>
                         </div>
                     )}
@@ -180,7 +189,7 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
 
                 <div className="flex flex-col items-center w-[30%]">
                     <Link href={`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center group active:scale-95 transition-transform w-full">
-                        <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
+                        <div className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
                             {dbData?.away_logo && <img src={dbData.away_logo} className="w-full h-full object-contain" alt="" />}
                         </div>
                         <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{awayTeamName}</h2>
@@ -213,16 +222,8 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                 {refName && <span className="flex items-center gap-1"><Flag size={9} className="text-slate-400"/> {refName}</span>}
             </div>
             
-            {/* 🟢 ALERTS AND SHARE BUTTONS RIGHT HERE */}
             <div className="pl-2 border-l border-white/10 shrink-0 flex items-center gap-1.5 md:gap-2">
-                <GoalAlertToggler 
-                    matchId={matchId} 
-                    homeTeam={homeTeamName} 
-                    awayTeam={awayTeamName} 
-                    currentHomeScore={data?.home_score} 
-                    currentAwayScore={data?.away_score} 
-                    status={data?.status} 
-                />
+                <GoalAlertToggler matchId={matchId} homeTeam={homeTeamName} awayTeam={awayTeamName} currentHomeScore={data?.home_score} currentAwayScore={data?.away_score} status={data?.status} />
                 <SocialShareButton matchData={{ ...data, id: matchId, home_team: homeTeamName, away_team: awayTeamName }} />
             </div>
         </div>
