@@ -53,7 +53,6 @@ export async function generateMetadata({ params }: { params: { id: string } }, p
     let hScore = match.home_score || 0;
     let aScore = match.away_score || 0;
 
-    // 🟢 FIX: If the match is live, fetch the real score from the Worker so WhatsApp/X shares the right score!
     if (isLive && match.espn_id) {
         try {
             const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${match.espn_id}`, { next: { revalidate: 3 } });
@@ -116,20 +115,29 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const isFinished = FINISHED_STATUSES.includes(currentStatus);
   const isLive = !SCHEDULED_STATUSES.includes(currentStatus) && !isFinished;
   
-  // 🟢 SMART LOCK LOGIC (Stops Delayed/Postponed games from unlocking early)
+  const matchDateMs = new Date(dbData.match_date).getTime();
+  const minutesToKick = (matchDateMs - Date.now()) / 60000;
+  
+  // 🟢 UNIVERSAL KILL SWITCH (4 Hours = 240 mins)
+  // If the match is officially finished, OR it has been 4 hours since kickoff (in case API is stuck), it's completely dead.
+  const isUniversallyFinished = isFinished || minutesToKick < -240;
+
+  // 🟢 STRICT MEDIA RULES
+  // Only allow highlights (video_url) after the match is dead. Completely nuke the livestream/audio links.
+  const activeVideoUrl = sanitizeUrl(isUniversallyFinished ? dbData.video_url : dbData.livestream_url);
+  const activeAudioUrl = sanitizeUrl(isUniversallyFinished ? null : dbData.audio_url);
+
   let isServerLocked = true;
-  if (isLive || isFinished) {
+  if (isUniversallyFinished) {
+      isServerLocked = false; 
+  } else if (isLive) {
       isServerLocked = false;
   } else {
-      const matchDateMs = new Date(dbData.match_date).getTime();
-      const minutesToKick = (matchDateMs - Date.now()) / 60000;
-      if (minutesToKick <= 5 && minutesToKick > -120) {
-          isServerLocked = false; // Unlock if within 5 mins of kickoff
+      if (minutesToKick <= 5 && minutesToKick > -240) {
+          isServerLocked = false; 
       }
   }
-  
-  const activeVideoUrl = sanitizeUrl(isFinished ? dbData.video_url : dbData.livestream_url);
-  const activeAudioUrl = sanitizeUrl(dbData.audio_url);
+
   const hasWidget = !!dbData.widget_id; 
 
   const jsonLd = {
@@ -138,7 +146,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       name: `${dbData.home_team} vs ${dbData.away_team}`,
       description: `Live scores, H2H stats, and predictions for ${dbData.home_team} vs ${dbData.away_team} in the ${dbData.league}.`,
       startDate: new Date(dbData.match_date).toISOString(),
-      eventStatus: isFinished ? 'https://schema.org/EventScheduled' : (isLive ? 'https://schema.org/EventLive' : 'https://schema.org/EventScheduled'),
+      eventStatus: isUniversallyFinished ? 'https://schema.org/EventScheduled' : (isLive ? 'https://schema.org/EventLive' : 'https://schema.org/EventScheduled'),
       sport: 'Soccer',
       competitor: [
           { '@type': 'SportsTeam', name: dbData.home_team, image: sanitizeUrl(dbData.home_logo) || undefined },
@@ -165,12 +173,13 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                   <HeadToHeadStats dbData={data} />
               </div>
 
+              {/* 🟢 The entire player block won't even render if activeVideoUrl and activeAudioUrl are null! */}
               {(activeVideoUrl || activeAudioUrl) && (
                   <div className="w-full bg-black">
                       {activeVideoUrl ? (
-                          <FactSportPlayer mediaUrl={activeVideoUrl} matchId={dbData.id} mode="video" isLocked={isServerLocked} matchDate={dbData.match_date} isFinished={isFinished} />
+                          <FactSportPlayer mediaUrl={activeVideoUrl} matchId={dbData.id} mode="video" isLocked={isServerLocked} matchDate={dbData.match_date} isFinished={isUniversallyFinished} />
                       ) : (
-                          <FactSportPlayer mediaUrl={activeAudioUrl!} matchId={dbData.id} mode="audio" isLocked={isServerLocked} matchDate={dbData.match_date} isFinished={isFinished} />
+                          <FactSportPlayer mediaUrl={activeAudioUrl!} matchId={dbData.id} mode="audio" isLocked={isServerLocked} matchDate={dbData.match_date} isFinished={isUniversallyFinished} />
                       )}
                   </div>
               )}
