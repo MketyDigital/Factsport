@@ -53,67 +53,70 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
     if (isFinishedInitially || hasPremiumWidget || !initialData?.espn_id) return;
 
     const fetchHeaderData = async () => {
-      if (isFetching.current || !isMounted || document.visibilityState !== 'visible') return;
+      if (!isMounted) return; // Completely dead if component unmounts
 
-      isFetching.current = true;
-      try {
-          let res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}&t=${Date.now()}`);
-          
-          if (res.ok) {
-              const payload = await res.json();
-              if (payload && !payload.error && isMounted) {
-                  hasFetchedLive.current = true; 
-                  
-                  // 🟢 THE MEMORY SHIELD: Prevents infinite re-renders
-                  setData((prev:any) => {
-                      const oldClock = prev.displayClock || '';
-                      const newClock = payload.displayClock || '';
-                      const oldStatus = prev.status || '';
-                      const newStatus = payload.status || '';
-                      const eventsChanged = (payload.events?.length || 0) !== (prev.events?.length || 0);
+      let matchFinished = false;
+
+      // 🟢 HEARTBEAT FIX: Only fetch if visible, but NEVER 'return' and kill the loop!
+      if (document.visibilityState === 'visible' && !isFetching.current) {
+          isFetching.current = true;
+          try {
+              let res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}&t=${Date.now()}`);
+              
+              if (res.ok) {
+                  const payload = await res.json();
+                  if (payload && !payload.error && isMounted) {
+                      hasFetchedLive.current = true; 
                       
-                      const noChanges = 
-                          prev.home_score === payload.home_score && 
-                          prev.away_score === payload.away_score && 
-                          oldClock === newClock && 
-                          oldStatus === newStatus &&
-                          !eventsChanged;
+                      setData((prev:any) => {
+                          const oldClock = prev.displayClock || '';
+                          const newClock = payload.displayClock || '';
+                          const oldStatus = prev.status || '';
+                          const newStatus = payload.status || '';
+                          const eventsChanged = (payload.events?.length || 0) !== (prev.events?.length || 0);
+                          
+                          const noChanges = 
+                              prev.home_score === payload.home_score && 
+                              prev.away_score === payload.away_score && 
+                              oldClock === newClock && 
+                              oldStatus === newStatus &&
+                              !eventsChanged;
 
-                      // Abort re-render to save RAM!
-                      if (noChanges) return prev;
+                          if (noChanges) return prev;
 
-                      if (payload.home_score > prevHomeScore.current) {
-                          setHomeFlash(true); setTimeout(() => setHomeFlash(false), 5000);
+                          if (payload.home_score > prevHomeScore.current) {
+                              setHomeFlash(true); setTimeout(() => setHomeFlash(false), 5000);
+                          }
+                          if (payload.away_score > prevAwayScore.current) {
+                              setAwayFlash(true); setTimeout(() => setAwayFlash(false), 5000);
+                          }
+                          
+                          prevHomeScore.current = payload.home_score;
+                          prevAwayScore.current = payload.away_score;
+
+                          return { 
+                              ...prev, 
+                              status: payload.status, 
+                              home_score: payload.home_score, 
+                              away_score: payload.away_score,
+                              displayClock: payload.displayClock,
+                              events: payload.events || payload.match_events || prev.events
+                          };
+                      });
+
+                      if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
+                          matchFinished = true; // Signals the loop to finally rest.
                       }
-                      if (payload.away_score > prevAwayScore.current) {
-                          setAwayFlash(true); setTimeout(() => setAwayFlash(false), 5000);
-                      }
-                      
-                      prevHomeScore.current = payload.home_score;
-                      prevAwayScore.current = payload.away_score;
-
-                      return { 
-                          ...prev, 
-                          status: payload.status, 
-                          home_score: payload.home_score, 
-                          away_score: payload.away_score,
-                          displayClock: payload.displayClock,
-                          events: payload.events || payload.match_events || prev.events
-                      };
-                  });
-
-                  if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
-                      isFetching.current = false;
-                      return; 
                   }
               }
+          } catch (error) {
+          } finally {
+              isFetching.current = false;
           }
-      } catch (error) {
-      } finally {
-          isFetching.current = false;
       }
       
-      if (isMounted) {
+      // 🟢 THE HEARTBEAT: Always schedules the next check, keeping it alive!
+      if (isMounted && !matchFinished) {
           timeoutId = setTimeout(fetchHeaderData, 4000);
       }
     };
@@ -154,7 +157,6 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
   return (
     <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
         <div className="absolute inset-0 z-0 pointer-events-none">
-            {/* 🟢 GPU FIX: Added decoding="async" and removed mix-blend mode */}
             <img src={leagueData.bg} alt="Stadium" decoding="async" fetchPriority="high" loading="eager" className="absolute inset-0 w-full h-full object-cover opacity-20" />
             <div className="absolute inset-0 bg-gradient-to-b from-[#0a1428]/60 via-[#0a1428]/50 to-[#0a1428]/90" />
         </div>
