@@ -43,6 +43,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
             setHasVoted(true);
             fetchVotes(); 
         } catch (e) {}
+        
         setIsVoting(false);
     };
 
@@ -54,7 +55,6 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
             
             {!hasVoted ? (
                 <div className="relative z-10 flex items-center justify-between gap-2 w-full">
-                    {/* 🟢 FIXED: The MOTM Title is now permanently visible on mobile! */}
                     <div className="flex items-center gap-1 shrink-0">
                         <Star size={12} className="text-yellow-400 fill-yellow-400" />
                         <span className="text-[10px] font-black uppercase tracking-widest text-white">vote MOTM</span>

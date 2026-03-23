@@ -74,7 +74,6 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
         const fetchChat = async () => {
             if (document.hidden) return; 
             try {
-                // 🟢 FIXED PWA CACHE LEAK: Added cache: 'no-store'
                 const res = await fetch(`${CHAT_WORKER_URL}/messages?match_id=${matchId}`, { cache: 'no-store' });
                 if (res.ok) {
                     const data = await res.json();
@@ -93,7 +92,6 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
         const fetchEvents = async () => {
             if (document.hidden) return; 
             try {
-                // 🟢 FIXED PWA CACHE LEAK: Added cache: 'no-store'
                 const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${espnId}`, { cache: 'no-store' });
                 if (res.ok) {
                     const data = await res.json();
@@ -197,9 +195,10 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
         setIsSending(false);
     };
 
-    const combinedFeed = [...messages, ...officialEvents].sort((a, b) => 
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    );
+    // 🟢 DOM OVERLOAD SHIELD: Slices array to 150 items to protect GPU memory!
+    const combinedFeed = [...messages, ...officialEvents]
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        .slice(-150);
 
     const getMinute = (timeStr: string) => {
         if (!timeStr) return 0;

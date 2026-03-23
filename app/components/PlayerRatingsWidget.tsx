@@ -28,20 +28,27 @@ export default function PlayerRatingsWidget({ matchId, lineups, status }: { matc
         const newRatings = { ...userRatings, [playerName]: rating };
         setUserRatings(newRatings);
         localStorage.setItem(`ratings_${matchId}`, JSON.stringify(newRatings));
+        
         const existing = ratingsData.find(r => r.player_name === playerName);
         if (existing) {
             setRatingsData(ratingsData.map(r => r.player_name === playerName ? { ...r, total_score: r.total_score + rating, vote_count: r.vote_count + 1 } : r));
         } else {
             setRatingsData([...ratingsData, { player_name: playerName, total_score: rating, vote_count: 1 }]);
         }
+        
         try {
-            await fetch(WORKER_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ matchId, playerName, rating }) });
+            await fetch(WORKER_URL, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ matchId, playerName, rating }) 
+            });
         } catch (e) {}
     };
 
     if (!isFinished || !lineups || (!lineups.home && !lineups.away)) return null;
 
     const allStarters = [...(lineups.home?.filter((p: any) => p.is_starter) || []), ...(lineups.away?.filter((p: any) => p.is_starter) || [])];
+    
     const getAverage = (playerName: string) => {
         const data = ratingsData.find(r => r.player_name === playerName);
         return (!data || data.vote_count === 0) ? '-' : (data.total_score / data.vote_count).toFixed(1);
@@ -70,7 +77,11 @@ export default function PlayerRatingsWidget({ matchId, lineups, status }: { matc
                                 {!isRated ? (
                                     <div className="flex gap-0.5">
                                         {[6, 7, 8, 9, 10].map(score => (
-                                            <button key={score} onClick={() => handleRate(p.name, score)} className="w-5 h-5 rounded bg-slate-100 hover:bg-yellow-400 hover:text-white text-[8px] font-black text-slate-500 transition-colors">
+                                            <button 
+                                                key={score} 
+                                                onClick={() => handleRate(p.name, score)} 
+                                                className="w-5 h-5 rounded bg-slate-100 hover:bg-yellow-400 hover:text-white text-[8px] font-black text-slate-500 transition-colors"
+                                            >
                                                 {score}
                                             </button>
                                         ))}
@@ -78,7 +89,7 @@ export default function PlayerRatingsWidget({ matchId, lineups, status }: { matc
                                 ) : (
                                     <span className="text-[8px] font-bold text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded">You: {userRatings[p.name]}</span>
                                 )}
-                                <div className="w-6 h-6 bg-[#0a1428] rounded flex items-center justify-center">
+                                <div className="w-6 h-6 bg-[#0a1428] rounded flex items-center justify-center shrink-0">
                                     <span className="text-white font-black text-[9px]">{avg}</span>
                                 </div>
                             </div>
