@@ -6,32 +6,68 @@ import { useRouter } from 'next/navigation';
 
 const AuthContext = createContext<any>(null);
 
+const ADMIN_EMAILS = [
+    'mkposcosunday@gmail.com', 
+    'factsportlive@gmail.com', 
+    'fact@factsport.com'
+];
+
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isVip, setIsVip] = useState(false);
   const [loading, setLoading] = useState(true);
+  
   const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
     let isMounted = true;
 
-    // 1. Check active session on load
-    const checkUser = async () => {
+    const fetchUserAndRoles = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (isMounted) {
-          setUser(session?.user || null);
-          setLoading(false);
+      
+      if (session?.user) {
+          const currentUser = session.user;
+          const userEmail = currentUser.email?.toLowerCase() || '';
+          
+          const { data: profile } = await supabase
+              .from('profiles')
+              .select('role, is_vip, username, avatar_url')
+              .eq('id', currentUser.id)
+              .single();
+
+          const adminStatus = ADMIN_EMAILS.includes(userEmail) || profile?.role === 'admin' || currentUser.user_metadata?.is_admin === true;
+          const vipStatus = adminStatus || profile?.is_vip === true || currentUser.user_metadata?.is_vip === true;
+
+          if (isMounted) {
+              setUser({ ...currentUser, profileData: profile });
+              setIsAdmin(adminStatus);
+              setIsVip(vipStatus);
+              setLoading(false);
+          }
+      } else {
+          if (isMounted) {
+              setUser(null);
+              setIsAdmin(false);
+              setIsVip(false);
+              setLoading(false);
+          }
       }
     };
-    checkUser();
 
-    // 2. Listen for changes (Login, Logout, Auto-refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (isMounted) {
-          setUser(session?.user || null);
-          if (event === 'SIGNED_OUT') {
-            router.refresh(); // Clear cache on logout
+    fetchUserAndRoles();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+          if (isMounted) {
+              setUser(null);
+              setIsAdmin(false);
+              setIsVip(false);
+              router.refresh(); 
           }
+      } else if (event === 'SIGNED_IN') {
+          fetchUserAndRoles(); 
       }
     });
 
@@ -39,10 +75,10 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         isMounted = false;
         subscription.unsubscribe();
     };
-  }, [router]); // 🟢 FIXED: Removed 'supabase' from the array!
+  }, [router]);
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, isAdmin, isVip, loading }}>
       {children}
     </AuthContext.Provider>
   );
