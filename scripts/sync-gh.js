@@ -33,7 +33,8 @@ async function getSafeLogo(teamName, originalLogoUrl) {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
-                'x-cron-key': CRON_KEY // 🛡️ Passing the CRON_KEY to the bouncer
+                'x-cron-key': CRON_KEY, // 🛡️ Passing the CRON_KEY to the bouncer
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
             },
             body: JSON.stringify({ teamName: teamName, logoUrl: originalLogoUrl })
         });
@@ -58,7 +59,7 @@ async function run() {
   const today = new Date();
   
   const fromDate = new Date(today); fromDate.setDate(today.getDate() - 3);
-  const toDate = new Date(today); toDate.setDate(today.getDate() + 21);
+  const toDate = new Date(today); toDate.setDate(today.getDate() + 35); // 🟢 Bumped to 35 days
   const fromStr = fromDate.toISOString().split('T')[0];
   const toStr = toDate.toISOString().split('T')[0];
 
@@ -162,7 +163,7 @@ async function run() {
             home_score: m.score.fullTime.home ?? 0,
             away_score: m.score.fullTime.away ?? 0,
             match_date: m.utcDate,
-            status: finalStatus, // 🟢 Injecting the smart status here
+            status: finalStatus, 
             home_logo: safeHomeLogo, 
             away_logo: safeAwayLogo, 
             updated_at: new Date().toISOString(),
