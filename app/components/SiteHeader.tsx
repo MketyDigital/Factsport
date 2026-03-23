@@ -44,9 +44,10 @@ export default function SiteHeader() {
 
             <div className="shrink-0 flex flex-col items-center min-w-[56px]">
                 {loading ? (
-                    <div className="flex flex-col items-center gap-1 opacity-50">
-                        <div className="w-[18px] h-[18px] bg-white/20 rounded-full animate-pulse"></div>
-                        <div className="w-8 h-2 bg-white/20 rounded animate-pulse mt-0.5"></div>
+                    // 🟢 UI UPGRADE: Clean pulsing icon instead of broken skeleton boxes
+                    <div className="flex flex-col items-center gap-1 text-slate-500 opacity-60 animate-pulse">
+                        <UserCircle size={18} />
+                        <span className="text-[9px] font-bold uppercase tracking-wider">Auth...</span>
                     </div>
                 ) : user ? (
                     <Link href="/dashboard" className="flex flex-col items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors group">

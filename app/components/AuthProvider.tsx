@@ -29,8 +29,15 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       
       if (session?.user) {
           const currentUser = session.user;
-          const userEmail = currentUser.email?.toLowerCase() || '';
           
+          // 🟢 SPEED FIX: Unlock the UI instantly so the Header stops loading!
+          if (isMounted) {
+              setUser(currentUser);
+              setLoading(false);
+          }
+
+          // 🟢 BACKGROUND TASK: Fetch the heavy VIP/Admin status silently
+          const userEmail = currentUser.email?.toLowerCase() || '';
           const { data: profile } = await supabase
               .from('profiles')
               .select('role, is_vip, username, avatar_url')
@@ -44,7 +51,6 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
               setUser({ ...currentUser, profileData: profile });
               setIsAdmin(adminStatus);
               setIsVip(vipStatus);
-              setLoading(false);
           }
       } else {
           if (isMounted) {
