@@ -96,7 +96,7 @@ export default function RootLayout({
 
         </GlobalMediaProvider>
 
-        {/* SERVICE WORKER REGISTRATION (Restored for PWA / Add to Home Screen) */}
+        {/* 🟢 PWA RESTORED: Add to Home Screen works perfectly */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
