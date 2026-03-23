@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { X, ArrowRight, Gift, Copy, CheckCircle2, Square, Maximize2 } from 'lucide-react';
 import { useGlobalMedia } from '@/app/providers/GlobalMediaProvider'; 
 import Link from 'next/link';
-import FactSportMediaRoom from './FactSportMediaRoom'; // 🟢 Needed for Streamio background play
 
 export default function StickyAffiliateBanner() {
     const [isVisible, setIsVisible] = useState(false);
@@ -35,7 +34,6 @@ export default function StickyAffiliateBanner() {
     const isYouTube = videoUrl?.includes('youtube.com') || videoUrl?.includes('youtu.be') || videoUrl?.includes('embed/');
     const isRawMedia = videoUrl?.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
     const isRawAudio = videoUrl?.match(/\.(mp3|wav)$/i);
-    const isStreamio = videoUrl === 'streamio';
 
     const getAutoPlayUrl = (url: string) => {
         if (!url) return '';
@@ -46,16 +44,14 @@ export default function StickyAffiliateBanner() {
     return (
         <div className="fixed bottom-4 left-0 right-0 z-[100] w-full flex flex-col items-center justify-end px-4 pointer-events-none gap-3">
             
-            {/* 🟢 UNIVERSAL BACKGROUND AUDIO PLAYER (Keeps Audio & Streamio playing across pages) */}
+            {/* 🟢 UNIVERSAL BACKGROUND AUDIO PLAYER (Fixed Infinite Loop!) */}
             {showFloatingAudio && (
                 <div className="hidden">
-                    {isStreamio && <FactSportMediaRoom matchId={activeMatchId!} mediaUrl="streamio" />}
                     {isRawAudio && <audio src={videoUrl!} autoPlay />}
                     {isYouTube && <iframe src={getAutoPlayUrl(videoUrl!)} allow="autoplay" />}
                 </div>
             )}
 
-            {/* 🟢 THE FLOATING VIDEO MINI-PLAYER */}
             {showFloatingVideo && (
                 <div className="w-full max-w-[320px] md:max-w-[400px] aspect-video bg-black rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] border border-blue-500/50 overflow-hidden pointer-events-auto relative animate-in slide-in-from-bottom-10 group self-end md:self-center flex flex-col">
                     
@@ -101,7 +97,6 @@ export default function StickyAffiliateBanner() {
                 </div>
             )}
 
-            {/* 🟢 DYNAMIC AFFILIATE BANNER */}
             <div className={`w-full pointer-events-auto relative transition-all duration-300 ${showFloatingAudio ? 'max-w-[480px]' : 'max-w-[420px]'}`}>
                 
                 <button 
@@ -177,23 +172,13 @@ export default function StickyAffiliateBanner() {
                     )}
                 </div>
             </div>
-
             <style jsx>{`
-                @keyframes slide-up {
-                    0% { transform: translateY(150%); opacity: 0; }
-                    100% { transform: translateY(0); opacity: 1; }
-                }
-                .animate-slide-up {
-                    animation: slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-                }
                 @keyframes text-slide {
                     0%, 40% { transform: translateY(0); }
                     50%, 90% { transform: translateY(-16px); }
                     100% { transform: translateY(0); }
                 }
-                .animate-text-slide {
-                    animation: text-slide 6s infinite ease-in-out;
-                }
+                .animate-text-slide { animation: text-slide 6s infinite ease-in-out; }
             `}</style>
         </div>
     );

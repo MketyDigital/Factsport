@@ -5,6 +5,12 @@ import Link from 'next/link';
 import { createClient } from '@/app/lib/supabase/client'; 
 import { useAuth } from '@/app/components/AuthProvider'; 
 
+const ADMIN_EMAILS = [
+    'mkposcosunday@gmail.com', 
+    'factsportlive@gmail.com', 
+    'fact@factsport.com'
+];
+
 export default function FanZoneChat({ matchId, espnId }: { matchId: string, espnId?: string }) {
     const [messages, setMessages] = useState<any[]>([]);
     const [officialEvents, setOfficialEvents] = useState<any[]>([]);
@@ -68,7 +74,8 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
         const fetchChat = async () => {
             if (document.hidden) return; 
             try {
-                const res = await fetch(`${CHAT_WORKER_URL}/messages?match_id=${matchId}&t=${Date.now()}`);
+                // 🟢 FIXED PWA CACHE LEAK: Added cache: 'no-store'
+                const res = await fetch(`${CHAT_WORKER_URL}/messages?match_id=${matchId}`, { cache: 'no-store' });
                 if (res.ok) {
                     const data = await res.json();
                     setMessages(data.messages || []);
@@ -86,7 +93,8 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
         const fetchEvents = async () => {
             if (document.hidden) return; 
             try {
-                const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${espnId}&t=${Date.now()}`);
+                // 🟢 FIXED PWA CACHE LEAK: Added cache: 'no-store'
+                const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${espnId}`, { cache: 'no-store' });
                 if (res.ok) {
                     const data = await res.json();
                     const formattedEvents = (data.match_events || []).map((e: any, index: number) => ({
