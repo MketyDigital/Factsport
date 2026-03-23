@@ -6,7 +6,7 @@ import Footer from '@/app/components/Footer';
 import SiteHeader from '@/app/components/SiteHeader'; 
 import StickyAffiliateBanner from '@/app/components/StickyAffiliateBanner'; 
 import CustomVignette from '@/app/components/CustomVignette'; 
-import { GlobalMediaProvider } from '@/app/providers/GlobalMediaProvider'; // 🟢 NEW GLOBAL PROVIDER
+import { GlobalMediaProvider } from '@/app/providers/GlobalMediaProvider'; 
 
 export const runtime = 'edge';
 
@@ -71,26 +71,32 @@ export default function RootLayout({
         
         {/* 🟢 THE GLOBAL WRAPPER ENCOMPASSING EVERYTHING */}
         <GlobalMediaProvider>
+            
+            {/* 🟢 THE AUTH PROVIDER FENCE STARTS HERE */}
             <AuthProvider>
-            <div className="flex flex-col min-h-screen">
-                <SiteHeader /> 
                 
-                <main className="flex-grow">
-                {children}
-                </main>
+                <div className="flex flex-col min-h-screen">
+                    <SiteHeader /> 
+                    
+                    <main className="flex-grow">
+                        {children}
+                    </main>
+                    
+                    <Footer />
+                </div>
+
+                {/* 🟢 MOVED INSIDE: The Custom Vignette now has access to useAuth! */}
+                <CustomVignette />
+
+                {/* 🟢 MOVED INSIDE: Safe in case it ever needs user data later */}
+                <StickyAffiliateBanner />
                 
-                <Footer />
-            </div>
-            </AuthProvider>
+            </AuthProvider> 
+            {/* 🟢 THE AUTH PROVIDER FENCE ENDS HERE */}
 
-            {/* 🟢 THE CUSTOM SMART VIGNETTE (Pops up after 5 seconds) */}
-            <CustomVignette />
-
-            {/* 🟢 THE GLOBAL STICKY AFFILIATE BANNER (Stays at the bottom, acts as PiP) */}
-            <StickyAffiliateBanner />
         </GlobalMediaProvider>
 
-        {/* SERVICE WORKER REGISTRATION */}
+        {/* SERVICE WORKER REGISTRATION (Restored for PWA / Add to Home Screen) */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
