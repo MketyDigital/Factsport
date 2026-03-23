@@ -10,7 +10,6 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// 🏆 THE EXPANDED CUP LIST
 const ESPN_CUPS = {
     'Europa League': 'uefa.europa',
     'Europa Conference League': 'uefa.conference',
@@ -21,7 +20,7 @@ const ESPN_CUPS = {
     'Coupe de France': 'fra.coupe_de_france',
     'DFB-Pokal': 'ger.dfb_pokal',
     
-    // 🌍 INTERNATIONAL BREAK ADDITIONS
+    // 🌍 INTERNATIONAL BREAK RESTORED
     'International Friendlies': 'fifa.friendly',
     'UEFA Nations League': 'uefa.nations',
     'CONCACAF Nations League': 'concacaf.nations',
@@ -32,20 +31,36 @@ const ESPN_CUPS = {
     'AFCON Qualifiers': 'caf.nations_qual'
 };
 
-const normalizeEspnStatus = (state) => {
+const normalizeEspnStatus = (state, matchDate) => {
+    const matchTime = new Date(matchDate).getTime();
+    const now = Date.now();
+
+    // 🟢 TIME SHIELD: Stops future matches from being marked as FT
+    if (matchTime > now + (1000 * 60 * 60) && state === 'post') {
+        return 'SCHEDULED';
+    }
+
     if (state === 'pre') return 'SCHEDULED';
     if (state === 'in') return 'LIVE';
     if (state === 'post') return 'FT';
     return 'SCHEDULED';
 };
 
+// 🟢 SMART FILTER: Detects fake/youth matches
+const isFakeMatch = (homeName, awayName) => {
+    const combined = `${homeName} ${awayName}`.toLowerCase();
+    return combined.includes(' u1') || 
+           combined.includes(' u2') || 
+           combined.includes('esports') || 
+           combined.includes('women');
+};
+
 async function fetchEspnCups() {
     console.log("🏆 Starting ESPN Cup Sync (-3 to +35 Days)...");
     
-    // 🟢 MATCHING YOUR EXACT SYNC-GH.JS TIME WINDOW
     const today = new Date();
     const fromDate = new Date(today); fromDate.setDate(today.getDate() - 3);
-    const toDate = new Date(today); toDate.setDate(today.getDate() + 35); // 🟢 Bumped to 35 Days
+    const toDate = new Date(today); toDate.setDate(today.getDate() + 35); 
     
     const fromStr = fromDate.toISOString().split('T')[0].replace(/-/g, '');
     const toStr = toDate.toISOString().split('T')[0].replace(/-/g, '');
@@ -73,16 +88,24 @@ async function fetchEspnCups() {
                 const homeCompetitor = e.competitions[0].competitors.find(c => c.homeAway === 'home');
                 const awayCompetitor = e.competitions[0].competitors.find(c => c.homeAway === 'away');
                 
+                const homeName = homeCompetitor.team.displayName;
+                const awayName = awayCompetitor.team.displayName;
+
+                // 🟢 If it's a youth, women's, or eSports match, skip it entirely!
+                if (isFakeMatch(homeName, awayName)) {
+                    continue;
+                }
+                
                 matchesToUpsert.push({
-                    api_id: espnId,     // Primary ID matches ESPN
-                    espn_id: espnId,    // Pre-mapped for Live Updater
+                    api_id: espnId,     
+                    espn_id: espnId,    
                     league: leagueName,
-                    home_team: homeCompetitor.team.displayName,
-                    away_team: awayCompetitor.team.displayName,
+                    home_team: homeName,
+                    away_team: awayName,
                     home_score: parseInt(homeCompetitor.score) || 0,
                     away_score: parseInt(awayCompetitor.score) || 0,
                     match_date: e.date,
-                    status: normalizeEspnStatus(e.status.type.state),
+                    status: normalizeEspnStatus(e.status.type.state, e.date),
                     home_logo: homeCompetitor.team.logo || null,
                     away_logo: awayCompetitor.team.logo || null,
                     updated_at: new Date().toISOString()
@@ -90,7 +113,6 @@ async function fetchEspnCups() {
             }
 
             if (matchesToUpsert.length > 0) {
-                // 🟢 BULK UPSERT EXACTLY LIKE YOUR MAIN SCRIPT
                 const { error } = await supabase.from('matches').upsert(matchesToUpsert, { onConflict: 'api_id' });
                 if (error) {
                     console.error(`   ❌ DB Error: ${error.message}`);

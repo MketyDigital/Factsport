@@ -4,8 +4,6 @@ const { createClient } = require('@supabase/supabase-js');
 const API_KEY = process.env.FOOTBALL_DATA_KEY;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const YOUR_DOMAIN = process.env.NEXT_PUBLIC_SITE_URL || 'https://factsport.com'; 
-const CRON_KEY = process.env.CRON_KEY; // 🛡️ Using your existing CRON_KEY
 
 const BASE_URL = 'https://api.football-data.org/v4';
 const LEAGUES = [
@@ -23,26 +21,47 @@ async function fetchSafe(url, options) {
   return res;
 }
 
-// 🟢 LOGO SHIELD INTERCEPTOR
-async function getSafeLogo(teamName, originalLogoUrl) {
+// 🟢 NATIVE LOGO SHIELD: Bypasses your API entirely!
+async function getSafeLogo(teamName, originalLogoUrl, supabase) {
     if (!originalLogoUrl || originalLogoUrl.includes('espncdn') || originalLogoUrl.includes('supabase')) {
         return originalLogoUrl;
     }
     try {
-        const res = await fetch(`${YOUR_DOMAIN}/api/logos/sync`, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'x-cron-key': CRON_KEY, // 🛡️ Passing the CRON_KEY to the bouncer
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-            },
-            body: JSON.stringify({ teamName: teamName, logoUrl: originalLogoUrl })
-        });
+        const { data: existing } = await supabase
+            .from('team_logos')
+            .select('local_url')
+            .eq('team_name', teamName)
+            .single();
+            
+        if (existing?.local_url) return existing.local_url;
+
+        // Download the image natively in the script
+        const imageRes = await fetch(originalLogoUrl);
+        if (!imageRes.ok) throw new Error('Failed to download image from source');
         
-        if (!res.ok) throw new Error('API returned an error or unauthorized');
+        const arrayBuffer = await imageRes.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer); 
+        const safeFileName = `${teamName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}-${Date.now()}.png`;
+
+        // Upload to Supabase using the Service Key
+        const { error: uploadError } = await supabase.storage
+            .from('team-logos')
+            .upload(`public/${safeFileName}`, buffer, { 
+                contentType: 'image/png', 
+                upsert: true
+            });
         
-        const data = await res.json();
-        return data.local_url || originalLogoUrl;
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage.from('team-logos').getPublicUrl(`public/${safeFileName}`);
+
+        await supabase.from('team_logos').insert([{
+            team_name: teamName,
+            original_url: originalLogoUrl,
+            local_url: publicUrl
+        }]);
+
+        return publicUrl;
     } catch (e) {
         console.error(`   ⚠️ Logo sync failed for ${teamName}: ${e.message}`);
         return originalLogoUrl;
@@ -50,7 +69,7 @@ async function getSafeLogo(teamName, originalLogoUrl) {
 }
 
 async function run() {
-  if (!API_KEY || !SUPABASE_URL || !SUPABASE_KEY || !CRON_KEY) {
+  if (!API_KEY || !SUPABASE_URL || !SUPABASE_KEY) {
     console.error('❌ Missing Env Variables');
     process.exit(1);
   }
@@ -59,7 +78,7 @@ async function run() {
   const today = new Date();
   
   const fromDate = new Date(today); fromDate.setDate(today.getDate() - 3);
-  const toDate = new Date(today); toDate.setDate(today.getDate() + 35); // 🟢 Bumped to 35 days
+  const toDate = new Date(today); toDate.setDate(today.getDate() + 35); 
   const fromStr = fromDate.toISOString().split('T')[0];
   const toStr = toDate.toISOString().split('T')[0];
 
@@ -96,7 +115,6 @@ async function run() {
         const data = await res.json();
         const now = Date.now();
         const matches = [];
-        let newH2hFetches = 0;
         
         for (const m of data.matches || []) {
           const matchTime = new Date(m.utcDate).getTime();
@@ -122,7 +140,6 @@ async function run() {
                       const parsedH2h = await h2hRes.json();
                       if (parsedH2h && parsedH2h.aggregates) {
                           h2hData = { aggregates: parsedH2h.aggregates, matches: parsedH2h.matches || [] }; 
-                          newH2hFetches++;
                       }
                   }
               } catch (err) {
@@ -132,28 +149,17 @@ async function run() {
 
           const formattedReferees = m.referees?.map(r => r.name) || existing?.referees || [];
 
-          // 🟢 SECURE LOGO FETCH
-          const safeHomeLogo = await getSafeLogo(m.homeTeam.shortName || m.homeTeam.name, m.homeTeam.crest);
-          const safeAwayLogo = await getSafeLogo(m.awayTeam.shortName || m.awayTeam.name, m.awayTeam.crest);
+          // 🟢 Pass the initialized Supabase client to the Logo script
+          const safeHomeLogo = await getSafeLogo(m.homeTeam.shortName || m.homeTeam.name, m.homeTeam.crest, supabase);
+          const safeAwayLogo = await getSafeLogo(m.awayTeam.shortName || m.awayTeam.name, m.awayTeam.crest, supabase);
 
-          // 🟢 SMART STATUS EVALUATOR (Fixes TBD, Postponed, and World Cup Edge Cases)
           let finalStatus = 'SCHEDULED';
-          
-          if (m.status === 'FINISHED' || m.status === 'AWARDED') {
-              finalStatus = 'FT';
-          } else if (m.status === 'IN_PLAY' || m.status === 'PAUSED') {
-              finalStatus = m.status;
-          } else if (m.status === 'POSTPONED' || m.status === 'CANCELLED' || m.status === 'SUSPENDED') {
-              finalStatus = 'POSTPONED';
-          } else if (m.status === 'SCHEDULED' && m.utcDate.endsWith('T00:00:00Z')) {
-              // The time is not officially confirmed yet. Safe to mark as TBD.
-              finalStatus = 'TBD';
-          } else if (m.status === 'TIMED') {
-              // The time IS confirmed (even if it's genuinely midnight). Normalize for your UI.
-              finalStatus = 'SCHEDULED';
-          } else {
-              finalStatus = m.status; // Safe fallback
-          }
+          if (m.status === 'FINISHED' || m.status === 'AWARDED') finalStatus = 'FT';
+          else if (m.status === 'IN_PLAY' || m.status === 'PAUSED') finalStatus = m.status;
+          else if (m.status === 'POSTPONED' || m.status === 'CANCELLED' || m.status === 'SUSPENDED') finalStatus = 'POSTPONED';
+          else if (m.status === 'SCHEDULED' && m.utcDate.endsWith('T00:00:00Z')) finalStatus = 'TBD';
+          else if (m.status === 'TIMED') finalStatus = 'SCHEDULED';
+          else finalStatus = m.status; 
 
           matches.push({
             api_id: m.id,

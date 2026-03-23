@@ -5,11 +5,12 @@ export const ESPN_LEAGUES: Record<string, string> = {
   'Premier League': 'eng.1', 'La Liga': 'esp.1', 'Bundesliga': 'ger.1',
   'Serie A': 'ita.1', 'Ligue 1': 'fra.1', 'Champions League': 'uefa.champions',
   'Euros': 'uefa.euro', 'World Cup': 'fifa.world',
+  
   // Major Cups
   'Europa League': 'uefa.europa', 'Europa Conference League': 'uefa.conference',
   'FA Cup': 'eng.fa', 'Carabao Cup': 'eng.league_cup', 'Copa del Rey': 'esp.copa_del_rey',
   'Coppa Italia': 'ita.copa_italia', 'Coupe de France': 'fra.coupe_de_france', 'DFB-Pokal': 'ger.dfb_pokal',
-  
+
   // 🌍 INTERNATIONAL BREAK ADDITIONS
   'International Friendlies': 'fifa.friendly',
   'UEFA Nations League': 'uefa.nations',
