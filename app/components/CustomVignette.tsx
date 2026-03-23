@@ -3,53 +3,29 @@
 import { useState, useEffect } from 'react';
 import { X, Crown, ArrowRight, Gift, Sparkles, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
-import { createClient } from '@/app/lib/supabase/client';
+import { useAuth } from '@/app/components/AuthProvider';
 
 export default function CustomVignette() {
     const [isVisible, setIsVisible] = useState(false);
+    const { isVip, loading } = useAuth(); 
 
-    // 🟢 THE MASTER CONFIG: Change this URL to switch the ad entirely!
     const TARGET_URL = "/vip/upgrade"; 
     const isInternalVIP = TARGET_URL.includes('/vip');
 
     useEffect(() => {
-        const checkStatusAndShow = async () => {
-            // 1. 🛡️ THE ZERO-COST GUARD: If they already saw it or are marked VIP this session, abort immediately!
-            const hasSeenVignette = sessionStorage.getItem('factsport_modal_seen');
-            if (hasSeenVignette) return; 
+        if (loading) return; 
 
-            // 2. Fetch the user session securely
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            const user = session?.user;
-            
-            let isVipUser = false;
+        const hasSeenVignette = sessionStorage.getItem('factsport_modal_seen');
+        if (hasSeenVignette) return; 
 
-            // 3. THE VIP CHECK (Only runs ONCE per session because of the guard above)
-            if (user) {
-                // Check local metadata first (fastest)
-                isVipUser = user.user_metadata?.is_vip === true || user.user_metadata?.vip === true || user.user_metadata?.role === 'admin';
+        if (isInternalVIP && isVip) {
+            sessionStorage.setItem('factsport_modal_seen', 'true');
+            return; 
+        }
 
-                // If not found in metadata, do ONE database check to be absolutely sure
-                if (!isVipUser) {
-                    const { data: profile } = await supabase.from('profiles').select('role, is_vip').eq('id', user.id).single();
-                    isVipUser = profile?.role === 'admin' || profile?.is_vip === true;
-                }
-            }
-
-            // 4. THE ABORT: If this is a VIP ad, and they are already VIP, hide it permanently!
-            if (isInternalVIP && isVipUser) {
-                sessionStorage.setItem('factsport_modal_seen', 'true');
-                return; 
-            }
-
-            // 5. Start the timer to show the ad
-            const timer = setTimeout(() => setIsVisible(true), 10000);
-            return () => clearTimeout(timer);
-        };
-
-        checkStatusAndShow();
-    }, [isInternalVIP]);
+        const timer = setTimeout(() => setIsVisible(true), 10000);
+        return () => clearTimeout(timer);
+    }, [isInternalVIP, isVip, loading]);
 
     const handleClose = () => {
         setIsVisible(false);
@@ -60,11 +36,7 @@ export default function CustomVignette() {
 
     return (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 pointer-events-none animate-fade-in">
-            
-            {/* 🟢 REDUCED WIDTH: max-w-[300px] makes it smaller and sleeker */}
             <div className="w-full max-w-[300px] relative pointer-events-auto animate-pop-up flex flex-col items-center text-center">
-                
-                {/* 🟢 THE TEXT BACKGROUND SHIELD: Black/70 frosted glass ensures text pops against any background */}
                 <div className="w-full bg-black/70 backdrop-blur-xl border border-white/10 rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex flex-col items-center">
                     
                     <button 

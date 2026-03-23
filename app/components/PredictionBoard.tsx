@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
 import { Loader2, Lock, CheckCircle, Trophy, XCircle, Target, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/app/components/AuthProvider'; 
 
 export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam }: any) {
   const [loading, setLoading] = useState(false);
@@ -14,20 +15,22 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
    
   const supabase = createClient();
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth(); 
 
   const isLocked = new Date() > new Date(matchDate);
 
-  useEffect(() => { fetchPrediction(); }, []);
+  useEffect(() => { 
+      if (user?.id) {
+          fetchPrediction(user.id); 
+      }
+  }, [user?.id]);
 
-  const fetchPrediction = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-    
+  const fetchPrediction = async (userId: string) => {
     const { data } = await supabase
         .from('user_predictions')
         .select('*')
         .eq('match_id', matchId) 
-        .eq('user_id', session.user.id)
+        .eq('user_id', userId)
         .single();
         
     if (data) setExistingPred(data);
@@ -47,14 +50,13 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
         return;
     }
 
-    setLoading(true);
+    if (!user) { router.push('/login'); return; }
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { router.push('/login'); return; }
+    setLoading(true);
 
     const { error } = await supabase.from('user_predictions').insert({
         match_id: matchId, 
-        user_id: session.user.id,
+        user_id: user.id,
         predicted_outcome: outcome, 
         predicted_home_score: parseInt(scoreHome), 
         predicted_away_score: parseInt(scoreAway),
@@ -65,11 +67,11 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
     if (error) {
         if (error.code === '23505') { 
             alert("Prediction already locked in!"); 
-            fetchPrediction(); 
+            fetchPrediction(user.id); 
         }
         else alert("Error: " + error.message);
     } else {
-        fetchPrediction();
+        fetchPrediction(user.id);
     }
     setLoading(false);
   };
@@ -208,7 +210,7 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
 
         <button 
             onClick={handleSubmit} 
-            disabled={loading} 
+            disabled={loading || authLoading} 
             className="w-full bg-[#0a1428] hover:bg-blue-900 text-white font-black uppercase tracking-widest py-3 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed border border-slate-800 text-[10px]"
         >
             {loading ? <Loader2 className="animate-spin" size={14} /> : <><CheckCircle size={14}/> Lock In Prediction</>}
