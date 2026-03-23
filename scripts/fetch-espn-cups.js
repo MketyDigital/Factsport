@@ -19,7 +19,17 @@ const ESPN_CUPS = {
     'Copa del Rey': 'esp.copa_del_rey',
     'Coppa Italia': 'ita.copa_italia',
     'Coupe de France': 'fra.coupe_de_france',
-    'DFB-Pokal': 'ger.dfb_pokal'
+    'DFB-Pokal': 'ger.dfb_pokal',
+    
+    // 🌍 INTERNATIONAL BREAK ADDITIONS
+    'International Friendlies': 'fifa.friendly',
+    'UEFA Nations League': 'uefa.nations',
+    'CONCACAF Nations League': 'concacaf.nations',
+    'World Cup Qualifiers (CONMEBOL)': 'fifa.worldq.conmebol',
+    'World Cup Qualifiers (UEFA)': 'fifa.worldq.uefa',
+    'World Cup Qualifiers (AFC)': 'fifa.worldq.afc',
+    'World Cup Qualifiers (CONCACAF)': 'fifa.worldq.concacaf',
+    'AFCON Qualifiers': 'caf.nations_qual'
 };
 
 const normalizeEspnStatus = (state) => {
@@ -30,12 +40,12 @@ const normalizeEspnStatus = (state) => {
 };
 
 async function fetchEspnCups() {
-    console.log("🏆 Starting ESPN Cup Sync (-3 to +21 Days)...");
+    console.log("🏆 Starting ESPN Cup Sync (-3 to +35 Days)...");
     
     // 🟢 MATCHING YOUR EXACT SYNC-GH.JS TIME WINDOW
     const today = new Date();
     const fromDate = new Date(today); fromDate.setDate(today.getDate() - 3);
-    const toDate = new Date(today); toDate.setDate(today.getDate() + 21);
+    const toDate = new Date(today); toDate.setDate(today.getDate() + 35); // 🟢 Bumped to 35 Days
     
     const fromStr = fromDate.toISOString().split('T')[0].replace(/-/g, '');
     const toStr = toDate.toISOString().split('T')[0].replace(/-/g, '');
