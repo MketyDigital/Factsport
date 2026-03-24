@@ -42,8 +42,10 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
 
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
    
-  const startDate = new Date(); startDate.setDate(startDate.getDate() - 7); 
-  const endDate = new Date(); endDate.setDate(endDate.getDate() + 14); 
+  // 🟢 MASSIVE FETCH WINDOW: Pulls the bulk of the current season (-4 Months to +4 Months)
+  // We fetch this ONCE server-side and let the Client Component neatly paginate it.
+  const startDate = new Date(); startDate.setMonth(startDate.getMonth() - 4); 
+  const endDate = new Date(); endDate.setMonth(endDate.getMonth() + 4); 
 
   let query = supabase.from('matches').select('*').order('match_date', { ascending: true });
   
@@ -134,56 +136,6 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
     leagues[match.league].push(match);
   });
 
-  const leaguesToProcess = Array.from(new Set([...PRIORITY_LEAGUES, ...Object.keys(leagues)]));
-
-  const gapFillPromises = leaguesToProcess.map(async (leagueName) => {
-      const currentMatches = leagues[leagueName] || [];
-      const currentResults = currentMatches.filter(m => FINISHED_STATUSES.includes((m.status || '').toUpperCase()));
-      
-      let extraMatches: any[] = [];
-
-      if (currentResults.length < 10) {
-          const { data: pastMatches } = await supabase
-              .from('matches')
-              .select('*')
-              .eq('league', leagueName)
-              .lt('match_date', new Date().toISOString())
-              .order('match_date', { ascending: false })
-              .limit(10);
-          
-          if (pastMatches) extraMatches = [...extraMatches, ...pastMatches];
-      }
-
-      if (currentMatches.length === 0 && PRIORITY_LEAGUES.includes(leagueName)) {
-          const { data: nextMatches } = await supabase
-              .from('matches')
-              .select('*')
-              .eq('league', leagueName)
-              .gt('match_date', new Date().toISOString())
-              .order('match_date', { ascending: true })
-              .limit(10);
-
-          if (nextMatches) extraMatches = [...extraMatches, ...nextMatches];
-      }
-
-      return { leagueName, extraMatches };
-  });
-
-  const gapFillData = await Promise.all(gapFillPromises);
-  
-  gapFillData.forEach(({ leagueName, extraMatches }) => {
-      if (extraMatches && extraMatches.length > 0) {
-          if (!leagues[leagueName]) leagues[leagueName] = [];
-          const existingIds = new Set(leagues[leagueName].map(m => m.id));
-          extraMatches.forEach(m => {
-              if (!existingIds.has(m.id)) {
-                  leagues[leagueName].push(m);
-                  existingIds.add(m.id);
-              }
-          });
-      }
-  });
-
   Object.keys(leagues).forEach(key => {
       if (leagues[key].length === 0) delete leagues[key];
   });
@@ -216,18 +168,8 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
             const leagueMatches = leagues[leagueName];
             const leagueBanner = leagueMatches[0]?.league_banner;
 
-            const fixtures = leagueMatches
-                .filter(m => !FINISHED_STATUSES.includes((m.status || '').toUpperCase()))
-                .sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime())
-                .slice(0, 10);
-
-            const results = leagueMatches
-                .filter(m => FINISHED_STATUSES.includes((m.status || '').toUpperCase()))
-                .sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime())
-                .slice(0, 10);
-
-            const smartDisplayList = [...fixtures, ...results];
-
+            // 🟢 PASSING THE FULL ARRAYS DOWN: No more .slice(0, 10) here. 
+            // The LeagueMatchGroup component will handle the pagination locally!
             return (
                 <div key={leagueName} id={leagueName.replace(/\s+/g, '-')}>
                     {leagueBanner ? (
@@ -242,7 +184,7 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
 
                     <LeagueMatchGroup 
                         leagueName={leagueName} 
-                        matches={smartDisplayList} 
+                        matches={leagueMatches} 
                     />
                 </div>
             );
