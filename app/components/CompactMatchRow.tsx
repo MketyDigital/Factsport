@@ -13,16 +13,16 @@ export default function CompactMatchRow({ match, disablePolling = false, showLea
     const isFinished = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(rawStatus);
 
     return (
-        <div className="bg-white border-b border-slate-100 hover:bg-slate-50 transition-colors group">
+        <div className="bg-white border-b border-slate-100 hover:bg-slate-50 transition-colors group flex flex-col">
             {showLeague && (
-                <div className="px-3 py-1 bg-slate-50/80 border-b border-slate-100 flex items-center gap-1.5">
+                <div className="px-3 py-1.5 bg-slate-50/80 border-b border-slate-100 flex items-center gap-1.5">
                     <Trophy size={10} className="text-slate-400"/>
                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{match.league}</span>
                 </div>
             )}
             <div className="flex items-stretch p-2 md:p-3">
                 {/* 🟢 Time / Status Column */}
-                <div className="w-[40px] md:w-[50px] shrink-0 flex flex-col items-center justify-center border-r border-slate-100 pr-2 mr-2">
+                <div className="w-[45px] md:w-[50px] shrink-0 flex flex-col items-center justify-center border-r border-slate-100 pr-2 mr-2">
                     {isScheduled ? (
                         <span className="text-[10px] md:text-xs font-bold text-slate-500"><MatchTime date={match.match_date} /></span>
                     ) : isFinished ? (
@@ -36,7 +36,7 @@ export default function CompactMatchRow({ match, disablePolling = false, showLea
                 </div>
 
                 {/* 🟢 Teams Column */}
-                <Link href={`/match/${match.id}`} className="flex-1 flex flex-col justify-center gap-1.5 min-w-0">
+                <Link href={`/match/${match.id}`} className="flex-1 flex flex-col justify-center gap-1.5 min-w-0 py-1">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0">
                             {match.home_logo ? <img src={match.home_logo} className="w-3.5 h-3.5 md:w-4 md:h-4 object-contain shrink-0" alt=""/> : <div className="w-3.5 h-3.5 bg-slate-200 rounded-full shrink-0"/>}
@@ -53,16 +53,18 @@ export default function CompactMatchRow({ match, disablePolling = false, showLea
                     </div>
                 </Link>
 
-                {/* 🟢 Micro Actions Column (Replaces massive buttons) */}
+                {/* 🟢 Micro Actions Column (With Tiny Text!) */}
                 {!isFinished && (
-                    <div className="w-[30px] md:w-[35px] shrink-0 flex flex-col items-end justify-center pl-2 ml-2 border-l border-slate-100 gap-1.5">
+                    <div className="w-[45px] md:w-[50px] shrink-0 flex flex-col items-center justify-center pl-2 ml-2 border-l border-slate-100 gap-1.5">
                         {isScheduled && (
-                            <Link href={`/match/${match.id}#predictions`} className="w-6 h-6 md:w-7 md:h-7 bg-blue-50 hover:bg-blue-100 rounded flex items-center justify-center text-blue-600 transition-colors shadow-sm" title="Predict">
-                                <Zap size={12} className="fill-blue-600" />
+                            <Link href={`/match/${match.id}#predictions`} className="w-full bg-blue-50 hover:bg-blue-100 rounded flex flex-col items-center justify-center text-blue-600 transition-colors shadow-sm py-1 pb-1.5" title="Predict">
+                                <Zap size={10} className="fill-blue-600 mb-0.5" />
+                                <span className="text-[6px] md:text-[7px] font-black uppercase tracking-widest leading-none">Predict</span>
                             </Link>
                         )}
-                        <a href={match.booking_code ? '#' : (match.affiliate_link || DEFAULT_AFFILIATE_LINK)} target="_blank" rel="noopener noreferrer" className="w-6 h-6 md:w-7 md:h-7 bg-green-50 hover:bg-green-100 rounded flex items-center justify-center text-green-600 transition-colors shadow-sm" title={match.booking_code ? `Code: ${match.booking_code}` : 'Bet Now'}>
-                            <Ticket size={12} />
+                        <a href={match.booking_code ? '#' : (match.affiliate_link || DEFAULT_AFFILIATE_LINK)} target="_blank" rel="noopener noreferrer" className="w-full bg-green-50 hover:bg-green-100 rounded flex flex-col items-center justify-center text-green-600 transition-colors shadow-sm py-1 pb-1.5" title={match.booking_code ? `Code: ${match.booking_code}` : 'Bet Now'}>
+                            <Ticket size={10} className="mb-0.5" />
+                            <span className="text-[6px] md:text-[7px] font-black uppercase tracking-widest leading-none">Bet</span>
                         </a>
                     </div>
                 )}
