@@ -18,7 +18,7 @@ const PremiumListenerUI = ({ role }: { role: string }) => {
     useEffect(() => {
         if (!isSpeaking) { setEqLevels([10, 10, 10, 10, 10, 10, 10]); return; }
         const interval = setInterval(() => {
-            if (document.hidden) return; // 🟢 CPU SHIELD: Don't animate EQ if hidden
+            if (document.hidden) return; 
             setEqLevels(Array.from({length: 7}, () => Math.floor(Math.random() * 70) + 20));
         }, 150);
         return () => clearInterval(interval);
@@ -280,6 +280,9 @@ export default function FactSportMediaRoom({ matchId, mediaUrl = 'streamio', tit
             </div>
         );
     }
+
+    // 🟢 DECLARED `inStudio` VARIABLE RIGHT BEFORE RETURN
+    const inStudio = role === 'admin' || role === 'guest' || (role === 'user' && canSpeak);
 
     return (
         <div className="w-full bg-gradient-to-b from-[#0a1428] to-black relative overflow-hidden border border-slate-800 flex flex-col group p-6 min-h-[350px] rounded-2xl shadow-2xl">
