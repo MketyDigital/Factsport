@@ -4,7 +4,7 @@ export const revalidate = 5;
 import { createClient } from '@supabase/supabase-js'; 
 import Link from "next/link";
 import { Metadata } from 'next';
-import { ArrowRight, Youtube, Newspaper, TrendingUp, Calendar, Award, Trophy } from "lucide-react";
+import { ArrowRight, Youtube, Newspaper, TrendingUp, Calendar, Award, Trophy, Info } from "lucide-react";
 
 import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
@@ -59,7 +59,7 @@ const groupByDate = (matchList: any[]) => {
     return groups;
 };
 
-// 🟢 NEW: Strict 3-Tier Sorting (Live -> Scheduled -> Finished)
+// 🟢 STRICT SORTING: LIVE -> UPCOMING -> FINISHED
 const sortMatches = (matches: any[]) => {
   return matches.sort((a, b) => {
     const rawA = (a.status || '').toUpperCase();
@@ -126,72 +126,69 @@ async function getHomepageData(leagueFilter: string | undefined) {
   tomorrowEnd.setDate(tomorrowEnd.getDate() + 1); 
   tomorrowEnd.setHours(23,59,59,999);
 
-  let matchQuery;
+  let matches: any[] = [];
+  let isShowingFallbackResults = false;
+
+  const [newsRes, highlightsRes, featuredRes] = await Promise.all([
+    supabase.from('news').select('*').order('created_at', { ascending: false }).limit(20),
+    supabase.from('matches').select('*').not('video_url', 'is', null).neq('video_url', '').order('match_date', { ascending: false }).limit(5),
+    supabase.from('matches').select('*').eq('is_featured', true).gte('match_date', todayStart.toISOString()).order('match_date', { ascending: true }).limit(5)
+  ]);
 
   if (leagueFilter) {
-      const startDate = new Date(); startDate.setDate(startDate.getDate() - 3); 
-      const endDate = new Date(); endDate.setDate(endDate.getDate() + 7); 
-      matchQuery = supabase.from('matches').select('*')
-        .gte('match_date', startDate.toISOString())
-        .lte('match_date', endDate.toISOString())
-        .ilike('league', `%${leagueFilter}%`)
-        .order('match_date', { ascending: true });
-  } 
-  else {
-      matchQuery = supabase.from('matches').select('*')
+      // 🟢 LEAGUE TABS: Fetch ONLY Live and Upcoming matches first
+      const { data: activeMatches } = await supabase.from('matches')
+          .select('*')
+          .ilike('league', `%${leagueFilter}%`)
+          .not('status', 'in', '("FT","FINISHED","AET","PEN","AWARDED","ABD","POST","ENDED")')
+          .order('match_date', { ascending: true })
+          .limit(15);
+
+      if (activeMatches && activeMatches.length > 0) {
+          matches = activeMatches;
+      } else {
+          // 🟢 FALLBACK: If zero upcoming, fetch the latest finished matches
+          const { data: pastMatches } = await supabase.from('matches')
+              .select('*')
+              .ilike('league', `%${leagueFilter}%`)
+              .in('status', ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD', 'POST', 'ENDED'])
+              .order('match_date', { ascending: false }) // Newest first
+              .limit(10);
+
+          if (pastMatches && pastMatches.length > 0) {
+              matches = pastMatches;
+              isShowingFallbackResults = true; // Triggers the UI message
+          }
+      }
+      matches = sortMatches(matches);
+
+  } else {
+      // 🟢 DEFAULT "FOR YOU" TAB: Original Logic untouched
+      const { data: defaultMatches } = await supabase.from('matches').select('*')
         .or(`status.eq.LIVE,status.eq.IN_PLAY,status.eq.HT,status.eq.in,match_date.gte.${todayStart.toISOString()}`)
         .lte('match_date', tomorrowEnd.toISOString()) 
         .order('match_date', { ascending: true })
         .limit(50); 
-  }
+      
+      matches = defaultMatches || [];
 
-  const [matchesRes, newsRes, highlightsRes, featuredRes] = await Promise.all([
-    matchQuery,
-    supabase.from('news').select('*').order('created_at', { ascending: false }).limit(20),
-    supabase.from('matches')
-      .select('*')
-      .not('video_url', 'is', null)
-      .neq('video_url', '') 
-      .order('match_date', { ascending: false })
-      .limit(5),
-    supabase.from('matches')
-      .select('*')
-      .eq('is_featured', true)
-      .gte('match_date', todayStart.toISOString()) 
-      .order('match_date', { ascending: true })
-      .limit(5)
-  ]);
-
-  let matches = matchesRes.data || [];
-
-  if (leagueFilter && matches.length === 0) {
-      const { data: past } = await supabase.from('matches')
-          .select('*').ilike('league', `%${leagueFilter}%`).lt('match_date', new Date().toISOString())
-          .order('match_date', { ascending: false }).limit(10);
-      const { data: future } = await supabase.from('matches')
-          .select('*').ilike('league', `%${leagueFilter}%`).gt('match_date', new Date().toISOString())
-          .order('match_date', { ascending: true }).limit(5);
-          
-      matches = [...(future || []), ...(past || [])].sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
-  } else if (!leagueFilter && matches.length > 0) {
-      matches = getDiverseMatches(matches, 20);
-  } else {
-      matches = sortMatches(matches);
-  }
-
-  if (matches.length === 0 && !leagueFilter) {
-      const { data: finishedMatches } = await supabase.from('matches').select('*')
-        .in('status', ['FT', 'FINISHED', 'ABD', 'post', 'POST', 'ENDED', 'AET', 'PEN']) 
-        .order('match_date', { ascending: false })
-        .limit(10);
-      if (finishedMatches) matches = finishedMatches;
+      if (matches.length > 0) {
+          matches = getDiverseMatches(matches, 20);
+      } else {
+          const { data: finishedMatches } = await supabase.from('matches').select('*')
+            .in('status', ['FT', 'FINISHED', 'ABD', 'post', 'POST', 'ENDED', 'AET', 'PEN']) 
+            .order('match_date', { ascending: false })
+            .limit(10);
+          if (finishedMatches) matches = finishedMatches;
+      }
   }
 
   return { 
       matches, 
       news: newsRes.data || [], 
       highlights: highlightsRes.data || [], 
-      featuredMatches: featuredRes.data || [] 
+      featuredMatches: featuredRes.data || [],
+      isShowingFallbackResults
   };
 }
 
@@ -199,7 +196,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const resolvedParams = await searchParams;
   const selectedLeague = resolvedParams.league;
     
-  const { matches, news, highlights, featuredMatches } = await getHomepageData(selectedLeague);
+  const { matches, news, highlights, featuredMatches, isShowingFallbackResults } = await getHomepageData(selectedLeague);
 
   const rawTicker = news.slice(0, 15);
   const tickerNews = [...rawTicker, ...rawTicker, ...rawTicker, ...rawTicker]; 
@@ -279,6 +276,21 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             ))}
             </div>
         </div>
+
+        {/* 🟢 THE FALLBACK ALERT MESSAGE */}
+        {selectedLeague && isShowingFallbackResults && (
+            <div className="px-4 mb-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+                    <div className="flex items-center gap-2 text-amber-800">
+                        <Info size={16} className="text-amber-600 shrink-0" />
+                        <p className="text-[10px] sm:text-xs font-bold">No upcoming fixtures available for this competition. Showing latest results.</p>
+                    </div>
+                    <Link href="/matches" className="shrink-0 bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors flex items-center gap-1 border border-amber-300">
+                        All Matches <ArrowRight size={12} />
+                    </Link>
+                </div>
+            </div>
+        )}
 
         {selectedLeague && matches.length > 0 && matches[0].league_banner && (
             <div className="px-4 mb-4">
