@@ -59,16 +59,36 @@ const groupByDate = (matchList: any[]) => {
     return groups;
 };
 
+// 🟢 NEW: Strict 3-Tier Sorting (Live -> Scheduled -> Finished)
 const sortMatches = (matches: any[]) => {
   return matches.sort((a, b) => {
-    const isLiveA = LIVE_STATUSES.includes((a.status || '').toUpperCase());
-    const isLiveB = LIVE_STATUSES.includes((b.status || '').toUpperCase());
+    const rawA = (a.status || '').toUpperCase();
+    const rawB = (b.status || '').toUpperCase();
 
-    if (isLiveA && !isLiveB) return -1; 
-    if (!isLiveA && isLiveB) return 1;  
+    const isLiveA = LIVE_STATUSES.includes(rawA);
+    const isLiveB = LIVE_STATUSES.includes(rawB);
+    const isFinishedA = FINISHED_STATUSES.includes(rawA);
+    const isFinishedB = FINISHED_STATUSES.includes(rawB);
 
-    if (isLiveA && isLiveB) return a.id - b.id;
-    return new Date(a.match_date).getTime() - new Date(b.match_date).getTime();
+    // Tier 1: LIVE matches always at the top
+    if (isLiveA && !isLiveB) return -1;
+    if (!isLiveA && isLiveB) return 1;
+
+    // Tier 2: SCHEDULED matches above Finished
+    const isScheduledA = !isLiveA && !isFinishedA;
+    const isScheduledB = !isLiveB && !isFinishedB;
+    if (isScheduledA && !isScheduledB) return -1;
+    if (!isScheduledA && isScheduledB) return 1;
+
+    // If they are in the same tier, sort by time
+    const timeA = new Date(a.match_date).getTime();
+    const timeB = new Date(b.match_date).getTime();
+
+    // If both are finished, show the most recently finished first
+    if (isFinishedA && isFinishedB) return timeB - timeA;
+    
+    // If both are scheduled/live, show the soonest first
+    return timeA - timeB;
   });
 };
 
