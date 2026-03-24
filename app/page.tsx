@@ -59,7 +59,6 @@ const groupByDate = (matchList: any[]) => {
     return groups;
 };
 
-// 🟢 STRICT SORTING: LIVE -> UPCOMING -> FINISHED
 const sortMatches = (matches: any[]) => {
   return matches.sort((a, b) => {
     const rawA = (a.status || '').toUpperCase();
@@ -70,24 +69,18 @@ const sortMatches = (matches: any[]) => {
     const isFinishedA = FINISHED_STATUSES.includes(rawA);
     const isFinishedB = FINISHED_STATUSES.includes(rawB);
 
-    // Tier 1: LIVE matches always at the top
     if (isLiveA && !isLiveB) return -1;
     if (!isLiveA && isLiveB) return 1;
 
-    // Tier 2: SCHEDULED matches above Finished
     const isScheduledA = !isLiveA && !isFinishedA;
     const isScheduledB = !isLiveB && !isFinishedB;
     if (isScheduledA && !isScheduledB) return -1;
     if (!isScheduledA && isScheduledB) return 1;
 
-    // If they are in the same tier, sort by time
     const timeA = new Date(a.match_date).getTime();
     const timeB = new Date(b.match_date).getTime();
 
-    // If both are finished, show the most recently finished first
     if (isFinishedA && isFinishedB) return timeB - timeA;
-    
-    // If both are scheduled/live, show the soonest first
     return timeA - timeB;
   });
 };
@@ -136,34 +129,34 @@ async function getHomepageData(leagueFilter: string | undefined) {
   ]);
 
   if (leagueFilter) {
-      // 🟢 LEAGUE TABS: Fetch ONLY Live and Upcoming matches first
+      // 🟢 STRICT LIMIT: Only fetch 5 upcoming matches
       const { data: activeMatches } = await supabase.from('matches')
           .select('*')
           .ilike('league', `%${leagueFilter}%`)
           .not('status', 'in', '("FT","FINISHED","AET","PEN","AWARDED","ABD","POST","ENDED")')
           .order('match_date', { ascending: true })
-          .limit(15);
+          .limit(5); 
 
       if (activeMatches && activeMatches.length > 0) {
           matches = activeMatches;
       } else {
-          // 🟢 FALLBACK: If zero upcoming, fetch the latest finished matches
+          // 🟢 FALLBACK: Only fetch 5 recent finished matches if no upcoming
           const { data: pastMatches } = await supabase.from('matches')
               .select('*')
               .ilike('league', `%${leagueFilter}%`)
               .in('status', ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD', 'POST', 'ENDED'])
-              .order('match_date', { ascending: false }) // Newest first
-              .limit(10);
+              .order('match_date', { ascending: false }) 
+              .limit(5); 
 
           if (pastMatches && pastMatches.length > 0) {
               matches = pastMatches;
-              isShowingFallbackResults = true; // Triggers the UI message
+              isShowingFallbackResults = true; 
           }
       }
       matches = sortMatches(matches);
 
   } else {
-      // 🟢 DEFAULT "FOR YOU" TAB: Original Logic untouched
+      // "For You" Tab remains untouched and smart
       const { data: defaultMatches } = await supabase.from('matches').select('*')
         .or(`status.eq.LIVE,status.eq.IN_PLAY,status.eq.HT,status.eq.in,match_date.gte.${todayStart.toISOString()}`)
         .lte('match_date', tomorrowEnd.toISOString()) 
@@ -274,20 +267,18 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             {['Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Champions League'].map((league) => (
                 <Link key={league} href={`/?league=${league}`} scroll={false} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all ${selectedLeague === league ? 'bg-[#0a1428] text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}`}>{league === 'Premier League' ? 'EPL' : league}</Link>
             ))}
+            {/* 🟢 THE OTHERS TAB (Redirects to full list) */}
+            <Link href="/matches" className="px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100">Others</Link>
             </div>
         </div>
 
-        {/* 🟢 THE FALLBACK ALERT MESSAGE */}
         {selectedLeague && isShowingFallbackResults && (
             <div className="px-4 mb-4">
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
                     <div className="flex items-center gap-2 text-amber-800">
                         <Info size={16} className="text-amber-600 shrink-0" />
-                        <p className="text-[10px] sm:text-xs font-bold">No upcoming fixtures available for this competition. Showing latest results.</p>
+                        <p className="text-[10px] sm:text-xs font-bold">No upcoming fixtures right now. Showing latest results.</p>
                     </div>
-                    <Link href="/matches" className="shrink-0 bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors flex items-center gap-1 border border-amber-300">
-                        All Matches <ArrowRight size={12} />
-                    </Link>
                 </div>
             </div>
         )}
@@ -306,7 +297,8 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
              <FreeTipsBanner />
 
              {Object.keys(groupedMatches).length > 0 ? (
-                 Object.keys(groupedMatches).map((dateKey) => (
+                 <>
+                 {Object.keys(groupedMatches).map((dateKey) => (
                     <div key={dateKey} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-4">
                         <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex items-center gap-2">
                             <Calendar size={12} className="text-slate-400"/>
@@ -373,7 +365,15 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                             })}
                         </div>
                     </div>
-                ))
+                 ))}
+                 
+                 {/* 🟢 VIEW FULL LEAGUE LIST BUTTON */}
+                 {selectedLeague && (
+                    <Link href={`/matches#${selectedLeague.replace(/\s+/g, '-')}`} className="block w-full text-center bg-white border border-slate-200 text-slate-600 font-black text-[10px] uppercase tracking-widest py-3.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition shadow-sm mb-4">
+                        View All {selectedLeague} Matches <ArrowRight size={12} className="inline ml-1 -mt-0.5" />
+                    </Link>
+                 )}
+                 </>
              ) : (
                 <div className="text-center py-12 opacity-50 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
                    <Calendar size={24} className="mx-auto mb-2 text-slate-400"/>
