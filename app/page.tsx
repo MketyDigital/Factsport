@@ -15,7 +15,6 @@ import LatestNewsList from '@/app/components/LatestNewsList';
 import HighlightsSlider from '@/app/components/HighlightsSlider'; 
 import HeroMatchCards from '@/app/components/HeroMatchCards'; 
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
-import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
 const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599"; 
 
@@ -23,7 +22,6 @@ const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'E
 const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
-// 🔥 ENHANCED SEO METADATA
 export const metadata: Metadata = {
   title: 'FactSport | Live Football, Sport News & Predictions',
   description: 'The #1 Platform for sports | football predictions, live scores, and breaking news.',
@@ -108,19 +106,19 @@ async function getHomepageData(leagueFilter: string | undefined) {
   tomorrowEnd.setDate(tomorrowEnd.getDate() + 1); 
   tomorrowEnd.setHours(23,59,59,999);
 
-  let matchQuery = supabase.from('matches').select('*');
+  let matchQuery;
 
   if (leagueFilter) {
-      const startDate = new Date(); startDate.setDate(startDate.getDate() - 1); 
-      const endDate = new Date(); endDate.setDate(endDate.getDate() + 3); 
-      matchQuery = matchQuery
+      const startDate = new Date(); startDate.setDate(startDate.getDate() - 3); 
+      const endDate = new Date(); endDate.setDate(endDate.getDate() + 7); 
+      matchQuery = supabase.from('matches').select('*')
         .gte('match_date', startDate.toISOString())
         .lte('match_date', endDate.toISOString())
         .ilike('league', `%${leagueFilter}%`)
         .order('match_date', { ascending: true });
   } 
   else {
-      matchQuery = matchQuery
+      matchQuery = supabase.from('matches').select('*')
         .or(`status.eq.LIVE,status.eq.IN_PLAY,status.eq.HT,status.eq.in,match_date.gte.${todayStart.toISOString()}`)
         .lte('match_date', tomorrowEnd.toISOString()) 
         .order('match_date', { ascending: true })
@@ -136,7 +134,6 @@ async function getHomepageData(leagueFilter: string | undefined) {
       .neq('video_url', '') 
       .order('match_date', { ascending: false })
       .limit(5),
-    
     supabase.from('matches')
       .select('*')
       .eq('is_featured', true)
@@ -147,7 +144,16 @@ async function getHomepageData(leagueFilter: string | undefined) {
 
   let matches = matchesRes.data || [];
 
-  if (!leagueFilter && matches.length > 0) {
+  if (leagueFilter && matches.length === 0) {
+      const { data: past } = await supabase.from('matches')
+          .select('*').ilike('league', `%${leagueFilter}%`).lt('match_date', new Date().toISOString())
+          .order('match_date', { ascending: false }).limit(10);
+      const { data: future } = await supabase.from('matches')
+          .select('*').ilike('league', `%${leagueFilter}%`).gt('match_date', new Date().toISOString())
+          .order('match_date', { ascending: true }).limit(5);
+          
+      matches = [...(future || []), ...(past || [])].sort((a,b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
+  } else if (!leagueFilter && matches.length > 0) {
       matches = getDiverseMatches(matches, 20);
   } else {
       matches = sortMatches(matches);
@@ -215,7 +221,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const displayMatches = matches.filter(m => !heroMatches.some(h => h.id === m.id));
   const groupedMatches = groupByDate(displayMatches);
 
-  // 🟢 JSON-LD SCHEMA FOR HOME PAGE
   const jsonLd = {
       "@context": "https://schema.org",
       "@type": "WebSite",
@@ -325,6 +330,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                                         initialStatus={match.status} 
                                                         variant="badge" 
                                                         matchDate={match.match_date} 
+                                                        disablePolling={true}
                                                     />
                                                     {isScheduled && <span className="text-[10px] font-bold text-slate-500 mt-1"><MatchTime date={match.match_date} /></span>}
                                                 </div>
@@ -358,7 +364,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </div>
 
-      <AdsterraNativeBanner />
+      <AdsterraStandardBanner />
 
       <div className="grid grid-cols-4 gap-3 px-4 py-6">
           <Link href="/matches" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">

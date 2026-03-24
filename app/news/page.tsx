@@ -7,13 +7,11 @@ import { Metadata } from 'next';
 import { Calendar, ChevronRight, Zap, Trophy, Youtube, Newspaper, ArrowRight, Flame, Radio, BarChart2, ChevronLeft } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
-import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 import BettingPromo from '@/app/components/BettingPromo';
 
 const CATEGORIES = ['All', 'Football', 'Transfers', 'Sports Update', 'Champions League', 'Euros', 'World Cup', 'AFCON', 'Copa America'];
 const ITEMS_PER_PAGE = 12;
 
-// 🔥 ENHANCED SEO METADATA
 export const metadata: Metadata = {
   title: 'Breaking Sports News & Football Updates | FactSport',
   description: 'Read the latest football news, transfer rumors, and breaking sports updates from around the globe.',
@@ -57,7 +55,6 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
   const firstHalf = rest.slice(0, midIndex);
   const secondHalf = rest.slice(midIndex);
 
-  // 🟢 JSON-LD Schema
   const jsonLd = {
       '@context': 'https://schema.org',
       '@type': 'CollectionPage',
@@ -70,7 +67,6 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
     <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans text-slate-900">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      {/* HEADER */}
       <div className="bg-[#0a1428] text-white pt-8 pb-12 px-6 relative overflow-hidden shadow-lg border-b border-blue-900/30">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
         <div className="relative z-10 max-w-7xl mx-auto">
@@ -86,7 +82,6 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
         </div>
       </div>
 
-      {/* CATEGORY NAVIGATOR */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm overflow-x-auto scrollbar-hide">
           <div className="max-w-7xl mx-auto flex px-4 py-3 space-x-2 min-w-max">
               {CATEGORIES.map((cat) => (
@@ -151,7 +146,7 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
 
             {rest.length > 0 && (
                 <div className="col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-4 my-2 border-y border-slate-200 py-4">
-                    <AdsterraNativeBanner />
+                    <AdsterraStandardBanner />
                 </div>
             )}
 
@@ -174,7 +169,6 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
 
         </div>
 
-        {/* PAGINATION CONTROLS */}
         {totalPages > 1 && (
             <div className="flex items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mt-8">
                 <Link 
@@ -202,7 +196,7 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
         )}
 
         <div className="mt-12 mb-4">
-            <AdsterraNativeBanner />
+            <AdsterraStandardBanner />
         </div>
       </div>
 

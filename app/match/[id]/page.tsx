@@ -17,12 +17,11 @@ import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
 import PredictionBoard from '@/app/components/PredictionBoard';
 import HeadToHeadStats from '@/app/components/HeadToHeadStats';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
-import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import BettingPromo from '@/app/components/BettingPromo'; 
 
 import { getExternalData } from '@/app/lib/matchService';
 import { getTeamForm } from '@/app/lib/teamForm';
-// 🟢 IMPORT THE PROVIDER
 import { MatchLiveProvider } from '@/app/providers/MatchLiveProvider';
 
 const sanitizeUrl = (url: string | null | undefined) => {
@@ -145,7 +144,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      {/* 🟢 WRAP EVERYTHING IN THE MASTER PROVIDER */}
       <MatchLiveProvider espnId={dbData.espn_id} initialData={data}>
           {!hasWidget ? (
               <div className="w-full">
@@ -155,7 +153,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                           <span className="text-[9px] font-black tracking-widest uppercase opacity-80">{dbData.league}</span>
                           <div className="w-6"></div>
                       </div>
-                      {/* Sub-components will now pull from context */}
                       <MatchHeaderClient dbData={dbData} />
                   </div>
 
@@ -201,7 +198,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                   </div>
               )}
 
-              <div className="mt-4"><AdsterraNativeBanner /></div>
+              <div className="mt-4"><AdsterraStandardBanner /></div>
               <div className="mt-4"><FreeTipsBanner /></div>
           </div>
       </MatchLiveProvider>

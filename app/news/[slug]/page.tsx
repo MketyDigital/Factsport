@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-export const revalidate = 180; // 🟢 SECURELY CACHED FOR 3 MINUTES
+export const revalidate = 180; 
 
 import { createClient } from '@supabase/supabase-js'; 
 import { notFound } from 'next/navigation';
@@ -11,14 +11,12 @@ import ShareButton from '@/app/components/ShareButton';
 import MarkdownRenderer from '@/app/components/MarkdownRenderer'; 
 import BettingPromo from '@/app/components/BettingPromo';
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
-import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
-// 🟢 CACHED DB CALL
 const getArticleData = cache(async (slug: string) => {
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    const { data, error } = await supabase.from('news').select('*').eq('slug', slug).single();
-    if (error) return null;
-    return data;
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  const { data, error } = await supabase.from('news').select('*').eq('slug', slug).single();
+  if (error) return null;
+  return data;
 });
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
@@ -55,7 +53,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   const { data: matches } = await supabase.from('matches').select('*').eq('status', 'SCHEDULED').limit(3);
 
-  // 🔥 GOOGLE NEWS SCHEMA FOR SEO
   const jsonLd = {
       "@context": "https://schema.org",
       "@type": "NewsArticle",
@@ -68,7 +65,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
       "description": article.body?.substring(0, 160) + '...'
   };
 
-  // 🟢 MID-ARTICLE AD SPLITTER LOGIC
   const content = article.body || article.content || '';
   const splitIndex = content.indexOf('\n\n', Math.floor(content.length / 2));
   const part1 = splitIndex !== -1 ? content.slice(0, splitIndex) : content;
@@ -78,7 +74,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
     <div className="min-h-screen bg-white pb-24 font-sans text-slate-900 selection:bg-blue-200">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       
-      {/* IMMERSIVE HERO SECTION */}
       <div className="relative h-[60vh] min-h-[400px] w-full bg-[#0a1428] overflow-hidden group border-b-8 border-blue-600">
         <NewsArtwork 
             image={article.image_url} 
@@ -107,7 +102,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                 {article.title}
             </h1>
             
-            {/* 1. 🟢 STANDARD BANNER INSIDE HERO SECTION */}
             <div className="mb-4">
                 <AdsterraStandardBanner />
             </div>
@@ -121,11 +115,9 @@ export default async function ArticlePage({ params }: { params: { slug: string }
 
       <div className="max-w-7xl mx-auto px-4 mt-12 grid grid-cols-1 lg:grid-cols-12 gap-12">
         
-        {/* MAIN ARTICLE CONTENT */}
         <div className="lg:col-span-8">
             <div className="bg-white">
 
-                {/* 2. 🟢 BETTING PROMO (Styled as a slim banner right before the text) */}
                 <div className="mb-8 w-full max-w-3xl overflow-hidden rounded-xl bg-slate-50 border border-slate-100 shadow-sm max-h-[90px]">
                     <BettingPromo affiliateLink={null} />
                 </div>
@@ -133,17 +125,14 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                 <div className="prose prose-lg prose-slate max-w-none text-slate-800 leading-relaxed md:leading-loose font-medium prose-headings:font-black prose-headings:tracking-tight prose-a:text-blue-600 prose-img:rounded-2xl prose-img:shadow-lg">
                     {content ? (
                         <>
-                            {/* Render First Half of Article */}
                             <MarkdownRenderer content={part1} />
                             
-                            {/* 3. 🟢 MID-ARTICLE NATIVE BANNER */}
                             {part2 && (
                                 <div className="my-8">
-                                    <AdsterraNativeBanner />
+                                    <AdsterraStandardBanner />
                                 </div>
                             )}
 
-                            {/* Render Second Half of Article */}
                             {part2 && <MarkdownRenderer content={part2} />}
                         </>
                     ) : (
@@ -151,25 +140,21 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                     )}
                 </div>
                 
-                {/* Share Row */}
                 <div className="mt-12 pt-6 border-t border-slate-200 flex items-center justify-between">
                     <span className="text-xs font-black uppercase tracking-widest text-slate-400">Share Story</span>
                     <ShareButton title={article.title} slug={article.slug} />
                 </div>
 
-                {/* 4. 🟢 END-OF-ARTICLE NATIVE BANNER */}
                 <div className="mt-6">
-                    <AdsterraNativeBanner />
+                    <AdsterraStandardBanner />
                 </div>
 
             </div> 
         </div>
 
-        {/* STICKY SIDEBAR */}
         <div className="lg:col-span-4 space-y-8">
             <div className="sticky top-24 space-y-8">
                 
-                {/* Sidebar VIP Card */}
                 <div className="bg-[#0a1428] rounded-3xl p-8 text-white text-center shadow-2xl relative overflow-hidden border border-slate-800 group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600 rounded-full blur-[80px] opacity-30 group-hover:opacity-50 transition-opacity"></div>
                     <Trophy className="text-yellow-500 mx-auto mb-4" size={40} />
@@ -180,7 +165,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                     </Link>
                 </div>
 
-                {/* Related Matches Widget */}
                 {matches && matches.length > 0 && (
                     <div className="bg-slate-50 rounded-3xl border border-slate-200 p-6">
                         <div className="flex items-center gap-2 mb-6">
