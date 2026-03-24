@@ -1,18 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from "next/link";
 import NewsArtwork from '@/app/components/NewsArtwork';
+import { useSmartInterval } from '@/app/hooks/useSmartInterval'; // 🟢 THE CPU SHIELD
 
 export default function HeadlinesSlider({ headlines }: { headlines: any[] }) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
+  const nextSlide = () => {
       setCurrentIndex((prev) => (prev + 1) % headlines.length);
-    }, 5000); 
-    return () => clearInterval(timer);
-  }, [headlines.length]);
+  };
+
+  // 🟢 CPU SHIELD: Only slides when the user is actually looking at it!
+  useSmartInterval(nextSlide, headlines.length > 0 ? 5000 : null);
 
   if (headlines.length === 0) return null;
 

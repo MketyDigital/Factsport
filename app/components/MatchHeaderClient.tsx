@@ -5,6 +5,7 @@ import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
 import { getLeagueAssets } from '@/app/lib/league-assets';
 import MatchTime from '@/app/components/MatchTime';
 import { MapPin, Trophy, Calendar, Flag, Zap } from 'lucide-react';
+import { useMatchLive } from '@/app/providers/MatchLiveProvider'; 
 
 const formatGoals = (goals: any[]) => {
     const grouped: Record<string, string[]> = {};
@@ -22,137 +23,51 @@ const formatGoals = (goals: any[]) => {
     return Object.entries(grouped).map(([name, times]) => `${name} ${times.join("', ")}'`);
 };
 
-const getSafeEvents = (dataEvs: any, initialEvs: any, dbEvs: any) => {
-    let raw = dataEvs || initialEvs || dbEvs || [];
-    if (typeof raw === 'string') {
-        try { raw = JSON.parse(raw); } catch(e) { raw = []; }
-    }
-    return Array.isArray(raw) ? raw : [];
-};
-
-export default function MatchHeaderClient({ matchId, initialData, dbData }: any) {
-  const [data, setData] = useState(initialData);
-  const hasPremiumWidget = !!initialData?.widget_id;
+export default function MatchHeaderClient({ dbData }: any) {
+  const liveData = useMatchLive();
+  const hasPremiumWidget = !!dbData?.widget_id;
   
-  const hasFetchedLive = useRef(false);
-  const isFetching = useRef(false); 
   const [homeFlash, setHomeFlash] = useState(false);
   const [awayFlash, setAwayFlash] = useState(false);
-  const prevHomeScore = useRef(initialData?.home_score || 0);
-  const prevAwayScore = useRef(initialData?.away_score || 0);
+  const prevHomeScore = useRef(liveData?.home_score || 0);
+  const prevAwayScore = useRef(liveData?.away_score || 0);
 
+  // Trigger flash animations when context updates
   useEffect(() => {
-      if (!hasFetchedLive.current) setData(initialData);
-  }, [initialData]);
-
-  useEffect(() => {
-    let isMounted = true;
-    let timeoutId: NodeJS.Timeout;
-    
-    const isFinishedInitially = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(initialData?.status);
-    if (isFinishedInitially || hasPremiumWidget || !initialData?.espn_id) return;
-
-    const fetchHeaderData = async () => {
-      if (!isMounted) return; // Completely dead if component unmounts
-
-      let matchFinished = false;
-
-      // 🟢 HEARTBEAT FIX: Only fetch if visible, but NEVER 'return' and kill the loop!
-      if (document.visibilityState === 'visible' && !isFetching.current) {
-          isFetching.current = true;
-          try {
-              let res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}&t=${Date.now()}`);
-              
-              if (res.ok) {
-                  const payload = await res.json();
-                  if (payload && !payload.error && isMounted) {
-                      hasFetchedLive.current = true; 
-                      
-                      setData((prev:any) => {
-                          const oldClock = prev.displayClock || '';
-                          const newClock = payload.displayClock || '';
-                          const oldStatus = prev.status || '';
-                          const newStatus = payload.status || '';
-                          const eventsChanged = (payload.events?.length || 0) !== (prev.events?.length || 0);
-                          
-                          const noChanges = 
-                              prev.home_score === payload.home_score && 
-                              prev.away_score === payload.away_score && 
-                              oldClock === newClock && 
-                              oldStatus === newStatus &&
-                              !eventsChanged;
-
-                          if (noChanges) return prev;
-
-                          if (payload.home_score > prevHomeScore.current) {
-                              setHomeFlash(true); setTimeout(() => setHomeFlash(false), 5000);
-                          }
-                          if (payload.away_score > prevAwayScore.current) {
-                              setAwayFlash(true); setTimeout(() => setAwayFlash(false), 5000);
-                          }
-                          
-                          prevHomeScore.current = payload.home_score;
-                          prevAwayScore.current = payload.away_score;
-
-                          return { 
-                              ...prev, 
-                              status: payload.status, 
-                              home_score: payload.home_score, 
-                              away_score: payload.away_score,
-                              displayClock: payload.displayClock,
-                              events: payload.events || payload.match_events || prev.events
-                          };
-                      });
-
-                      if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
-                          matchFinished = true; // Signals the loop to finally rest.
-                      }
-                  }
-              }
-          } catch (error) {
-          } finally {
-              isFetching.current = false;
-          }
+      if (liveData?.home_score > prevHomeScore.current) {
+          setHomeFlash(true); setTimeout(() => setHomeFlash(false), 5000);
       }
-      
-      // 🟢 THE HEARTBEAT: Always schedules the next check, keeping it alive!
-      if (isMounted && !matchFinished) {
-          timeoutId = setTimeout(fetchHeaderData, 4000);
+      if (liveData?.away_score > prevAwayScore.current) {
+          setAwayFlash(true); setTimeout(() => setAwayFlash(false), 5000);
       }
-    };
+      prevHomeScore.current = liveData?.home_score || 0;
+      prevAwayScore.current = liveData?.away_score || 0;
+  }, [liveData?.home_score, liveData?.away_score]);
 
-    fetchHeaderData();
+  if (hasPremiumWidget) return <ScoreAxisWidget matchId={dbData.widget_id} />;
 
-    return () => {
-        isMounted = false;
-        clearTimeout(timeoutId);
-    };
-  }, [initialData?.status, initialData?.espn_id, hasPremiumWidget]);
-
-  if (hasPremiumWidget) return <ScoreAxisWidget matchId={initialData.widget_id} />;
-
-  const currentStatus = data?.status?.toUpperCase() || '';
+  const currentStatus = liveData?.status?.toUpperCase() || '';
   const isHT = ['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME'].includes(currentStatus);
   const isLive = ['LIVE', 'IN_PLAY', '1H', '2H', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'].includes(currentStatus) || isHT;
   const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'].includes(currentStatus);
   const isUpcoming = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'].includes(currentStatus);
   const leagueData = getLeagueAssets(dbData?.league);
 
-  const homeTeamName = dbData?.home_team || initialData?.home?.name || '';
-  const awayTeamName = dbData?.away_team || initialData?.away?.name || '';
+  const homeTeamName = dbData?.home_team || '';
+  const awayTeamName = dbData?.away_team || '';
   const formattedDate = dbData?.match_date ? new Date(dbData.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
   
   let refName = null;
-  if (initialData?.referees && initialData.referees.length > 0) {
-      refName = typeof initialData.referees[0] === 'string' ? initialData.referees[0] : initialData.referees[0].name;
+  if (liveData?.referees && liveData.referees.length > 0) {
+      refName = typeof liveData.referees[0] === 'string' ? liveData.referees[0] : liveData.referees[0].name;
   }
 
-  const homeForm = initialData?.home_form || [];
-  const awayForm = initialData?.away_form || [];
+  const homeForm = liveData?.home_form || [];
+  const awayForm = liveData?.away_form || [];
   
-  const events = useMemo(() => getSafeEvents(data?.events || data?.match_events, initialData?.events || initialData?.match_events, dbData?.match_events), [data?.events, data?.match_events]);
-  const homeGoals = useMemo(() => events.filter((e: any) => e.type === 'goal' && (e.team === 'home' || (e.player && e.player.toLowerCase().includes(homeTeamName.toLowerCase())))), [events, homeTeamName]);
-  const awayGoals = useMemo(() => events.filter((e: any) => e.type === 'goal' && (e.team === 'away' || (e.player && e.player.toLowerCase().includes(awayTeamName.toLowerCase())))), [events, awayTeamName]);
+  const events = liveData?.match_events || liveData?.events || [];
+  const homeGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'home' || (e.player && e.player.toLowerCase().includes(homeTeamName.toLowerCase()))));
+  const awayGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'away' || (e.player && e.player.toLowerCase().includes(awayTeamName.toLowerCase()))));
 
   return (
     <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
@@ -191,7 +106,7 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                 <div className="flex flex-col items-center justify-start pt-2 w-[40%] drop-shadow-lg">
                     {isLive && (
                         <div className="flex items-center gap-1 bg-red-600/90 text-white text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded-sm animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.5)] mb-1">
-                            <span className="w-1 h-1 bg-white rounded-full"></span> {isHT ? 'HT' : 'LIVE'} {data?.displayClock && !isHT && <span className="text-red-200 ml-0.5">{data.displayClock}</span>}
+                            <span className="w-1 h-1 bg-white rounded-full"></span> {isHT ? 'HT' : 'LIVE'} {liveData?.displayClock && !isHT && <span className="text-red-200 ml-0.5">{liveData.displayClock}</span>}
                         </div>
                     )}
                     {!isLive && (
@@ -204,9 +119,9 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
                          <div className="text-xl md:text-2xl font-black text-white/30 italic">VS</div>
                     ) : (
                         <div className="text-2xl md:text-3xl font-black tracking-tighter flex gap-1 items-center drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
-                            <span className={`transition-all duration-300 ${homeFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{data?.home_score ?? 0}</span>
+                            <span className={`transition-all duration-300 ${homeFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{liveData?.home_score ?? 0}</span>
                             <span className="text-white/40 text-xl md:text-2xl pb-1">-</span>
-                            <span className={`transition-all duration-300 ${awayFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{data?.away_score ?? 0}</span>
+                            <span className={`transition-all duration-300 ${awayFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{liveData?.away_score ?? 0}</span>
                         </div>
                     )}
                 </div>
@@ -241,8 +156,8 @@ export default function MatchHeaderClient({ matchId, initialData, dbData }: any)
         <div className="relative z-10 w-full bg-black/40 backdrop-blur-sm border-t border-white/5 py-1.5 px-2 flex justify-between items-center drop-shadow-md">
             <div className="flex items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide text-[7px] md:text-[8px] font-bold text-slate-300 uppercase tracking-widest whitespace-nowrap">
                 {formattedDate && <span className="flex items-center gap-1"><Calendar size={9} className="text-blue-400"/> {formattedDate}</span>}
-                {initialData?.venue && <span className="flex items-center gap-1"><MapPin size={9} className="text-red-400"/> {initialData.venue}</span>}
-                {initialData?.stage && <span className="flex items-center gap-1"><Trophy size={9} className="text-yellow-500"/> {initialData.stage.replace(/_/g, ' ')}</span>}
+                {dbData?.venue && <span className="flex items-center gap-1"><MapPin size={9} className="text-red-400"/> {dbData.venue}</span>}
+                {dbData?.stage && <span className="flex items-center gap-1"><Trophy size={9} className="text-yellow-500"/> {dbData.stage.replace(/_/g, ' ')}</span>}
                 {refName && <span className="flex items-center gap-1"><Flag size={9} className="text-slate-400"/> {refName}</span>}
             </div>
         </div>

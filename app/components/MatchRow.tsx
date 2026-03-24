@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Zap, Ticket } from 'lucide-react';
+import { useSmartInterval } from '@/app/hooks/useSmartInterval'; // 🟢 NEW SHIELD
 
 export default function MatchRow({ match }: { match: any }) {
   const [data, setData] = useState({
@@ -12,33 +13,42 @@ export default function MatchRow({ match }: { match: any }) {
     clock: match.clock || '',
   });
 
+  const isFetching = useRef(false);
+  const now = new Date();
+  const matchTime = new Date(match.match_date);
+  
+  // Keep polling if it's LIVE, IN, or if kickoff passed but it isn't marked FT yet
+  const isLive = ['LIVE', 'in'].includes(data.status) || 
+                 (now >= matchTime && !['FT', 'post', 'FINISHED'].includes(data.status));
+
+  const fetchScore = async () => {
+    if (isFetching.current || !isLive) return;
+    isFetching.current = true;
+
+    try {
+      const res = await fetch(`/api/match/${match.id}`);
+      if (res.ok) {
+        const json = await res.json();
+        setData({
+          status: json.status,
+          home_score: json.home.score,
+          away_score: json.away.score,
+          clock: json.displayClock
+        });
+      }
+    } catch (e) {
+    } finally {
+      isFetching.current = false;
+    }
+  };
+
+  // Initial fetch on mount
   useEffect(() => {
-    const now = new Date();
-    const matchTime = new Date(match.match_date);
-    const isLive = ['LIVE', 'in'].includes(data.status) || 
-                   (now >= matchTime && !['FT', 'post', 'FINISHED'].includes(data.status));
-
-    if (!isLive) return;
-
-    const fetchScore = async () => {
-      try {
-        const res = await fetch(`/api/match/${match.id}`);
-        if (res.ok) {
-          const json = await res.json();
-          setData({
-            status: json.status,
-            home_score: json.home.score,
-            away_score: json.away.score,
-            clock: json.displayClock
-          });
-        }
-      } catch (e) {}
-    };
-
-    fetchScore();
-    const interval = setInterval(fetchScore, 60000);
-    return () => clearInterval(interval);
+      fetchScore();
   }, []);
+
+  // 🟢 CPU SHIELD: Polls every 60s, pauses when hidden, stops completely if not live
+  useSmartInterval(fetchScore, isLive ? 60000 : null);
 
   return (
     <div className="block hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0">

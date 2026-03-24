@@ -1,9 +1,12 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Send, MessageCircle, ShieldAlert, Zap, Reply, X, ArrowDown, Pin, Settings, Megaphone } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/app/lib/supabase/client'; 
 import { useAuth } from '@/app/components/AuthProvider'; 
+import { useSmartInterval } from '@/app/hooks/useSmartInterval';
+// 🟢 PULLS FROM THE SINGLE SOURCE OF TRUTH
+import { useMatchLive } from '@/app/providers/MatchLiveProvider';
 
 const ADMIN_EMAILS = [
     'mkposcosunday@gmail.com', 
@@ -13,17 +16,12 @@ const ADMIN_EMAILS = [
 
 export default function FanZoneChat({ matchId, espnId }: { matchId: string, espnId?: string }) {
     const [messages, setMessages] = useState<any[]>([]);
-    const [officialEvents, setOfficialEvents] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [isSending, setIsSending] = useState(false);
-    
     const [replyTo, setReplyTo] = useState<{user: string, text: string} | null>(null);
     const [showScrollBottom, setShowScrollBottom] = useState(false);
-    
     const { user, isAdmin, loading: authLoading } = useAuth();
-    
     const [lastMsgTime, setLastMsgTime] = useState(0); 
-    
     const [pinnedMessage, setPinnedMessage] = useState<{text: string, link: string | null} | null>(null);
     const [showPinUI, setShowPinUI] = useState(false);
     const [pinTextInput, setPinTextInput] = useState("");
@@ -31,27 +29,57 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
     const [isAnnouncement, setIsAnnouncement] = useState(false); 
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const CHAT_WORKER_URL = "https://chatworkerjs.mkpoikankes.workers.dev"; 
+    const CHAT_WORKER_URL = "https://chat-api.factsport.com"; 
 
-    useEffect(() => {
-        const fetchPin = async () => {
-            if (document.hidden) return; 
-            try {
-                const res = await fetch(`/api/match/pin?match_id=${matchId}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.chat_pin_text || data.chat_pin_link) {
-                        setPinnedMessage({ text: data.chat_pin_text, link: data.chat_pin_link });
-                    } else {
-                        setPinnedMessage(null);
-                    }
+    // 🟢 ALL ESPN FETCHING IS GONE. It just listens to the context!
+    const liveData = useMatchLive();
+    
+    // We memoize the formatting so it doesn't recalculate unless the events actually change
+    const officialEvents = useMemo(() => {
+        const rawEvents = liveData?.match_events || liveData?.events || [];
+        return rawEvents.map((e: any, index: number) => ({
+             id: `official-${index}-${e.time}`,
+             isOfficial: true,
+             time: e.time,
+             type: e.type,
+             text: e.text,
+             player: e.player,
+             created_at: new Date(Date.now() - (index * 60000)).toISOString() 
+        }));
+    }, [liveData?.match_events, liveData?.events]);
+
+    // Keep the Pin Fetcher (From Supabase)
+    const fetchPin = async () => {
+        if (document.hidden) return; 
+        try {
+            const res = await fetch(`/api/match/pin?match_id=${matchId}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.chat_pin_text || data.chat_pin_link) {
+                    setPinnedMessage({ text: data.chat_pin_text, link: data.chat_pin_link });
+                } else {
+                    setPinnedMessage(null);
                 }
-            } catch (e) {}
-        };
-        fetchPin();
-        const interval = setInterval(fetchPin, 10000); 
-        return () => clearInterval(interval);
-    }, [matchId]);
+            }
+        } catch (e) {}
+    };
+    useEffect(() => { fetchPin(); }, [matchId]);
+    useSmartInterval(fetchPin, 10000); 
+
+    // Keep the Chat Fetcher (From Chat Worker)
+    const fetchChat = async () => {
+        if (document.hidden) return; 
+        try {
+            const res = await fetch(`${CHAT_WORKER_URL}/messages?match_id=${matchId}`, { cache: 'no-store' });
+            if (res.ok) {
+                const data = await res.json();
+                setMessages(data.messages || []);
+                setTimeout(() => scrollToBottom(false), 100);
+            }
+        } catch (e) {}
+    };
+    useEffect(() => { fetchChat(); }, [matchId]);
+    useSmartInterval(fetchChat, 6000); 
 
     const handleScroll = () => {
         if (scrollContainerRef.current) {
@@ -69,50 +97,6 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
             }
         }
     };
-
-    useEffect(() => {
-        const fetchChat = async () => {
-            if (document.hidden) return; 
-            try {
-                const res = await fetch(`${CHAT_WORKER_URL}/messages?match_id=${matchId}`, { cache: 'no-store' });
-                if (res.ok) {
-                    const data = await res.json();
-                    setMessages(data.messages || []);
-                    setTimeout(() => scrollToBottom(false), 100);
-                }
-            } catch (e) {}
-        };
-        fetchChat();
-        const interval = setInterval(fetchChat, 6000);
-        return () => clearInterval(interval);
-    }, [matchId]);
-
-    useEffect(() => {
-        if (!espnId) return;
-        const fetchEvents = async () => {
-            if (document.hidden) return; 
-            try {
-                const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${espnId}`, { cache: 'no-store' });
-                if (res.ok) {
-                    const data = await res.json();
-                    const formattedEvents = (data.match_events || []).map((e: any, index: number) => ({
-                        id: `official-${index}-${e.time}`,
-                        isOfficial: true,
-                        time: e.time,
-                        type: e.type,
-                        text: e.text,
-                        player: e.player,
-                        created_at: new Date(Date.now() - (index * 60000)).toISOString() 
-                    }));
-                    setOfficialEvents(formattedEvents);
-                    setTimeout(() => scrollToBottom(false), 100);
-                }
-            } catch (e) {}
-        };
-        fetchEvents();
-        const interval = setInterval(fetchEvents, 5000);
-        return () => clearInterval(interval);
-    }, [espnId]);
 
     const handleSetPin = async () => {
         const supabase = createClient();
@@ -195,7 +179,6 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
         setIsSending(false);
     };
 
-    // 🟢 DOM OVERLOAD SHIELD: Slices array to 150 items to protect GPU memory!
     const combinedFeed = [...messages, ...officialEvents]
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
         .slice(-150);
