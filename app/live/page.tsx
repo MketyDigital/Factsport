@@ -8,7 +8,6 @@ import { Video, Mic, Calendar, ChevronLeft, Radio, Trophy, Activity, PlayCircle,
 import LiveScoreLabel from '@/app/components/LiveScoreLabel'; 
 import BettingPromo from '@/app/components/BettingPromo';
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
-import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 import FactSportMediaRoom from '@/app/components/FactSportMediaRoom'; 
 import FanZoneChat from '@/app/components/FanZoneChat'; 
 
@@ -40,7 +39,6 @@ export default async function LiveMediaPage() {
   const safeMatches = matches || [];
   const coveredMatches = safeMatches.filter(m => m.livestream_url || m.audio_url);
   
-  // 🟢 FIXED: Now includes SCHEDULED matches so they sit on the page waiting to wake up!
   const liveUncoveredMatches = safeMatches.filter(m => 
     !m.livestream_url && !m.audio_url && 
     ['LIVE','IN_PLAY','1H','2H','HT','SCHEDULED','PRE'].includes(m.status) 
@@ -51,7 +49,6 @@ export default async function LiveMediaPage() {
     ? new Date(nextUpcomingMatch.match_date).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : "a later date";
 
-  // FETCH THE DEDICATED GLOBAL STUDIO SETTINGS
   const { data: studioData } = await supabase
       .from('global_studio')
       .select('*')
@@ -91,11 +88,8 @@ export default async function LiveMediaPage() {
             <BettingPromo affiliateLink={null} />
         </div>
 
-        {/* THE GLOBAL STUDIO + FAN ZONE CHAT LAYOUT */}
         {isStudioActive && globalMediaUrl && (
             <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                
-                {/* LEFT SIDE: The Media Player */}
                 <div className="lg:col-span-2 flex flex-col h-full">
                     <FactSportMediaRoom 
                         matchId="global-goal-rush" 
@@ -104,9 +98,7 @@ export default async function LiveMediaPage() {
                     />
                 </div>
 
-                {/* RIGHT SIDE: The Studio Chat */}
                 <div className="lg:col-span-1 bg-white rounded-2xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.5)] border border-slate-700 flex flex-col h-full max-h-[600px] lg:max-h-none">
-                     
                      <div className="bg-[#0a1428] p-3.5 border-b border-slate-800 flex items-center justify-between shrink-0 shadow-md relative z-10">
                          <div className="flex items-center gap-2.5">
                              <div className="w-8 h-8 bg-blue-600/20 rounded-full flex items-center justify-center border border-blue-500/30">
@@ -127,11 +119,9 @@ export default async function LiveMediaPage() {
                          <FanZoneChat matchId="global-goal-rush" />
                      </div>
                 </div>
-
             </div>
         )}
 
-        {/* REGULAR LIVE MATCHES SECTION */}
         <div className="max-w-5xl mx-auto space-y-8">
             {coveredMatches.length === 0 && liveUncoveredMatches.length === 0 ? (
                 <div className="text-center py-20 bg-white/5 rounded-3xl border border-white/10 p-6 backdrop-blur-sm">
@@ -163,7 +153,7 @@ export default async function LiveMediaPage() {
                         )}
                     </div>
 
-                    <AdsterraNativeBanner />
+                    <AdsterraStandardBanner />
 
                     {liveUncoveredMatches.length > 0 && (
                         <div>
@@ -181,7 +171,7 @@ export default async function LiveMediaPage() {
                 </>
             )}
 
-            <AdsterraNativeBanner />
+            <AdsterraStandardBanner />
 
             <div className="mt-10 max-w-3xl mx-auto bg-[#0a1428] rounded-2xl p-4 md:p-5 border border-yellow-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden group">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 opacity-10 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
@@ -215,13 +205,11 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
                              <Trophy size={10} className="text-slate-500"/>
                              {match.league || 'Competition'}
                          </div>
-                         {/* 🟢 TOP RIGHT BADGE DELETED TO PREVENT MULTI-POLLING BOMB */}
                     </div>
                     
                     <div className="flex items-center justify-between p-3 md:p-4">
                         <div className="flex-1 text-right text-xs md:text-sm font-black text-white truncate pr-3">{match.home_team}</div>
                         <div className="shrink-0 flex justify-center w-16">
-                            {/* 🟢 THE SINGLE, HIGHLY-OPTIMIZED LIVE SCORE FETCHER */}
                             <LiveScoreLabel 
                                 matchId={match.id} 
                                 espnId={match.espn_id}
@@ -248,12 +236,10 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
                      <Trophy size={10} className="text-yellow-500"/>
                      {match.league || 'Competition'}
                  </div>
-                 {/* 🟢 TOP RIGHT BADGE DELETED TO PREVENT MULTI-POLLING BOMB */}
             </div>
 
             <Link href={`/match/${match.id}`} className="block p-5 flex-1 hover:bg-white/5 transition-colors group">
                 
-                {/* 🟢 THE SINGLE, HIGHLY-OPTIMIZED LIVE SCORE FETCHER */}
                 <LiveScoreLabel 
                     matchId={match.id} 
                     espnId={match.espn_id}

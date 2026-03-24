@@ -6,8 +6,7 @@ import { Metadata } from 'next';
 import { ChevronLeft, BarChart2, AlertTriangle } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js'; 
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
-import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
-import LeagueLeaders from '@/app/components/LeagueLeaders'; // 🟢 NEW IMPORT
+import LeagueLeaders from '@/app/components/LeagueLeaders'; 
 
 const LEAGUE_MAP: Record<string, string> = {
     'Premier League': 'PL',
@@ -18,7 +17,6 @@ const LEAGUE_MAP: Record<string, string> = {
     'Champions League': 'CL'
 };
 
-// 🟢 ENHANCED SEO: OpenGraph & Twitter Cards added
 export async function generateMetadata({ searchParams }: { searchParams: { league?: string } }): Promise<Metadata> {
     const resolvedParams = await searchParams;
     const league = resolvedParams?.league || 'Premier League';
@@ -281,12 +279,11 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                     </div>
                 )}
 
-                {/* 🟢 TOP SCORERS / ASSISTS WIDGET INJECTED HERE */}
                 {standings.length > 0 && (
                     <LeagueLeaders leagueName={validLeague} />
                 )}
 
-                <AdsterraNativeBanner />
+                <AdsterraStandardBanner />
             </div>
         </div>
     );

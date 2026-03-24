@@ -9,12 +9,10 @@ import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 import LeagueMatchGroup from '@/app/components/LeagueMatchGroup'; 
 import LeagueNavigator from '@/app/components/LeagueNavigator'; 
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
-import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
 import { getTeamForm } from '@/app/lib/teamForm';
 import { getTeamQueryFilter } from '@/app/lib/teamAliases';
 
-// 🔥 ENHANCED SEO METADATA
 export const metadata: Metadata = {
   title: 'Football Fixtures, Live Scores & Results | FactSport',
   description: 'View today\'s football fixtures, live scores, and recent match results from the Premier League, Champions League, La Liga, WorldCup and more.',
@@ -68,7 +66,6 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
   const { data: matches } = await query;
   const validMatches = matches || [];
 
-  // 🟢 JSON-LD Schema
   const jsonLd = {
       '@context': 'https://schema.org',
       '@type': 'WebPage',
@@ -124,7 +121,7 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
                 />
             </div>
 
-            <AdsterraNativeBanner />
+            <AdsterraStandardBanner />
         </div>
       );
   }
@@ -257,7 +254,7 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
             </div>
         )}
 
-        <AdsterraNativeBanner />
+        <AdsterraStandardBanner />
       </div>
     </div>
   );
