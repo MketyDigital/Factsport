@@ -4,15 +4,13 @@ export const revalidate = 3;
 import { createClient } from '@supabase/supabase-js'; 
 import Link from 'next/link';
 import { Metadata } from 'next';
-// 🟢 FIX: Added 'MessageCircle' to the import list!
 import { Video, Mic, Calendar, ChevronLeft, Radio, Trophy, Activity, PlayCircle, ArrowRight, MessageCircle } from 'lucide-react';
 import LiveScoreLabel from '@/app/components/LiveScoreLabel'; 
 import BettingPromo from '@/app/components/BettingPromo';
-import AutoRefresh from '@/app/components/AutoRefresh'; 
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 import FactSportMediaRoom from '@/app/components/FactSportMediaRoom'; 
-import FanZoneChat from '@/app/components/FanZoneChat'; // 🟢 NEW: Imported the Chat Component
+import FanZoneChat from '@/app/components/FanZoneChat'; 
 
 export const metadata: Metadata = {
     title: 'Live Football Scores, Video & Audio Broadcasts | FactSport',
@@ -41,9 +39,11 @@ export default async function LiveMediaPage() {
 
   const safeMatches = matches || [];
   const coveredMatches = safeMatches.filter(m => m.livestream_url || m.audio_url);
+  
+  // 🟢 FIXED: Now includes SCHEDULED matches so they sit on the page waiting to wake up!
   const liveUncoveredMatches = safeMatches.filter(m => 
     !m.livestream_url && !m.audio_url && 
-    ['LIVE','IN_PLAY','1H','2H','HT'].includes(m.status)
+    ['LIVE','IN_PLAY','1H','2H','HT','SCHEDULED','PRE'].includes(m.status) 
   );
 
   const nextUpcomingMatch = safeMatches.find(m => new Date(m.match_date) > new Date());
@@ -74,8 +74,6 @@ export default async function LiveMediaPage() {
     <div className="min-h-screen bg-[#0a1428] pb-20 font-sans text-white selection:bg-red-500">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       
-      <AutoRefresh interval={60000} />
-      
       <div className="bg-[#0f1c3a] border-b border-white/10 text-white p-4 sticky top-0 z-50 shadow-2xl flex items-center gap-4 backdrop-blur-lg">
           <Link href="/" className="p-1.5 bg-white/5 rounded-full hover:bg-white/10 transition border border-white/5"><ChevronLeft size={20} /></Link>
           <div>
@@ -86,7 +84,6 @@ export default async function LiveMediaPage() {
           </div>
       </div>
 
-      {/* 🟢 EXPANDED MAX-WIDTH: Changed max-w-5xl to max-w-7xl to accommodate the side-by-side chat layout */}
       <div className="p-4 space-y-8 max-w-7xl mx-auto mt-4">
         <AdsterraStandardBanner />
 
@@ -94,11 +91,11 @@ export default async function LiveMediaPage() {
             <BettingPromo affiliateLink={null} />
         </div>
 
-        {/* 🟢 THE GLOBAL STUDIO + FAN ZONE CHAT LAYOUT */}
+        {/* THE GLOBAL STUDIO + FAN ZONE CHAT LAYOUT */}
         {isStudioActive && globalMediaUrl && (
             <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 
-                {/* LEFT SIDE: The Media Player (Takes up 2/3 of the screen on desktop) */}
+                {/* LEFT SIDE: The Media Player */}
                 <div className="lg:col-span-2 flex flex-col h-full">
                     <FactSportMediaRoom 
                         matchId="global-goal-rush" 
@@ -107,10 +104,9 @@ export default async function LiveMediaPage() {
                     />
                 </div>
 
-                {/* RIGHT SIDE: The Studio Chat (Takes up 1/3 of the screen on desktop) */}
+                {/* RIGHT SIDE: The Studio Chat */}
                 <div className="lg:col-span-1 bg-white rounded-2xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.5)] border border-slate-700 flex flex-col h-full max-h-[600px] lg:max-h-none">
                      
-                     {/* Custom Chat Header */}
                      <div className="bg-[#0a1428] p-3.5 border-b border-slate-800 flex items-center justify-between shrink-0 shadow-md relative z-10">
                          <div className="flex items-center gap-2.5">
                              <div className="w-8 h-8 bg-blue-600/20 rounded-full flex items-center justify-center border border-blue-500/30">
@@ -127,7 +123,6 @@ export default async function LiveMediaPage() {
                          </span>
                      </div>
 
-                     {/* The Chat Component (Assigned to the global studio ID) */}
                      <div className="flex-1 overflow-hidden relative">
                          <FanZoneChat matchId="global-goal-rush" />
                      </div>
@@ -220,14 +215,13 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
                              <Trophy size={10} className="text-slate-500"/>
                              {match.league || 'Competition'}
                          </div>
-                         <div className="shrink-0">
-                             <LiveScoreLabel matchId={match.id} espnId={match.espn_id} initialStatus={match.status} variant="badge" />
-                         </div>
+                         {/* 🟢 TOP RIGHT BADGE DELETED TO PREVENT MULTI-POLLING BOMB */}
                     </div>
                     
                     <div className="flex items-center justify-between p-3 md:p-4">
                         <div className="flex-1 text-right text-xs md:text-sm font-black text-white truncate pr-3">{match.home_team}</div>
                         <div className="shrink-0 flex justify-center w-16">
+                            {/* 🟢 THE SINGLE, HIGHLY-OPTIMIZED LIVE SCORE FETCHER */}
                             <LiveScoreLabel 
                                 matchId={match.id} 
                                 espnId={match.espn_id}
@@ -254,18 +248,12 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
                      <Trophy size={10} className="text-yellow-500"/>
                      {match.league || 'Competition'}
                  </div>
-                 <div className="shrink-0 drop-shadow-md">
-                     <LiveScoreLabel 
-                        matchId={match.id} 
-                        espnId={match.espn_id}
-                        initialStatus={match.status} 
-                        variant="badge" 
-                     />
-                 </div>
+                 {/* 🟢 TOP RIGHT BADGE DELETED TO PREVENT MULTI-POLLING BOMB */}
             </div>
 
             <Link href={`/match/${match.id}`} className="block p-5 flex-1 hover:bg-white/5 transition-colors group">
                 
+                {/* 🟢 THE SINGLE, HIGHLY-OPTIMIZED LIVE SCORE FETCHER */}
                 <LiveScoreLabel 
                     matchId={match.id} 
                     espnId={match.espn_id}

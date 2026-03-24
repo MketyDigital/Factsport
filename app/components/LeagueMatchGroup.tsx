@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Calendar, Zap, Ticket, ExternalLink, BarChart2, ChevronRight, Clock, CheckCircle, Trophy } from 'lucide-react';
 import MatchTime from '@/app/components/MatchTime';
+import { useSmartInterval } from '@/app/hooks/useSmartInterval';
 
 const groupByDate = (matchList: any[]) => {
     const groups: { [date: string]: any[] } = {};
@@ -31,74 +32,48 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
         });
     }, [matches]);
 
-    // 🟢 HUGE OPTIMIZATION: ONLY poll active matches + HEARTBEAT RESTORED
-    useEffect(() => {
-        let isMounted = true;
-        let timeoutId: NodeJS.Timeout;
+    const activeLiveMatches = liveMatches.filter(m => 
+        ['LIVE', 'IN_PLAY', 'HT', '1H', '2H', 'ET', 'P'].includes((m.status || '').toUpperCase()) && m.espn_id
+    );
 
-        const fetchUpdates = async () => {
-            if (!isMounted) return;
+    const fetchUpdates = async () => {
+        if (isFetching.current || activeLiveMatches.length === 0) return;
 
-            // Only grab matches that are actually live and have an ESPN ID
-            const activeLiveMatches = liveMatches.filter(m => 
-                ['LIVE', 'IN_PLAY', 'HT', '1H', '2H', 'ET', 'P'].includes((m.status || '').toUpperCase()) && m.espn_id
-            );
-
-            // If no games are playing, schedule a slower 30-second heartbeat and exit early.
-            if (activeLiveMatches.length === 0) {
-                if (isMounted) timeoutId = setTimeout(fetchUpdates, 30000);
-                return;
-            }
-
-            // 🟢 HEARTBEAT FIX: Only fetch if visible, but NEVER 'return' here!
-            if (document.visibilityState === 'visible' && !isFetching.current) {
-                isFetching.current = true;
+        isFetching.current = true;
+        try {
+            const updatePromises = activeLiveMatches.map(async (m) => {
                 try {
-                    // Fetch updates for the live matches concurrently
-                    const updatePromises = activeLiveMatches.map(async (m) => {
-                        try {
-                            const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${m.espn_id}&t=${Date.now()}`);
-                            if (res.ok) {
-                                const data = await res.json();
-                                if (!data.error) return { id: m.id, status: data.status, home_score: data.home_score, away_score: data.away_score };
-                            }
-                        } catch (e) {}
-                        return null;
-                    });
+                    const res = await fetch(`https://live-api.factsport.com/?espn_id=${m.espn_id}&t=${Date.now()}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (!data.error) return { id: m.id, status: data.status, home_score: data.home_score, away_score: data.away_score, displayClock: data.displayClock };
+                    }
+                } catch (e) {}
+                return null;
+            });
 
-                    const results = await Promise.all(updatePromises);
-                    
-                    let hasChanges = false;
-                    const newLiveMatches = liveMatches.map(m => {
-                        const update = results.find(r => r && r.id === m.id);
-                        if (update && (update.status !== m.status || update.home_score !== m.home_score || update.away_score !== m.away_score)) {
-                            hasChanges = true;
-                            return { ...m, status: update.status, home_score: update.home_score, away_score: update.away_score };
-                        }
-                        return m;
-                    });
-
-                    if (hasChanges && isMounted) setLiveMatches(newLiveMatches);
-
-                } catch(e) { } 
-                finally {
-                    isFetching.current = false;
+            const results = await Promise.all(updatePromises);
+            
+            let hasChanges = false;
+            const newLiveMatches = liveMatches.map(m => {
+                const update = results.find(r => r && r.id === m.id);
+                if (update && (update.status !== m.status || update.home_score !== m.home_score || update.away_score !== m.away_score || update.displayClock !== m.displayClock)) {
+                    hasChanges = true;
+                    return { ...m, status: update.status, home_score: update.home_score, away_score: update.away_score, displayClock: update.displayClock };
                 }
-            }
+                return m;
+            });
 
-            // 🟢 THE HEARTBEAT: Schedules the next active check (8 seconds is best for multiple matches)
-            if (isMounted) {
-                timeoutId = setTimeout(fetchUpdates, 8000); 
-            }
-        };
+            if (hasChanges) setLiveMatches(newLiveMatches);
 
-        fetchUpdates();
+        } catch(e) { } 
+        finally {
+            isFetching.current = false;
+        }
+    };
 
-        return () => {
-            isMounted = false;
-            clearTimeout(timeoutId);
-        };
-    }, [liveMatches]);
+    useEffect(() => { fetchUpdates(); }, []);
+    useSmartInterval(fetchUpdates, activeLiveMatches.length > 0 ? 8000 : null);
 
     const fixtures = liveMatches
         .filter(m => !['FT', 'FINISHED', 'ABD'].includes(m.status))
@@ -202,7 +177,7 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                             {isLive ? (
                                                 <div className="flex flex-col items-center">
                                                     <span className="animate-pulse text-red-600 font-black text-[10px] bg-red-50 px-2 py-0.5 rounded border border-red-100">LIVE</span>
-                                                    <span className="text-[9px] text-red-500 font-bold mt-1">{match.status === 'HT' ? 'HT' : 'On Going'}</span>
+                                                    <span className="text-[9px] text-red-500 font-bold mt-1">{match.status === 'HT' ? 'HT' : match.displayClock || 'On Going'}</span>
                                                 </div>
                                             ) : isFinished ? (
                                                 <div className="flex flex-col items-center">

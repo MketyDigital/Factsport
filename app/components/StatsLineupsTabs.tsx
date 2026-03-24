@@ -1,113 +1,19 @@
 'use client';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState } from 'react';
 import { BarChart2, Users } from 'lucide-react';
 import PitchLineup from './PitchLineup';
 import MatchTimeline from './MatchTimeline';
 import PlayerRatingsWidget from './PlayerRatingsWidget';
+import { useMatchLive } from '@/app/providers/MatchLiveProvider';
 
-const getSafeEvents = (dataEvs: any, initialEvs: any, dbEvs: any) => {
-    let raw = dataEvs || initialEvs || dbEvs || [];
-    if (typeof raw === 'string') {
-        try { raw = JSON.parse(raw); } catch(e) { raw = []; }
-    }
-    return Array.isArray(raw) ? raw : [];
-};
-
-export default function StatsLineupsTabs({ matchId, initialData, dbData }: { matchId: string, initialData: any, dbData?: any }) {
+export default function StatsLineupsTabs({ matchId, dbData }: { matchId: string, dbData?: any }) {
   const [activeTab, setActiveTab] = useState<'stats' | 'lineups'>('stats');
 
-  const [liveData, setLiveData] = useState({
-      stats: initialData?.stats || { home: {}, away: {} },
-      lineups: initialData?.lineups || { home: [], away: [], formations: { home: null, away: null } },
-      rawEvents: initialData?.events || initialData?.match_events || dbData?.match_events || []
-  });
-  
-  const hasFetchedLive = useRef(false);
-  const isFetching = useRef(false);
+  const liveData = useMatchLive();
 
-  useEffect(() => {
-      if (!hasFetchedLive.current) {
-          setLiveData({
-              stats: initialData?.stats || { home: {}, away: {} },
-              lineups: initialData?.lineups || { home: [], away: [], formations: { home: null, away: null } },
-              rawEvents: initialData?.events || initialData?.match_events || dbData?.match_events || []
-          });
-      }
-  }, [initialData, dbData]);
-
-  useEffect(() => {
-    let isMounted = true;
-    let timeoutId: NodeJS.Timeout;
-
-    const isFinishedInitially = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(initialData?.status);
-    if (isFinishedInitially || !initialData?.espn_id) return;
-
-    const fetchStatsData = async () => {
-      if (!isMounted) return; 
-
-      let matchFinished = false;
-
-      // 🟢 HEARTBEAT FIX: Bypasses fetching when hidden, but keeps scheduling the next loop!
-      if (document.visibilityState === 'visible' && !isFetching.current) {
-          isFetching.current = true;
-          try {
-              let res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${initialData.espn_id}&t=${Date.now()}`);
-              
-              if (res.ok) {
-                  const payload = await res.json();
-                  if (payload && !payload.error && isMounted) {
-                      hasFetchedLive.current = true;
-                      
-                      setLiveData(prev => {
-                          const oldHomePoss = prev.stats?.home?.possession;
-                          const newHomePoss = payload.stats?.home?.possession;
-                          const oldEventsLen = (prev.rawEvents || []).length;
-                          const newEventsLen = (payload.events || payload.match_events || []).length;
-                          const oldStatus = prev.stats?.status;
-                          const newStatus = payload.stats?.status;
-
-                          const oldLineupsStr = JSON.stringify(prev.lineups || {});
-                          const newLineupsStr = JSON.stringify(payload.lineups || {});
-                          const lineupsChanged = oldLineupsStr !== newLineupsStr;
-
-                          if (oldHomePoss === newHomePoss && oldEventsLen === newEventsLen && oldStatus === newStatus && !lineupsChanged) {
-                              return prev; 
-                          }
-
-                          return {
-                              stats: payload.stats || prev.stats,
-                              lineups: lineupsChanged ? payload.lineups : prev.lineups, 
-                              rawEvents: payload.events || payload.match_events || prev.rawEvents 
-                          };
-                      });
-
-                      if (['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(payload.status)) {
-                          matchFinished = true; // Match is over, we can finally stop polling.
-                      }
-                  }
-              }
-          } catch (error) {
-          } finally {
-              isFetching.current = false;
-          }
-      }
-      
-      // 🟢 THE HEARTBEAT: Re-fires every 8 seconds until the game is FT.
-      if (isMounted && !matchFinished) {
-          timeoutId = setTimeout(fetchStatsData, 8000); 
-      }
-    };
-
-    fetchStatsData();
-
-    return () => {
-        isMounted = false;
-        clearTimeout(timeoutId);
-    };
-  }, [initialData?.status, initialData?.espn_id]);
-
-  const { stats, lineups, rawEvents } = liveData;
-  const events = useMemo(() => getSafeEvents(rawEvents, null, null), [rawEvents]);
+  const stats = liveData?.stats || { home: {}, away: {} };
+  const lineups = liveData?.lineups || { home: [], away: [], formations: { home: null, away: null } };
+  const events = liveData?.match_events || liveData?.events || [];
 
   const getSafeShots = (teamStats: any) => {
       if (!teamStats) return '0';
@@ -149,9 +55,9 @@ export default function StatsLineupsTabs({ matchId, initialData, dbData }: { mat
         )}
         {activeTab === 'lineups' && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 -m-4">
-                <PitchLineup data={{ lineups: liveData.lineups }} dbData={dbData} />
+                <PitchLineup data={{ lineups: lineups }} dbData={dbData} />
                 <div className="p-4 bg-white border-t border-slate-100">
-                    <PlayerRatingsWidget matchId={matchId} lineups={liveData.lineups} status={liveData.stats?.status || initialData?.status} />
+                    <PlayerRatingsWidget matchId={matchId} lineups={lineups} status={liveData?.status} />
                 </div>
             </div>
         )}

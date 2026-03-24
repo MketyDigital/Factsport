@@ -7,10 +7,15 @@ import ProBettingSlipLock from '@/app/components/ProBettingSlipLock';
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import LiveStandings from '@/app/components/LiveStandings';
 import WinProbability from '@/app/components/WinProbability';
-import MOTMVoteWidget from '@/app/components/MOTMVoteWidget'; // 🟢 NEW IMPORT
+import MOTMVoteWidget from '@/app/components/MOTMVoteWidget'; 
+// 🟢 PULLS FROM THE SINGLE SOURCE OF TRUTH
+import { useMatchLive } from '@/app/providers/MatchLiveProvider';
 
-export default function MatchMobileHub({ matchId, espnId, currentUser, initialData, dbData }: any) {
+export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
     const [activeTab, setActiveTab] = useState<'chat' | 'stats' | 'pro' | 'table'>('chat');
+    
+    // 🟢 ALL FETCHING IS GONE. It just listens to the context!
+    const liveData = useMatchLive();
 
     const scrollToSection = (id: string) => {
         const element = document.getElementById(id);
@@ -23,7 +28,7 @@ export default function MatchMobileHub({ matchId, espnId, currentUser, initialDa
     return (
         <div className="w-full flex flex-col bg-white shadow-md md:rounded-2xl overflow-hidden mb-4 border border-slate-200">
             
-            <WinProbability predictor={initialData?.predictor} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
+            <WinProbability predictor={liveData?.predictor} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
 
             <div className="flex overflow-x-auto scrollbar-hide border-b border-slate-200 bg-white sticky top-0 z-40 shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
                 <button onClick={() => setActiveTab('chat')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'chat' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
@@ -48,21 +53,20 @@ export default function MatchMobileHub({ matchId, espnId, currentUser, initialDa
                     <AdsterraStandardBanner />
                 </div>
                 
-                {/* 🟢 FAN ZONE TAB NOW HAS THE MOTM WIDGET! */}
                 {activeTab === 'chat' && (
                     <div className="p-2 md:p-4 bg-white flex flex-col h-full">
-                        <MOTMVoteWidget matchId={matchId} lineups={initialData?.lineups} />
+                        <MOTMVoteWidget matchId={matchId} lineups={liveData?.lineups} />
                         <FanZoneChat matchId={matchId} espnId={espnId} />
                     </div>
                 )}
                 
-                {activeTab === 'stats' && <div className="p-2 md:p-4 bg-white"><StatsLineupsTabs matchId={matchId} initialData={initialData} dbData={dbData} /></div>}
+                {activeTab === 'stats' && <div className="p-2 md:p-4 bg-white"><StatsLineupsTabs matchId={matchId} dbData={dbData} /></div>}
                 
                 {activeTab === 'table' && (
                     <div className="p-2 md:p-4 bg-white">
                         <LiveStandings 
                             leagueName={dbData.league} homeTeam={dbData.home_team} awayTeam={dbData.away_team} 
-                            homeScore={initialData.home_score} awayScore={initialData.away_score} status={initialData.status} 
+                            homeScore={liveData?.home_score} awayScore={liveData?.away_score} status={liveData?.status} 
                         />
                     </div>
                 )}
