@@ -122,7 +122,7 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
 
         return (
             <div className="w-full">
-                <div className="flex overflow-x-auto scrollbar-hide bg-white border-b border-slate-200 sticky top-[56px] md:top-[60px] z-40 shadow-sm scroll-smooth">
+                <div className="flex overflow-x-auto scrollbar-hide bg-white border-b border-slate-200 sticky top-[52px] md:top-[60px] z-40 shadow-sm scroll-smooth">
                     {dateStrip.map(d => {
                         const isActive = selectedDate === d.val;
                         return (
@@ -173,81 +173,89 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         );
     };
 
-    // --- 2. THE GLOBAL LATEST RESULTS VIEW (Modified exactly as requested) ---
+    // --- 2. THE GLOBAL LATEST RESULTS VIEW (Grouped by League -> Date snapshot) ---
     const renderGlobalResultsView = () => {
         const finishedMatches = liveMatches
             .filter(m => FINISHED_STATUSES.includes((m.status || '').toUpperCase()))
             .sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
 
-        // 🟢 Get the last 3 distinct dates (e.g. "The Last Weekend Snapshot")
-        const uniqueDates = Array.from(new Set(finishedMatches.map(m => m.match_date.split('T')[0]))).slice(0, 3);
+        // 🟢 Group by League First
+        const groupedByLeague: Record<string, any[]> = {};
+        finishedMatches.forEach(m => {
+            if (!groupedByLeague[m.league]) groupedByLeague[m.league] = [];
+            // Cap at 10 matches per league to keep it a concise snapshot
+            if (groupedByLeague[m.league].length < 10) {
+                groupedByLeague[m.league].push(m);
+            }
+        });
+
+        const sortedLeagues = Object.keys(groupedByLeague).sort((a, b) => {
+            const idxA = PRIORITY_LEAGUES.indexOf(a);
+            const idxB = PRIORITY_LEAGUES.indexOf(b);
+            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+            if (idxA !== -1) return -1;
+            if (idxB !== -1) return 1;
+            return a.localeCompare(b);
+        });
 
         return (
-            <div className="w-full p-2 md:p-3 max-w-4xl mx-auto min-h-[600px] space-y-6">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-2">
+            <div className="w-full p-2 md:p-3 max-w-4xl mx-auto min-h-[600px] space-y-4">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-2 mt-2">
                     <div className="bg-slate-50 p-3 md:p-4 flex items-center gap-2">
                         <History className="text-green-600" size={18} />
                         <h2 className="font-black text-sm md:text-base uppercase text-slate-800 tracking-wider">Latest Global Results</h2>
                     </div>
                 </div>
 
-                {uniqueDates.length === 0 ? (
+                {sortedLeagues.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-dashed border-slate-200 shadow-sm text-slate-400">
                         <History size={32} className="mb-2 opacity-30"/>
                         <p className="text-xs font-bold uppercase tracking-widest text-slate-500">No recent results found.</p>
                     </div>
                 ) : (
-                    uniqueDates.map(dateStr => {
-                        const dateMatches = finishedMatches.filter(m => m.match_date.split('T')[0] === dateStr);
-                        const dateLabel = new Date(dateStr).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
-                        
-                        // Group by League inside this date
-                        const groupedByLeague: Record<string, any[]> = {};
-                        dateMatches.forEach(m => { if (!groupedByLeague[m.league]) groupedByLeague[m.league] = []; groupedByLeague[m.league].push(m); });
-                        
-                        const sortedLeagues = Object.keys(groupedByLeague).sort((a, b) => {
-                            const idxA = PRIORITY_LEAGUES.indexOf(a);
-                            const idxB = PRIORITY_LEAGUES.indexOf(b);
-                            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-                            if (idxA !== -1) return -1;
-                            if (idxB !== -1) return 1;
-                            return a.localeCompare(b);
+                    sortedLeagues.map(league => {
+                        const groupKey = `global-res-${league}`;
+                        const isCollapsed = collapsedLeagues[groupKey];
+                        const leagueMatches = groupedByLeague[league];
+
+                        // 🟢 Inside the League, group by Date for the subheaders
+                        const matchesByDate: Record<string, any[]> = {};
+                        leagueMatches.forEach(m => {
+                            const dateLabel = new Date(m.match_date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+                            if (!matchesByDate[dateLabel]) matchesByDate[dateLabel] = [];
+                            matchesByDate[dateLabel].push(m);
                         });
 
                         return (
-                            <div key={dateStr} className="space-y-3">
-                                <div className="flex items-center gap-2 pl-2 mt-8 first:mt-2">
-                                    <CalendarIcon size={14} className="text-slate-400"/>
-                                    <h3 className="font-black text-xs uppercase tracking-widest text-slate-600">{dateLabel}</h3>
+                            <div key={groupKey} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-all">
+                                <div className="w-full flex items-center justify-between bg-slate-50 hover:bg-slate-100 transition-colors px-3 py-2.5 border-b border-slate-200">
+                                    <button onClick={() => setCollapsedLeagues(prev => ({ ...prev, [groupKey]: !prev[groupKey] }))} className="flex-1 flex items-center gap-2 overflow-hidden text-left">
+                                        <Trophy size={14} className="text-slate-400 shrink-0" />
+                                        <span className="font-black text-[11px] md:text-xs uppercase tracking-widest text-slate-700 truncate">{league}</span>
+                                        <span className="bg-slate-200 text-slate-600 text-[9px] font-black px-1.5 py-0.5 rounded ml-1">{leagueMatches.length}</span>
+                                        <ChevronDown className={`text-slate-400 transition-transform duration-300 ml-auto mr-2 ${isCollapsed ? '-rotate-90' : ''}`} size={16} />
+                                    </button>
+                                    <Link href={`/standings?league=${encodeURIComponent(league)}`} title="View Table" className="p-1.5 bg-white border border-slate-200 text-slate-500 hover:text-blue-600 rounded shadow-sm transition">
+                                        <BarChart2 size={12} />
+                                    </Link>
                                 </div>
                                 
-                                {sortedLeagues.map(league => {
-                                    const groupKey = `res-${dateStr}-${league}`;
-                                    const isCollapsed = collapsedLeagues[groupKey];
-                                    const leagueMatches = groupedByLeague[league];
-                                    
-                                    return (
-                                        <div key={groupKey} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-all">
-                                            <div className="w-full flex items-center justify-between bg-slate-50 hover:bg-slate-100 transition-colors px-3 py-2.5 border-b border-slate-200">
-                                                <button onClick={() => setCollapsedLeagues(prev => ({ ...prev, [groupKey]: !prev[groupKey] }))} className="flex-1 flex items-center gap-2 overflow-hidden text-left">
-                                                    <Trophy size={14} className="text-slate-400 shrink-0" />
-                                                    <span className="font-black text-[11px] md:text-xs uppercase tracking-widest text-slate-700 truncate">{league}</span>
-                                                    <span className="bg-slate-200 text-slate-600 text-[9px] font-black px-1.5 py-0.5 rounded ml-1">{leagueMatches.length}</span>
-                                                    <ChevronDown className={`text-slate-400 transition-transform duration-300 ml-auto mr-2 ${isCollapsed ? '-rotate-90' : ''}`} size={16} />
-                                                </button>
-                                                <Link href={`/standings?league=${encodeURIComponent(league)}`} title="View Table" className="p-1.5 bg-white border border-slate-200 text-slate-500 hover:text-blue-600 rounded shadow-sm transition">
-                                                    <BarChart2 size={12} />
-                                                </Link>
+                                <div className={`transition-all duration-300 ease-in-out ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[5000px] opacity-100'}`}>
+                                    {Object.keys(matchesByDate).map(dateLabel => (
+                                        <div key={dateLabel}>
+                                            {/* Date Subheader inside the accordion */}
+                                            <div className="bg-slate-100/80 backdrop-blur-sm px-4 py-1.5 border-b border-slate-50 flex items-center gap-1.5">
+                                                <CalendarIcon size={10} className="text-slate-400"/>
+                                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{dateLabel}</span>
                                             </div>
-                                            
-                                            <div className={`transition-all duration-300 ease-in-out ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[5000px] opacity-100'}`}>
-                                                <div className="flex flex-col">
-                                                    {leagueMatches.map(m => <CompactMatchRow key={m.id} match={m} disablePolling={true} />)}
-                                                </div>
+                                            <div className="flex flex-col bg-white">
+                                                {matchesByDate[dateLabel].map(m => (
+                                                    <CompactMatchRow key={m.id} match={m} disablePolling={true} />
+                                                ))}
                                             </div>
                                         </div>
-                                    );
-                                })}
+                                    ))}
+                                </div>
                             </div>
                         );
                     })
@@ -305,7 +313,7 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                         ) : (
                             Object.keys(groupedData).map((dateKey) => (
                                 <div key={dateKey}>
-                                    <div className="bg-slate-100/80 backdrop-blur-sm px-4 py-1.5 border-b border-slate-50 sticky top-[56px] md:top-[60px] z-10 flex items-center gap-1.5">
+                                    <div className="bg-slate-100/80 backdrop-blur-sm px-4 py-1.5 border-b border-slate-50 sticky top-[52px] md:top-[60px] z-10 flex items-center gap-1.5">
                                         <Clock size={12} className="text-slate-400"/>
                                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{dateKey}</span>
                                     </div>
@@ -362,14 +370,14 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                 </div>
             </aside>
 
-            {/* 🟢 MOBILE LEAGUE NAVIGATOR */}
-            <div className="md:hidden w-full bg-white border-b border-slate-200 sticky top-[56px] z-40 shadow-sm overflow-x-auto scrollbar-hide py-2">
-                <div className="flex px-3 space-x-2 min-w-max items-center">
-                    <button onClick={() => handleLeagueSelect('All')} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${selectedLeague === 'All' ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>All Matches</button>
-                    <button onClick={() => handleLeagueSelect('Results')} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border flex items-center gap-1.5 ${selectedLeague === 'Results' ? 'bg-green-600 border-green-600 text-white shadow-md' : 'bg-green-50 border-green-200 text-green-700'}`}><CheckCircle size={12}/> Results</button>
-                    <div className="w-[1px] h-6 bg-slate-200 mx-1"></div>
+            {/* 🟢 COMPACT MOBILE LEAGUE NAVIGATOR */}
+            <div className="md:hidden w-full bg-white border-b border-slate-200 sticky top-[52px] z-40 shadow-sm overflow-x-auto scrollbar-hide py-1.5">
+                <div className="flex px-2 space-x-1.5 min-w-max items-center">
+                    <button onClick={() => handleLeagueSelect('All')} className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${selectedLeague === 'All' ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>All Matches</button>
+                    <button onClick={() => handleLeagueSelect('Results')} className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border flex items-center gap-1 ${selectedLeague === 'Results' ? 'bg-green-600 border-green-600 text-white shadow-md' : 'bg-green-50 border-green-200 text-green-700'}`}><CheckCircle size={10}/> Results</button>
+                    <div className="w-[1px] h-5 bg-slate-200 mx-0.5"></div>
                     {allLeagues.map((league) => (
-                        <button key={league} onClick={() => handleLeagueSelect(league)} className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all border ${selectedLeague === league ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>{league === 'Premier League' ? 'EPL' : league}</button>
+                        <button key={league} onClick={() => handleLeagueSelect(league)} className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wide transition-all border ${selectedLeague === league ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>{league === 'Premier League' ? 'EPL' : league}</button>
                     ))}
                 </div>
             </div>
