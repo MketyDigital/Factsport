@@ -15,7 +15,7 @@ const TRUSTED_CHANNELS = [
     'UC6GLKMOGjwKNqXCXbf-Ryyw', 'UCrCChz8uQ1H7L1S2k1H4X5Q', 
     'UCb1G_d8o4rRk3wB0n6Z3mDQ', 'UCG5qGWdu8nIRZqJ_GgXQAWg', 
     'UC0IGBdOVni-jzSQpAMGQhCw', 'UCpcTrCXblq78GZrTUTLWeBw', 
-    'UCqZQlzSHbVJrwrn5XvzrzcA'
+    'UCqZQlzSHbVJrwrn5XvzrzcA', 'UCwu87p766uwEyzG1p8dEMlg'.
 ];
 
 export async function GET(req: Request) {
