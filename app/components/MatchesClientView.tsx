@@ -1,6 +1,6 @@
 'use client';
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ChevronDown, Search, X, Calendar as CalendarIcon, Trophy, CheckCircle, BarChart2, RefreshCcw, LayoutGrid, Clock } from 'lucide-react';
+import { ChevronDown, Search, X, Calendar as CalendarIcon, Trophy, CheckCircle, BarChart2, RefreshCcw, LayoutGrid, Clock, History } from 'lucide-react';
 import Link from 'next/link';
 import CompactMatchRow from '@/app/components/CompactMatchRow';
 import { useSmartInterval } from '@/app/hooks/useSmartInterval';
@@ -11,13 +11,12 @@ const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET'
 
 export default function MatchesClientView({ initialMatches, teamFilter, teamFormArray }: { initialMatches: any[], teamFilter?: string | null, teamFormArray?: string[] }) {
     const [liveMatches, setLiveMatches] = useState(initialMatches);
-    const [selectedLeague, setSelectedLeague] = useState<string>('All');
+    const [selectedLeague, setSelectedLeague] = useState<string>('All'); // Can be 'All', 'Results', or 'LeagueName'
     const [activeTab, setActiveTab] = useState<'fixtures' | 'results'>('fixtures');
-    const [visibleCount, setVisibleCount] = useState(10);
+    const [visibleCount, setVisibleCount] = useState(15);
     const [collapsedLeagues, setCollapsedLeagues] = useState<Record<string, boolean>>({});
     const isFetching = useRef(false);
 
-    // 🟢 SMART AUTO-DATE SELECTION: Never lands on an empty day
     const [selectedDate, setSelectedDate] = useState(() => {
         const todayStr = new Date().toISOString().split('T')[0];
         const matchesByDate = new Set(initialMatches.map(m => m.match_date.split('T')[0]));
@@ -25,7 +24,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         if (matchesByDate.has(todayStr)) return todayStr;
         if (matchesByDate.size === 0) return todayStr;
 
-        // Find the closest future date, or fallback to closest past date
         const availableDates = Array.from(matchesByDate).sort();
         const todayTime = new Date(todayStr).getTime();
         
@@ -34,7 +32,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
 
         availableDates.forEach(d => {
             const diff = new Date(d).getTime() - todayTime;
-            // Prefer future dates
             if (diff >= 0 && diff < smallestDiff) {
                 smallestDiff = diff;
                 closestDate = d;
@@ -44,7 +41,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         return closestDate;
     });
 
-    // 🟢 15-Day Calendar Strip
     const dateStrip = useMemo(() => {
         const dates = [];
         for (let i = -7; i <= 7; i++) {
@@ -70,7 +66,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         return [...priority, ...others];
     }, [initialMatches]);
 
-    // 🟢 BATCH POLLER
     const fetchUpdates = async () => {
         if (isFetching.current) return;
         const activeEspnIds = liveMatches.filter(m => ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'P'].includes((m.status || '').toUpperCase()) && m.espn_id).map(m => m.espn_id);
@@ -106,12 +101,11 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
     const handleLeagueSelect = (league: string) => {
         setSelectedLeague(league);
         setActiveTab('fixtures');
-        setVisibleCount(10);
+        setVisibleCount(15);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    // --- RENDER HELPERS ---
-
+    // --- 1. THE CALENDAR VIEW (Default "All Matches") ---
     const renderCalendarView = () => {
         const filtered = liveMatches.filter(m => m.match_date.split('T')[0] === selectedDate);
         const grouped: Record<string, any[]> = {};
@@ -179,6 +173,66 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         );
     };
 
+    // --- 2. THE GLOBAL LATEST RESULTS VIEW (The New Addition!) ---
+    const renderGlobalResultsView = () => {
+        const finishedMatches = liveMatches
+            .filter(m => FINISHED_STATUSES.includes((m.status || '').toUpperCase()))
+            .sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
+
+        const displayMatches = finishedMatches.slice(0, visibleCount);
+        const hasMore = visibleCount < finishedMatches.length;
+
+        const groupedData: Record<string, any[]> = {};
+        displayMatches.forEach(m => {
+            const dateKey = new Date(m.match_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+            if (!groupedData[dateKey]) groupedData[dateKey] = [];
+            groupedData[dateKey].push(m);
+        });
+
+        return (
+            <div className="w-full p-2 md:p-4 max-w-4xl mx-auto min-h-[600px]">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6 flex flex-col">
+                    <div className="bg-slate-50 border-b border-slate-200 p-3 md:p-4 flex items-center gap-2">
+                        <History className="text-green-600" size={18} />
+                        <h2 className="font-black text-sm md:text-base uppercase text-slate-800 tracking-wider">Latest Global Results</h2>
+                    </div>
+
+                    <div className="divide-y divide-slate-50 min-h-[200px] bg-slate-50/30">
+                        {displayMatches.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                                <History size={32} className="mb-2 opacity-30"/>
+                                <p className="text-xs font-bold uppercase tracking-widest text-slate-500">No recent results found.</p>
+                            </div>
+                        ) : (
+                            Object.keys(groupedData).map((dateKey) => (
+                                <div key={dateKey}>
+                                    <div className="bg-slate-100/80 backdrop-blur-sm px-4 py-1.5 border-b border-slate-50 sticky top-[56px] md:top-[60px] z-10 flex items-center gap-1.5">
+                                        <CheckCircle size={12} className="text-green-600"/>
+                                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{dateKey}</span>
+                                    </div>
+                                    <div className="flex flex-col bg-white">
+                                        {groupedData[dateKey].map((match) => (
+                                            <CompactMatchRow key={match.id} match={match} disablePolling={true} showLeague={true} />
+                                        ))}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {hasMore && (
+                        <div className="p-4 border-t border-slate-200 bg-slate-50">
+                            <button onClick={() => setVisibleCount(prev => prev + 15)} className="w-full bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-slate-600 font-black text-[10px] md:text-xs uppercase tracking-widest py-3 md:py-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
+                                <RefreshCcw size={14} className="text-blue-500" /> Load {Math.min(15, finishedMatches.length - visibleCount)} More Results
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    // --- 3. THE SPECIFIC LEAGUE VIEW ---
     const renderLeagueView = () => {
         const leagueMatches = liveMatches.filter(m => m.league === selectedLeague);
         const fixtures = leagueMatches.filter(m => !FINISHED_STATUSES.includes((m.status || '').toUpperCase())).sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
@@ -206,10 +260,10 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                     </div>
                     
                     <div className="flex px-2 md:px-4 gap-2 py-3 bg-slate-50 border-b border-slate-200">
-                        <button onClick={() => { setActiveTab('fixtures'); setVisibleCount(10); }} className={`flex-1 py-2 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'fixtures' ? 'bg-white shadow-sm text-blue-600 border border-slate-200' : 'text-slate-400 hover:bg-slate-100 border border-transparent'}`}>
+                        <button onClick={() => { setActiveTab('fixtures'); setVisibleCount(15); }} className={`flex-1 py-2 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'fixtures' ? 'bg-white shadow-sm text-blue-600 border border-slate-200' : 'text-slate-400 hover:bg-slate-100 border border-transparent'}`}>
                             <CalendarIcon size={14} /> Fixtures <span className={`px-1.5 rounded-full text-[9px] ${activeTab === 'fixtures' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{fixtures.length}</span>
                         </button>
-                        <button onClick={() => { setActiveTab('results'); setVisibleCount(10); }} className={`flex-1 py-2 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'results' ? 'bg-white shadow-sm text-blue-600 border border-slate-200' : 'text-slate-400 hover:bg-slate-100 border border-transparent'}`}>
+                        <button onClick={() => { setActiveTab('results'); setVisibleCount(15); }} className={`flex-1 py-2 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'results' ? 'bg-white shadow-sm text-blue-600 border border-slate-200' : 'text-slate-400 hover:bg-slate-100 border border-transparent'}`}>
                             <CheckCircle size={14} /> Results <span className={`px-1.5 rounded-full text-[9px] ${activeTab === 'results' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{results.length}</span>
                         </button>
                         <Link href={`/standings?league=${encodeURIComponent(selectedLeague)}`} className="flex-1 py-2 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg text-slate-400 hover:bg-slate-100 border border-transparent flex items-center justify-center gap-2 transition-all">
@@ -242,8 +296,8 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
 
                     {hasMore && (
                         <div className="p-4 border-t border-slate-200 bg-slate-50">
-                            <button onClick={() => setVisibleCount(prev => prev + 10)} className="w-full bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-slate-600 font-black text-[10px] md:text-xs uppercase tracking-widest py-3 md:py-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
-                                <RefreshCcw size={14} className="text-blue-500" /> Load {Math.min(10, activeList.length - visibleCount)} More {activeTab === 'fixtures' ? 'Fixtures' : 'Results'}
+                            <button onClick={() => setVisibleCount(prev => prev + 15)} className="w-full bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-slate-600 font-black text-[10px] md:text-xs uppercase tracking-widest py-3 md:py-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
+                                <RefreshCcw size={14} className="text-blue-500" /> Load {Math.min(15, activeList.length - visibleCount)} More {activeTab === 'fixtures' ? 'Fixtures' : 'Results'}
                             </button>
                         </div>
                     )}
@@ -260,9 +314,14 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
             <aside className="hidden md:flex flex-col w-[260px] lg:w-[280px] shrink-0 sticky top-[60px] h-[calc(100vh-60px)] overflow-y-auto border-r border-slate-200 bg-white shadow-[5px_0_15px_rgba(0,0,0,0.02)] z-30">
                 <div className="p-4 border-b border-slate-100 bg-slate-50">
                     <h3 className="font-black uppercase tracking-widest text-xs text-slate-500 flex items-center gap-2 mb-3"><LayoutGrid size={14} className="text-blue-500"/> Navigation</h3>
-                    <button onClick={() => handleLeagueSelect('All')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${selectedLeague === 'All' ? 'bg-blue-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>
-                        <CalendarIcon size={14} /> All Matches
-                    </button>
+                    <div className="space-y-2">
+                        <button onClick={() => handleLeagueSelect('All')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${selectedLeague === 'All' ? 'bg-blue-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>
+                            <CalendarIcon size={14} /> All Matches
+                        </button>
+                        <button onClick={() => handleLeagueSelect('Results')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${selectedLeague === 'Results' ? 'bg-green-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>
+                            <History size={14} /> Latest Results
+                        </button>
+                    </div>
                 </div>
                 
                 <div className="p-4">
@@ -280,8 +339,10 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
 
             {/* 🟢 MOBILE LEAGUE NAVIGATOR (Horizontal Scroll) */}
             <div className="md:hidden w-full bg-white border-b border-slate-200 sticky top-[56px] z-40 shadow-sm overflow-x-auto scrollbar-hide py-2">
-                <div className="flex px-3 space-x-2 min-w-max">
+                <div className="flex px-3 space-x-2 min-w-max items-center">
                     <button onClick={() => handleLeagueSelect('All')} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${selectedLeague === 'All' ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>All Matches</button>
+                    <button onClick={() => handleLeagueSelect('Results')} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border flex items-center gap-1.5 ${selectedLeague === 'Results' ? 'bg-green-600 border-green-600 text-white shadow-md' : 'bg-green-50 border-green-200 text-green-700'}`}><CheckCircle size={12}/> Results</button>
+                    <div className="w-[1px] h-6 bg-slate-200 mx-1"></div>
                     {allLeagues.map((league) => (
                         <button key={league} onClick={() => handleLeagueSelect(league)} className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all border ${selectedLeague === league ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>{league === 'Premier League' ? 'EPL' : league}</button>
                     ))}
@@ -309,11 +370,12 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                             </div>
                             <Link href="/matches" className="bg-white/20 hover:bg-white/30 p-1.5 rounded-full backdrop-blur-sm transition"><X size={16} /></Link>
                         </div>
-                        {/* If searching a team, just render the default calendar view since we have their specific matches */}
                         {renderCalendarView()}
                     </div>
                 ) : (
-                    selectedLeague === 'All' ? renderCalendarView() : renderLeagueView()
+                    selectedLeague === 'All' ? renderCalendarView() : 
+                    selectedLeague === 'Results' ? renderGlobalResultsView() : 
+                    renderLeagueView()
                 )}
             </main>
         </div>
