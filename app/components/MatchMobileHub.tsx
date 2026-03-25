@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MessageCircle, BarChart2, Zap, BrainCircuit, Table } from 'lucide-react';
 import FanZoneChat from '@/app/components/FanZoneChat';
 import StatsLineupsTabs from '@/app/components/StatsLineupsTabs';
@@ -8,14 +8,25 @@ import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import LiveStandings from '@/app/components/LiveStandings';
 import WinProbability from '@/app/components/WinProbability';
 import MOTMVoteWidget from '@/app/components/MOTMVoteWidget'; 
-// 🟢 PULLS FROM THE SINGLE SOURCE OF TRUTH
 import { useMatchLive } from '@/app/providers/MatchLiveProvider';
 
 export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
     const [activeTab, setActiveTab] = useState<'chat' | 'stats' | 'pro' | 'table'>('chat');
-    
-    // 🟢 ALL FETCHING IS GONE. It just listens to the context!
     const liveData = useMatchLive();
+
+    const currentStatus = (liveData?.status || '').toUpperCase();
+    const isFinished = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(currentStatus);
+    
+    const matchDateMs = new Date(dbData.match_date).getTime();
+    const minutesToKick = (matchDateMs - Date.now()) / 60000;
+    // 🟢 TRUE if match has been over for more than 4 hours (Garbage Collection Trigger)
+    const isUniversallyFinished = isFinished || minutesToKick < -240;
+
+    useEffect(() => {
+        if (isUniversallyFinished && (activeTab === 'table' || activeTab === 'pro')) {
+            setActiveTab('stats');
+        }
+    }, [isUniversallyFinished, activeTab]);
 
     const scrollToSection = (id: string) => {
         const element = document.getElementById(id);
@@ -37,15 +48,26 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
                 <button onClick={() => setActiveTab('stats')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'stats' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
                     <BarChart2 size={14} /> Stats & XI
                 </button>
-                <button onClick={() => setActiveTab('table')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'table' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
-                    <Table size={14} /> Table
-                </button>
-                <button onClick={() => setActiveTab('pro')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'pro' ? 'text-yellow-600 border-b-2 border-yellow-500 bg-yellow-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
-                    <BrainCircuit size={14} className={activeTab === 'pro' ? 'text-yellow-500' : ''}/> Pro Slip
-                </button>
-                <button onClick={() => scrollToSection('predictions')} className="flex-1 py-3 px-4 min-w-max text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 flex items-center justify-center gap-1.5 border-l border-slate-100">
-                    <Zap size={12} /> Predict
-                </button>
+                
+                {/* 🟢 Post-Match Purge: Destroy the Table tab */}
+                {!isUniversallyFinished && (
+                    <button onClick={() => setActiveTab('table')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'table' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
+                        <Table size={14} /> Table
+                    </button>
+                )}
+
+                {/* 🟢 Post-Match Purge: Destroy the Pro slip tab */}
+                {!isUniversallyFinished && (
+                    <button onClick={() => setActiveTab('pro')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'pro' ? 'text-yellow-600 border-b-2 border-yellow-500 bg-yellow-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
+                        <BrainCircuit size={14} className={activeTab === 'pro' ? 'text-yellow-500' : ''}/> Pro Slip
+                    </button>
+                )}
+
+                {!isUniversallyFinished && (
+                    <button onClick={() => scrollToSection('predictions')} className="flex-1 py-3 px-4 min-w-max text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 flex items-center justify-center gap-1.5 border-l border-slate-100">
+                        <Zap size={12} /> Predict
+                    </button>
+                )}
             </div>
 
             <div className="bg-[#F0F2F5] relative min-h-[300px]">
@@ -62,16 +84,13 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
                 
                 {activeTab === 'stats' && <div className="p-2 md:p-4 bg-white"><StatsLineupsTabs matchId={matchId} dbData={dbData} /></div>}
                 
-                {activeTab === 'table' && (
+                {!isUniversallyFinished && activeTab === 'table' && (
                     <div className="p-2 md:p-4 bg-white">
-                        <LiveStandings 
-                            leagueName={dbData.league} homeTeam={dbData.home_team} awayTeam={dbData.away_team} 
-                            homeScore={liveData?.home_score} awayScore={liveData?.away_score} status={liveData?.status} 
-                        />
+                        <LiveStandings leagueName={dbData.league} homeTeam={dbData.home_team} awayTeam={dbData.away_team} homeScore={liveData?.home_score} awayScore={liveData?.away_score} status={liveData?.status} />
                     </div>
                 )}
                 
-                {activeTab === 'pro' && <div className="p-3 md:p-6 bg-slate-900"><ProBettingSlipLock homeTeam={dbData.home_team} awayTeam={dbData.away_team} status={dbData.status} proAnalysis={dbData.pro_analysis} /></div>}
+                {!isUniversallyFinished && activeTab === 'pro' && <div className="p-3 md:p-6 bg-slate-900"><ProBettingSlipLock homeTeam={dbData.home_team} awayTeam={dbData.away_team} status={dbData.status} proAnalysis={dbData.pro_analysis} /></div>}
             </div>
         </div>
     );
