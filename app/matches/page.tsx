@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-export const revalidate = 5;
+export const revalidate = 5; // 🟢 ISR Cache: Protects database from traffic spikes
 
 import { createClient } from '@supabase/supabase-js'; 
 import Link from 'next/link';
@@ -18,26 +18,38 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
   const resolvedParams = await searchParams;
   const teamFilter = resolvedParams?.team || null; 
 
+  // 🟢 Server-side DB connection
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
    
-  const startDate = new Date(); startDate.setMonth(startDate.getMonth() - 4); 
-  const endDate = new Date(); endDate.setMonth(endDate.getMonth() + 4); 
-
-  let query = supabase.from('matches').select('*').order('match_date', { ascending: true }).limit(5000);
+  let query = supabase.from('matches').select('*').order('match_date', { ascending: true });
   
   if (teamFilter) {
-      const teamStart = new Date(); teamStart.setDate(teamStart.getDate() - 60);
-      const teamEnd = new Date(); teamEnd.setDate(teamEnd.getDate() + 60);
+      // 🟢 TEAM VIEW: Fetch a wide 4-month window, but ONLY for this specific team (Results in ~20-40 matches)
+      const teamStart = new Date(); teamStart.setMonth(teamStart.getMonth() - 2);
+      const teamEnd = new Date(); teamEnd.setMonth(teamEnd.getMonth() + 2);
       
       const queryFilter = getTeamQueryFilter(teamFilter);
-      query = query.gte('match_date', teamStart.toISOString()).lte('match_date', teamEnd.toISOString()).or(queryFilter);
+      query = query
+        .gte('match_date', teamStart.toISOString())
+        .lte('match_date', teamEnd.toISOString())
+        .or(queryFilter)
+        .limit(100); // Hard cap for safety
   } else {
-      query = query.gte('match_date', startDate.toISOString()).lte('match_date', endDate.toISOString());
+      // 🟢 GLOBAL VIEW: Strict 28-Day Window (-14 days to +14 days)
+      // This perfectly fuels the Calendar Strip while saving massive amounts of Mobile RAM
+      const globalStart = new Date(); globalStart.setDate(globalStart.getDate() - 14); 
+      const globalEnd = new Date(); globalEnd.setDate(globalEnd.getDate() + 14); 
+      
+      query = query
+        .gte('match_date', globalStart.toISOString())
+        .lte('match_date', globalEnd.toISOString())
+        .limit(1500); // Cap it just in case it's a crazy busy week
   }
 
   const { data: matches } = await query;
   const validMatches = matches || [];
 
+  // Fetch the 5-game form array if a team is searched
   let teamFormArray: string[] = [];
   if (teamFilter) {
       teamFormArray = await getTeamForm(teamFilter);
@@ -64,7 +76,7 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
             </div>
         </div>
 
-        {/* 🟢 THE ENGINE (Handles Desktop Sidebar & Mobile Nav) */}
+        {/* 🟢 THE ENGINE */}
         <MatchesClientView 
             initialMatches={validMatches} 
             teamFilter={teamFilter} 

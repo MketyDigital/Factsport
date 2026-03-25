@@ -1,6 +1,6 @@
 'use client';
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ChevronDown, Search, X, Calendar as CalendarIcon, Trophy, CheckCircle, BarChart2, RefreshCcw, LayoutGrid, Clock } from 'lucide-react';
+import { ChevronDown, Search, X, Calendar as CalendarIcon, Trophy, CheckCircle, BarChart2, RefreshCcw, LayoutGrid, Clock, History as HistoryIcon } from 'lucide-react';
 import Link from 'next/link';
 import CompactMatchRow from '@/app/components/CompactMatchRow';
 import { useSmartInterval } from '@/app/hooks/useSmartInterval';
@@ -9,7 +9,6 @@ import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 const PRIORITY_LEAGUES = ['Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Ligue 1', 'Champions League'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
-// 🟢 STRICT LOCAL TIMEZONE CONVERTER
 const getLocalYMD = (dateInput: string | Date | number) => {
     const d = new Date(dateInput);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -22,13 +21,16 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
     const [visibleCount, setVisibleCount] = useState(15);
     const [collapsedLeagues, setCollapsedLeagues] = useState<Record<string, boolean>>({});
     
+    // 🟢 LAZY LOADING STATES
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [dbDepleted, setDbDepleted] = useState({ fixtures: false, results: false });
+
     const isFetching = useRef(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => setIsMounted(true), []);
 
-    // 🟢 SMART DATE CALCULATOR
     const getSmartDate = (matches: any[]) => {
         const todayStr = getLocalYMD(new Date());
         const matchesByDate = new Set(matches.map(m => getLocalYMD(m.match_date)));
@@ -53,12 +55,12 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
 
     const [selectedDate, setSelectedDate] = useState(() => getSmartDate(initialMatches));
 
-    // 🟢 SYNC CLIENT STATE (Fixes Team Search 'X' button)
     const prevFilterRef = useRef(teamFilter);
     useEffect(() => {
         setLiveMatches(initialMatches);
         if (teamFilter !== prevFilterRef.current) {
             setVisibleCount(15);
+            setDbDepleted({ fixtures: false, results: false });
             if (!teamFilter) {
                 setSelectedLeague('All');
                 setSelectedDate(getSmartDate(initialMatches));
@@ -67,10 +69,8 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         }
     }, [initialMatches, teamFilter]);
 
-    // 🟢 BULLETPROOF AUTO-CENTERING DATE STRIP
     useEffect(() => {
         if (selectedLeague === 'All' && !teamFilter && isMounted) {
-            // A tiny delay ensures the browser has fully painted the horizontal layout before scrolling
             const timer = setTimeout(() => {
                 if (scrollContainerRef.current) {
                     const activeBtn = scrollContainerRef.current.querySelector('.active-date-btn') as HTMLElement;
@@ -144,8 +144,47 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         setSelectedLeague(league);
         setActiveTab('fixtures');
         setVisibleCount(15);
+        setDbDepleted({ fixtures: false, results: false });
         if (league === 'All') setSelectedDate(getSmartDate(liveMatches));
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // 🟢 THE API SHIELD HYDRATOR
+    const handleLoadMore = async (activeList: any[]) => {
+        if (visibleCount + 15 <= activeList.length) {
+            setVisibleCount(prev => prev + 15);
+            return;
+        }
+
+        setIsLoadingMore(true);
+        
+        try {
+            const edgeMatch = activeList[activeList.length - 1];
+            const cursorDate = edgeMatch ? edgeMatch.match_date : new Date().toISOString();
+            
+            // Call the secure, cached API route
+            const res = await fetch(`/api/matches?league=${encodeURIComponent(selectedLeague)}&type=${activeTab}&cursor=${encodeURIComponent(cursorDate)}`);
+            
+            if (res.ok) {
+                const fetchedData = await res.json();
+                
+                if (fetchedData.length > 0) {
+                    const newItems = fetchedData.filter((d: any) => !liveMatches.some((m: any) => m.id === d.id));
+                    if (newItems.length > 0) {
+                        setLiveMatches(prev => [...prev, ...newItems]);
+                    }
+                    setVisibleCount(prev => prev + 15);
+                }
+                
+                if (fetchedData.length < 15) {
+                    setDbDepleted(prev => ({ ...prev, [activeTab]: true }));
+                }
+            }
+        } catch(e) {
+            console.error("Failed to load more matches", e);
+        }
+        
+        setIsLoadingMore(false);
     };
 
     const renderCalendarView = () => {
@@ -236,7 +275,9 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         
         const activeList = activeTab === 'fixtures' ? fixtures : results;
         const displayMatches = activeList.slice(0, visibleCount);
-        const hasMore = visibleCount < activeList.length;
+        
+        // Button shows as long as we have local data OR the database hasn't signaled it's empty
+        const showLoadMoreButton = visibleCount < activeList.length || !dbDepleted[activeTab];
 
         const groupedData: Record<string, any[]> = {};
         displayMatches.forEach(m => {
@@ -257,10 +298,10 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                     
                     <div className="flex px-2 md:px-4 gap-2 py-3 bg-slate-50 border-b border-slate-200">
                         <button onClick={() => { setActiveTab('fixtures'); setVisibleCount(15); }} className={`flex-1 py-2 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'fixtures' ? 'bg-white shadow-sm text-blue-600 border border-slate-200' : 'text-slate-400 hover:bg-slate-100 border border-transparent'}`}>
-                            <CalendarIcon size={14} /> Fixtures <span className={`px-1.5 rounded-full text-[9px] ${activeTab === 'fixtures' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{fixtures.length}</span>
+                            <CalendarIcon size={14} /> Fixtures
                         </button>
                         <button onClick={() => { setActiveTab('results'); setVisibleCount(15); }} className={`flex-1 py-2 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'results' ? 'bg-white shadow-sm text-blue-600 border border-slate-200' : 'text-slate-400 hover:bg-slate-100 border border-transparent'}`}>
-                            <CheckCircle size={14} /> Results <span className={`px-1.5 rounded-full text-[9px] ${activeTab === 'results' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{results.length}</span>
+                            <CheckCircle size={14} /> Results
                         </button>
                         <Link href={`/standings?league=${encodeURIComponent(selectedLeague)}`} className="flex-1 py-2 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg text-slate-400 hover:bg-slate-100 border border-transparent flex items-center justify-center gap-2 transition-all">
                             <BarChart2 size={14} /> Table
@@ -268,7 +309,7 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                     </div>
 
                     <div className="divide-y divide-slate-50 min-h-[200px] bg-slate-50/30">
-                        {displayMatches.length === 0 ? (
+                        {displayMatches.length === 0 && !isLoadingMore ? (
                             <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                                 <CalendarIcon size={32} className="mb-2 opacity-30"/>
                                 <p className="text-xs font-bold uppercase tracking-widest text-slate-500">No {activeTab} available.</p>
@@ -290,10 +331,11 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                         )}
                     </div>
 
-                    {hasMore && (
+                    {showLoadMoreButton && (
                         <div className="p-4 border-t border-slate-200 bg-slate-50">
-                            <button onClick={() => setVisibleCount(prev => prev + 15)} className="w-full bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-slate-600 font-black text-[10px] md:text-xs uppercase tracking-widest py-3 md:py-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
-                                <RefreshCcw size={14} className="text-blue-500" /> Load {Math.min(15, activeList.length - visibleCount)} More {activeTab === 'fixtures' ? 'Fixtures' : 'Results'}
+                            <button onClick={() => handleLoadMore(activeList)} disabled={isLoadingMore} className="w-full bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-slate-600 font-black text-[10px] md:text-xs uppercase tracking-widest py-3 md:py-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                                <RefreshCcw size={14} className={`text-blue-500 ${isLoadingMore ? 'animate-spin' : ''}`} /> 
+                                {isLoadingMore ? 'Fetching Data...' : `Load More ${activeTab === 'fixtures' ? 'Fixtures' : 'Results'}`}
                             </button>
                         </div>
                     )}
@@ -349,7 +391,7 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                     <div className="divide-y divide-slate-50 min-h-[200px] bg-slate-50/30">
                         {displayMatches.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                                <CalendarIcon size={32} className="mb-2 opacity-30"/>
+                                <HistoryIcon size={32} className="mb-2 opacity-30"/>
                                 <p className="text-xs font-bold uppercase tracking-widest text-slate-500">No {activeTab} found.</p>
                             </div>
                         ) : (
@@ -371,7 +413,7 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                     {hasMore && (
                         <div className="p-4 border-t border-slate-200 bg-slate-50">
                             <button onClick={() => setVisibleCount(prev => prev + 15)} className="w-full bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-slate-600 font-black text-[10px] md:text-xs uppercase tracking-widest py-3 md:py-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
-                                <RefreshCcw size={14} className="text-blue-500" /> Load {Math.min(15, activeList.length - visibleCount)} More {activeTab === 'fixtures' ? 'Fixtures' : 'Results'}
+                                <RefreshCcw size={14} className="text-blue-500" /> Load {Math.min(15, activeList.length - visibleCount)} More
                             </button>
                         </div>
                     )}
