@@ -1,6 +1,7 @@
 'use client';
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ChevronDown, Search, X, Calendar as CalendarIcon, Trophy, CheckCircle, BarChart2, RefreshCcw, LayoutGrid, Clock } from 'lucide-react';
+// 🟢 ALIASED HISTORY TO AVOID GLOBAL NAMESPACE CONFLICT
+import { ChevronDown, Search, X, Calendar as CalendarIcon, Trophy, CheckCircle, BarChart2, RefreshCcw, LayoutGrid, Clock, History as HistoryIcon } from 'lucide-react';
 import Link from 'next/link';
 import CompactMatchRow from '@/app/components/CompactMatchRow';
 import { useSmartInterval } from '@/app/hooks/useSmartInterval';
@@ -9,7 +10,6 @@ import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 const PRIORITY_LEAGUES = ['Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Ligue 1', 'Champions League'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
-// 🟢 STRICT LOCAL TIMEZONE CONVERTER (Kills the UTC Bug)
 const getLocalYMD = (dateInput: string | Date | number) => {
     const d = new Date(dateInput);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -28,7 +28,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
 
     useEffect(() => setIsMounted(true), []);
 
-    // 🟢 SMART DATE CALCULATOR
     const getSmartDate = (matches: any[]) => {
         const todayStr = getLocalYMD(new Date());
         const matchesByDate = new Set(matches.map(m => getLocalYMD(m.match_date)));
@@ -53,7 +52,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
 
     const [selectedDate, setSelectedDate] = useState(() => getSmartDate(initialMatches));
 
-    // 🟢 SYNC CLIENT STATE (Fixes the Team Search 'X' button bug)
     const prevFilterRef = useRef(teamFilter);
     useEffect(() => {
         setLiveMatches(initialMatches);
@@ -67,7 +65,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         }
     }, [initialMatches, teamFilter]);
 
-    // 🟢 AUTO-CENTERING DATE STRIP
     useEffect(() => {
         if (scrollContainerRef.current && selectedLeague === 'All' && !teamFilter) {
             const activeBtn = scrollContainerRef.current.querySelector('.active-date-btn') as HTMLElement;
@@ -208,7 +205,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                                             <BarChart2 size={12} />
                                         </Link>
                                     </div>
-                                    
                                     <div className={`transition-all duration-300 ease-in-out ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[5000px] opacity-100'}`}>
                                         <div className="flex flex-col">
                                             {groupMatches.map(m => <CompactMatchRow key={m.id} match={m} disablePolling={true} />)}
@@ -284,7 +280,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                             ))
                         )}
                     </div>
-
                     {hasMore && (
                         <div className="p-4 border-t border-slate-200 bg-slate-50">
                             <button onClick={() => setVisibleCount(prev => prev + 15)} className="w-full bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-slate-600 font-black text-[10px] md:text-xs uppercase tracking-widest py-3 md:py-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
@@ -332,7 +327,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                     </div>
                     <Link href="/matches" className="bg-white/20 hover:bg-white/30 p-1.5 rounded-full backdrop-blur-sm transition"><X size={16} /></Link>
                 </div>
-                
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6 flex flex-col">
                     <div className="flex px-2 md:px-4 gap-2 py-3 bg-slate-50 border-b border-slate-200">
                         <button onClick={() => { setActiveTab('fixtures'); setVisibleCount(15); }} className={`flex-1 py-2 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'fixtures' ? 'bg-white shadow-sm text-blue-600 border border-slate-200' : 'text-slate-400 hover:bg-slate-100 border border-transparent'}`}>
@@ -342,11 +336,11 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                             <CheckCircle size={14} /> Results <span className={`px-1.5 rounded-full text-[9px] ${activeTab === 'results' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{results.length}</span>
                         </button>
                     </div>
-                    
                     <div className="divide-y divide-slate-50 min-h-[200px] bg-slate-50/30">
                         {displayMatches.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                                <History size={32} className="mb-2 opacity-30"/>
+                                {/* 🟢 USED HISTORYICON ALIAS HERE TO FIX TYPE ERROR */}
+                                <HistoryIcon size={32} className="mb-2 opacity-30"/>
                                 <p className="text-xs font-bold uppercase tracking-widest text-slate-500">No {activeTab} found.</p>
                             </div>
                         ) : (
@@ -365,7 +359,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                             ))
                         )}
                     </div>
-                    
                     {hasMore && (
                         <div className="p-4 border-t border-slate-200 bg-slate-50">
                             <button onClick={() => setVisibleCount(prev => prev + 15)} className="w-full bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-slate-600 font-black text-[10px] md:text-xs uppercase tracking-widest py-3 md:py-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
@@ -391,7 +384,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                         </button>
                     </div>
                 </div>
-                
                 <div className="p-4">
                     <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3 pl-1">Competitions</h4>
                     <div className="space-y-1">
