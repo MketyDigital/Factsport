@@ -27,7 +27,7 @@ export default function AdsterraStandardBanner() {
                     
                     <div className="flex flex-col flex-1 overflow-hidden">
                         <span className="font-black text-white text-[11px] md:text-sm uppercase tracking-tight truncate drop-shadow-md">
-                            300% Welcome Bonus!
+                            300% Welcome Bonus On 1xbet!
                         </span>
                         
                         <div className="h-4 md:h-5 overflow-hidden relative mt-0.5">
