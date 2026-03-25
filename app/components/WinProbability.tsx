@@ -1,12 +1,26 @@
 'use client';
 import { PieChart, Percent } from 'lucide-react';
+import { useMatchLive } from '@/app/providers/MatchLiveProvider';
 
 export default function WinProbability({ predictor, homeTeam, awayTeam }: any) {
-    if (!predictor || (!predictor.home && !predictor.away)) return null;
+    const liveData = useMatchLive();
+    
+    // 🟢 HIDE WIDGET IF MATCH IS FINISHED
+    const currentStatus = (liveData?.status || '').toUpperCase();
+    const isFinished = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(currentStatus);
+    
+    if (isFinished) return null;
 
-    const home = parseFloat(predictor.home).toFixed(1);
-    const away = parseFloat(predictor.away).toFixed(1);
-    const draw = parseFloat(predictor.draw).toFixed(1);
+    // 🟢 ROBUST PARSING (Catches all ESPN API variations)
+    const homeVal = predictor?.home || predictor?.homeChance || predictor?.home_chance;
+    const awayVal = predictor?.away || predictor?.awayChance || predictor?.away_chance;
+    const drawVal = predictor?.draw || predictor?.tieChance || predictor?.tie_chance || predictor?.tie;
+
+    if (!homeVal && !awayVal) return null;
+
+    const home = parseFloat(homeVal).toFixed(1);
+    const away = parseFloat(awayVal).toFixed(1);
+    const draw = parseFloat(drawVal || '0').toFixed(1);
 
     return (
         <div className="w-full bg-white p-4 md:p-5 border-b border-slate-200">

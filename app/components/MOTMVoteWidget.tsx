@@ -1,12 +1,20 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Star, CheckCircle } from 'lucide-react';
+import { Star, CheckCircle, Lock } from 'lucide-react';
+import { useMatchLive } from '@/app/providers/MatchLiveProvider';
 
 export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, lineups: any }) {
     const [hasVoted, setHasVoted] = useState(false);
     const [voteData, setVoteData] = useState<any[]>([]);
     const [selectedPlayer, setSelectedPlayer] = useState('');
     const [isVoting, setIsVoting] = useState(false);
+
+    const liveData = useMatchLive();
+    
+    // 🟢 24-HOUR AUTO-LOCK LOGIC
+    const matchDateMs = liveData?.match_date ? new Date(liveData.match_date).getTime() : 0;
+    const hoursSinceKickoff = matchDateMs ? (Date.now() - matchDateMs) / 3600000 : 0;
+    const isVotingClosed = hoursSinceKickoff > 24;
 
     const homeStarters = lineups?.home?.filter((p: any) => p.is_starter) || [];
     const awayStarters = lineups?.away?.filter((p: any) => p.is_starter) || [];
@@ -29,7 +37,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
     };
 
     const handleVote = async () => {
-        if (!selectedPlayer || hasVoted || isVoting) return;
+        if (!selectedPlayer || hasVoted || isVoting || isVotingClosed) return;
         setIsVoting(true);
 
         try {
@@ -53,7 +61,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
     return (
         <div className="w-[95%] md:max-w-md mx-auto bg-[#0a1428] rounded-lg border border-slate-800 mb-3 text-white relative overflow-hidden py-2 px-3 shadow-sm flex flex-col justify-center min-h-[40px]">
             
-            {!hasVoted ? (
+            {!hasVoted && !isVotingClosed ? (
                 <div className="relative z-10 flex items-center justify-between gap-2 w-full">
                     <div className="flex items-center gap-1 shrink-0">
                         <Star size={12} className="text-yellow-400 fill-yellow-400" />
@@ -64,6 +72,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
                         className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded text-[9px] font-bold px-2 py-1 text-white outline-none focus:border-yellow-500 h-6"
                         value={selectedPlayer}
                         onChange={(e) => setSelectedPlayer(e.target.value)}
+                        disabled={isVotingClosed}
                     >
                         <option value="">Choose player...</option>
                         {allStarters.map((p, i) => (
@@ -73,7 +82,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
                     
                     <button 
                         onClick={handleVote}
-                        disabled={!selectedPlayer || isVoting}
+                        disabled={!selectedPlayer || isVoting || isVotingClosed}
                         className="bg-yellow-500 hover:bg-yellow-400 text-black font-black text-[9px] uppercase tracking-widest px-3 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed h-6 shrink-0 flex items-center justify-center"
                     >
                         {isVoting ? '...' : 'Vote'}
@@ -83,8 +92,14 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
                 <div className="relative z-10 flex flex-col gap-1.5 w-full animate-in fade-in duration-500">
                     <div className="flex items-center justify-between w-full">
                         <div className="flex items-center gap-1">
-                            <CheckCircle size={10} className="text-green-400" />
-                            <span className="text-[8px] md:text-[9px] text-green-400 font-black uppercase tracking-widest">MOTM Vote Cast</span>
+                            {isVotingClosed ? (
+                                <Lock size={10} className="text-slate-400" />
+                            ) : (
+                                <CheckCircle size={10} className="text-green-400" />
+                            )}
+                            <span className={`text-[8px] md:text-[9px] font-black uppercase tracking-widest ${isVotingClosed ? 'text-slate-400' : 'text-green-400'}`}>
+                                {isVotingClosed ? 'Voting Closed (Final Results)' : 'MOTM Vote Cast'}
+                            </span>
                         </div>
                     </div>
                     

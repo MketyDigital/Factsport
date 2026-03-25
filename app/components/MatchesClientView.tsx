@@ -1,6 +1,6 @@
 'use client';
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ChevronDown, Search, X, Calendar as CalendarIcon, Trophy, CheckCircle, BarChart2, RefreshCcw, LayoutGrid, Clock, History } from 'lucide-react';
+import { ChevronDown, Search, X, Calendar as CalendarIcon, Trophy, CheckCircle, BarChart2, RefreshCcw, LayoutGrid, Clock } from 'lucide-react';
 import Link from 'next/link';
 import CompactMatchRow from '@/app/components/CompactMatchRow';
 import { useSmartInterval } from '@/app/hooks/useSmartInterval';
@@ -8,6 +8,12 @@ import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
 const PRIORITY_LEAGUES = ['Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Ligue 1', 'Champions League'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
+
+// 🟢 STRICT LOCAL TIMEZONE CONVERTER (Kills the UTC Bug)
+const getLocalYMD = (dateInput: string | Date | number) => {
+    const d = new Date(dateInput);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 export default function MatchesClientView({ initialMatches, teamFilter, teamFormArray }: { initialMatches: any[], teamFilter?: string | null, teamFormArray?: string[] }) {
     const [liveMatches, setLiveMatches] = useState(initialMatches);
@@ -18,11 +24,14 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
     
     const isFetching = useRef(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const [isMounted, setIsMounted] = useState(false);
 
-    // 🟢 SMART DATE CALCULATOR (Reusable function)
+    useEffect(() => setIsMounted(true), []);
+
+    // 🟢 SMART DATE CALCULATOR
     const getSmartDate = (matches: any[]) => {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const matchesByDate = new Set(matches.map(m => m.match_date.split('T')[0]));
+        const todayStr = getLocalYMD(new Date());
+        const matchesByDate = new Set(matches.map(m => getLocalYMD(m.match_date)));
         
         if (matchesByDate.has(todayStr) || matchesByDate.size === 0) return todayStr;
 
@@ -34,7 +43,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
 
         availableDates.forEach(d => {
             const diff = new Date(d).getTime() - todayTime;
-            // Find closest future date, or fallback to closest past date naturally
             if (diff >= 0 && diff < smallestDiff) {
                 smallestDiff = diff;
                 closestDate = d;
@@ -45,13 +53,12 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
 
     const [selectedDate, setSelectedDate] = useState(() => getSmartDate(initialMatches));
 
-    // 🟢 BUG FIX: Sync Client State when Server Props Change (e.g., clicking 'X' on Team Search)
+    // 🟢 SYNC CLIENT STATE (Fixes the Team Search 'X' button bug)
     const prevFilterRef = useRef(teamFilter);
     useEffect(() => {
         setLiveMatches(initialMatches);
         if (teamFilter !== prevFilterRef.current) {
             setVisibleCount(15);
-            // If team search was cleared, reset to flawless default state
             if (!teamFilter) {
                 setSelectedLeague('All');
                 setSelectedDate(getSmartDate(initialMatches));
@@ -75,7 +82,7 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         for (let i = -7; i <= 7; i++) {
             const d = new Date();
             d.setDate(d.getDate() + i);
-            const val = d.toISOString().split('T')[0];
+            const val = getLocalYMD(d); 
             
             let label = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }).toUpperCase();
             let subLabel = '';
@@ -131,13 +138,12 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         setSelectedLeague(league);
         setActiveTab('fixtures');
         setVisibleCount(15);
-        if (league === 'All') setSelectedDate(getSmartDate(liveMatches)); // Reset date logic on 'All Matches' click
+        if (league === 'All') setSelectedDate(getSmartDate(liveMatches));
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    // --- 1. THE FLAWLESS CALENDAR VIEW ---
     const renderCalendarView = () => {
-        const filtered = liveMatches.filter(m => m.match_date.split('T')[0] === selectedDate);
+        const filtered = liveMatches.filter(m => getLocalYMD(m.match_date) === selectedDate);
         const grouped: Record<string, any[]> = {};
         filtered.forEach(m => { if (!grouped[m.league]) grouped[m.league] = []; grouped[m.league].push(m); });
         
@@ -150,14 +156,12 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
             return a.localeCompare(b);
         });
 
-        // 🟢 Visual Cues for Past vs Future
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = getLocalYMD(new Date());
         const isPastDate = selectedDate < todayStr;
         const isFutureDate = selectedDate > todayStr;
 
         return (
             <div className="w-full">
-                {/* Scrollable Date Strip */}
                 <div ref={scrollContainerRef} className="flex overflow-x-auto scrollbar-hide bg-white border-b border-slate-200 sticky top-[52px] md:top-[60px] z-40 shadow-sm scroll-smooth pl-2 md:pl-0">
                     {dateStrip.map(d => {
                         const isActive = selectedDate === d.val;
@@ -171,7 +175,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                 </div>
 
                 <div className="p-2 md:p-3 space-y-4 max-w-4xl mx-auto mt-2 min-h-[500px]">
-                    {/* Visual context indicator */}
                     <div className="flex items-center justify-between px-2 mb-2">
                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
                             {isPastDate ? 'Viewing Past Results' : isFutureDate ? 'Viewing Upcoming Fixtures' : "Today's Action"}
@@ -221,7 +224,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         );
     };
 
-    // --- 2. THE SPECIFIC LEAGUE VIEW ---
     const renderLeagueView = () => {
         const leagueMatches = liveMatches.filter(m => m.league === selectedLeague);
         const fixtures = leagueMatches.filter(m => !FINISHED_STATUSES.includes((m.status || '').toUpperCase())).sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
@@ -296,7 +298,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         );
     };
 
-    // --- 3. THE TEAM SEARCH VIEW (Fixed and Paginated) ---
     const renderTeamView = () => {
         const fixtures = liveMatches.filter(m => !FINISHED_STATUSES.includes((m.status || '').toUpperCase())).sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
         const results = liveMatches.filter(m => FINISHED_STATUSES.includes((m.status || '').toUpperCase())).sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
@@ -314,7 +315,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
 
         return (
             <div className="w-full p-2 md:p-4 max-w-4xl mx-auto min-h-[600px]">
-                
                 <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl p-4 shadow-md flex items-center justify-between text-white mb-4">
                     <div>
                         <div className="flex items-center gap-2 mb-1.5">
@@ -330,12 +330,10 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                             </div>
                         )}
                     </div>
-                    {/* Next.js soft navigation via Link */}
                     <Link href="/matches" className="bg-white/20 hover:bg-white/30 p-1.5 rounded-full backdrop-blur-sm transition"><X size={16} /></Link>
                 </div>
-
+                
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6 flex flex-col">
-                    
                     <div className="flex px-2 md:px-4 gap-2 py-3 bg-slate-50 border-b border-slate-200">
                         <button onClick={() => { setActiveTab('fixtures'); setVisibleCount(15); }} className={`flex-1 py-2 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'fixtures' ? 'bg-white shadow-sm text-blue-600 border border-slate-200' : 'text-slate-400 hover:bg-slate-100 border border-transparent'}`}>
                             <CalendarIcon size={14} /> Fixtures <span className={`px-1.5 rounded-full text-[9px] ${activeTab === 'fixtures' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{fixtures.length}</span>
@@ -344,7 +342,7 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                             <CheckCircle size={14} /> Results <span className={`px-1.5 rounded-full text-[9px] ${activeTab === 'results' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{results.length}</span>
                         </button>
                     </div>
-
+                    
                     <div className="divide-y divide-slate-50 min-h-[200px] bg-slate-50/30">
                         {displayMatches.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-16 text-slate-400">
@@ -359,7 +357,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{dateKey}</span>
                                     </div>
                                     <div className="flex flex-col bg-white">
-                                        {/* 🟢 showLeague=true so users know what competition the team is playing in */}
                                         {groupedData[dateKey].map((match) => (
                                             <CompactMatchRow key={match.id} match={match} disablePolling={false} showLeague={true} />
                                         ))}
@@ -368,7 +365,7 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                             ))
                         )}
                     </div>
-
+                    
                     {hasMore && (
                         <div className="p-4 border-t border-slate-200 bg-slate-50">
                             <button onClick={() => setVisibleCount(prev => prev + 15)} className="w-full bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-slate-600 font-black text-[10px] md:text-xs uppercase tracking-widest py-3 md:py-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
@@ -381,10 +378,10 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         );
     };
 
+    if (!isMounted) return <div className="min-h-screen bg-[#F0F2F5]"></div>;
+
     return (
-        <div className="flex flex-col md:flex-row max-w-[1400px] mx-auto items-start w-full relative">
-            
-            {/* 🟢 DESKTOP SIDEBAR */}
+        <div className="flex flex-col md:flex-row max-w-[1400px] mx-auto items-start w-full relative" suppressHydrationWarning>
             <aside className="hidden md:flex flex-col w-[260px] lg:w-[280px] shrink-0 sticky top-[60px] h-[calc(100vh-60px)] overflow-y-auto border-r border-slate-200 bg-white shadow-[5px_0_15px_rgba(0,0,0,0.02)] z-30">
                 <div className="p-4 border-b border-slate-100 bg-slate-50">
                     <h3 className="font-black uppercase tracking-widest text-xs text-slate-500 flex items-center gap-2 mb-3"><LayoutGrid size={14} className="text-blue-500"/> Navigation</h3>
@@ -408,7 +405,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                 </div>
             </aside>
 
-            {/* 🟢 COMPACT MOBILE LEAGUE NAVIGATOR */}
             <div className="md:hidden w-full bg-white border-b border-slate-200 sticky top-[52px] z-40 shadow-sm overflow-x-auto scrollbar-hide py-1.5">
                 <div className="flex px-2 space-x-1.5 min-w-max items-center">
                     <button onClick={() => handleLeagueSelect('All')} className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${selectedLeague === 'All' && !teamFilter ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>All Matches</button>
@@ -419,7 +415,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                 </div>
             </div>
 
-            {/* 🟢 MAIN CONTENT AREA */}
             <main className="flex-1 w-full min-w-0 bg-[#F0F2F5]">
                 {teamFilter ? renderTeamView() :
                  selectedLeague === 'All' ? renderCalendarView() : 
