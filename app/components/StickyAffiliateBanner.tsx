@@ -1,39 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { X, ArrowRight, Gift, Copy, CheckCircle2, Square, Maximize2 } from 'lucide-react';
+import { X, Square, Maximize2 } from 'lucide-react';
 import { useGlobalMedia } from '@/app/providers/GlobalMediaProvider'; 
 import Link from 'next/link';
 
 export default function StickyAffiliateBanner() {
-    const [isVisible, setIsVisible] = useState(false);
-    const [copied, setCopied] = useState(false);
-    
+    // 1. Subscribe only to the required Global Media context
     const { activeMatchId, mediaType, videoUrl, isPageActive, stopMedia } = useGlobalMedia();
 
-    useEffect(() => {
-        const timer = setTimeout(() => setIsVisible(true), 1500);
-        return () => clearTimeout(timer);
-    }, []);
+    // 2. Determine if the floating player should actually be visible
+    const showFloatingAudio = mediaType === 'audio' && !isPageActive && !!videoUrl;
+    const showFloatingVideo = mediaType === 'video' && !isPageActive && !!videoUrl;
 
-    if (!isVisible) return null;
+    // 🛑 THE GHOST PROTOCOL: If no media is playing, this component returns NOTHING. 
+    // It consumes zero memory, zero CSS, and zero loops.
+    if (!showFloatingAudio && !showFloatingVideo) return null;
 
-    const AFFILIATE_LINK = "https://refpa14435.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599&r=registration"; 
-    const PROMO_CODE = "FACTSPORT";
-
-    const copyToClipboard = (e: React.MouseEvent) => {
-        e.preventDefault();
-        navigator.clipboard.writeText(PROMO_CODE);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    const showFloatingAudio = mediaType === 'audio' && !isPageActive && videoUrl;
-    const showFloatingVideo = mediaType === 'video' && !isPageActive && videoUrl;
-
+    // 3. Media parsing logic (Only runs IF media is supposed to show)
     const isYouTube = videoUrl?.includes('youtube.com') || videoUrl?.includes('youtu.be') || videoUrl?.includes('embed/');
-    const isRawMedia = videoUrl?.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
-    const isRawAudio = videoUrl?.match(/\.(mp3|wav)$/i);
+    const isRawMedia = !!videoUrl?.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
+    const isRawAudio = !!videoUrl?.match(/\.(mp3|wav)$/i);
 
     const getAutoPlayUrl = (url: string) => {
         if (!url) return '';
@@ -44,17 +30,17 @@ export default function StickyAffiliateBanner() {
     return (
         <div className="fixed bottom-4 left-0 right-0 z-[100] w-full flex flex-col items-center justify-end px-4 pointer-events-none gap-3">
             
-            {/* 🟢 UNIVERSAL BACKGROUND AUDIO PLAYER (Fixed Infinite Loop!) */}
+            {/* 🟢 UNIVERSAL BACKGROUND AUDIO PLAYER (Hidden loop for audio) */}
             {showFloatingAudio && (
                 <div className="hidden">
                     {isRawAudio && <audio src={videoUrl!} autoPlay />}
-                    {isYouTube && <iframe src={getAutoPlayUrl(videoUrl!)} allow="autoplay" />}
+                    {isYouTube && <iframe src={getAutoPlayUrl(videoUrl!)} allow="autoplay" title="Background Audio" />}
                 </div>
             )}
 
+            {/* 🟢 FLOATING VIDEO PLAYER (PIP Mode) */}
             {showFloatingVideo && (
                 <div className="w-full max-w-[320px] md:max-w-[400px] aspect-video bg-black rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] border border-blue-500/50 overflow-hidden pointer-events-auto relative animate-in slide-in-from-bottom-10 group self-end md:self-center flex flex-col">
-                    
                     <div className="absolute top-0 left-0 w-full h-12 bg-gradient-to-b from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end gap-2 p-2 z-20 pointer-events-none">
                         <Link 
                             href={activeMatchId === 'global-goal-rush' ? '/live' : `/match/${activeMatchId}`} 
@@ -73,113 +59,37 @@ export default function StickyAffiliateBanner() {
                     </div>
 
                     {isYouTube ? (
-                        <iframe 
-                            src={getAutoPlayUrl(videoUrl!)} 
-                            className="w-full h-full relative z-10" 
-                            allow="autoplay; encrypted-media; picture-in-picture; fullscreen" 
-                            allowFullScreen
-                        />
+                        <iframe src={getAutoPlayUrl(videoUrl!)} className="w-full h-full relative z-10" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen title="PIP Video" />
                     ) : isRawMedia ? (
-                        <video 
-                            src={videoUrl!} 
-                            className="w-full h-full object-contain relative z-10" 
-                            autoPlay 
-                            playsInline 
-                            controls={false}
-                        />
+                        <video src={videoUrl!} className="w-full h-full object-contain relative z-10" autoPlay playsInline controls={false} />
                     ) : (
-                        <iframe 
-                            src={videoUrl!} 
-                            className="w-full h-full relative z-10" 
-                            allow="autoplay; encrypted-media; fullscreen" 
-                        />
+                        <iframe src={videoUrl!} className="w-full h-full relative z-10" allow="autoplay; encrypted-media; fullscreen" title="PIP Video" />
                     )}
                 </div>
             )}
 
-            <div className={`w-full pointer-events-auto relative transition-all duration-300 ${showFloatingAudio ? 'max-w-[480px]' : 'max-w-[420px]'}`}>
-                
-                <button 
-                    onClick={() => setIsVisible(false)}
-                    className="absolute -top-3 -right-2 bg-slate-800 text-slate-400 hover:text-white border border-slate-600 rounded-full p-1 transition-colors shadow-xl z-20"
-                    aria-label="Close"
-                >
-                    <X size={14} />
-                </button>
-
-                <div className="bg-[#0a1428]/95 backdrop-blur-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.9)] rounded-full p-1.5 flex items-center justify-between gap-2 w-full h-[52px]">
+            {/* 🟢 FLOATING AUDIO CONTROLS (Live Radio Only) */}
+            {showFloatingAudio && (
+                <div className="bg-[#0a1428]/95 backdrop-blur-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.9)] rounded-full px-5 py-2.5 flex items-center justify-between gap-4 max-w-[220px] pointer-events-auto animate-in slide-in-from-bottom-10 mx-auto">
+                    <Link href={activeMatchId === 'global-goal-rush' ? '/live' : `/match/${activeMatchId}`} className="flex flex-col hover:opacity-70 transition-opacity">
+                        <span className="text-[10px] text-red-500 font-black uppercase tracking-widest flex items-center gap-1.5 drop-shadow-md">
+                            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_red]"></span> LIVE RADIO
+                        </span>
+                        <div className="flex items-end gap-[2px] h-3 mt-1 opacity-80 justify-center">
+                            <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.1s] h-[60%]"></div>
+                            <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.3s] h-[100%]"></div>
+                            <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.2s] h-[40%]"></div>
+                            <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.5s] h-[80%]"></div>
+                        </div>
+                    </Link>
                     
-                    <div className={`flex items-center gap-2 h-full transition-all overflow-hidden ${showFloatingAudio ? 'w-[65%] border-r border-white/10 pr-2' : 'w-full'}`}>
-                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0 shadow-inner">
-                            <Gift className="text-[#1562a3] w-5 h-5 animate-pulse" />
-                        </div>
-                        
-                        <div className="flex flex-col flex-1 overflow-hidden">
-                            <span className="font-black text-white text-[11px] md:text-xs uppercase tracking-tight truncate drop-shadow-md">
-                                300% Welcome Bonus!
-                            </span>
-                            
-                            <div className="h-4 overflow-hidden relative mt-0.5">
-                                <div className="animate-text-slide flex flex-col absolute w-full">
-                                    <span className="text-[10px] md:text-[11px] text-[#6ae045] font-black truncate h-4 flex items-center">
-                                        Code: {PROMO_CODE}
-                                    </span>
-                                    <span className="text-[10px] md:text-[11px] text-white font-bold truncate h-4 flex items-center">
-                                        Best global odds!
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
+                    <div className="w-[1px] h-6 bg-white/10"></div>
 
-                        <div className="flex items-center gap-1.5 shrink-0">
-                            <button 
-                                onClick={copyToClipboard}
-                                className={`flex items-center justify-center w-8 h-8 rounded-full transition-all shadow-[0_4px_10px_rgba(0,0,0,0.4)] ${copied ? 'bg-white text-[#6ae045]' : 'bg-[#1562a3] text-white hover:bg-[#0d477a]'}`}
-                                title="Copy Promo Code"
-                            >
-                                {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
-                            </button>
-
-                            <a 
-                                href={AFFILIATE_LINK}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="bg-[#6ae045] hover:bg-[#5bc23a] text-[#052b4d] px-3.5 py-2 rounded-full font-black text-[10px] uppercase tracking-widest flex items-center gap-1 shadow-[0_4px_15px_rgba(106,224,69,0.5)] active:scale-95 transition-transform"
-                            >
-                                Claim <ArrowRight size={12} className="hidden sm:block" />
-                            </a>
-                        </div>
-                    </div>
-
-                    {showFloatingAudio && (
-                        <div className="flex shrink-0 w-[35%] items-center justify-between pl-2 pr-1 animate-in fade-in slide-in-from-right-4">
-                            <Link href={activeMatchId === 'global-goal-rush' ? '/live' : `/match/${activeMatchId}`} className="flex flex-col hover:opacity-70 transition-opacity">
-                                <span className="text-[8px] text-red-500 font-black uppercase tracking-widest flex items-center gap-1 drop-shadow-md">
-                                    <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_red]"></span> LIVE RADIO
-                                </span>
-                                <div className="flex items-end gap-[1px] md:gap-0.5 h-3 mt-0.5 opacity-80">
-                                    <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.1s] h-[60%]"></div>
-                                    <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.3s] h-[100%]"></div>
-                                    <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.2s] h-[40%]"></div>
-                                    <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.5s] h-[80%]"></div>
-                                </div>
-                            </Link>
-                            
-                            <button onClick={stopMedia} className="w-8 h-8 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm">
-                                <Square size={14} fill="currentColor" />
-                            </button>
-                        </div>
-                    )}
+                    <button onClick={stopMedia} className="w-8 h-8 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm">
+                        <Square size={14} fill="currentColor" />
+                    </button>
                 </div>
-            </div>
-            <style jsx>{`
-                @keyframes text-slide {
-                    0%, 40% { transform: translateY(0); }
-                    50%, 90% { transform: translateY(-16px); }
-                    100% { transform: translateY(0); }
-                }
-                .animate-text-slide { animation: text-slide 6s infinite ease-in-out; }
-            `}</style>
+            )}
         </div>
     );
 }
