@@ -81,6 +81,17 @@ async function fetchEspnCups() {
                 continue;
             }
 
+            // 🟢 PRE-FETCH PENDING MATCHES FOR ID SWAP CHECK
+            const { data: pendingMatches, error: fetchErr } = await supabase
+                .from('matches')
+                .select('api_id, home_team, away_team')
+                .eq('league', leagueName)
+                .in('status', ['SCHEDULED', 'HT', 'LIVE']); // Only look at unresolved games
+
+            if (fetchErr) {
+                console.error(`   ⚠️ Could not fetch pending matches to verify IDs: ${fetchErr.message}`);
+            }
+
             const matchesToUpsert = [];
 
             for (const e of events) {
@@ -94,6 +105,24 @@ async function fetchEspnCups() {
                 // 🟢 If it's a youth, women's, or eSports match, skip it entirely!
                 if (isFakeMatch(homeName, awayName)) {
                     continue;
+                }
+
+                // 🔥 SMART ID SWAPPER: Check if ESPN changed the ID for this specific fixture
+                if (pendingMatches) {
+                    const existingMatch = pendingMatches.find(m => 
+                        m.home_team === homeName && 
+                        m.away_team === awayName && 
+                        m.api_id !== espnId
+                    );
+
+                    if (existingMatch) {
+                        console.log(`   🔄 ID Change Detected! [${homeName} vs ${awayName}] old:${existingMatch.api_id} -> new:${espnId}`);
+                        // Force update the old row to hold the new ID so we don't create a duplicate
+                        await supabase
+                            .from('matches')
+                            .update({ api_id: espnId, espn_id: espnId })
+                            .eq('api_id', existingMatch.api_id);
+                    }
                 }
                 
                 matchesToUpsert.push({
