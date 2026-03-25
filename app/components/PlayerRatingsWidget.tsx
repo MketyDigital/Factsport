@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Star } from 'lucide-react';
+import { Star, Lock } from 'lucide-react';
+import { useMatchLive } from '@/app/providers/MatchLiveProvider';
 
 export default function PlayerRatingsWidget({ matchId, lineups, status }: { matchId: string, lineups: any, status: string }) {
     const [ratingsData, setRatingsData] = useState<any[]>([]);
@@ -8,6 +9,13 @@ export default function PlayerRatingsWidget({ matchId, lineups, status }: { matc
     
     const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'].includes((status || '').toUpperCase());
     const WORKER_URL = 'https://fse.mkpoikankes.workers.dev/api/ratings';
+
+    const liveData = useMatchLive();
+    
+    // 🟢 24-HOUR AUTO-LOCK LOGIC
+    const matchDateMs = liveData?.match_date ? new Date(liveData.match_date).getTime() : 0;
+    const hoursSinceKickoff = matchDateMs ? (Date.now() - matchDateMs) / 3600000 : 0;
+    const isVotingClosed = hoursSinceKickoff > 24;
 
     useEffect(() => {
         if (isFinished) {
@@ -25,6 +33,8 @@ export default function PlayerRatingsWidget({ matchId, lineups, status }: { matc
     };
 
     const handleRate = async (playerName: string, rating: number) => {
+        if (isVotingClosed) return;
+        
         const newRatings = { ...userRatings, [playerName]: rating };
         setUserRatings(newRatings);
         localStorage.setItem(`ratings_${matchId}`, JSON.stringify(newRatings));
@@ -56,9 +66,16 @@ export default function PlayerRatingsWidget({ matchId, lineups, status }: { matc
 
     return (
         <div className="w-full bg-slate-50 rounded-lg p-2 border border-slate-200 mt-2">
-            <div className="flex items-center gap-1.5 mb-2 border-b border-slate-200 pb-1">
-                <Star size={10} className="text-yellow-500 fill-yellow-500" />
-                <h3 className="font-black uppercase tracking-widest text-[9px] text-slate-500">Fan Ratings</h3>
+            <div className="flex items-center justify-between mb-2 border-b border-slate-200 pb-1">
+                <div className="flex items-center gap-1.5">
+                    <Star size={10} className="text-yellow-500 fill-yellow-500" />
+                    <h3 className="font-black uppercase tracking-widest text-[9px] text-slate-500">Fan Ratings</h3>
+                </div>
+                {isVotingClosed && (
+                    <span className="text-[8px] font-bold text-slate-400 flex items-center gap-1">
+                        <Lock size={8} /> Closed
+                    </span>
+                )}
             </div>
 
             <div className="grid grid-cols-1 gap-1">
@@ -74,7 +91,7 @@ export default function PlayerRatingsWidget({ matchId, lineups, status }: { matc
                             </div>
 
                             <div className="flex items-center gap-2">
-                                {!isRated ? (
+                                {!isRated && !isVotingClosed ? (
                                     <div className="flex gap-0.5">
                                         {[6, 7, 8, 9, 10].map(score => (
                                             <button 
@@ -86,11 +103,12 @@ export default function PlayerRatingsWidget({ matchId, lineups, status }: { matc
                                             </button>
                                         ))}
                                     </div>
-                                ) : (
+                                ) : isRated ? (
                                     <span className="text-[8px] font-bold text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded">You: {userRatings[p.name]}</span>
-                                )}
-                                <div className="w-6 h-6 bg-[#0a1428] rounded flex items-center justify-center shrink-0">
-                                    <span className="text-white font-black text-[9px]">{avg}</span>
+                                ) : null}
+                                
+                                <div className="w-6 h-6 bg-[#0a1428] rounded flex items-center justify-center shrink-0 shadow-sm border border-slate-800">
+                                    <span className="text-yellow-400 font-black text-[9px]">{avg}</span>
                                 </div>
                             </div>
                         </div>

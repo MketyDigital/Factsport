@@ -1,34 +1,56 @@
-const CACHE_NAME = 'factsport-v1';
+const CACHE_NAME = 'factsport-v2'; // Bumped version to clear old bloated caches
 
-// 1. Install Event: Cache critical assets
+const STATIC_ASSETS = [
+  '/',
+  '/icon.png',
+  '/manifest.json'
+];
+
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll([
-        '/',
-        '/icon.png',
-        '/manifest.json'
-      ]);
-    })
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)));
   self.skipWaiting();
 });
 
-// 2. Fetch Event: Network First, Fallback to Cache (Safe for betting apps)
+// 🟢 NEW: Automatically delete old bloated caches when this new version activates
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((name) => {
+          if (name !== CACHE_NAME) return caches.delete(name);
+        })
+      );
+    })
+  );
+  self.clients.claim();
+});
+
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // 🛑 THE STORAGE BOMB SHIELD: NEVER cache APIs, Supabase, or Workers.
+  if (
+    event.request.method !== 'GET' ||
+    url.pathname.startsWith('/api') ||
+    url.hostname.includes('supabase.co') ||
+    url.hostname.includes('workers.dev')
+  ) {
+    return; // Bypass the Service Worker entirely
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // If the network works, return data AND cache a copy
+        // Only cache valid, successful static responses
+        if (!response || response.status !== 200 || response.type !== 'basic') {
+          return response;
+        }
         const clone = response.clone();
         caches.open(CACHE_NAME).then((cache) => {
           cache.put(event.request, clone);
         });
         return response;
       })
-      .catch(() => {
-        // If network fails (offline), try the cache
-        return caches.match(event.request);
-      })
+      .catch(() => caches.match(event.request))
   );
 });

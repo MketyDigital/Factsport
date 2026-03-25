@@ -1,8 +1,9 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from "next/link";
 import { Video, Radio } from "lucide-react";
 import MatchTime from '@/app/components/MatchTime';
+import { useSmartInterval } from '@/app/hooks/useSmartInterval'; 
 
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
@@ -10,6 +11,7 @@ const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET'
 
 export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) {
     const [liveMatches, setLiveMatches] = useState(heroMatches);
+    const isFetching = useRef(false);
 
     useEffect(() => {
         setLiveMatches(prev => {
@@ -20,14 +22,17 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
         });
     }, [heroMatches]);
 
-    useEffect(() => {
-        const fetchUpdates = async () => {
+    const fetchUpdates = async () => {
+        if (isFetching.current) return;
+        isFetching.current = true;
+
+        try {
             const updated = await Promise.all(liveMatches.map(async (m) => {
                 if (FINISHED_STATUSES.includes((m.status || '').toUpperCase())) return m;
                 try {
                     let res;
                     if (m.espn_id) {
-                        res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${m.espn_id}&t=${Date.now()}`);
+                        res = await fetch(`https://live-api.factsport.com/?espn_id=${m.espn_id}&t=${Date.now()}`);
                     } else {
                         res = await fetch(`/api/match-data?id=${m.id}&t=${Date.now()}`);
                     }
@@ -35,7 +40,7 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                     if (res.ok) {
                         const data = await res.json();
                         if (!data.error) {
-                            return { ...m, status: data.status, home_score: data.home_score, away_score: data.away_score };
+                            return { ...m, status: data.status, home_score: data.home_score, away_score: data.away_score, displayClock: data.displayClock };
                         }
                     }
                 } catch(e) { }
@@ -45,11 +50,17 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
             if (JSON.stringify(updated) !== JSON.stringify(liveMatches)) {
                 setLiveMatches(updated);
             }
-        };
+        } finally {
+            isFetching.current = false;
+        }
+    };
 
-        const interval = setInterval(fetchUpdates, 5000); // 🟢 5 SECONDS
-        return () => clearInterval(interval);
-    }, [liveMatches]);
+    const hasActiveMatches = liveMatches.some(m => 
+        LIVE_STATUSES.includes((m.status || '').toUpperCase()) || 
+        SCHEDULED_STATUSES.includes((m.status || '').toUpperCase())
+    );
+
+    useSmartInterval(fetchUpdates, hasActiveMatches ? 5000 : null);
 
     if (!liveMatches || liveMatches.length === 0) return null;
 
@@ -110,7 +121,7 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                                             <span className="text-[7px] font-black text-blue-300 uppercase tracking-widest text-center drop-shadow-md bg-blue-900/30 px-1.5 py-0.5 rounded whitespace-nowrap">
                                                 {isScheduled 
                                                     ? <MatchTime date={match.match_date} />
-                                                    : (rawStatus === 'HT' || rawStatus === 'HALFTIME' ? 'HT' : rawStatus)
+                                                    : (rawStatus === 'HT' || rawStatus === 'HALFTIME' ? 'HT' : match.displayClock || 'ON GOING')
                                                 }
                                             </span>
                                         </div>
@@ -126,6 +137,6 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                     </Link>
                 );
              })}
-         </div>
+        </div>
     );
 }

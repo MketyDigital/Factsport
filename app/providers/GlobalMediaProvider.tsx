@@ -73,11 +73,8 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
             const urlParams = new URLSearchParams(window.location.search);
             const guestToken = urlParams.get('guest');
             
-            // 🟢 THE FIX: Clean string concatenation instead of nested template literals
             let apiUrl = '/api/stream/token?match_id=' + matchId;
-            if (guestToken) {
-                apiUrl += '&guest=' + guestToken;
-            }
+            if (guestToken) apiUrl += '&guest=' + guestToken;
             
             const res = await fetch(apiUrl);
             const text = await res.text();
@@ -113,6 +110,7 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
             } else {
                 setIsWaitingForHost(true);
                 pollRef.current = setInterval(async () => {
+                    if (document.hidden) return; // 🛑 THE CPU SHIELD: Don't poll Stream if phone is locked
                     try {
                         await myCall.join();
                         if (pollRef.current) clearInterval(pollRef.current);

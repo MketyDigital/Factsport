@@ -1,9 +1,11 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Send, MessageCircle, ShieldAlert, Zap, Reply, X, ArrowDown, Pin, Settings, Megaphone } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/app/lib/supabase/client'; 
 import { useAuth } from '@/app/components/AuthProvider'; 
+import { useSmartInterval } from '@/app/hooks/useSmartInterval';
+import { useMatchLive } from '@/app/providers/MatchLiveProvider';
 
 const ADMIN_EMAILS = [
     'mkposcosunday@gmail.com', 
@@ -11,19 +13,16 @@ const ADMIN_EMAILS = [
     'fact@factsport.com'
 ];
 
+const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
+
 export default function FanZoneChat({ matchId, espnId }: { matchId: string, espnId?: string }) {
     const [messages, setMessages] = useState<any[]>([]);
-    const [officialEvents, setOfficialEvents] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [isSending, setIsSending] = useState(false);
-    
     const [replyTo, setReplyTo] = useState<{user: string, text: string} | null>(null);
     const [showScrollBottom, setShowScrollBottom] = useState(false);
-    
     const { user, isAdmin, loading: authLoading } = useAuth();
-    
     const [lastMsgTime, setLastMsgTime] = useState(0); 
-    
     const [pinnedMessage, setPinnedMessage] = useState<{text: string, link: string | null} | null>(null);
     const [showPinUI, setShowPinUI] = useState(false);
     const [pinTextInput, setPinTextInput] = useState("");
@@ -31,27 +30,63 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
     const [isAnnouncement, setIsAnnouncement] = useState(false); 
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const CHAT_WORKER_URL = "https://chatworkerjs.mkpoikankes.workers.dev"; 
+    const CHAT_WORKER_URL = "https://chat-api.factsport.com"; 
 
-    useEffect(() => {
-        const fetchPin = async () => {
-            if (document.hidden) return; 
-            try {
-                const res = await fetch(`/api/match/pin?match_id=${matchId}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.chat_pin_text || data.chat_pin_link) {
-                        setPinnedMessage({ text: data.chat_pin_text, link: data.chat_pin_link });
-                    } else {
-                        setPinnedMessage(null);
-                    }
+    const liveData = useMatchLive();
+    
+    // 🟢 POST-MATCH PURGE LOGIC
+    const currentStatus = (liveData?.status || '').toUpperCase();
+    const isFinished = FINISHED_STATUSES.includes(currentStatus);
+    const matchDateStr = liveData?.match_date || liveData?.date;
+    const matchDateMs = matchDateStr ? new Date(matchDateStr).getTime() : 0;
+    const minutesToKick = matchDateMs ? (matchDateMs - Date.now()) / 60000 : 0;
+    
+    // True if match is FT OR if it has been over 4 hours since scheduled kickoff
+    const isUniversallyFinished = isFinished || (matchDateMs > 0 && minutesToKick < -240);
+    
+    const officialEvents = useMemo(() => {
+        const rawEvents = liveData?.match_events || liveData?.events || [];
+        return rawEvents.map((e: any, index: number) => ({
+             id: `official-${index}-${e.time}`,
+             isOfficial: true,
+             time: e.time,
+             type: e.type,
+             text: e.text,
+             player: e.player,
+             created_at: new Date(Date.now() - (index * 60000)).toISOString() 
+        }));
+    }, [liveData?.match_events, liveData?.events]);
+
+    const fetchPin = async () => {
+        if (document.hidden) return; 
+        try {
+            const res = await fetch(`/api/match/pin?match_id=${matchId}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.chat_pin_text || data.chat_pin_link) {
+                    setPinnedMessage({ text: data.chat_pin_text, link: data.chat_pin_link });
+                } else {
+                    setPinnedMessage(null);
                 }
-            } catch (e) {}
-        };
-        fetchPin();
-        const interval = setInterval(fetchPin, 10000); 
-        return () => clearInterval(interval);
-    }, [matchId]);
+            }
+        } catch (e) {}
+    };
+    useEffect(() => { fetchPin(); }, [matchId]);
+    useSmartInterval(fetchPin, 10000); 
+
+    const fetchChat = async () => {
+        if (document.hidden) return; 
+        try {
+            const res = await fetch(`${CHAT_WORKER_URL}/messages?match_id=${matchId}`, { cache: 'no-store' });
+            if (res.ok) {
+                const data = await res.json();
+                setMessages(data.messages || []);
+                setTimeout(() => scrollToBottom(false), 100);
+            }
+        } catch (e) {}
+    };
+    useEffect(() => { fetchChat(); }, [matchId]);
+    useSmartInterval(fetchChat, 6000); 
 
     const handleScroll = () => {
         if (scrollContainerRef.current) {
@@ -69,50 +104,6 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
             }
         }
     };
-
-    useEffect(() => {
-        const fetchChat = async () => {
-            if (document.hidden) return; 
-            try {
-                const res = await fetch(`${CHAT_WORKER_URL}/messages?match_id=${matchId}`, { cache: 'no-store' });
-                if (res.ok) {
-                    const data = await res.json();
-                    setMessages(data.messages || []);
-                    setTimeout(() => scrollToBottom(false), 100);
-                }
-            } catch (e) {}
-        };
-        fetchChat();
-        const interval = setInterval(fetchChat, 6000);
-        return () => clearInterval(interval);
-    }, [matchId]);
-
-    useEffect(() => {
-        if (!espnId) return;
-        const fetchEvents = async () => {
-            if (document.hidden) return; 
-            try {
-                const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${espnId}`, { cache: 'no-store' });
-                if (res.ok) {
-                    const data = await res.json();
-                    const formattedEvents = (data.match_events || []).map((e: any, index: number) => ({
-                        id: `official-${index}-${e.time}`,
-                        isOfficial: true,
-                        time: e.time,
-                        type: e.type,
-                        text: e.text,
-                        player: e.player,
-                        created_at: new Date(Date.now() - (index * 60000)).toISOString() 
-                    }));
-                    setOfficialEvents(formattedEvents);
-                    setTimeout(() => scrollToBottom(false), 100);
-                }
-            } catch (e) {}
-        };
-        fetchEvents();
-        const interval = setInterval(fetchEvents, 5000);
-        return () => clearInterval(interval);
-    }, [espnId]);
 
     const handleSetPin = async () => {
         const supabase = createClient();
@@ -195,7 +186,6 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
         setIsSending(false);
     };
 
-    // 🟢 DOM OVERLOAD SHIELD: Slices array to 150 items to protect GPU memory!
     const combinedFeed = [...messages, ...officialEvents]
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
         .slice(-150);
@@ -268,7 +258,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                 </div>
             )}
 
-            {isAdmin && showPinUI && (
+            {isAdmin && showPinUI && !isUniversallyFinished && (
                 <div className="bg-slate-50 border-b border-slate-200 p-3 shrink-0 shadow-inner z-20">
                     <div className="flex justify-between items-center mb-2">
                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Manage Pinned Message</span>
@@ -297,9 +287,11 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                             const isGoal = msg.type === 'goal';
                             return (
                                 <div key={msg.id} className="flex justify-end w-full pl-8 my-2 group">
-                                    <button onClick={() => setReplyTo({user: 'System', text: `${msg.time} ${msg.text}`})} className="mr-2 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition active:scale-95 self-center">
-                                        <Reply size={14} />
-                                    </button>
+                                    {!isUniversallyFinished && (
+                                        <button onClick={() => setReplyTo({user: 'System', text: `${msg.time} ${msg.text}`})} className="mr-2 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition active:scale-95 self-center">
+                                            <Reply size={14} />
+                                        </button>
+                                    )}
                                     <div className={`px-3 py-2 md:px-4 rounded-l-xl rounded-tr-xl shadow-md border text-[9px] md:text-[10px] font-black uppercase tracking-wider flex flex-col items-end gap-1 max-w-[90%] text-right leading-tight ${isGoal ? 'bg-green-600 text-white border-green-500 shadow-[0_4px_15px_rgba(34,197,94,0.3)]' : 'bg-[#0a1428] text-slate-200 border-slate-800'}`}>
                                         <div className="flex items-center gap-1.5 opacity-80 mb-0.5">
                                              <span className="text-[8px] md:text-[9px]">{msg.time}</span>
@@ -329,9 +321,11 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                                         <span className={`text-[9px] md:text-[10px] font-black truncate ${isAlert ? 'text-red-600' : 'text-slate-800'}`}>
                                             {msg.username} {isAlert && '(Admin)'}
                                         </span>
-                                        <button onClick={() => setReplyTo({user: msg.username, text: displayMessage})} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition active:scale-95">
-                                            <Reply size={12} />
-                                        </button>
+                                        {!isUniversallyFinished && (
+                                            <button onClick={() => setReplyTo({user: msg.username, text: displayMessage})} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition active:scale-95">
+                                                <Reply size={12} />
+                                            </button>
+                                        )}
                                     </div>
                                     
                                     <div className={`text-[11px] md:text-xs font-medium leading-relaxed px-3 py-2 rounded-2xl rounded-tl-sm border shadow-sm break-words ${
@@ -355,7 +349,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
             )}
 
             <div className="bg-white border-t border-slate-200 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] z-10 shrink-0 flex flex-col">
-                {replyTo && (
+                {replyTo && !isUniversallyFinished && (
                     <div className="bg-slate-50 border-b border-slate-200 px-3 py-1.5 flex items-center justify-between">
                         <div className="flex items-center gap-1.5 overflow-hidden">
                             <Reply size={12} className="text-blue-500 shrink-0"/>
@@ -366,7 +360,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                 )}
                 
                 <div className="p-2 md:p-3 flex items-center gap-2">
-                    {isAdmin && (
+                    {isAdmin && !isUniversallyFinished && (
                         <div className="flex items-center bg-slate-100 rounded-full border border-slate-200 p-1 shrink-0">
                             <button onClick={() => setShowPinUI(!showPinUI)} className={`p-1.5 rounded-full transition ${showPinUI ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`} title="Manage Pinned Message">
                                 <Settings size={14} />
@@ -378,7 +372,11 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                     )}
 
                     <div className="flex-1">
-                        {authLoading ? (
+                        {isUniversallyFinished ? (
+                            <div className="w-full text-center bg-slate-50 border border-slate-200 text-slate-400 text-[10px] font-black uppercase tracking-widest py-3 rounded-full shadow-inner">
+                                Match Ended. Chat is Closed.
+                            </div>
+                        ) : authLoading ? (
                              <div className="h-10 w-full bg-slate-100 rounded-full animate-pulse border border-slate-200"></div>
                         ) : user ? (
                             <form onSubmit={handleSendMessage} className="relative flex items-center">

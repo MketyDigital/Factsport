@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'; 
-import { getCoreTeamName } from '@/app/lib/teamAliases';
+import { getTeamQueryFilter, getTeamSearchVariations } from '@/app/lib/teamAliases';
 
 export async function getTeamForm(teamName: string) {
     if (!teamName) return [];
@@ -7,24 +7,22 @@ export async function getTeamForm(teamName: string) {
     // 🟢 Guaranteed to prevent Next.js from checking cookies
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     
-    // 1. Get the smart core name from your aliases file (e.g., "Manchester United")
-    const coreName = getCoreTeamName(teamName).toLowerCase();
-    const originalTarget = teamName.toLowerCase().replace(/['"]/g, '');
-
-    // 2. Extract the absolute base word for a broad database search (e.g., "Manchester")
-    const baseSearchWord = coreName.split(' ')[0];
+    // 1. Get the massive multi-variation query string
+    const exactQueryFilter = getTeamQueryFilter(teamName);
+    
+    // Get the array of words to validate against later
+    const variations = getTeamSearchVariations(teamName).map(v => v.toLowerCase());
 
     try {
-        // 3. OVER-FETCH: Ask DB for 20 matches using the broad base word. 
-        // This guarantees we capture all variations like "Man Utd", "Manchester Utd", etc.
+        // 2. Fetch safely! We grab 30 matches because multi-competition teams play a lot.
         const { data } = await supabase
             .from('matches')
             .select('home_team, away_team, home_score, away_score')
             .in('status', ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'])
-            .or(`home_team.ilike.%${baseSearchWord}%,away_team.ilike.%${baseSearchWord}%`)
+            .or(exactQueryFilter)
             .lt('match_date', new Date().toISOString())
             .order('match_date', { ascending: false })
-            .limit(20); 
+            .limit(30); 
 
         if (!data || data.length === 0) return [];
 
@@ -34,12 +32,12 @@ export async function getTeamForm(teamName: string) {
             const homeName = (m.home_team || '').toLowerCase();
             const awayName = (m.away_team || '').toLowerCase();
             
-            // 4. THE JAVASCRIPT FILTER (The Derby Checker)
-            // It ignores "Man City" matches, and strictly accepts "Man Utd" or "Manchester United"
-            const isHomeMatch = homeName.includes(coreName) || homeName.includes(originalTarget) || coreName.includes(homeName);
-            const isAwayMatch = awayName.includes(coreName) || awayName.includes(originalTarget) || coreName.includes(awayName);
+            // 3. Robust JS Validation: Check if ANY variation is inside the DB name.
+            // Solves the issue: ESPN sends "man city", Variations array has "man city". -> MATCH!
+            const isHomeMatch = variations.some(v => homeName.includes(v) || v.includes(homeName));
+            const isAwayMatch = variations.some(v => awayName.includes(v) || v.includes(awayName));
             
-            // Skip false positives from the broad database query!
+            // If it's a false positive (like Leeds United sneaking into a USA search), skip it!
             if (!isHomeMatch && !isAwayMatch) continue; 
 
             const isHome = isHomeMatch;
@@ -56,7 +54,7 @@ export async function getTeamForm(teamName: string) {
             
             form.push(result);
             
-            // 🟢 Stop exactly when we hit 5 valid matches!
+            // 🟢 Stop exactly when we hit 5 valid, confirmed matches!
             if (form.length === 5) break; 
         }
 

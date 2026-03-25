@@ -1,10 +1,8 @@
-// ✅ Required for Cloudflare Pages/Edge compatibility
 export const runtime = 'edge'; 
-// ✅ Ensures the score is never cached by the server so it stays "Live"
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js'; // 🟢 OPTIMIZED: Anon Client for pure speed
+import { createClient } from '@supabase/supabase-js'; 
 import { getExternalData } from '@/app/lib/matchService';
 
 export async function GET(
@@ -13,14 +11,11 @@ export async function GET(
 ) {
 
   // 🛡️ THE SAFE BROWSER BOUNCER 
-  // (Allows your Admin Dashboard to use this route, but blocks scrapers)
   if (process.env.NODE_ENV === 'production') {
       const referer = request.headers.get('referer') || '';
       const fetchSite = request.headers.get('sec-fetch-site') || '';
       const isBrowser = referer.includes('factsport.com') || fetchSite === 'same-origin';
       
-      // We still allow the CRON_KEY just in case you ever use a backend script, 
-      // but now the browser check will let your admin panel through!
       const authHeader = request.headers.get('Authorization') || '';
       const isVIP = authHeader === `Bearer ${process.env.CRON_KEY}`;
 
@@ -30,10 +25,8 @@ export async function GET(
   }
 
   try {
-    // 🟢 OPTIMIZED: Bypasses cookie checks entirely for maximum Edge speed
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     
-    // 1. Fetch the match record from your Database
     const { data: dbData, error } = await supabase
       .from('matches')
       .select('*')
@@ -44,11 +37,15 @@ export async function GET(
       return NextResponse.json({ error: 'Match not found in database' }, { status: 404 });
     }
 
-    // 2. Use the Centralized Service to fetch fresh data from ESPN
     const freshData = await getExternalData(dbData);
 
-    // 3. Return the clean, unified data to your frontend components
-    return NextResponse.json(freshData);
+    // 🟢 THE CLOUDFLARE SHIELD: Caches at the edge for 5 seconds. 
+    // Resolves the DDOS threat and drastically lowers your server CPU usage.
+    return NextResponse.json(freshData, {
+        headers: {
+            'Cache-Control': 'max-age=0, s-maxage=5, stale-while-revalidate=10',
+        },
+    });
 
   } catch (error: any) {
     console.error('Bridge API Error:', error);

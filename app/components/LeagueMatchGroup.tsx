@@ -1,8 +1,9 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Calendar, Zap, Ticket, ExternalLink, BarChart2, ChevronRight, Clock, CheckCircle, Trophy } from 'lucide-react';
+import { Calendar, Zap, Ticket, ExternalLink, BarChart2, ChevronRight, Clock, CheckCircle, Trophy, RefreshCcw } from 'lucide-react';
 import MatchTime from '@/app/components/MatchTime';
+import { useSmartInterval } from '@/app/hooks/useSmartInterval';
 
 const groupByDate = (matchList: any[]) => {
     const groups: { [date: string]: any[] } = {};
@@ -21,6 +22,15 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
     const [activeTab, setActiveTab] = useState<'fixtures' | 'results'>('fixtures');
     const [liveMatches, setLiveMatches] = useState(matches);
     const isFetching = useRef(false);
+    
+    // 🟢 PAGINATION STATE: Shows 10 matches at a time to prevent layout bloating
+    const [visibleCount, setVisibleCount] = useState(10);
+
+    // Reset pagination when tab switches
+    const handleTabChange = (tab: 'fixtures' | 'results') => {
+        setActiveTab(tab);
+        setVisibleCount(10);
+    };
 
     useEffect(() => {
         setLiveMatches(prev => {
@@ -31,84 +41,62 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
         });
     }, [matches]);
 
-    // 🟢 HUGE OPTIMIZATION: ONLY poll active matches + HEARTBEAT RESTORED
-    useEffect(() => {
-        let isMounted = true;
-        let timeoutId: NodeJS.Timeout;
+    const activeLiveMatches = liveMatches.filter(m => 
+        ['LIVE', 'IN_PLAY', 'HT', '1H', '2H', 'ET', 'P'].includes((m.status || '').toUpperCase()) && m.espn_id
+    );
 
-        const fetchUpdates = async () => {
-            if (!isMounted) return;
+    const fetchUpdates = async () => {
+        if (isFetching.current || activeLiveMatches.length === 0) return;
 
-            // Only grab matches that are actually live and have an ESPN ID
-            const activeLiveMatches = liveMatches.filter(m => 
-                ['LIVE', 'IN_PLAY', 'HT', '1H', '2H', 'ET', 'P'].includes((m.status || '').toUpperCase()) && m.espn_id
-            );
-
-            // If no games are playing, schedule a slower 30-second heartbeat and exit early.
-            if (activeLiveMatches.length === 0) {
-                if (isMounted) timeoutId = setTimeout(fetchUpdates, 30000);
-                return;
-            }
-
-            // 🟢 HEARTBEAT FIX: Only fetch if visible, but NEVER 'return' here!
-            if (document.visibilityState === 'visible' && !isFetching.current) {
-                isFetching.current = true;
+        isFetching.current = true;
+        try {
+            const updatePromises = activeLiveMatches.map(async (m) => {
                 try {
-                    // Fetch updates for the live matches concurrently
-                    const updatePromises = activeLiveMatches.map(async (m) => {
-                        try {
-                            const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${m.espn_id}&t=${Date.now()}`);
-                            if (res.ok) {
-                                const data = await res.json();
-                                if (!data.error) return { id: m.id, status: data.status, home_score: data.home_score, away_score: data.away_score };
-                            }
-                        } catch (e) {}
-                        return null;
-                    });
+                    const res = await fetch(`https://live-api.factsport.com/?espn_id=${m.espn_id}&t=${Date.now()}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (!data.error) return { id: m.id, status: data.status, home_score: data.home_score, away_score: data.away_score, displayClock: data.displayClock };
+                    }
+                } catch (e) {}
+                return null;
+            });
 
-                    const results = await Promise.all(updatePromises);
-                    
-                    let hasChanges = false;
-                    const newLiveMatches = liveMatches.map(m => {
-                        const update = results.find(r => r && r.id === m.id);
-                        if (update && (update.status !== m.status || update.home_score !== m.home_score || update.away_score !== m.away_score)) {
-                            hasChanges = true;
-                            return { ...m, status: update.status, home_score: update.home_score, away_score: update.away_score };
-                        }
-                        return m;
-                    });
-
-                    if (hasChanges && isMounted) setLiveMatches(newLiveMatches);
-
-                } catch(e) { } 
-                finally {
-                    isFetching.current = false;
+            const results = await Promise.all(updatePromises);
+            
+            let hasChanges = false;
+            const newLiveMatches = liveMatches.map(m => {
+                const update = results.find(r => r && r.id === m.id);
+                if (update && (update.status !== m.status || update.home_score !== m.home_score || update.away_score !== m.away_score || update.displayClock !== m.displayClock)) {
+                    hasChanges = true;
+                    return { ...m, status: update.status, home_score: update.home_score, away_score: update.away_score, displayClock: update.displayClock };
                 }
-            }
+                return m;
+            });
 
-            // 🟢 THE HEARTBEAT: Schedules the next active check (8 seconds is best for multiple matches)
-            if (isMounted) {
-                timeoutId = setTimeout(fetchUpdates, 8000); 
-            }
-        };
+            if (hasChanges) setLiveMatches(newLiveMatches);
 
-        fetchUpdates();
+        } catch(e) { } 
+        finally {
+            isFetching.current = false;
+        }
+    };
 
-        return () => {
-            isMounted = false;
-            clearTimeout(timeoutId);
-        };
-    }, [liveMatches]);
+    useSmartInterval(fetchUpdates, activeLiveMatches.length > 0 ? 8000 : null);
 
     const fixtures = liveMatches
-        .filter(m => !['FT', 'FINISHED', 'ABD'].includes(m.status))
+        .filter(m => !['FT', 'FINISHED', 'ABD'].includes((m.status || '').toUpperCase()))
         .sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
     
     const results = liveMatches
-        .filter(m => ['FT', 'FINISHED', 'ABD'].includes(m.status))
+        .filter(m => ['FT', 'FINISHED', 'ABD'].includes((m.status || '').toUpperCase()))
         .sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
 
-    const displayMatches = activeTab === 'fixtures' ? fixtures : results;
+    const activeList = activeTab === 'fixtures' ? fixtures : results;
+    
+    // 🟢 SLICE THE ARRAY: Only render the currently visible count
+    const displayMatches = activeList.slice(0, visibleCount);
+    const hasMore = visibleCount < activeList.length;
+
     const dateGroups = groupByDate(displayMatches);
     const hasData = displayMatches.length > 0;
 
@@ -117,27 +105,27 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
             <div className="bg-slate-50 border-b border-slate-200">
                 <div className="px-4 py-3 flex justify-between items-center">
                     <h2 className="font-black text-sm uppercase text-slate-800 tracking-wider truncate">{leagueName}</h2>
-                    <Link href={`/standings?league=${encodeURIComponent(leagueName)}`} className="text-[10px] font-bold text-blue-600 flex items-center gap-1 hover:underline">
+                    <Link href={`/standings?league=${encodeURIComponent(leagueName.replace(' Matches', ''))}`} className="text-[10px] font-bold text-blue-600 flex items-center gap-1 hover:underline">
                         Full Table <ChevronRight size={10} />
                     </Link>
                 </div>
                 
                 <div className="flex px-2 gap-2 pb-2">
                     <button 
-                        onClick={() => setActiveTab('fixtures')} 
+                        onClick={() => handleTabChange('fixtures')} 
                         className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'fixtures' ? 'bg-white shadow-sm text-blue-600 border border-slate-100' : 'text-slate-400 hover:bg-slate-100'}`}
                     >
                         <Calendar size={12} /> Fixtures
                         <span className={`px-1.5 rounded-full text-[9px] ${activeTab === 'fixtures' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{fixtures.length}</span>
                     </button>
                     <button 
-                        onClick={() => setActiveTab('results')} 
+                        onClick={() => handleTabChange('results')} 
                         className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'results' ? 'bg-white shadow-sm text-blue-600 border border-slate-100' : 'text-slate-400 hover:bg-slate-100'}`}
                     >
                         <CheckCircle size={12} /> Results
                         <span className={`px-1.5 rounded-full text-[9px] ${activeTab === 'results' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{results.length}</span>
                     </button>
-                    <Link href={`/standings?league=${encodeURIComponent(leagueName)}`} className="flex-1 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:bg-slate-100 flex items-center justify-center gap-2 transition-all">
+                    <Link href={`/standings?league=${encodeURIComponent(leagueName.replace(' Matches', ''))}`} className="flex-1 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:bg-slate-100 flex items-center justify-center gap-2 transition-all">
                         <BarChart2 size={12} /> Table
                     </Link>
                 </div>
@@ -147,7 +135,7 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                 {!hasData ? (
                     <div className="flex flex-col items-center justify-center py-8 text-slate-400">
                         <Calendar size={24} className="mb-2 opacity-50"/>
-                        <p className="text-xs font-medium">No {activeTab} found.</p>
+                        <p className="text-xs font-medium">No {activeTab} available.</p>
                     </div>
                 ) : (
                     Object.keys(dateGroups).map((dateKey) => (
@@ -159,9 +147,9 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                             </div>
 
                             {dateGroups[dateKey].map((match) => {
-                                const isLive = ['LIVE', 'HT', 'IN_PLAY'].includes(match.status);
-                                const isScheduled = match.status === 'SCHEDULED' || match.status === 'PRE';
-                                const isFinished = ['FT', 'FINISHED'].includes(match.status);
+                                const isLive = ['LIVE', 'HT', 'IN_PLAY'].includes((match.status || '').toUpperCase());
+                                const isScheduled = ['SCHEDULED', 'PRE'].includes((match.status || '').toUpperCase());
+                                const isFinished = ['FT', 'FINISHED'].includes((match.status || '').toUpperCase());
                                 
                                 const stageText = match.match_group ? match.match_group.replace(/_/g, ' ') : (match.stage && match.stage !== 'REGULAR_SEASON' ? match.stage.replace(/_/g, ' ') : null);
                                 const isKnockout = match.stage && (match.stage.includes('FINAL') || match.stage.includes('KNOCKOUT'));
@@ -202,7 +190,7 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                             {isLive ? (
                                                 <div className="flex flex-col items-center">
                                                     <span className="animate-pulse text-red-600 font-black text-[10px] bg-red-50 px-2 py-0.5 rounded border border-red-100">LIVE</span>
-                                                    <span className="text-[9px] text-red-500 font-bold mt-1">{match.status === 'HT' ? 'HT' : 'On Going'}</span>
+                                                    <span className="text-[9px] text-red-500 font-bold mt-1">{match.status === 'HT' ? 'HT' : match.displayClock || 'On Going'}</span>
                                                 </div>
                                             ) : isFinished ? (
                                                 <div className="flex flex-col items-center">
@@ -244,6 +232,19 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                     ))
                 )}
             </div>
+
+            {/* 🟢 LOAD MORE BUTTON */}
+            {hasMore && (
+                <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+                    <button 
+                        onClick={() => setVisibleCount(prev => prev + 10)}
+                        className="w-full bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-slate-600 font-black text-[10px] uppercase tracking-widest py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+                    >
+                        <RefreshCcw size={14} className="text-blue-500" /> 
+                        Load {Math.min(10, activeList.length - visibleCount)} More {activeTab === 'fixtures' ? 'Upcoming Matches' : 'Recent Results'}
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

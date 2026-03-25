@@ -24,7 +24,6 @@ export default function FactSportPlayer({
   const [progress, setProgress] = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
   
-  // Inherit strict lock state from the server
   const [isTimeLocked, setIsTimeLocked] = useState(isLocked);
   const [coverageTimeText, setCoverageTimeText] = useState('Coverage starts 5 mins to Kick-off');
   
@@ -36,7 +35,6 @@ export default function FactSportPlayer({
   const isRawAudio = mediaUrl.match(/\.(mp3|wav)$/i);
 
   useEffect(() => {
-      // Re-sync if the server lock state changes
       setIsTimeLocked(isLocked);
       if (matchDate && isLocked) {
           const timeStr = new Date(matchDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -45,18 +43,22 @@ export default function FactSportPlayer({
   }, [isLocked, matchDate]);
 
   useEffect(() => {
-      // Auto-unlock precisely 5 minutes before kickoff
       if (!isTimeLocked || isFinished || !matchDate) return;
 
-      const checkUnlock = () => {
-          const kickoffTime = new Date(matchDate).getTime();
-          if (Date.now() >= kickoffTime - (5 * 60 * 1000)) {
-              setIsTimeLocked(false);
-          }
-      };
+      const kickoffTime = new Date(matchDate).getTime();
+      const unlockTime = kickoffTime - (5 * 60 * 1000);
+      const timeUntilUnlock = unlockTime - Date.now();
 
-      const interval = setInterval(checkUnlock, 5000);
-      return () => clearInterval(interval);
+      // 🟢 CPU SHIELD: Instead of checking every 5 seconds forever, 
+      // we set ONE single timeout to unlock it exactly when needed.
+      if (timeUntilUnlock > 0) {
+          const timeout = setTimeout(() => {
+              setIsTimeLocked(false);
+          }, timeUntilUnlock);
+          return () => clearTimeout(timeout);
+      } else {
+          setIsTimeLocked(false);
+      }
   }, [isTimeLocked, matchDate, isFinished]);
 
   useEffect(() => {
@@ -93,7 +95,6 @@ export default function FactSportPlayer({
     else if (document.fullscreenElement) document.exitFullscreen();
   };
 
-  // 🟢 THE STRICT SHIELD UI
   if (isTimeLocked) {
       return (
           <div className={`w-full ${mode === 'audio' ? 'h-[120px]' : 'aspect-video'} bg-[#0a1428] relative flex flex-col items-center justify-center overflow-hidden border-b border-slate-800 shadow-inner group`}>

@@ -5,9 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Trophy, Star, Crown, History, TrendingUp, Calendar, Send, ExternalLink, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
-import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
-// 🔥 SEO METADATA ADDED
 export const metadata = {
   title: 'Prediction Leaderboard & Winners | FactSport',
   description: 'View the global VIP prediction leaderboard. See who is winning monthly cash prizes by predicting football matches and scores.',
@@ -119,7 +117,6 @@ export default async function LeaderboardPage() {
             </p>
         </div>
 
-        {/* 1. 🟢 STANDARD BANNER (Top of the page, under the intro) */}
         <AdsterraStandardBanner />
 
         <div className="flex items-end justify-center gap-2 mt-6 mb-4 max-w-lg mx-auto h-[320px]">
@@ -209,9 +206,8 @@ export default async function LeaderboardPage() {
              </div>
         </div>
 
-        {/* 2. 🟢 END OF PAGE NATIVE BANNER */}
         <div className="mt-8">
-            <AdsterraNativeBanner />
+            <AdsterraStandardBanner />
         </div>
     </div>
   );

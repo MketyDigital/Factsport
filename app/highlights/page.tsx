@@ -7,11 +7,9 @@ import { Metadata } from 'next';
 import { PlayCircle, Calendar, ArrowLeft, Tv, ShieldCheck, Trophy, ArrowRight, ChevronRight, ChevronLeft } from "lucide-react";
 import BettingPromo from '@/app/components/BettingPromo';
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
-import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
 
 const ITEMS_PER_PAGE = 12;
 
-// 🟢 ENHANCED SEO: OpenGraph & Twitter Cards
 export const metadata: Metadata = {
   title: 'Football Highlights & Goal Replays | FactSport',
   description: 'Watch the latest football highlights, goal replays, and match recaps from the top leagues worldwide.',
@@ -68,7 +66,6 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
   const firstHalf = safeHighlights.slice(0, midIndex);
   const secondHalf = safeHighlights.slice(midIndex);
 
-  // 🟢 JSON-LD SCHEMA FOR COLLECTION PAGE
   const jsonLd = {
       '@context': 'https://schema.org',
       '@type': 'CollectionPage',
@@ -79,7 +76,6 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
 
   return (
     <div className="min-h-screen bg-[#0a1428] text-white font-sans pb-16 overflow-x-hidden selection:bg-red-500">
-      {/* Inject JSON-LD Schema */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       
       <div className="bg-[#0f1c3a] border-b border-white/10 sticky top-0 z-40 shadow-2xl backdrop-blur-lg">
@@ -166,7 +162,7 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
                     
                     {safeHighlights.length > 0 && (
                         <div className="col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-4 py-4">
-                            <AdsterraNativeBanner />
+                            <AdsterraStandardBanner />
                         </div>
                     )}
 
@@ -226,7 +222,7 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
                     </div>
                 )}
 
-                <AdsterraNativeBanner />
+                <AdsterraStandardBanner />
 
                 <div className="mt-10 max-w-3xl mx-auto bg-[#0f1c3a] rounded-2xl p-4 md:p-5 border border-yellow-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 opacity-10 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>

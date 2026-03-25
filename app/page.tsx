@@ -4,50 +4,25 @@ export const revalidate = 5;
 import { createClient } from '@supabase/supabase-js'; 
 import Link from "next/link";
 import { Metadata } from 'next';
-import { ArrowRight, Youtube, Newspaper, TrendingUp, Calendar, Award, Trophy } from "lucide-react";
+import { ArrowRight, Youtube, Newspaper, TrendingUp, Calendar, Award, Trophy, Info } from "lucide-react";
 
-import LiveScoreLabel from '@/app/components/LiveScoreLabel';
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
-import MatchTime from '@/app/components/MatchTime';
 import NewsTicker from '@/app/components/NewsTicker'; 
 import LatestNewsList from '@/app/components/LatestNewsList'; 
 import HighlightsSlider from '@/app/components/HighlightsSlider'; 
 import HeroMatchCards from '@/app/components/HeroMatchCards'; 
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
-import AdsterraNativeBanner from '@/app/components/AdsterraNativeBanner';
-
-const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599"; 
+// 🟢 NEW: Using the Compact Row for the League Tabs
+import CompactMatchRow from '@/app/components/CompactMatchRow';
 
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
-// 🔥 ENHANCED SEO METADATA
 export const metadata: Metadata = {
   title: 'FactSport | Live Football, Sport News & Predictions',
   description: 'The #1 Platform for sports | football predictions, live scores, and breaking news.',
-  openGraph: {
-      title: 'FactSport | Live Football, Sport News & Predictions',
-      description: 'The #1 Platform for sports | football predictions, live scores, and breaking news.',
-      type: 'website',
-      siteName: 'FactSport',
-  },
-  twitter: {
-      card: 'summary_large_image',
-      title: 'FactSport | Live Football, Sport News & Predictions',
-      description: 'The #1 Platform for sports | football predictions, live scores, and breaking news.',
-  }
-};
-
-const formatDateLabel = (dateString: string) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const tomorrow = new Date();
-    tomorrow.setDate(today.getDate() + 1);
-    if (date.toDateString() === today.toDateString()) return "Today";
-    if (date.toDateString() === tomorrow.toDateString()) return "Tomorrow";
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 };
 
 const groupByDate = (matchList: any[]) => {
@@ -63,14 +38,27 @@ const groupByDate = (matchList: any[]) => {
 
 const sortMatches = (matches: any[]) => {
   return matches.sort((a, b) => {
-    const isLiveA = LIVE_STATUSES.includes((a.status || '').toUpperCase());
-    const isLiveB = LIVE_STATUSES.includes((b.status || '').toUpperCase());
+    const rawA = (a.status || '').toUpperCase();
+    const rawB = (b.status || '').toUpperCase();
 
-    if (isLiveA && !isLiveB) return -1; 
-    if (!isLiveA && isLiveB) return 1;  
+    const isLiveA = LIVE_STATUSES.includes(rawA);
+    const isLiveB = LIVE_STATUSES.includes(rawB);
+    const isFinishedA = FINISHED_STATUSES.includes(rawA);
+    const isFinishedB = FINISHED_STATUSES.includes(rawB);
 
-    if (isLiveA && isLiveB) return a.id - b.id;
-    return new Date(a.match_date).getTime() - new Date(b.match_date).getTime();
+    if (isLiveA && !isLiveB) return -1;
+    if (!isLiveA && isLiveB) return 1;
+
+    const isScheduledA = !isLiveA && !isFinishedA;
+    const isScheduledB = !isLiveB && !isFinishedB;
+    if (isScheduledA && !isScheduledB) return -1;
+    if (!isScheduledA && isScheduledB) return 1;
+
+    const timeA = new Date(a.match_date).getTime();
+    const timeB = new Date(b.match_date).getTime();
+
+    if (isFinishedA && isFinishedB) return timeB - timeA;
+    return timeA - timeB;
   });
 };
 
@@ -108,64 +96,66 @@ async function getHomepageData(leagueFilter: string | undefined) {
   tomorrowEnd.setDate(tomorrowEnd.getDate() + 1); 
   tomorrowEnd.setHours(23,59,59,999);
 
-  let matchQuery = supabase.from('matches').select('*');
+  let matches: any[] = [];
+  let isShowingFallbackResults = false;
+
+  const [newsRes, highlightsRes, featuredRes] = await Promise.all([
+    supabase.from('news').select('*').order('created_at', { ascending: false }).limit(20),
+    supabase.from('matches').select('*').not('video_url', 'is', null).neq('video_url', '').order('match_date', { ascending: false }).limit(5),
+    supabase.from('matches').select('*').eq('is_featured', true).gte('match_date', todayStart.toISOString()).order('match_date', { ascending: true }).limit(5)
+  ]);
 
   if (leagueFilter) {
-      const startDate = new Date(); startDate.setDate(startDate.getDate() - 1); 
-      const endDate = new Date(); endDate.setDate(endDate.getDate() + 3); 
-      matchQuery = matchQuery
-        .gte('match_date', startDate.toISOString())
-        .lte('match_date', endDate.toISOString())
-        .ilike('league', `%${leagueFilter}%`)
-        .order('match_date', { ascending: true });
-  } 
-  else {
-      matchQuery = matchQuery
+      const { data: activeMatches } = await supabase.from('matches')
+          .select('*')
+          .ilike('league', `%${leagueFilter}%`)
+          .not('status', 'in', '("FT","FINISHED","AET","PEN","AWARDED","ABD","POST","ENDED")')
+          .order('match_date', { ascending: true })
+          .limit(5); 
+
+      if (activeMatches && activeMatches.length > 0) {
+          matches = activeMatches;
+      } else {
+          const { data: pastMatches } = await supabase.from('matches')
+              .select('*')
+              .ilike('league', `%${leagueFilter}%`)
+              .in('status', ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD', 'POST', 'ENDED'])
+              .order('match_date', { ascending: false }) 
+              .limit(5); 
+
+          if (pastMatches && pastMatches.length > 0) {
+              matches = pastMatches;
+              isShowingFallbackResults = true; 
+          }
+      }
+      matches = sortMatches(matches);
+
+  } else {
+      const { data: defaultMatches } = await supabase.from('matches').select('*')
         .or(`status.eq.LIVE,status.eq.IN_PLAY,status.eq.HT,status.eq.in,match_date.gte.${todayStart.toISOString()}`)
         .lte('match_date', tomorrowEnd.toISOString()) 
         .order('match_date', { ascending: true })
         .limit(50); 
-  }
+      
+      matches = defaultMatches || [];
 
-  const [matchesRes, newsRes, highlightsRes, featuredRes] = await Promise.all([
-    matchQuery,
-    supabase.from('news').select('*').order('created_at', { ascending: false }).limit(20),
-    supabase.from('matches')
-      .select('*')
-      .not('video_url', 'is', null)
-      .neq('video_url', '') 
-      .order('match_date', { ascending: false })
-      .limit(5),
-    
-    supabase.from('matches')
-      .select('*')
-      .eq('is_featured', true)
-      .gte('match_date', todayStart.toISOString()) 
-      .order('match_date', { ascending: true })
-      .limit(5)
-  ]);
-
-  let matches = matchesRes.data || [];
-
-  if (!leagueFilter && matches.length > 0) {
-      matches = getDiverseMatches(matches, 20);
-  } else {
-      matches = sortMatches(matches);
-  }
-
-  if (matches.length === 0 && !leagueFilter) {
-      const { data: finishedMatches } = await supabase.from('matches').select('*')
-        .in('status', ['FT', 'FINISHED', 'ABD', 'post', 'POST', 'ENDED', 'AET', 'PEN']) 
-        .order('match_date', { ascending: false })
-        .limit(10);
-      if (finishedMatches) matches = finishedMatches;
+      if (matches.length > 0) {
+          matches = getDiverseMatches(matches, 20);
+      } else {
+          const { data: finishedMatches } = await supabase.from('matches').select('*')
+            .in('status', ['FT', 'FINISHED', 'ABD', 'post', 'POST', 'ENDED', 'AET', 'PEN']) 
+            .order('match_date', { ascending: false })
+            .limit(10);
+          if (finishedMatches) matches = finishedMatches;
+      }
   }
 
   return { 
       matches, 
       news: newsRes.data || [], 
       highlights: highlightsRes.data || [], 
-      featuredMatches: featuredRes.data || [] 
+      featuredMatches: featuredRes.data || [],
+      isShowingFallbackResults
   };
 }
 
@@ -173,7 +163,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const resolvedParams = await searchParams;
   const selectedLeague = resolvedParams.league;
     
-  const { matches, news, highlights, featuredMatches } = await getHomepageData(selectedLeague);
+  const { matches, news, highlights, featuredMatches, isShowingFallbackResults } = await getHomepageData(selectedLeague);
 
   const rawTicker = news.slice(0, 15);
   const tickerNews = [...rawTicker, ...rawTicker, ...rawTicker, ...rawTicker]; 
@@ -187,50 +177,18 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   } 
   
   if (heroMatches.length === 0) {
-      const bigTeams = [
-          'Arsenal', 'Chelsea', 'Liverpool', 'Man City', 'Manchester City', 'Man United', 'Manchester United', 'Tottenham',
-          'Real Madrid', 'Barcelona', 'Atletico', 
-          'Bayern', 'Dortmund', 'Leverkusen',
-          'Juventus', 'Inter', 'AC Milan', 'Napoli', 
-          'PSG', 'Paris Saint Germain'
-      ];
-
+      const bigTeams = ['Arsenal', 'Chelsea', 'Liverpool', 'Man City', 'Manchester City', 'Man United', 'Manchester United', 'Tottenham', 'Real Madrid', 'Barcelona', 'Atletico', 'Bayern', 'Dortmund', 'Leverkusen', 'Juventus', 'Inter', 'AC Milan', 'Napoli', 'PSG', 'Paris Saint Germain'];
       const activeMatches = matches.filter(m => !FINISHED_STATUSES.includes((m.status || '').toUpperCase()));
       const candidates = activeMatches.length > 0 ? activeMatches : matches;
-
-      const bigMatches = candidates.filter(m => {
-          return bigTeams.some(giant => 
-              (m.home_team && m.home_team.toLowerCase().includes(giant.toLowerCase())) || 
-              (m.away_team && m.away_team.toLowerCase().includes(giant.toLowerCase()))
-          );
-      });
-
-      if (bigMatches.length > 0) {
-          heroMatches = bigMatches.slice(0, 2);
-      } else {
-          heroMatches = candidates.slice(0, 2);
-      }
+      const bigMatches = candidates.filter(m => { return bigTeams.some(giant => (m.home_team && m.home_team.toLowerCase().includes(giant.toLowerCase())) || (m.away_team && m.away_team.toLowerCase().includes(giant.toLowerCase()))); });
+      if (bigMatches.length > 0) { heroMatches = bigMatches.slice(0, 2); } else { heroMatches = candidates.slice(0, 2); }
   }
 
   const displayMatches = matches.filter(m => !heroMatches.some(h => h.id === m.id));
   const groupedMatches = groupByDate(displayMatches);
 
-  // 🟢 JSON-LD SCHEMA FOR HOME PAGE
-  const jsonLd = {
-      "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": "FactSport",
-      "url": "https://factsport.com/",
-      "potentialAction": {
-          "@type": "SearchAction",
-          "target": "https://factsport.com/news?category={search_term_string}",
-          "query-input": "required name=search_term_string"
-      }
-  };
-
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-0 overflow-x-hidden">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       
       <NewsTicker tickerNews={tickerNews} />
       <AdsterraStandardBanner />
@@ -252,8 +210,20 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
             {['Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Champions League'].map((league) => (
                 <Link key={league} href={`/?league=${league}`} scroll={false} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all ${selectedLeague === league ? 'bg-[#0a1428] text-white shadow-md' : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'}`}>{league === 'Premier League' ? 'EPL' : league}</Link>
             ))}
+            <Link href="/matches" className="px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100">Others</Link>
             </div>
         </div>
+
+        {selectedLeague && isShowingFallbackResults && (
+            <div className="px-4 mb-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+                    <div className="flex items-center gap-2 text-amber-800">
+                        <Info size={16} className="text-amber-600 shrink-0" />
+                        <p className="text-[10px] sm:text-xs font-bold">No upcoming fixtures right now. Showing latest results.</p>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {selectedLeague && matches.length > 0 && matches[0].league_banner && (
             <div className="px-4 mb-4">
@@ -265,79 +235,35 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
 
         {!selectedLeague && <HeroMatchCards heroMatches={heroMatches} />}
         
-        <div className="px-4 py-0 space-y-4 mt-2">
+        <div className="px-2 md:px-4 py-0 space-y-4 mt-2 max-w-4xl mx-auto">
              <FreeTipsBanner />
 
              {Object.keys(groupedMatches).length > 0 ? (
-                 Object.keys(groupedMatches).map((dateKey) => (
-                    <div key={dateKey} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-4">
-                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex items-center gap-2">
+                 <>
+                 {Object.keys(groupedMatches).map((dateKey) => (
+                    <div key={dateKey} className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-4">
+                        <div className="bg-slate-50 px-3 py-2 md:py-2.5 border-b border-slate-200 flex items-center gap-2">
                             <Calendar size={12} className="text-slate-400"/>
                             <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">{dateKey}</span>
                         </div>
 
-                        <div className="divide-y divide-slate-50">
-                            {groupedMatches[dateKey].map((match) => {
-                                const rawStatus = (match.status || '').toUpperCase();
-                                
-                                const isScheduled = SCHEDULED_STATUSES.includes(rawStatus);
-                                const isFinished = FINISHED_STATUSES.includes(rawStatus);
-                                
-                                const stageText = match.match_group ? match.match_group.replace(/_/g, ' ') : (match.stage && match.stage !== 'REGULAR_SEASON' ? match.stage.replace(/_/g, ' ') : null);
-
-                                return (
-                                    <div key={match.id} className="hover:bg-slate-50/80 transition block">
-                                        <Link href={`/match/${match.id}`} className="block p-4">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider">{match.league}</span>
-                                                    {stageText && (
-                                                        <>
-                                                            <span className="text-[8px] text-slate-300">•</span>
-                                                            <span className="text-[8px] font-black text-blue-500 uppercase tracking-wider bg-blue-50 px-1.5 py-0.5 rounded">{stageText}</span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="flex justify-between items-center">
-                                                <div className="flex-1 flex flex-col gap-2">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-6 h-6 flex items-center justify-center shrink-0">{match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain" /> : <div className="w-5 h-5 bg-slate-200 rounded-full"></div>}</div>
-                                                        <span className={`text-xs font-black uppercase tracking-tight truncate max-w-[120px] sm:max-w-none ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-600'}`}>
-                                                            {match.home_team}
-                                                        </span>
-                                                        {!isScheduled && <span className={`ml-auto font-black text-sm ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-400'}`}>{match.home_score}</span>}
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-6 h-6 flex items-center justify-center shrink-0">{match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain" /> : <div className="w-5 h-5 bg-slate-200 rounded-full"></div>}</div>
-                                                        <span className={`text-xs font-black uppercase tracking-tight truncate max-w-[120px] sm:max-w-none ${isFinished && match.away_score > match.home_score ? 'text-slate-900' : 'text-slate-600'}`}>
-                                                            {match.away_team}
-                                                        </span>
-                                                        {!isScheduled && <span className={`ml-auto font-black text-sm ${isFinished && match.away_score > match.home_score ? 'text-slate-900' : 'text-slate-400'}`}>{match.away_score}</span>}
-                                                    </div>
-                                                </div>
-                                                
-                                                <div className="flex flex-col items-end justify-center pl-4 border-l border-slate-100 ml-4 w-16 shrink-0">
-                                                    <LiveScoreLabel 
-                                                        matchId={match.id} 
-                                                        espnId={match.espn_id} 
-                                                        initialStatus={match.status} 
-                                                        variant="badge" 
-                                                        matchDate={match.match_date} 
-                                                    />
-                                                    {isScheduled && <span className="text-[10px] font-bold text-slate-500 mt-1"><MatchTime date={match.match_date} /></span>}
-                                                </div>
-                                            </div>
-                                        </Link>
-                                    </div>
-                                );
-                            })}
+                        <div className="flex flex-col">
+                            {/* 🟢 THE INJECTED COMPACT ROWS */}
+                            {groupedMatches[dateKey].map((match) => (
+                                <CompactMatchRow key={match.id} match={match} disablePolling={false} showLeague={!selectedLeague} />
+                            ))}
                         </div>
                     </div>
-                ))
+                 ))}
+                 
+                 {selectedLeague && (
+                    <Link href="/matches" className="block w-full text-center bg-white border border-slate-200 text-slate-600 font-black text-[10px] uppercase tracking-widest py-3.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition shadow-sm mb-4">
+                        View All {selectedLeague} Matches <ArrowRight size={12} className="inline ml-1 -mt-0.5" />
+                    </Link>
+                 )}
+                 </>
              ) : (
-                <div className="text-center py-12 opacity-50 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
+                <div className="text-center py-12 opacity-50 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm mx-2">
                    <Calendar size={24} className="mx-auto mb-2 text-slate-400"/>
                    <p className="text-xs font-bold text-slate-500">No matches found.</p>
                 </div>
@@ -345,7 +271,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </section>
 
-      <div className="mx-4 mb-4 mt-6">
+      <div className="mx-4 mb-4 mt-6 max-w-4xl md:mx-auto">
         <div className="rounded-2xl overflow-hidden relative shadow-2xl group cursor-pointer bg-black p-6 text-center">
             <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 blur-[60px] opacity-20 group-hover:opacity-30 transition"></div>
             <div className="relative z-10">
@@ -358,9 +284,9 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </div>
 
-      <AdsterraNativeBanner />
+      <div className="max-w-4xl mx-auto"><AdsterraStandardBanner /></div>
 
-      <div className="grid grid-cols-4 gap-3 px-4 py-6">
+      <div className="grid grid-cols-4 gap-3 px-4 py-6 max-w-4xl mx-auto">
           <Link href="/matches" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
               <Trophy className="text-yellow-500" size={20} />
               <span className="text-[10px] font-bold text-slate-700">Predict</span>

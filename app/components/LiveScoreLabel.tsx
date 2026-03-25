@@ -1,87 +1,68 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import { useSmartInterval } from '@/app/hooks/useSmartInterval'; 
+import MatchTime from '@/app/components/MatchTime'; 
 
 const HT_STATUSES = ['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME'];
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'ET', 'EXTRA TIME', 'P', 'PENALTIES', ...HT_STATUSES];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
 export default function LiveScoreLabel({ 
-    matchId, espnId, initialStatus, homeScore, awayScore, matchDate, variant = 'small', homeTeam, awayTeam 
+    matchId, espnId, initialStatus, homeScore, awayScore, displayClock, matchDate, variant = 'small', homeTeam, awayTeam, disablePolling = false 
 }: any) {
-  const [data, setData] = useState({ status: initialStatus, home: homeScore, away: awayScore, clock: '' });
+  const [data, setData] = useState({ status: initialStatus, home: homeScore, away: awayScore, clock: displayClock || '' });
   
   const hasFetchedLive = useRef(false);
   const isFetching = useRef(false);
+  const currentDataStatus = (initialStatus || '').toUpperCase();
+  const [matchFinished, setMatchFinished] = useState(FINISHED_STATUSES.includes(currentDataStatus));
 
   useEffect(() => {
-      if (!hasFetchedLive.current) {
-          setData(prev => ({ ...prev, status: initialStatus, home: homeScore, away: awayScore }));
+      if (disablePolling) {
+          setData({ status: initialStatus, home: homeScore, away: awayScore, clock: displayClock || '' });
+      } else if (!hasFetchedLive.current) {
+          setData(prev => ({ ...prev, status: initialStatus, home: homeScore, away: awayScore, clock: displayClock || '' }));
       }
-  }, [initialStatus, homeScore, awayScore]);
+  }, [initialStatus, homeScore, awayScore, displayClock, disablePolling]);
 
-  // 🟢 RECURSIVE POLLING + HEARTBEAT + WORKER ONLY
-  useEffect(() => {
-    let isMounted = true;
-    let timeoutId: NodeJS.Timeout;
+  const fetchLiveScore = async () => {
+      if (matchFinished || !espnId || isFetching.current || disablePolling) return;
+      isFetching.current = true;
 
-    const currentDataStatus = (initialStatus || '').toUpperCase();
-    if (FINISHED_STATUSES.includes(currentDataStatus) || !espnId) return;
-
-    const fetchLiveScore = async () => {
-      if (!isMounted) return; // Completely dead if component unmounts
-
-      let matchFinished = false;
-
-      // 🟢 HEARTBEAT FIX: Only fetch if visible, but NEVER 'return' and kill the loop!
-      if (document.visibilityState === 'visible' && !isFetching.current) {
-          isFetching.current = true;
-
-          try {
-              const res = await fetch(`https://fse.mkpoikankes.workers.dev/?espn_id=${espnId}&t=${Date.now()}`);
-              if (res.ok) {
-                  const matchData = await res.json();
-                  if (matchData && !matchData.error && isMounted) {
-                      hasFetchedLive.current = true; 
-                      
-                      // 🟢 O(1) SHALLOW DIFF: Only update React if numbers actually changed
-                      setData(prev => {
-                          if (prev.status === matchData.status && prev.home === matchData.home_score && prev.away === matchData.away_score && prev.clock === matchData.displayClock) {
-                              return prev; // Abort re-render to save CPU!
-                          }
-                          return { 
-                              status: matchData.status, 
-                              home: matchData.home_score, 
-                              away: matchData.away_score,
-                              clock: matchData.displayClock
-                          };
-                      });
-
-                      if (FINISHED_STATUSES.includes((matchData.status || '').toUpperCase())) {
-                          matchFinished = true; // Stop polling permanently
+      try {
+          const res = await fetch(`https://live-api.factsport.com/?espn_id=${espnId}&t=${Date.now()}`);
+          if (res.ok) {
+              const matchData = await res.json();
+              if (matchData && !matchData.error) {
+                  hasFetchedLive.current = true; 
+                  
+                  setData(prev => {
+                      if (prev.status === matchData.status && prev.home === matchData.home_score && prev.away === matchData.away_score && prev.clock === matchData.displayClock) {
+                          return prev; 
                       }
+                      return { 
+                          status: matchData.status, 
+                          home: matchData.home_score, 
+                          away: matchData.away_score,
+                          clock: matchData.displayClock
+                      };
+                  });
+
+                  if (FINISHED_STATUSES.includes((matchData.status || '').toUpperCase())) {
+                      setMatchFinished(true); 
                   }
               }
-          } catch (error) {}
-          finally {
-              isFetching.current = false;
           }
+      } catch (error) {}
+      finally {
+          isFetching.current = false;
       }
+  };
 
-      // 🟢 THE HEARTBEAT: Always schedules the next check (every 5s) to keep it alive
-      if (isMounted && !matchFinished) {
-          timeoutId = setTimeout(fetchLiveScore, 5000); 
-      }
-    };
+  useEffect(() => { if (!disablePolling) fetchLiveScore(); }, [disablePolling]);
+  useSmartInterval(fetchLiveScore, !matchFinished && !disablePolling ? 5000 : null);
 
-    fetchLiveScore();
-
-    return () => {
-        isMounted = false;
-        clearTimeout(timeoutId);
-    };
-  }, [espnId, initialStatus]); 
-
-  const userTime = new Date(matchDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  const userTime = matchDate ? new Date(matchDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--';
   const cleanStatus = (data.status || '').toUpperCase();
   const isHT = HT_STATUSES.includes(cleanStatus);
   const isLive = LIVE_STATUSES.includes(cleanStatus);

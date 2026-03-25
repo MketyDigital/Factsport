@@ -6,7 +6,6 @@ import '@stream-io/video-react-sdk/dist/css/styles.css';
 import { Loader2, Radio, Hand, Mic, MicOff, CheckCircle, XCircle, Link as LinkIcon, Play, Square, LogOut, Users, Circle, Activity, Tv } from 'lucide-react';
 import { useGlobalMedia } from '@/app/providers/GlobalMediaProvider';
 
-// --- YOUR ORIGINAL LISTENER UI ---
 const PremiumListenerUI = ({ role }: { role: string }) => {
     const { call, stopMedia } = useGlobalMedia();
     const { useParticipants } = useCallStateHooks();
@@ -18,7 +17,10 @@ const PremiumListenerUI = ({ role }: { role: string }) => {
 
     useEffect(() => {
         if (!isSpeaking) { setEqLevels([10, 10, 10, 10, 10, 10, 10]); return; }
-        const interval = setInterval(() => setEqLevels(Array.from({length: 7}, () => Math.floor(Math.random() * 70) + 20)), 150);
+        const interval = setInterval(() => {
+            if (document.hidden) return; 
+            setEqLevels(Array.from({length: 7}, () => Math.floor(Math.random() * 70) + 20));
+        }, 150);
         return () => clearInterval(interval);
     }, [isSpeaking]);
 
@@ -72,7 +74,6 @@ const PremiumListenerUI = ({ role }: { role: string }) => {
     );
 };
 
-// --- YOUR ORIGINAL STUDIO AVATARS ---
 const CustomAudioLayout = () => {
     const { useParticipants } = useCallStateHooks();
     const participants = useParticipants();
@@ -97,7 +98,6 @@ const CustomAudioLayout = () => {
     );
 };
 
-// --- YOUR ORIGINAL STUDIO UI DECK ---
 const StudioUI = ({ role, matchId }: { role: string, matchId: string }) => {
     const { call, stopMedia } = useGlobalMedia();
     const { useIsCallLive, useMicrophoneState, useParticipants, useIsCallRecordingInProgress } = useCallStateHooks(); 
@@ -200,7 +200,6 @@ const StudioUI = ({ role, matchId }: { role: string, matchId: string }) => {
     );
 };
 
-// --- THE MAIN COMPONENT EXPORT (Dual Video/Audio mode) ---
 export default function FactSportMediaRoom({ matchId, mediaUrl = 'streamio', title = 'FactSport Broadcast' }: { matchId: string, mediaUrl?: string, title?: string }) {
     const { activeMatchId, mediaType, videoUrl, client, call, role, isConnecting, isWaitingForHost, setIsPageActive, tuneInAudio, tuneInVideo } = useGlobalMedia();
     const [canSpeak, setCanSpeak] = useState(false);
@@ -223,7 +222,6 @@ export default function FactSportMediaRoom({ matchId, mediaUrl = 'streamio', tit
         return () => sub();
     }, [call, role]);
 
-    // TUNE IN GATE (Mandatory)
     if (activeMatchId !== matchId) {
         return (
             <div className="w-full min-h-[300px] bg-gradient-to-b from-[#0a1428] to-black relative overflow-hidden flex flex-col items-center justify-center p-6 border border-slate-800 rounded-2xl shadow-xl">
@@ -246,7 +244,6 @@ export default function FactSportMediaRoom({ matchId, mediaUrl = 'streamio', tit
         );
     }
 
-    // 📺 LARGE VIDEO PLAYER VIEW (For Live Match or Goal Rush Video)
     if (mediaType === 'video' && videoUrl) {
         return (
             <div className="w-full aspect-video bg-black relative overflow-hidden rounded-2xl shadow-2xl border border-slate-800 group">
@@ -260,7 +257,6 @@ export default function FactSportMediaRoom({ matchId, mediaUrl = 'streamio', tit
         );
     }
 
-    // ⏳ WAITING FOR AUDIO HOST
     if (isWaitingForHost || !client || !call) {
         return (
             <div className="w-full min-h-[250px] bg-gradient-to-b from-[#0a1428] to-black relative overflow-hidden flex flex-col items-center justify-center p-6 border border-slate-800 rounded-2xl shadow-xl">
@@ -285,7 +281,7 @@ export default function FactSportMediaRoom({ matchId, mediaUrl = 'streamio', tit
         );
     }
 
-    // 🎙️ LIVE AUDIO STUDIO VIEW
+    // 🟢 DECLARED `inStudio` VARIABLE RIGHT BEFORE RETURN
     const inStudio = role === 'admin' || role === 'guest' || (role === 'user' && canSpeak);
 
     return (
