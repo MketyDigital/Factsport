@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
-import { Loader2, Lock, CheckCircle, Trophy, XCircle, Target, TrendingUp, Zap, Users, Save, ListChecks } from 'lucide-react';
+import { Loader2, CheckCircle, Target, TrendingUp, Zap, Users, Save, ListChecks } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/components/AuthProvider'; 
 
@@ -25,12 +25,16 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
   const router = useRouter();
   const { user, loading: authLoading } = useAuth(); 
 
+  // 🟢 THE TRIGGER: Determines if the match has started
   const isLocked = new Date() > new Date(matchDate);
 
   useEffect(() => { 
+      // 🟢 THE DATABASE SHIELD: If match is locked/started, abort immediately! Zero DB reads.
+      if (isLocked) return;
+
       if (user?.id) fetchPrediction(user.id);
       fetchCampaignRules();
-  }, [user?.id]);
+  }, [user?.id, isLocked]);
 
   const fetchCampaignRules = async () => {
       const { data: mData } = await supabase.from('matches').select('campaign_id').eq('id', matchId).single();
@@ -127,7 +131,7 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
       setLoading(true);
       
       const customPayload = { 
-          ...existingPred.custom_predictions, 
+          ...existingPred?.custom_predictions, 
           first_scorer: firstScorer, 
           red_card: redCard, 
           penalty: penalty 
@@ -160,58 +164,15 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
       return [...homePlayers, ...awayPlayers].sort();
   }, [matchData, homeTeam, awayTeam]);
 
-
-  // 🟢 UI STATE 1: MARKET IS CLOSED (Match Started or Finished)
+  // 🟢 THE DOM SHIELD: If the match has started/ended, completely vanish from the page!
   if (isLocked) {
-    const isFinalized = existingPred?.status?.toUpperCase() === 'WON' || existingPred?.status?.toUpperCase() === 'LOST';
-    const totalEarned = (existingPred?.points_awarded || 0) + (existingPred?.campaign_points_awarded || 0);
-
-    return (
-        <div className="bg-[#f8f9fa] rounded-xl p-4 text-center border border-slate-200 shadow-inner relative overflow-hidden">
-            <div className="absolute -left-10 -top-10 w-24 h-24 bg-slate-200 rounded-full blur-[30px] opacity-50"></div>
-            <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm border border-slate-100 relative z-10">
-                <Lock className="text-slate-400" size={14} />
-            </div>
-            <h3 className="text-slate-800 font-black uppercase tracking-widest text-[10px] relative z-10">Market Closed</h3>
-            
-            {existingPred && (
-                <div className="mt-3 bg-white p-3 rounded-xl shadow-sm border border-slate-100 relative z-10">
-                    <div className="flex justify-center items-center gap-2 mb-3">
-                         <div className="text-center flex-1 bg-slate-50 p-1.5 rounded border border-slate-100">
-                            <div className="text-[7px] uppercase font-bold text-slate-400 tracking-widest mb-0.5">Winner</div>
-                            <div className="font-black text-slate-800 text-[10px] uppercase">{existingPred.predicted_outcome}</div>
-                         </div>
-                         <div className="text-center flex-1 bg-slate-50 p-1.5 rounded border border-slate-100">
-                            <div className="text-[7px] uppercase font-bold text-slate-400 tracking-widest mb-0.5">Score</div>
-                            <div className="font-black text-slate-800 text-[10px]">
-                                {existingPred.predicted_home_score !== null ? `${existingPred.predicted_home_score} - ${existingPred.predicted_away_score}` : 'SKIPPED'}
-                            </div>
-                         </div>
-                    </div>
-
-                    {isFinalized ? (
-                        <div className={`w-full text-[9px] font-black uppercase tracking-widest py-1.5 rounded-lg flex items-center justify-center gap-1 ${totalEarned > 0 ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-500 border border-red-100'}`}>
-                           {totalEarned > 0 ? (
-                               <><Trophy size={10} className="text-green-500"/> +{totalEarned} PTS</>
-                           ) : (
-                               <><XCircle size={10} /> BUSTED</>
-                           )}
-                        </div>
-                    ) : (
-                        <div className="w-full text-[8px] font-black uppercase tracking-widest bg-yellow-50 text-yellow-600 py-1.5 rounded-lg border border-yellow-200 flex items-center justify-center gap-1">
-                            <Loader2 size={10} className="animate-spin" /> PENDING
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-    );
+      return null;
   }
 
   return (
     <div className="space-y-3 relative z-10">
         
-        {/* 🟢 UI STATE 2: MAIN PREDICTION LOCKED IN */}
+        {/* UI STATE: MAIN PREDICTION LOCKED IN */}
         {existingPred ? (
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 text-center relative overflow-hidden shadow-sm">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-green-400 rounded-full blur-[50px] opacity-10 pointer-events-none"></div>
@@ -234,7 +195,7 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
             </div>
         ) : (
             
-        /* 🟢 UI STATE 3: USER IS PREDICTING FOR THE FIRST TIME */
+        /* UI STATE: USER IS PREDICTING FOR THE FIRST TIME */
             <div className="space-y-3">
                 {isCamp && (
                     <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-3 rounded-xl shadow-md mb-2 flex items-center justify-between">
@@ -334,7 +295,7 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
             </div>
         )}
 
-        {/* 🟢 UI STATE 4: THE PROGRESSIVE BONUS MARKETS */}
+        {/* 🟢 THE PROGRESSIVE BONUS MARKETS */}
         {isCamp && existingPred && (
             <div className="mt-4 p-3 bg-gradient-to-br from-slate-900 to-[#0a1428] border border-slate-800 rounded-xl shadow-xl">
                 <h4 className="text-[10px] font-black text-yellow-400 uppercase tracking-widest flex items-center gap-1.5 mb-3 border-b border-slate-700 pb-2">
@@ -346,7 +307,6 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
                 </h4>
 
                 <div className="space-y-3">
-                    {/* ALWAYS OPEN: Red Card & Penalty */}
                     <div className="grid grid-cols-2 gap-2">
                         <div>
                             <label className="text-[9px] font-bold text-slate-300 uppercase flex items-center justify-between mb-1">
@@ -380,7 +340,6 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
                         </div>
                     </div>
 
-                    {/* CONDITIONALLY LOCKED: First Goalscorer */}
                     {rosterOptions.length === 0 ? (
                         <div className="text-center py-3 mt-2 bg-white/5 rounded-lg border border-white/5">
                             <Users size={16} className="mx-auto text-slate-500 mb-1" />
