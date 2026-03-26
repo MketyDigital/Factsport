@@ -11,6 +11,9 @@ import CleanupButton from './components/CleanupButton';
 import PromoSettingsManager from '@/app/components/PromoSettingsManager';
 import GameRulesManager from '@/app/components/GameRulesManager';
 import AuditManager from '@/app/components/AuditManager';
+// 🟢 NEW: Imported the Social Settings Manager
+import SocialSettingsManager from '@/app/components/SocialSettingsManager';
+import AdminCampaignManager from '@/app/admin/components/AdminCampaignManager';
 
 export default async function AdminDashboard() {
   const supabase = createClient();
@@ -43,21 +46,21 @@ export default async function AdminDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 lg:px-12 -mt-10 relative z-20 space-y-8">
-          
-          {/* QUICK SYSTEM ACTIONS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ResetMonthButton />
-              <CleanupButton /> 
-          </div>
+         
+         {/* QUICK SYSTEM ACTIONS */}
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <ResetMonthButton />
+             <CleanupButton /> 
+         </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              
-              {/* MAIN LEFT COLUMN */}
-              <div className="lg:col-span-8 space-y-8">
-                  {error && <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm font-bold shadow-sm">Database Error: {error.message}</div>}
+         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+             
+             {/* MAIN LEFT COLUMN */}
+             <div className="lg:col-span-8 space-y-8">
+                 {error && <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm font-bold shadow-sm">Database Error: {error.message}</div>}
 
-                  {/* VIP APPROVALS TRAY */}
-                  <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+                 {/* VIP APPROVALS TRAY */}
+                 <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
                     <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
                         <div className="flex items-center gap-3">
                             <div className="bg-emerald-100 p-2 rounded-lg"><CreditCard size={20} className="text-emerald-600" /></div>
@@ -124,20 +127,25 @@ export default async function AdminDashboard() {
                             </table>
                         </div>
                     )}
-                  </div>
+                 </div>
 
-                  {/* GLOBAL SETTINGS MANAGER */}
-                  <PromoSettingsManager />
+                 {/* GLOBAL SETTINGS MANAGER */}
+                 <PromoSettingsManager />
+                 {/* 🟢 NEW: CAMPAIGN GAMIFICATION ENGINE */}
+                 <AdminCampaignManager />
 
-                  {/* RULES & AUDIT */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <GameRulesManager />
-                      <AuditManager />
-                  </div>
-              </div>
+                 {/* 🟢 NEW: SOCIAL MEDIA COMMAND CENTER */}
+                 <SocialSettingsManager />
 
-              {/* RIGHT SIDEBAR - QUICK NAV */}
-              <div className="lg:col-span-4 space-y-6">
+                 {/* RULES & AUDIT */}
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                     <GameRulesManager />
+                     <AuditManager />
+                 </div>
+             </div>
+
+             {/* RIGHT SIDEBAR - QUICK NAV */}
+             <div className="lg:col-span-4 space-y-6">
                  
                  <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-200 sticky top-24">
                      <h3 className="font-black text-xs text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2 pb-2 border-b border-slate-100">
@@ -197,9 +205,9 @@ export default async function AdminDashboard() {
                          </div>
                      </div>
                  </div>
-              </div>
+             </div>
 
-          </div>
+         </div>
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { 
   Trophy, Star, User as UserIcon, 
   Crown, CheckCircle, Lock,
-  MessageCircle, Settings, Clock, Target, Info, ArrowRight, Award // Award added here for Leaderboard icon
+  MessageCircle, Settings, Clock, Target, Info, ArrowRight, Award, Zap
 } from 'lucide-react';
 import SignOutButton from '@/app/components/SignOutButton';
 import DashboardHistory from '@/app/components/DashboardHistory'; 
@@ -38,31 +38,41 @@ async function getUserData() {
   const { data: currentPredictions } = await supabase
     .from('user_predictions')
     .select(`
-        id, predicted_outcome, predicted_home_score, predicted_away_score, points_awarded, status, created_at, is_eligible_for_prize,
-        match:matches ( home_team, away_team, home_score, away_score, status ) 
+        id, predicted_outcome, predicted_home_score, predicted_away_score, points_awarded, campaign_points_awarded, status, created_at, is_eligible_for_prize, custom_predictions,
+        match:matches ( home_team, away_team, home_score, away_score, status, match_events ), 
+        campaign:campaigns ( title )
     `)
     .eq('user_id', user.id)
     .gte('created_at', startOfMonth.toISOString())
     .order('created_at', { ascending: false })
-    .limit(50);
+    .limit(100); 
+
+  const { data: activeCampaignStandings } = await supabase
+    .from('campaign_leaderboards')
+    .select(`
+        total_points, 
+        campaign:campaigns ( id, title, end_date, is_vip_required, rules )
+    `)
+    .eq('user_id', user.id)
+    .not('campaign', 'is', null);
 
   let pastWins: any[] = [];
   if (!currentPredictions || currentPredictions.length === 0) {
       const { data: wins } = await supabase
         .from('user_predictions')
         .select(`
-            id, predicted_outcome, predicted_home_score, predicted_away_score, points_awarded, status, created_at, is_eligible_for_prize,
-            match:matches ( home_team, away_team, home_score, away_score, status ) 
+            id, predicted_outcome, predicted_home_score, predicted_away_score, points_awarded, campaign_points_awarded, status, created_at, is_eligible_for_prize, custom_predictions,
+            match:matches ( home_team, away_team, home_score, away_score, status, match_events ), 
+            campaign:campaigns ( title )
         `)
         .eq('user_id', user.id)
         .lt('created_at', startOfMonth.toISOString())
-        .or('status.eq.Won,points_awarded.gt.0')
+        .or('status.eq.WON,points_awarded.gt.0,campaign_points_awarded.gt.0')
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(20);
       pastWins = wins || [];
   }
 
-  // 🟢 Fetch latest Rank #1 winner for the VIP Upsell banner
   const { data: latestWinner } = await supabase
     .from('monthly_winners')
     .select('prize_amount, user:profiles(full_name)')
@@ -72,14 +82,16 @@ async function getUserData() {
     .limit(1)
     .single();
 
-  return { user, profile, settings, predictions: currentPredictions, pastWins, latestWinner };
+  const activeCamps = activeCampaignStandings?.filter((c: any) => new Date(c.campaign.end_date) > new Date()) || [];
+
+  return { user, profile, settings, predictions: currentPredictions, pastWins, latestWinner, activeCamps };
 }
 
 export default async function Dashboard() {
   const data = await getUserData();
   if (!data) redirect('/login');
 
-  const { profile, settings, predictions, pastWins, latestWinner } = data;
+  const { profile, settings, predictions, pastWins, latestWinner, activeCamps } = data;
     
   const expiryDate = profile?.vip_expires_at ? new Date(profile.vip_expires_at) : null;
   const isVipActive = profile?.is_vip && (!expiryDate || expiryDate > new Date());
@@ -102,17 +114,14 @@ export default async function Dashboard() {
   const formSource = (predictions && predictions.length > 0) ? predictions : pastWins;
   const formGuide = formSource?.slice(0, 5).map((p: any) => {
       const s = p.status?.toLowerCase();
-      if(s === 'won' || p.points_awarded > 0) return 'W';
+      if(s === 'won' || p.points_awarded > 0 || p.campaign_points_awarded > 0) return 'W';
       if(s === 'lost') return 'L';
       return 'P';
   }).reverse() || [];
 
-  // 🟢 TS FIX: Safely extract the name whether Supabase returns an object or an array
   let winnerName = 'A Champion';
   if (latestWinner?.user) {
-      winnerName = Array.isArray(latestWinner.user) 
-          ? latestWinner.user[0]?.full_name 
-          : (latestWinner.user as any).full_name;
+      winnerName = Array.isArray(latestWinner.user) ? latestWinner.user[0]?.full_name : (latestWinner.user as any).full_name;
   }
 
   return (
@@ -190,6 +199,35 @@ export default async function Dashboard() {
             </div>
       </div>
 
+      {/* 🟢 NEW: ACTIVE CAMPAIGNS WIDGET */}
+      {activeCamps.length > 0 && (
+          <div className="px-4 mb-4">
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 pl-1 flex items-center gap-1">
+                  <Zap size={12} className="text-orange-500"/> Active Tournaments
+              </h3>
+              <div className="grid grid-cols-1 gap-2">
+                  {activeCamps.map((ac: any) => {
+                      const campFloor = ac.campaign.rules?.min_points_floor || 50;
+                      const isQualified = ac.total_points >= campFloor && (!ac.campaign.is_vip_required || isVipActive);
+                      
+                      return (
+                      <div key={ac.campaign.id} className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl p-3 flex justify-between items-center shadow-md">
+                          <div className="text-white">
+                              <h4 className="font-black text-xs uppercase tracking-tight flex items-center gap-1">
+                                  {ac.campaign.title} 
+                                  {isQualified && <span className="bg-green-500 text-[7px] px-1.5 py-0.5 rounded shadow ml-1">QUALIFIED</span>}
+                              </h4>
+                              <p className="text-[9px] font-bold text-orange-100 uppercase tracking-widest">Your Score</p>
+                          </div>
+                          <div className="bg-white text-orange-600 font-black text-lg px-3 py-1 rounded-lg shadow-inner">
+                              {ac.total_points}
+                          </div>
+                      </div>
+                  )})}
+              </div>
+          </div>
+      )}
+
       <div className="px-4 mb-4">
         <div className={`rounded-2xl border p-4 shadow-sm relative overflow-hidden ${isFullyQualified ? 'bg-gradient-to-r from-green-900 to-emerald-900 border-green-700 text-white' : 'bg-white border-slate-200'}`}>
             <div className="flex justify-between items-start mb-2 relative z-10">
@@ -238,7 +276,6 @@ export default async function Dashboard() {
         </div>
       </div>
 
-      {/* 🟢 VIP UPSELL BANNER */}
       {!isVipActive && latestWinner && (
         <div className="px-4 mb-4">
             <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-2xl p-4 text-slate-900 shadow-xl relative overflow-hidden">
@@ -249,7 +286,6 @@ export default async function Dashboard() {
                             <Trophy size={10} /> Last Month's Winner
                         </p>
                         <h4 className="font-black text-sm">
-                            {/* 🟢 Safely uses the extracted winnerName */}
                             {winnerName} won <span className="text-white bg-black/20 px-1.5 py-0.5 rounded">{latestWinner.prize_amount}</span>!
                         </h4>
                         <p className="text-[9px] font-medium text-yellow-900 mt-1">Upgrade to VIP to qualify for this month's prizes.</p>
@@ -287,7 +323,6 @@ export default async function Dashboard() {
         </div>
       </div>
 
-      {/* 🚀 🟢 NEW: QUICK ACTION LINKS RESTORED */}
       <div className="grid grid-cols-3 gap-3 px-4 pb-6">
           <Link href="/matches" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
               <Trophy className="text-yellow-500" size={20} />
