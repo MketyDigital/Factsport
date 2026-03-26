@@ -199,7 +199,8 @@ export async function POST(request: Request) {
     // 🟢 THE FIX: PRE-WARM THE CACHE BEFORE PINGING MAKE.COM
     // ===================================================================
     // Extract any unique image URLs from the payload
-    const urlsToWarm = [...new Set([payload.xImageUrl, payload.fb1ImageUrl].filter(Boolean))] as string[];
+    const rawUrls = [payload.xImageUrl, payload.fb1ImageUrl].filter(Boolean) as string[];
+const urlsToWarm = rawUrls.filter((url, index) => rawUrls.indexOf(url) === index);
     
     if (urlsToWarm.length > 0) {
         try {
