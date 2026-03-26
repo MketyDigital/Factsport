@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
 import Link from 'next/link';
-import { ChevronLeft, Trophy, Target, Star, ShieldAlert } from 'lucide-react';
+import { ChevronLeft, Trophy, Target, Star, ShieldAlert, Zap, Flame } from 'lucide-react';
 
 export default function HowToPlay() {
   return (
@@ -11,7 +11,7 @@ export default function HowToPlay() {
       </Link>
 
       <h1 className="text-3xl font-black italic mb-2">HOW TO PLAY</h1>
-      <p className="text-slate-400 text-sm mb-8">Master the rules to become the Monthly Champion.</p>
+      <p className="text-slate-400 text-sm mb-8">Master the rules to become the Global Champion.</p>
 
       <div className="space-y-6">
         
@@ -46,7 +46,7 @@ export default function HowToPlay() {
         {/* Step 3 */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6 relative overflow-hidden">
              <div className="absolute top-0 right-0 p-4 opacity-10"><Trophy size={64} /></div>
-            <h3 className="text-xl font-bold text-green-400 mb-2">3. Win Prizes</h3>
+            <h3 className="text-xl font-bold text-green-400 mb-2">3. Monthly Prizes</h3>
             <p className="text-sm text-slate-300 leading-relaxed mb-4">
                 The leaderboard resets every month. To win 1st, 2nd, or 3rd place, you must meet the <b>VIP Criteria</b>:
             </p>
@@ -58,14 +58,45 @@ export default function HowToPlay() {
             <p className="text-[10px] text-slate-500 mt-2 italic">*Only VIP Members are eligible for ranking prizes.</p>
         </div>
 
+        {/* 🟢 NEW: SPECIAL CAMPAIGNS RULES */}
+        <div className="bg-gradient-to-br from-orange-900/30 to-amber-900/10 border border-orange-500/30 rounded-2xl p-6 relative overflow-hidden mt-8">
+             <div className="absolute top-0 right-0 p-4 opacity-10"><Zap size={64} className="text-orange-400" /></div>
+            <h3 className="text-xl font-bold text-orange-400 mb-2 flex items-center gap-2">
+                ⚡ Special Tournaments
+            </h3>
+            <p className="text-xs text-slate-300 leading-relaxed mb-4 pr-8">
+                During major events (World Cup, Finals, Weekend Giveaways), we launch Special Tournaments with independent leaderboards and massive point multipliers!
+            </p>
+            
+            <ul className="space-y-4 text-xs text-slate-300">
+                <li className="flex items-start gap-3">
+                    <span className="bg-orange-500 text-white text-[10px] font-black px-2 py-1 rounded shrink-0">BONUS</span>
+                    <span><b>Unlock Markets:</b> Predict First Goalscorer, Red Cards, and Penalties. These unlock ~1 hour before kickoff when official squads are announced.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                    <span className="bg-slate-700 text-white text-[10px] font-black px-2 py-1 rounded shrink-0">OPTIONAL</span>
+                    <span><b>Skip the Score:</b> In some tournaments, Exact Score is optional. You can just pick the Winner, but you sacrifice the massive points!</span>
+                </li>
+            </ul>
+
+            <div className="mt-6 border-t border-orange-500/20 pt-4">
+                <h4 className="text-sm font-black text-orange-300 mb-2 flex items-center gap-1"><Flame size={14}/> Campaign Winner Criteria</h4>
+                <ul className="space-y-2 text-[11px] text-slate-300">
+                    <li><span className="text-orange-400">●</span> <b>Top Points:</b> Finish #1 on the isolated Campaign Leaderboard.</li>
+                    <li><span className="text-orange-400">●</span> <b>The Sniper:</b> You must have hit at least ONE Exact Score during the campaign.</li>
+                    <li><span className="text-orange-400">●</span> <b>The Specialist:</b> You must have correctly predicted at least ONE Bonus Market (Scorer/Cards/Penalty).</li>
+                </ul>
+            </div>
+        </div>
+
         {/* The Champion's Checklist */}
         <div className="bg-gradient-to-br from-purple-900/30 to-[#0a1428] border border-purple-500/30 rounded-2xl p-6 relative overflow-hidden">
              <div className="absolute top-0 right-0 p-4 opacity-10"><ShieldAlert size={64} className="text-purple-400" /></div>
             <h3 className="text-xl font-bold text-purple-400 mb-2 flex items-center gap-2">
-                🏆 Champion's Checklist
+                🏆 Champion's Audit
             </h3>
             <p className="text-xs text-slate-300 leading-relaxed mb-4 pr-8">
-                To claim your VIP cash prize at the end of the month, your predictions must pass the ultimate test. You must meet <b>ALL</b> of these conditions:
+                To claim your Monthly VIP cash prize, your predictions must pass the ultimate test. You must meet <b>ALL</b> of these conditions:
             </p>
             
             <ul className="space-y-3 text-xs text-slate-300">
@@ -95,7 +126,7 @@ export default function HowToPlay() {
       </div>
 
       <div className="mt-10 text-center">
-        <Link href="/" className="bg-yellow-500 text-black font-black py-4 px-8 rounded-xl shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] active:scale-95 transition inline-block w-full">
+        <Link href="/matches" className="bg-yellow-500 text-black font-black py-4 px-8 rounded-xl shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] active:scale-95 transition inline-block w-full">
             START PREDICTING
         </Link>
       </div>
