@@ -18,12 +18,14 @@ export default async function LeaderboardPage() {
   const targetCS = settings?.target_exact_scores || 4;
   const floorPts = settings?.min_points_floor || 100;
 
+  // 🟢 INCREASED TO TOP 100
   const { data: users } = await supabase
     .from('profiles')
     .select('full_name, monthly_points, points, monthly_correct_scores, eligible_monthly_points, eligible_monthly_correct_scores, is_vip')
+    .gt('monthly_points', 0) 
     .order('monthly_points', { ascending: false })
     .order('monthly_correct_scores', { ascending: false })
-    .limit(50);
+    .limit(100);
     
   const podiumQualifiers = users?.filter(u => u.is_vip && u.eligible_monthly_correct_scores >= targetCS && u.eligible_monthly_points >= floorPts)
       .sort((a, b) => b.eligible_monthly_points - a.eligible_monthly_points) || [];
@@ -132,46 +134,55 @@ export default async function LeaderboardPage() {
             </p>
         </div>
 
+        {/* 🟢 MAIN LEADERBOARD - SCROLLABLE UP TO 100 */}
         <div className="bg-white/5 rounded-3xl border border-white/10 overflow-hidden mb-12 shadow-2xl">
             <div className="p-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
-                <h3 className="font-bold text-sm flex items-center gap-2"><TrendingUp size={16} /> Live Standings</h3>
+                <h3 className="font-bold text-sm flex items-center gap-2"><TrendingUp size={16} /> Live Standings (Top 100)</h3>
                 <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-slate-300">Total Points</span>
             </div>
             
-            <table className="w-full text-sm text-left">
-                <thead className="text-[9px] uppercase text-slate-400 bg-black/20">
-                    <tr>
-                        <th className="p-3 pl-4">Rank</th>
-                        <th className="p-3">User</th>
-                        <th className="p-3 text-center">Total Pts</th>
-                        <th className="p-3 text-center">Overall</th>
-                        <th className="p-3 text-right pr-4">Total CS</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                    {users?.map((u, i) => (
-                        <tr key={i} className={`transition group ${u.is_vip ? 'hover:bg-yellow-500/5' : 'hover:bg-white/5'}`}>
-                            <td className="p-3 pl-4 font-mono text-slate-500 text-xs font-bold">{i + 1}</td>
-                            <td className="p-3 font-bold">
-                                <div className="flex items-center gap-2">
-                                    <span className={u.is_vip ? "text-white" : "text-slate-300"}>{u.full_name}</span>
-                                    {u.is_vip && <Star size={10} className="text-yellow-400 fill-yellow-400 animate-pulse" />}
-                                </div>
-                            </td>
-                            <td className="p-3 text-center">
-                                <span className="bg-yellow-500/10 text-yellow-400 px-2 py-1 rounded font-mono font-bold text-xs border border-yellow-500/20">{u.monthly_points}</span>
-                            </td>
-                            <td className="p-3 text-center font-mono text-slate-400 text-xs">{u.points}</td>
-                            <td className="p-3 pr-4 text-right">
-                                <span className="font-mono font-bold text-xs text-slate-300">{u.monthly_correct_scores}</span>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+            {(!users || users.length === 0) ? (
+                <div className="p-8 text-center text-xs font-bold text-slate-400">
+                    No active predictions yet. Be the first to score!
+                </div>
+            ) : (
+                <div className="max-h-[400px] overflow-y-auto relative styled-scrollbar">
+                    <table className="w-full text-sm text-left">
+                        <thead className="text-[9px] uppercase text-slate-400 bg-[#0f192e] sticky top-0 z-20 shadow-sm">
+                            <tr>
+                                <th className="p-3 pl-4">Rank</th>
+                                <th className="p-3">User</th>
+                                <th className="p-3 text-center">Total Pts</th>
+                                <th className="p-3 text-center">Overall</th>
+                                <th className="p-3 text-right pr-4">Total CS</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                            {users.map((u, i) => (
+                                <tr key={i} className={`transition group ${u.is_vip ? 'hover:bg-yellow-500/5' : 'hover:bg-white/5'}`}>
+                                    <td className="p-3 pl-4 font-mono text-slate-500 text-xs font-bold">{i + 1}</td>
+                                    <td className="p-3 font-bold">
+                                        <div className="flex items-center gap-2">
+                                            <span className={u.is_vip ? "text-white" : "text-slate-300"}>{u.full_name}</span>
+                                            {u.is_vip && <Star size={10} className="text-yellow-400 fill-yellow-400 animate-pulse" />}
+                                        </div>
+                                    </td>
+                                    <td className="p-3 text-center">
+                                        <span className="bg-yellow-500/10 text-yellow-400 px-2 py-1 rounded font-mono font-bold text-xs border border-yellow-500/20">{u.monthly_points}</span>
+                                    </td>
+                                    <td className="p-3 text-center font-mono text-slate-400 text-xs">{u.points}</td>
+                                    <td className="p-3 pr-4 text-right">
+                                        <span className="font-mono font-bold text-xs text-slate-300">{u.monthly_correct_scores}</span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
 
-        {/* 🟢 NEW: CAMPAIGN LEADERBOARDS */}
+        {/* 🟢 CAMPAIGN LEADERBOARDS - SCROLLABLE UP TO 100 */}
         {activeCampaigns && activeCampaigns.length > 0 && (
             <div className="mb-12">
                 <h3 className="text-xl font-black italic flex items-center justify-center gap-2 mb-6 uppercase tracking-widest text-orange-500">
@@ -180,7 +191,12 @@ export default async function LeaderboardPage() {
                 
                 <div className="grid gap-6">
                     {activeCampaigns.map(camp => {
-                        const sortedLeaders = camp.leaderboard?.sort((a:any, b:any) => b.total_points - a.total_points).slice(0, 10) || [];
+                        // 🟢 INCREASED LIMIT TO 100 FOR CAMPAIGNS
+                        const sortedLeaders = camp.leaderboard
+                            ?.filter((l: any) => l.total_points > 0)
+                            .sort((a:any, b:any) => b.total_points - a.total_points)
+                            .slice(0, 100) || [];
+                            
                         const campFloor = camp.rules?.min_points_floor || 50;
                         
                         return (
@@ -201,30 +217,32 @@ export default async function LeaderboardPage() {
                                 {sortedLeaders.length === 0 ? (
                                     <div className="p-6 text-center text-xs font-bold text-slate-400">No points awarded yet.</div>
                                 ) : (
-                                    <table className="w-full text-sm text-left">
-                                        <thead className="text-[9px] uppercase text-orange-200/50 bg-black/20">
-                                            <tr>
-                                                <th className="p-3 pl-4 w-12">Rank</th>
-                                                <th className="p-3">Champion</th>
-                                                <th className="p-3 text-right pr-4">Points</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/5">
-                                            {sortedLeaders.map((ldr:any, i:number) => {
-                                                const isQualified = ldr.total_points >= campFloor && (!camp.is_vip_required || ldr.user?.is_vip);
-                                                return (
-                                                <tr key={i} className="hover:bg-white/5 transition">
-                                                    <td className="p-3 pl-4 font-mono text-orange-400 text-xs font-black">{i + 1}</td>
-                                                    <td className="p-3 font-bold text-slate-200 flex items-center gap-2">
-                                                        {ldr.user?.full_name} 
-                                                        {ldr.user?.is_vip && <Star size={10} className="text-yellow-400 fill-yellow-400" />} 
-                                                        {isQualified && <span className="bg-green-500 text-white text-[7px] px-1.5 py-0.5 rounded ml-2">QUALIFIED</span>}
-                                                    </td>
-                                                    <td className="p-3 text-right pr-4 font-mono font-black text-white">{ldr.total_points}</td>
+                                    <div className="max-h-[350px] overflow-y-auto relative styled-scrollbar">
+                                        <table className="w-full text-sm text-left">
+                                            <thead className="text-[9px] uppercase text-orange-200/50 bg-[#1a0f00] sticky top-0 z-20 shadow-sm border-b border-orange-500/20">
+                                                <tr>
+                                                    <th className="p-3 pl-4 w-12">Rank</th>
+                                                    <th className="p-3">Champion</th>
+                                                    <th className="p-3 text-right pr-4">Points</th>
                                                 </tr>
-                                            )})}
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody className="divide-y divide-white/5">
+                                                {sortedLeaders.map((ldr:any, i:number) => {
+                                                    const isQualified = ldr.total_points >= campFloor && (!camp.is_vip_required || ldr.user?.is_vip);
+                                                    return (
+                                                    <tr key={i} className="hover:bg-white/5 transition">
+                                                        <td className="p-3 pl-4 font-mono text-orange-400 text-xs font-black">{i + 1}</td>
+                                                        <td className="p-3 font-bold text-slate-200 flex items-center gap-2">
+                                                            {ldr.user?.full_name} 
+                                                            {ldr.user?.is_vip && <Star size={10} className="text-yellow-400 fill-yellow-400" />} 
+                                                            {isQualified && <span className="bg-green-500 text-white text-[7px] px-1.5 py-0.5 rounded ml-2">QUALIFIED</span>}
+                                                        </td>
+                                                        <td className="p-3 text-right pr-4 font-mono font-black text-white">{ldr.total_points}</td>
+                                                    </tr>
+                                                )})}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 )}
                             </div>
                         )
