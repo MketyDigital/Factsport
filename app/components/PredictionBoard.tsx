@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
-import { Loader2, Lock, CheckCircle, Trophy, XCircle, Target, TrendingUp, Zap, Users, Save } from 'lucide-react';
+import { Loader2, Lock, CheckCircle, Trophy, XCircle, Target, TrendingUp, Zap, Users, Save, ListChecks } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/components/AuthProvider'; 
 
@@ -11,10 +11,12 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
   const [existingPred, setExistingPred] = useState<any>(null);
   const [campaign, setCampaign] = useState<any>(null);
 
+  // Core State
   const [outcome, setOutcome] = useState<string>(''); 
   const [scoreHome, setScoreHome] = useState<string>('');
   const [scoreAway, setScoreAway] = useState<string>('');
 
+  // Bonus Market State
   const [firstScorer, setFirstScorer] = useState<string>('');
   const [redCard, setRedCard] = useState<string>('');
   const [penalty, setPenalty] = useState<string>('');
@@ -65,6 +67,7 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
     let finalAway = parseInt(scoreAway);
     const requireScore = campaign ? campaign.rules?.require_score : true;
 
+    // 🟢 SECURITY FIX: Safe NULL handling if Exact Score is optional
     if (isNaN(finalHome) || isNaN(finalAway)) {
         if (!requireScore) {
             finalHome = null as any; 
@@ -80,7 +83,9 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
         return;
     }
 
-    if (!user) return router.push('/login');
+    if (!user) {
+        return router.push('/login');
+    }
     
     setLoading(true);
 
@@ -106,14 +111,21 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
     } else {
         fetchPrediction(user.id);
     }
+    
     setLoading(false);
   };
 
   const handleUpdateBonus = async () => {
-      if (new Date() >= new Date(matchDate)) return alert("⛔ Prediction Window Closed!");
-      if (!firstScorer && !redCard && !penalty) return alert("Please select at least one bonus market.");
+      if (new Date() >= new Date(matchDate)) {
+          return alert("⛔ Prediction Window Closed!");
+      }
+      
+      if (!firstScorer && !redCard && !penalty) {
+          return alert("Please select at least one bonus market.");
+      }
 
       setLoading(true);
+      
       const customPayload = { 
           ...existingPred.custom_predictions, 
           first_scorer: firstScorer, 
@@ -123,8 +135,11 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
       
       const { error } = await supabase.from('user_predictions').update({ custom_predictions: customPayload }).eq('id', existingPred.id);
       
-      if (error) alert("Error: " + error.message);
-      else fetchPrediction(user.id);
+      if (error) {
+          alert("Error: " + error.message);
+      } else {
+          fetchPrediction(user.id);
+      }
       
       setLoading(false);
   };
@@ -137,6 +152,7 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
   const ptsPenalty = isCamp ? (campaign.rules?.points_penalty || 0) : 5;
   const requireScore = isCamp ? campaign.rules?.require_score : true;
 
+  // Automatically parse ESPN Lineups to populate the dropdown
   const rosterOptions = useMemo(() => {
       if (!matchData?.lineups) return [];
       const homePlayers = (matchData.lineups.home || []).map((p:any) => `${p.name} (${homeTeam})`);
@@ -144,6 +160,8 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
       return [...homePlayers, ...awayPlayers].sort();
   }, [matchData, homeTeam, awayTeam]);
 
+
+  // 🟢 UI STATE 1: MARKET IS CLOSED (Match Started or Finished)
   if (isLocked) {
     const isFinalized = existingPred?.status?.toUpperCase() === 'WON' || existingPred?.status?.toUpperCase() === 'LOST';
     const totalEarned = (existingPred?.points_awarded || 0) + (existingPred?.campaign_points_awarded || 0);
@@ -173,7 +191,11 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
 
                     {isFinalized ? (
                         <div className={`w-full text-[9px] font-black uppercase tracking-widest py-1.5 rounded-lg flex items-center justify-center gap-1 ${totalEarned > 0 ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-500 border border-red-100'}`}>
-                           {totalEarned > 0 ? <><Trophy size={10} className="text-green-500"/> +{totalEarned} PTS</> : <><XCircle size={10} /> BUSTED</>}
+                           {totalEarned > 0 ? (
+                               <><Trophy size={10} className="text-green-500"/> +{totalEarned} PTS</>
+                           ) : (
+                               <><XCircle size={10} /> BUSTED</>
+                           )}
                         </div>
                     ) : (
                         <div className="w-full text-[8px] font-black uppercase tracking-widest bg-yellow-50 text-yellow-600 py-1.5 rounded-lg border border-yellow-200 flex items-center justify-center gap-1">
@@ -189,6 +211,7 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
   return (
     <div className="space-y-3 relative z-10">
         
+        {/* 🟢 UI STATE 2: MAIN PREDICTION LOCKED IN */}
         {existingPred ? (
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 text-center relative overflow-hidden shadow-sm">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-green-400 rounded-full blur-[50px] opacity-10 pointer-events-none"></div>
@@ -203,11 +226,15 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
                     </div>
                     <div className="flex-1 bg-white p-2 rounded border border-slate-100 shadow-sm">
                         <p className="text-[7px] text-slate-400 uppercase font-black tracking-widest mb-0.5">Score</p>
-                        <p className="font-black text-slate-800 text-[10px]">{existingPred.predicted_home_score !== null ? `${existingPred.predicted_home_score} - ${existingPred.predicted_away_score}` : 'SKIPPED'}</p>
+                        <p className="font-black text-slate-800 text-[10px]">
+                            {existingPred.predicted_home_score !== null ? `${existingPred.predicted_home_score} - ${existingPred.predicted_away_score}` : 'SKIPPED'}
+                        </p>
                     </div>
                 </div>
             </div>
         ) : (
+            
+        /* 🟢 UI STATE 3: USER IS PREDICTING FOR THE FIRST TIME */
             <div className="space-y-3">
                 {isCamp && (
                     <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-3 rounded-xl shadow-md mb-2 flex items-center justify-between">
@@ -230,14 +257,24 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
                             {ptsWin} PTS
                         </span>
                     </div>
+                    
                     <div className="grid grid-cols-3 gap-1.5">
-                        <button onClick={() => setOutcome('home')} className={`py-2 rounded-lg font-black text-[9px] uppercase tracking-tight border-2 transition-all duration-300 ${outcome === 'home' ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' : 'bg-white text-slate-600 hover:bg-slate-100 border-slate-200'}`}>
+                        <button 
+                            onClick={() => setOutcome('home')} 
+                            className={`py-2 rounded-lg font-black text-[9px] uppercase tracking-tight border-2 transition-all duration-300 ${outcome === 'home' ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' : 'bg-white text-slate-600 hover:bg-slate-100 border-slate-200'}`}
+                        >
                             <span className="block truncate px-1">{homeTeam}</span>
                         </button>
-                        <button onClick={() => setOutcome('draw')} className={`py-2 rounded-lg font-black text-[9px] uppercase tracking-widest border-2 transition-all duration-300 ${outcome === 'draw' ? 'bg-slate-800 text-white border-slate-800 shadow-md transform scale-105' : 'bg-white text-slate-600 hover:bg-slate-100 border-slate-200'}`}>
+                        <button 
+                            onClick={() => setOutcome('draw')} 
+                            className={`py-2 rounded-lg font-black text-[9px] uppercase tracking-widest border-2 transition-all duration-300 ${outcome === 'draw' ? 'bg-slate-800 text-white border-slate-800 shadow-md transform scale-105' : 'bg-white text-slate-600 hover:bg-slate-100 border-slate-200'}`}
+                        >
                             Draw
                         </button>
-                        <button onClick={() => setOutcome('away')} className={`py-2 rounded-lg font-black text-[9px] uppercase tracking-tight border-2 transition-all duration-300 ${outcome === 'away' ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' : 'bg-white text-slate-600 hover:bg-slate-100 border-slate-200'}`}>
+                        <button 
+                            onClick={() => setOutcome('away')} 
+                            className={`py-2 rounded-lg font-black text-[9px] uppercase tracking-tight border-2 transition-all duration-300 ${outcome === 'away' ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' : 'bg-white text-slate-600 hover:bg-slate-100 border-slate-200'}`}
+                        >
                             <span className="block truncate px-1">{awayTeam}</span>
                         </button>
                     </div>
@@ -255,85 +292,131 @@ export default function PredictionBoard({ matchId, matchDate, homeTeam, awayTeam
                             </span>
                         </div>
                     </div>
+
                     <div className="flex items-center justify-between bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm">
                         <div className="text-center w-[40%]">
                             <label className="text-[8px] font-black text-slate-400 block mb-1 uppercase tracking-tight truncate">{homeTeam}</label>
-                            <input type="number" min="0" max="20" className="w-full h-8 text-center text-lg font-black border-2 border-slate-200 rounded-md bg-slate-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors" value={scoreHome} onChange={(e) => setScoreHome(e.target.value)} placeholder="-"/>
+                            <input 
+                                type="number" 
+                                min="0" 
+                                max="20" 
+                                className="w-full h-8 text-center text-lg font-black border-2 border-slate-200 rounded-md bg-slate-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors" 
+                                value={scoreHome} 
+                                onChange={(e) => setScoreHome(e.target.value)} 
+                                placeholder="-"
+                            />
                         </div>
                         <div className="w-[20%] flex justify-center">
                             <span className="text-sm font-black text-slate-300 italic pt-3">VS</span>
                         </div>
                         <div className="text-center w-[40%]">
                             <label className="text-[8px] font-black text-slate-400 block mb-1 uppercase tracking-tight truncate">{awayTeam}</label>
-                            <input type="number" min="0" max="20" className="w-full h-8 text-center text-lg font-black border-2 border-slate-200 rounded-md bg-slate-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors" value={scoreAway} onChange={(e) => setScoreAway(e.target.value)} placeholder="-"/>
+                            <input 
+                                type="number" 
+                                min="0" 
+                                max="20" 
+                                className="w-full h-8 text-center text-lg font-black border-2 border-slate-200 rounded-md bg-slate-50 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors" 
+                                value={scoreAway} 
+                                onChange={(e) => setScoreAway(e.target.value)} 
+                                placeholder="-"
+                            />
                         </div>
                     </div>
                 </div>
 
-                <button onClick={handleSubmitMain} disabled={loading || authLoading} className={`w-full text-white font-black uppercase tracking-widest py-3 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed border text-[10px] ${isCamp ? 'bg-orange-600 hover:bg-orange-500 border-orange-800' : 'bg-[#0a1428] hover:bg-blue-900 border-slate-800'}`}>
+                <button 
+                    onClick={handleSubmitMain} 
+                    disabled={loading || authLoading} 
+                    className={`w-full text-white font-black uppercase tracking-widest py-3 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed border text-[10px] ${isCamp ? 'bg-orange-600 hover:bg-orange-500 border-orange-800' : 'bg-[#0a1428] hover:bg-blue-900 border-slate-800'}`}
+                >
                     {loading ? <Loader2 className="animate-spin" size={14} /> : <><CheckCircle size={14}/> Lock In Prediction</>}
                 </button>
             </div>
         )}
 
-        {/* PHASE 2: BONUS MARKETS */}
+        {/* 🟢 UI STATE 4: THE PROGRESSIVE BONUS MARKETS */}
         {isCamp && existingPred && (
             <div className="mt-4 p-3 bg-gradient-to-br from-slate-900 to-[#0a1428] border border-slate-800 rounded-xl shadow-xl">
                 <h4 className="text-[10px] font-black text-yellow-400 uppercase tracking-widest flex items-center gap-1.5 mb-3 border-b border-slate-700 pb-2">
-                    <Star size={12} className="text-yellow-400 fill-yellow-400"/> Bonus Markets <span className="ml-auto text-[7px] bg-yellow-500/20 text-yellow-300 px-1.5 py-0.5 rounded border border-yellow-500/30">OPTIONAL</span>
+                    <ListChecks size={12} className="text-yellow-400"/> 
+                    Bonus Markets 
+                    <span className="ml-auto text-[7px] bg-yellow-500/20 text-yellow-300 px-1.5 py-0.5 rounded border border-yellow-500/30">
+                        OPTIONAL
+                    </span>
                 </h4>
 
-                {rosterOptions.length === 0 ? (
-                    <div className="text-center py-4 bg-white/5 rounded-lg border border-white/5">
-                        <Users size={20} className="mx-auto text-slate-500 mb-1" />
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Locked</p>
-                        <p className="text-[8px] text-slate-500 mt-1">Markets open ~1hr before kickoff when squads are confirmed.</p>
-                    </div>
-                ) : (
-                    <div className="space-y-3">
+                <div className="space-y-3">
+                    {/* ALWAYS OPEN: Red Card & Penalty */}
+                    <div className="grid grid-cols-2 gap-2">
                         <div>
+                            <label className="text-[9px] font-bold text-slate-300 uppercase flex items-center justify-between mb-1">
+                                Red Card? <span className="text-green-400">+{ptsRedCard} PTS</span>
+                            </label>
+                            <select 
+                                value={redCard} 
+                                onChange={(e) => setRedCard(e.target.value)} 
+                                disabled={!!existingPred?.custom_predictions?.red_card}
+                                className="w-full bg-slate-800 border border-slate-700 text-white text-xs font-bold rounded-lg p-2 outline-none focus:border-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <option value="">Select</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-[9px] font-bold text-slate-300 uppercase flex items-center justify-between mb-1">
+                                Penalty? <span className="text-green-400">+{ptsPenalty} PTS</span>
+                            </label>
+                            <select 
+                                value={penalty} 
+                                onChange={(e) => setPenalty(e.target.value)} 
+                                disabled={!!existingPred?.custom_predictions?.penalty}
+                                className="w-full bg-slate-800 border border-slate-700 text-white text-xs font-bold rounded-lg p-2 outline-none focus:border-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <option value="">Select</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* CONDITIONALLY LOCKED: First Goalscorer */}
+                    {rosterOptions.length === 0 ? (
+                        <div className="text-center py-3 mt-2 bg-white/5 rounded-lg border border-white/5">
+                            <Users size={16} className="mx-auto text-slate-500 mb-1" />
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Goalscorer Locked</p>
+                            <p className="text-[8px] text-slate-500 mt-1">Opens ~1hr before kickoff when squads are confirmed.</p>
+                        </div>
+                    ) : (
+                        <div className="mt-2">
                             <label className="text-[9px] font-bold text-slate-300 uppercase flex items-center justify-between mb-1">
                                 First Goalscorer <span className="text-green-400">+{ptsFirstScorer} PTS</span>
                             </label>
                             <select 
                                 value={firstScorer} 
                                 onChange={(e) => setFirstScorer(e.target.value)} 
-                                className="w-full bg-slate-800 border border-slate-700 text-white text-xs font-bold rounded-lg p-2 outline-none focus:border-yellow-500"
+                                disabled={!!existingPred?.custom_predictions?.first_scorer}
+                                className="w-full bg-slate-800 border border-slate-700 text-white text-xs font-bold rounded-lg p-2 outline-none focus:border-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <option value="">-- Select Player --</option>
                                 {rosterOptions.map(player => <option key={player} value={player}>{player}</option>)}
                             </select>
                         </div>
+                    )}
 
-                        <div className="grid grid-cols-2 gap-2">
-                            <div>
-                                <label className="text-[9px] font-bold text-slate-300 uppercase flex items-center justify-between mb-1">
-                                    Red Card? <span className="text-green-400">+{ptsRedCard} PTS</span>
-                                </label>
-                                <select value={redCard} onChange={(e) => setRedCard(e.target.value)} className="w-full bg-slate-800 border border-slate-700 text-white text-xs font-bold rounded-lg p-2 outline-none focus:border-yellow-500">
-                                    <option value="">Select</option><option value="Yes">Yes</option><option value="No">No</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-[9px] font-bold text-slate-300 uppercase flex items-center justify-between mb-1">
-                                    Penalty? <span className="text-green-400">+{ptsPenalty} PTS</span>
-                                </label>
-                                <select value={penalty} onChange={(e) => setPenalty(e.target.value)} className="w-full bg-slate-800 border border-slate-700 text-white text-xs font-bold rounded-lg p-2 outline-none focus:border-yellow-500">
-                                    <option value="">Select</option><option value="Yes">Yes</option><option value="No">No</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <button 
-                            onClick={handleUpdateBonus} 
-                            disabled={loading || (!firstScorer && !redCard && !penalty)} 
-                            className="w-full mt-2 bg-yellow-500 hover:bg-yellow-400 text-black font-black uppercase text-[10px] py-2.5 rounded-lg shadow-lg flex items-center justify-center gap-1.5 active:scale-95 transition disabled:opacity-50"
-                        >
-                            {loading ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                            Update Bonus Markets
-                        </button>
-                    </div>
-                )}
+                    <button 
+                        onClick={handleUpdateBonus} 
+                        disabled={
+                            loading || 
+                            (!firstScorer && !redCard && !penalty) || 
+                            (!!existingPred?.custom_predictions?.first_scorer && !!existingPred?.custom_predictions?.red_card && !!existingPred?.custom_predictions?.penalty)
+                        } 
+                        className="w-full mt-3 bg-yellow-500 hover:bg-yellow-400 text-black font-black uppercase text-[10px] py-2.5 rounded-lg shadow-lg flex items-center justify-center gap-1.5 active:scale-95 transition disabled:opacity-50"
+                    >
+                        {loading ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                        Update Bonus Markets
+                    </button>
+                </div>
             </div>
         )}
     </div>
