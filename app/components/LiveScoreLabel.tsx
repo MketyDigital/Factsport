@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSmartInterval } from '@/app/hooks/useSmartInterval'; 
 import MatchTime from '@/app/components/MatchTime'; 
+import { fetchLiveMatchDeduplicated } from '@/app/utils/liveFetcher';
 
 const HT_STATUSES = ['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME'];
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'ET', 'EXTRA TIME', 'P', 'PENALTIES', ...HT_STATUSES];
@@ -30,27 +31,26 @@ export default function LiveScoreLabel({
       isFetching.current = true;
 
       try {
-          const res = await fetch(`https://live-api.factsport.com/?espn_id=${espnId}&t=${Date.now()}`);
-          if (res.ok) {
-              const matchData = await res.json();
-              if (matchData && !matchData.error) {
-                  hasFetchedLive.current = true; 
-                  
-                  setData(prev => {
-                      if (prev.status === matchData.status && prev.home === matchData.home_score && prev.away === matchData.away_score && prev.clock === matchData.displayClock) {
-                          return prev; 
-                      }
-                      return { 
-                          status: matchData.status, 
-                          home: matchData.home_score, 
-                          away: matchData.away_score,
-                          clock: matchData.displayClock
-                      };
-                  });
-
-                  if (FINISHED_STATUSES.includes((matchData.status || '').toUpperCase())) {
-                      setMatchFinished(true); 
+          // 🟢 USES THE GLOBAL DEDUPLICATOR
+          const matchData = await fetchLiveMatchDeduplicated(espnId);
+          
+          if (matchData && !matchData.error) {
+              hasFetchedLive.current = true; 
+              
+              setData(prev => {
+                  if (prev.status === matchData.status && prev.home === matchData.home_score && prev.away === matchData.away_score && prev.clock === matchData.displayClock) {
+                      return prev; 
                   }
+                  return { 
+                      status: matchData.status, 
+                      home: matchData.home_score, 
+                      away: matchData.away_score,
+                      clock: matchData.displayClock
+                  };
+              });
+
+              if (FINISHED_STATUSES.includes((matchData.status || '').toUpperCase())) {
+                  setMatchFinished(true); 
               }
           }
       } catch (error) {}
@@ -60,17 +60,24 @@ export default function LiveScoreLabel({
   };
 
   useEffect(() => { if (!disablePolling) fetchLiveScore(); }, [disablePolling]);
-  useSmartInterval(fetchLiveScore, !matchFinished && !disablePolling ? 5000 : null);
+
+  const cleanStatus = (data.status || '').toUpperCase();
+  const isLiveNow = LIVE_STATUSES.includes(cleanStatus);
+  
+  let pollInterval = null;
+  if (!matchFinished && !disablePolling && espnId) {
+      pollInterval = isLiveNow ? 10000 : 60000;
+  }
+
+  useSmartInterval(fetchLiveScore, pollInterval);
 
   const userTime = matchDate ? new Date(matchDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--';
-  const cleanStatus = (data.status || '').toUpperCase();
   const isHT = HT_STATUSES.includes(cleanStatus);
-  const isLive = LIVE_STATUSES.includes(cleanStatus);
   const isFinished = FINISHED_STATUSES.includes(cleanStatus);
 
   if (variant === 'badge') {
       if (isHT) return <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded shadow-sm tracking-widest border border-amber-600">HT</span>;
-      if (isLive) return <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded animate-pulse shadow-sm tracking-widest border border-red-500">{data.clock || 'LIVE'}</span>;
+      if (isLiveNow) return <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded animate-pulse shadow-sm tracking-widest border border-red-500">{data.clock || 'LIVE'}</span>;
       if (isFinished) return <span className="bg-slate-200 text-slate-600 text-[9px] font-black px-2 py-0.5 rounded tracking-widest shadow-inner border border-slate-300">FT</span>;
       return <span className="bg-slate-100 text-slate-500 text-[9px] font-bold px-2 py-0.5 rounded shadow-inner uppercase tracking-widest border border-slate-200">UPCOMING</span>;
   }
@@ -85,7 +92,7 @@ export default function LiveScoreLabel({
               <div className="flex flex-col items-center justify-center">
                   <div className="text-slate-300 font-black text-lg italic mb-1">VS</div>
                   {isHT && <span className="bg-amber-100 text-amber-700 text-[9px] px-2 py-0.5 rounded font-black border border-amber-200">HT</span>}
-                  {isLive && !isHT && data.clock && <span className="text-red-500 text-[10px] font-black animate-pulse bg-red-50 px-2 py-0.5 rounded">{data.clock}</span>}
+                  {isLiveNow && !isHT && data.clock && <span className="text-red-500 text-[10px] font-black animate-pulse bg-red-50 px-2 py-0.5 rounded">{data.clock}</span>}
               </div>
               <div className="text-center w-1/3">
                   <div className="text-3xl font-black text-slate-800 tracking-tighter">{data.away ?? 0}</div>
@@ -95,7 +102,7 @@ export default function LiveScoreLabel({
       );
   }
 
-  if (isLive) {
+  if (isLiveNow) {
     return (
         <div className="flex flex-col items-center justify-center">
             <span className={`font-black text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${isHT ? 'text-amber-600 bg-amber-50 border border-amber-200' : 'text-red-600 bg-red-50 border border-red-100 animate-pulse'}`}>

@@ -17,7 +17,6 @@ import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
 import PredictionBoard from '@/app/components/PredictionBoard';
 import HeadToHeadStats from '@/app/components/HeadToHeadStats';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
-import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import BettingPromo from '@/app/components/BettingPromo'; 
 
 import { getExternalData } from '@/app/lib/matchService';
@@ -199,7 +198,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                   </div>
               )}
 
-              <div className="mt-4"><AdsterraStandardBanner /></div>
               <div className="mt-4"><FreeTipsBanner /></div>
           </div>
       </MatchLiveProvider>

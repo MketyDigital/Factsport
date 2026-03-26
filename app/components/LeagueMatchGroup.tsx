@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Calendar, Zap, Ticket, ExternalLink, BarChart2, ChevronRight, Clock, CheckCircle, Trophy, RefreshCcw } from 'lucide-react';
 import MatchTime from '@/app/components/MatchTime';
 import { useSmartInterval } from '@/app/hooks/useSmartInterval';
+import { fetchLiveMatchDeduplicated } from '@/app/utils/liveFetcher';
 
 const groupByDate = (matchList: any[]) => {
     const groups: { [date: string]: any[] } = {};
@@ -22,11 +23,8 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
     const [activeTab, setActiveTab] = useState<'fixtures' | 'results'>('fixtures');
     const [liveMatches, setLiveMatches] = useState(matches);
     const isFetching = useRef(false);
-    
-    // 🟢 PAGINATION STATE: Shows 10 matches at a time to prevent layout bloating
     const [visibleCount, setVisibleCount] = useState(10);
 
-    // Reset pagination when tab switches
     const handleTabChange = (tab: 'fixtures' | 'results') => {
         setActiveTab(tab);
         setVisibleCount(10);
@@ -52,10 +50,10 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
         try {
             const updatePromises = activeLiveMatches.map(async (m) => {
                 try {
-                    const res = await fetch(`https://live-api.factsport.com/?espn_id=${m.espn_id}&t=${Date.now()}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (!data.error) return { id: m.id, status: data.status, home_score: data.home_score, away_score: data.away_score, displayClock: data.displayClock };
+                    // 🟢 USES THE GLOBAL DEDUPLICATOR
+                    const data = await fetchLiveMatchDeduplicated(m.espn_id);
+                    if (data && !data.error) {
+                        return { id: m.id, status: data.status, home_score: data.home_score, away_score: data.away_score, displayClock: data.displayClock };
                     }
                 } catch (e) {}
                 return null;
@@ -81,7 +79,8 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
         }
     };
 
-    useSmartInterval(fetchUpdates, activeLiveMatches.length > 0 ? 8000 : null);
+    // 🟢 10 SECONDS FOR LIST VIEWS
+    useSmartInterval(fetchUpdates, activeLiveMatches.length > 0 ? 10000 : null);
 
     const fixtures = liveMatches
         .filter(m => !['FT', 'FINISHED', 'ABD'].includes((m.status || '').toUpperCase()))
@@ -92,11 +91,8 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
         .sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
 
     const activeList = activeTab === 'fixtures' ? fixtures : results;
-    
-    // 🟢 SLICE THE ARRAY: Only render the currently visible count
     const displayMatches = activeList.slice(0, visibleCount);
     const hasMore = visibleCount < activeList.length;
-
     const dateGroups = groupByDate(displayMatches);
     const hasData = displayMatches.length > 0;
 
@@ -233,7 +229,6 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                 )}
             </div>
 
-            {/* 🟢 LOAD MORE BUTTON */}
             {hasMore && (
                 <div className="p-4 border-t border-slate-100 bg-slate-50/50">
                     <button 
