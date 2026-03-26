@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Video, Radio } from "lucide-react";
 import MatchTime from '@/app/components/MatchTime';
 import { useSmartInterval } from '@/app/hooks/useSmartInterval'; 
+import { fetchLiveMatchDeduplicated } from '@/app/utils/liveFetcher';
 
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
 const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
@@ -30,18 +31,17 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
             const updated = await Promise.all(liveMatches.map(async (m) => {
                 if (FINISHED_STATUSES.includes((m.status || '').toUpperCase())) return m;
                 try {
-                    let res;
+                    let data;
                     if (m.espn_id) {
-                        res = await fetch(`https://live-api.factsport.com/?espn_id=${m.espn_id}&t=${Date.now()}`);
+                        // 🟢 USES THE GLOBAL DEDUPLICATOR
+                        data = await fetchLiveMatchDeduplicated(m.espn_id);
                     } else {
-                        res = await fetch(`/api/match-data?id=${m.id}&t=${Date.now()}`);
+                        const res = await fetch(`/api/match-data?id=${m.id}`, { cache: 'no-store' });
+                        data = await res.json();
                     }
 
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (!data.error) {
-                            return { ...m, status: data.status, home_score: data.home_score, away_score: data.away_score, displayClock: data.displayClock };
-                        }
+                    if (data && !data.error) {
+                        return { ...m, status: data.status, home_score: data.home_score, away_score: data.away_score, displayClock: data.displayClock };
                     }
                 } catch(e) { }
                 return m;
@@ -60,7 +60,8 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
         SCHEDULED_STATUSES.includes((m.status || '').toUpperCase())
     );
 
-    useSmartInterval(fetchUpdates, hasActiveMatches ? 5000 : null);
+    // 🟢 10 SECONDS FOR LIST VIEWS
+    useSmartInterval(fetchUpdates, hasActiveMatches ? 10000 : null);
 
     if (!liveMatches || liveMatches.length === 0) return null;
 

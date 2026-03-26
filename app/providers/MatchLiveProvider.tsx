@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useRef } from 'react';
 import { useSmartInterval } from '@/app/hooks/useSmartInterval';
+import { fetchLiveMatchDeduplicated } from '@/app/utils/liveFetcher';
 
 const MatchLiveContext = createContext<any>(null);
 
@@ -11,52 +12,55 @@ export function MatchLiveProvider({ espnId, initialData, children }: { espnId: s
     
     const currentStatus = (liveData?.status || '').toUpperCase();
     const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(currentStatus);
+    const isLive = ['LIVE', 'HT', 'IN_PLAY', '1H', '2H', 'ET', 'P'].includes(currentStatus);
 
     const fetchUpdates = async () => {
         if (isFinished || !espnId || isFetching.current) return;
         
         isFetching.current = true;
         try {
-            const res = await fetch(`https://live-api.factsport.com/?espn_id=${espnId}`);
-            if (res.ok) {
-                const data = await res.json();
-                if (!data.error) {
-                    setLiveData((prev: any) => {
-                        // O(1) Shallow Diff: Only trigger React renders if data actually changed!
-                        const eventsChanged = (prev.events?.length || 0) !== (data.events?.length || 0);
-                        if (
-                            prev.status === data.status && 
-                            prev.home_score === data.home_score && 
-                            prev.away_score === data.away_score && 
-                            prev.displayClock === data.displayClock && 
-                            !eventsChanged
-                        ) {
-                            return prev;
-                        }
-                        
-                        // Merge the new live data with the existing initial structure
-                        return {
-                            ...prev,
-                            status: data.status,
-                            home_score: data.home_score,
-                            away_score: data.away_score,
-                            displayClock: data.displayClock,
-                            stats: data.stats || prev.stats,
-                            lineups: data.lineups?.home?.length > 0 ? data.lineups : prev.lineups,
-                            events: data.events || data.match_events || prev.events,
-                            match_events: data.events || data.match_events || prev.match_events
-                        };
-                    });
-                }
+            // 🟢 USES THE GLOBAL DEDUPLICATOR
+            const data = await fetchLiveMatchDeduplicated(espnId);
+            
+            if (data && !data.error) {
+                setLiveData((prev: any) => {
+                    const eventsChanged = (prev.events?.length || 0) !== (data.events?.length || 0);
+                    if (
+                        prev.status === data.status && 
+                        prev.home_score === data.home_score && 
+                        prev.away_score === data.away_score && 
+                        prev.displayClock === data.displayClock && 
+                        !eventsChanged
+                    ) {
+                        return prev;
+                    }
+                    
+                    return {
+                        ...prev,
+                        status: data.status,
+                        home_score: data.home_score,
+                        away_score: data.away_score,
+                        displayClock: data.displayClock,
+                        stats: data.stats || prev.stats,
+                        lineups: data.lineups?.home?.length > 0 ? data.lineups : prev.lineups,
+                        events: data.events || data.match_events || prev.events,
+                        match_events: data.events || data.match_events || prev.match_events
+                    };
+                });
             }
         } catch (e) {
+            console.error("Live sync error", e);
         } finally {
             isFetching.current = false;
         }
     };
 
-    // 🟢 THE SINGLE MASTER POLLER: Runs once every 5 seconds for the entire page
-    useSmartInterval(fetchUpdates, !isFinished && espnId ? 5000 : null);
+    let pollInterval = null;
+    if (!isFinished && espnId) {
+        pollInterval = isLive ? 3000 : 60000;
+    }
+
+    useSmartInterval(fetchUpdates, pollInterval);
 
     return (
         <MatchLiveContext.Provider value={liveData}>

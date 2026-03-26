@@ -1,8 +1,8 @@
 import { createClient } from '@/app/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
-export const revalidate = 5; 
 export const runtime = 'edge';
+// ❌ Removed export const revalidate = 5; (It is ignored in dynamic routes anyway)
 
 export async function GET(request: Request) {
     if (process.env.NODE_ENV === 'production') {
@@ -35,10 +35,20 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Match not found' }, { status: 404 });
     }
 
-    // 🟢 SMOOTH POLLING: Added stale-while-revalidate so users never see a loading spinner.
+    // 🟢 DYNAMIC CACHE LOGIC: Protects your Supabase Limits
+    const currentStatus = (data.status || '').toUpperCase();
+    const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(currentStatus);
+    const isLive = ['LIVE', 'HT', 'IN_PLAY', '1H', '2H', 'ET', 'P'].includes(currentStatus);
+
+    // Live = 5s cache | Scheduled = 60s cache | Finished = 1 hour cache
+    let cacheSeconds = 60;
+    if (isLive) cacheSeconds = 5;
+    if (isFinished) cacheSeconds = 3600;
+
+    // 🟢 SMOOTH POLLING: stale-while-revalidate keeps the UI completely seamless
     return NextResponse.json(data, {
         headers: {
-            'Cache-Control': 'max-age=0, s-maxage=5, stale-while-revalidate=10',
+            'Cache-Control': `public, max-age=0, s-maxage=${cacheSeconds}, stale-while-revalidate=10`,
         },
     });
 }

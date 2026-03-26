@@ -34,9 +34,10 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
 
     const liveData = useMatchLive();
     
-    // 🟢 POST-MATCH PURGE LOGIC
+    // 🟢 DYNAMIC STATUS TRACKING
     const currentStatus = (liveData?.status || '').toUpperCase();
     const isFinished = FINISHED_STATUSES.includes(currentStatus);
+    const isLive = ['LIVE', 'HT', 'IN_PLAY', '1H', '2H', 'ET', 'P'].includes(currentStatus);
     const matchDateStr = liveData?.match_date || liveData?.date;
     const matchDateMs = matchDateStr ? new Date(matchDateStr).getTime() : 0;
     const minutesToKick = matchDateMs ? (matchDateMs - Date.now()) / 60000 : 0;
@@ -72,21 +73,40 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
         } catch (e) {}
     };
     useEffect(() => { fetchPin(); }, [matchId]);
-    useSmartInterval(fetchPin, 10000); 
 
     const fetchChat = async () => {
         if (document.hidden) return; 
         try {
-            const res = await fetch(`${CHAT_WORKER_URL}/messages?match_id=${matchId}`, { cache: 'no-store' });
+            // 🟢 Pass the status to the worker so it knows how long to cache!
+            const res = await fetch(`${CHAT_WORKER_URL}/messages?match_id=${matchId}&status=${currentStatus}`, { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
-                setMessages(data.messages || []);
+                
+                // Only update state if we actually have new data to prevent unnecessary re-renders
+                setMessages((prev) => {
+                    const latestNewId = data.messages?.[data.messages.length - 1]?.id;
+                    const latestOldId = prev[prev.length - 1]?.id;
+                    if (latestNewId === latestOldId) return prev;
+                    return data.messages || [];
+                });
+                
                 setTimeout(() => scrollToBottom(false), 100);
             }
         } catch (e) {}
     };
     useEffect(() => { fetchChat(); }, [matchId]);
-    useSmartInterval(fetchChat, 6000); 
+
+    // 🟢 DYNAMIC POLLING INTERVALS (Saves Battery & API Limits)
+    let chatPollInterval = null;
+    let pinPollInterval = null;
+    
+    if (!isUniversallyFinished && matchId) {
+        chatPollInterval = isLive ? 3000 : 60000; // 3s Live, 60s Scheduled
+        pinPollInterval = isLive ? 15000 : 60000; // 15s Live, 60s Scheduled (Saves DB reads)
+    }
+
+    useSmartInterval(fetchChat, chatPollInterval);
+    useSmartInterval(fetchPin, pinPollInterval); 
 
     const handleScroll = () => {
         if (scrollContainerRef.current) {
@@ -156,6 +176,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
             finalMessageStr = `[Reply @${replyTo.user}: "${safeQuote}..."] ${messageText}`;
         }
 
+        // 🟢 OPTIMISTIC UPDATE: Instantly show message to the user
         const tempMsg = {
             id: 'temp-' + Date.now(),
             username: user.user_metadata?.username || user.profileData?.username || 'FactSport Fan',
