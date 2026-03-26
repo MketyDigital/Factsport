@@ -13,6 +13,7 @@ import GameRulesManager from '@/app/components/GameRulesManager';
 import AuditManager from '@/app/components/AuditManager';
 // 🟢 NEW: Imported the Social Settings Manager
 import SocialSettingsManager from '@/app/components/SocialSettingsManager';
+import AdminCampaignManager from '@/app/admin/components/AdminCampaignManager';
 
 export default async function AdminDashboard() {
   const supabase = createClient();
@@ -130,6 +131,8 @@ export default async function AdminDashboard() {
 
                  {/* GLOBAL SETTINGS MANAGER */}
                  <PromoSettingsManager />
+                 {/* 🟢 NEW: CAMPAIGN GAMIFICATION ENGINE */}
+                 <AdminCampaignManager />
 
                  {/* 🟢 NEW: SOCIAL MEDIA COMMAND CENTER */}
                  <SocialSettingsManager />
