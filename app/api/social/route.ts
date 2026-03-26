@@ -194,7 +194,24 @@ export async function POST(request: Request) {
     }
 
     if (!payload.fb1Message && !payload.xMessage) return NextResponse.json({ message: "No postable event occurred." });
+
+    // ===================================================================
+    // 🟢 THE FIX: PRE-WARM THE CACHE BEFORE PINGING MAKE.COM
+    // ===================================================================
+    // Extract any unique image URLs from the payload
+    const urlsToWarm = [...new Set([payload.xImageUrl, payload.fb1ImageUrl].filter(Boolean))] as string[];
     
+    if (urlsToWarm.length > 0) {
+        try {
+            // We 'await' this so the server pauses until Cloudflare has successfully built and cached the image
+            await Promise.all(urlsToWarm.map(url => fetch(url)));
+        } catch (e) {
+            console.error("Cache pre-warm failed, but proceeding anyway...", e);
+        }
+    }
+    // ===================================================================
+
+    // NOW ping Make.com. Buffer will fetch the image and get it instantly from cache.
     await postToSocials(payload);
 
     try {

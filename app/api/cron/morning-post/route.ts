@@ -6,6 +6,11 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { postToSocials } from '@/app/lib/socialService';
 
+// 🟢 STATUS LISTS
+const FINISHED_STATUSES = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'];
+const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
+const INVALID_STATUSES = ['POSTPONED', 'PST', 'CANC', 'CANCELLED', 'TBD', 'ABD'];
+
 // 🟢 CLOUDFLARE EDGE-SAFE ENCODER
 function encodeBase64Safe(obj: any) {
     const str = JSON.stringify(obj);
@@ -25,7 +30,6 @@ export async function GET(request: Request) {
     
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     const today = new Date().toISOString().split('T')[0];
-
     const lockKey = `${today}-morning`;
     
     const { error: lockError } = await supabase.from('cron_logs').insert([{ run_date: lockKey }]);
@@ -40,7 +44,6 @@ export async function GET(request: Request) {
         .select('*')
         .gte('match_date', startOfDay)
         .lte('match_date', endOfDay)
-        .in('status', ['SCHEDULED', 'NS', 'PRE_MATCH', 'TIMED']) 
         .order('match_date', { ascending: true });
 
     if (error || !matches || matches.length === 0) {
@@ -48,42 +51,78 @@ export async function GET(request: Request) {
         return NextResponse.json({ message: "No upcoming games found for today. Lock removed." });
     }
 
+    // 👻 THE GHOST FILTER
+    const validMatches = matches.filter(m => {
+        const status = (m.status || '').toUpperCase();
+        if (INVALID_STATUSES.includes(status)) return false;
+        
+        const isMidnight = m.match_date.includes('T00:00:00');
+        const isZeroZero = m.home_score === 0 && m.away_score === 0;
+        
+        if (FINISHED_STATUSES.includes(status) && isMidnight && isZeroZero) {
+            const hasEvents = m.match_events && Array.isArray(m.match_events) && m.match_events.length > 0;
+            const hasLineups = m.lineups && m.lineups.home && Array.isArray(m.lineups.home) && m.lineups.home.length > 0;
+            if (!hasEvents && !hasLineups) return false; 
+        }
+        return true;
+    });
+
+    if (validMatches.length === 0) {
+        await supabase.from('cron_logs').delete().eq('run_date', lockKey);
+        return NextResponse.json({ message: "Only ghost/postponed matches found. Lock removed." });
+    }
+
     const frontendUrl = 'https://factsport.com'; 
     const todayString = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
-
     const leagues: Record<string, any[]> = {};
-    matches.forEach(m => {
+    
+    validMatches.forEach(m => {
         if (!leagues[m.league]) leagues[m.league] = [];
         leagues[m.league].push(m);
     });
 
+    // 🟢 FACEBOOK FORMAT
     let fb1Text = `📅 ${todayString.toUpperCase()} MATCHDAY SCHEDULE!\n\n`;
     for (const [league, leagueMatches] of Object.entries(leagues)) {
         fb1Text += `🏆 ${league}\n`;
         leagueMatches.forEach(m => {
-            const time = new Date(m.match_date).toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute:'2-digit' });
-            fb1Text += `⚽ ${m.home_team} vs ${m.away_team} (${time})\n`;
+            const status = (m.status || '').toUpperCase();
+            if (FINISHED_STATUSES.includes(status)) {
+                fb1Text += `⚽ ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} (FT)\n`;
+            } else if (LIVE_STATUSES.includes(status)) {
+                fb1Text += `🔴 ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} (LIVE)\n`;
+            } else {
+                const time = new Date(m.match_date).toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute:'2-digit' });
+                fb1Text += `⚽ ${m.home_team} vs ${m.away_team} (${time})\n`;
+            }
         });
         fb1Text += `\n`; 
     }
     fb1Text += `⏰ All kick-off times are in GMT.\nCatch all live scores and stats on: ${frontendUrl} 🏆`;
 
-    // 🖼️ TWITTER SCHEDULE GRID IMAGE
-    const topMatches = matches.slice(0, 10).map(m => ({
-        home: m.home_team,
-        away: m.away_team,
-        time: new Date(m.match_date).toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute:'2-digit' })
-    }));
+    // 🟢 X/TWITTER FORMAT (Kept exactly as you wrote it)
+    let dynamicXText = `📅 ${todayString} Matchday is here!\n\nWe have ${validMatches.length} massive games lined up today. Who are you backing? Drop your predictions below 👇`;
+
+    // 🖼️ IMAGE GENERATION
+    const topMatches = validMatches.slice(0, 10).map(m => {
+        const status = (m.status || '').toUpperCase();
+        let timeOrScore = new Date(m.match_date).toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute:'2-digit' });
+        if (FINISHED_STATUSES.includes(status) || LIVE_STATUSES.includes(status)) {
+            timeOrScore = `${m.home_score} - ${m.away_score}`;
+        }
+        return { home: m.home_team, away: m.away_team, time: timeOrScore };
+    });
     
     const ogPayload = { type: 'schedule', label: 'MATCHDAY SCHEDULE', matches: topMatches };
     const safeBase64 = encodeBase64Safe(ogPayload);
     const scheduleOgUrl = `${frontendUrl}/api/og?data=${safeBase64}`;
-    
-    let dynamicXText = `📅 ${todayString} Matchday is here!\n\nWe have ${matches.length} massive games lined up today. Who are you backing? Drop your predictions below 👇`;
 
+    // 🟢 PRE-WARM CACHE
+    try { await fetch(scheduleOgUrl); } catch (e) { }
+    
     try {
         await postToSocials({ fb1Message: fb1Text, xMessage: dynamicXText, xImageUrl: scheduleOgUrl }); 
-        return NextResponse.json({ success: true, total_matches: matches.length });
+        return NextResponse.json({ success: true, total_matches: validMatches.length });
     } catch (e) {
         await supabase.from('cron_logs').delete().eq('run_date', lockKey);
         return NextResponse.json({ error: "Posting failed. Lock removed for retry." }, { status: 500 });
