@@ -11,7 +11,8 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
 
     const liveData = useMatchLive();
     
-    // 🟢 24-HOUR AUTO-LOCK LOGIC
+    // 🟢 STATUS FOR WORKER CACHE & AUTO-LOCK LOGIC
+    const currentStatus = (liveData?.status || '').toUpperCase();
     const matchDateMs = liveData?.match_date ? new Date(liveData.match_date).getTime() : 0;
     const hoursSinceKickoff = matchDateMs ? (Date.now() - matchDateMs) / 3600000 : 0;
     const isVotingClosed = hoursSinceKickoff > 24;
@@ -20,18 +21,21 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
     const awayStarters = lineups?.away?.filter((p: any) => p.is_starter) || [];
     const allStarters = [...homeStarters, ...awayStarters];
 
-    const WORKER_URL = 'https://fse.mkpoikankes.workers.dev/api/motm';
+    // 🟢 UPDATED: Pointing to your main API worker
+    const WORKER_URL = 'https://live-api.factsport.com/api/motm';
 
     useEffect(() => {
         if (localStorage.getItem(`motm_voted_${matchId}`)) {
             setHasVoted(true);
         }
         fetchVotes();
-    }, [matchId]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [matchId, currentStatus]); // Added currentStatus so it refreshes if match goes FT
 
     const fetchVotes = async () => {
         try {
-            const res = await fetch(`${WORKER_URL}?matchId=${matchId}`);
+            // 🟢 UPDATED: Passing status to worker and bypassing browser cache
+            const res = await fetch(`${WORKER_URL}?matchId=${matchId}&status=${currentStatus}`, { cache: 'no-store' });
             if (res.ok) setVoteData(await res.json());
         } catch (e) {}
     };
