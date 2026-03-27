@@ -193,8 +193,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                           </h3>
                           <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
                       </div>
-                      
-                      <BettingPromo affiliateLink={sanitizeUrl(dbData.affiliate_link) || null} />
                   </div>
               )}
 
