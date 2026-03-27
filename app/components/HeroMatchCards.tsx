@@ -33,7 +33,6 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                 try {
                     let data;
                     if (m.espn_id) {
-                        // 🟢 USES THE GLOBAL DEDUPLICATOR
                         data = await fetchLiveMatchDeduplicated(m.espn_id);
                     } else {
                         const res = await fetch(`/api/match-data?id=${m.id}`, { cache: 'no-store' });
@@ -55,12 +54,17 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
         }
     };
 
+    // 🟢 FIX: Ensure we instantly fetch on mount so we don't stare at stale Next.js cache for 10 seconds
+    useEffect(() => {
+        fetchUpdates();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const hasActiveMatches = liveMatches.some(m => 
         LIVE_STATUSES.includes((m.status || '').toUpperCase()) || 
         SCHEDULED_STATUSES.includes((m.status || '').toUpperCase())
     );
 
-    // 🟢 10 SECONDS FOR LIST VIEWS
     useSmartInterval(fetchUpdates, hasActiveMatches ? 10000 : null);
 
     if (!liveMatches || liveMatches.length === 0) return null;

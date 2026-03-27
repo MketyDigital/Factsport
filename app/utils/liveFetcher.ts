@@ -1,5 +1,3 @@
-// src/app/utils/liveFetcher.ts
-
 const activeRequests = new Map<string, Promise<any>>();
 
 export const fetchLiveMatchDeduplicated = async (espnId: string) => {
@@ -8,8 +6,11 @@ export const fetchLiveMatchDeduplicated = async (espnId: string) => {
         return activeRequests.get(espnId);
     }
 
-    // Otherwise, create a new fetch request (bypassing browser cache)
-    const fetchPromise = fetch(`https://live-api.factsport.com/?espn_id=${espnId}`, { cache: 'no-store' })
+    // 🟢 FIX: Append a timestamp to completely bust Safari/Chrome aggressive mobile caching 
+    // This guarantees the browser asks Cloudflare, and Cloudflare handles the real caching.
+    const url = `https://live-api.factsport.com/?espn_id=${espnId}&_t=${Date.now()}`;
+
+    const fetchPromise = fetch(url, { cache: 'no-store' })
         .then(res => res.json())
         .catch(err => ({ error: err.message }))
         .finally(() => {
