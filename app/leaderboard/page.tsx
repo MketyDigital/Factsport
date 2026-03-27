@@ -76,11 +76,16 @@ export default async function LeaderboardPage() {
           if (camp.leaderboard && camp.leaderboard.length > 0) {
               const topPlayer = camp.leaderboard.sort((a:any, b:any) => b.total_points - a.total_points)[0];
               if (topPlayer.user) {
+                  // 🟢 THE FIX: Safely extract the name whether Supabase sends an Array or an Object
+                  const championName = Array.isArray(topPlayer.user) 
+                      ? topPlayer.user[0]?.full_name 
+                      : (topPlayer.user as any).full_name;
+
                   allPastWinners.push({
                       title: camp.title,
-                      name: topPlayer.user.full_name,
+                      name: championName || 'Champion',
                       points: topPlayer.total_points,
-                      prize: camp.rules?.prize || 'Tournament Champion', // 🟢 Uses Admin defined custom Prize!
+                      prize: camp.rules?.prize || 'Tournament Champion', 
                       isCampaign: true,
                       date: new Date(camp.end_date).getTime()
                   });
