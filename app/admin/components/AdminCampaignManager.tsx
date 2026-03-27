@@ -32,7 +32,7 @@ export default function AdminCampaignManager() {
             points_first_scorer: 15, 
             points_red_card: 5, 
             points_penalty: 5,
-            prize: 'Tournament Champion' // 🟢 NEW PRIZE FIELD
+            prize: 'Tournament Champion'
         }
     });
 
@@ -43,7 +43,21 @@ export default function AdminCampaignManager() {
     const fetchCampaignsAndLeagues = async () => {
         setLoading(true);
         const { data: camps } = await supabase.from('campaigns').select('*').order('created_at', { ascending: false });
-        if (camps) setCampaigns(camps);
+        
+        if (camps) {
+            const now = new Date();
+            // 🟢 AUTO-CLEANUP: Check for Expired Campaigns on load
+            for (const camp of camps) {
+                const isExpired = new Date(camp.end_date) < now;
+                if (camp.is_active && isExpired) {
+                    // Turn it offline and UNLINK its matches because time ran out!
+                    await supabase.from('campaigns').update({ is_active: false }).eq('id', camp.id);
+                    await supabase.from('matches').update({ campaign_id: null }).eq('campaign_id', camp.id);
+                    camp.is_active = false; // Update local state so UI reflects it immediately
+                }
+            }
+            setCampaigns(camps);
+        }
 
         const { data: matchData } = await supabase.from('matches').select('league');
         if (matchData) {
@@ -73,25 +87,77 @@ export default function AdminCampaignManager() {
             rules: formData.rules
         };
 
-        if (formData.id) {
-            await supabase.from('campaigns').update(payload).eq('id', formData.id);
-        } else {
-            await supabase.from('campaigns').insert([payload]);
-        }
+        let currentCampaignId = formData.id;
+        const isExpired = new Date(payload.end_date) <= new Date();
+        const shouldBeLinked = payload.is_active && !isExpired;
 
-        await fetchCampaignsAndLeagues(); 
-        resetForm(); 
-        setSaving(false);
+        try {
+            // 1. Save or Update the Campaign
+            if (currentCampaignId) {
+                await supabase.from('campaigns').update(payload).eq('id', currentCampaignId);
+            } else {
+                const { data, error } = await supabase.from('campaigns').insert([payload]).select().single();
+                if (error) throw error;
+                currentCampaignId = data.id;
+            }
+
+            // 🟢 AUTO-SYNC & CLEANUP ON SAVE
+            if (currentCampaignId) {
+                // ALWAYS detach all matches first to ensure a clean slate
+                await supabase.from('matches').update({ campaign_id: null }).eq('campaign_id', currentCampaignId);
+
+                // ONLY attach them if the campaign is Active AND Not Expired
+                if (shouldBeLinked && formData.target_leagues.length > 0) {
+                    await supabase
+                        .from('matches')
+                        .update({ campaign_id: currentCampaignId })
+                        .in('league', formData.target_leagues)
+                        .gte('match_date', payload.start_date)
+                        .lte('match_date', payload.end_date);
+                }
+            }
+
+            await fetchCampaignsAndLeagues(); 
+            resetForm(); 
+        } catch (error) {
+            console.error("Error saving campaign:", error);
+            alert("An error occurred while saving the campaign.");
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const toggleActive = async (id: string, currentStatus: boolean) => {
-        await supabase.from('campaigns').update({ is_active: !currentStatus }).eq('id', id); 
+    const toggleActive = async (camp: any) => {
+        const newStatus = !camp.is_active;
+        const isExpired = new Date(camp.end_date) <= new Date();
+
+        // Update the campaign status
+        await supabase.from('campaigns').update({ is_active: newStatus }).eq('id', camp.id); 
+        
+        // 🟢 OFFLINE/ONLINE LINKING LOGIC
+        if (!newStatus || isExpired) {
+            // If we turn it OFF (or it's expired), UNLINK all matches immediately
+            await supabase.from('matches').update({ campaign_id: null }).eq('campaign_id', camp.id);
+        } else if (newStatus && camp.target_leagues?.length > 0) {
+            // If we turn it ON (and it's valid), RE-LINK the matches
+            await supabase
+                .from('matches')
+                .update({ campaign_id: camp.id })
+                .in('league', camp.target_leagues)
+                .gte('match_date', camp.start_date)
+                .lte('match_date', camp.end_date);
+        }
+        
         fetchCampaignsAndLeagues();
     };
 
     const deleteCampaign = async (id: string) => {
         if(!confirm("Delete campaign and its leaderboard?")) return;
+        
+        // 🟢 DELETION LOGIC: Unlink matches before deleting the campaign!
+        await supabase.from('matches').update({ campaign_id: null }).eq('campaign_id', id);
         await supabase.from('campaigns').delete().eq('id', id); 
+        
         fetchCampaignsAndLeagues();
     };
 
@@ -173,7 +239,6 @@ export default function AdminCampaignManager() {
                                 <div><label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">End</label><input type="datetime-local" value={formData.end_date} onChange={e => setFormData({...formData, end_date: e.target.value})} className="w-full border border-slate-200 rounded-xl p-3 text-xs font-bold focus:border-orange-500 outline-none" /></div>
                             </div>
 
-                            {/* 🟢 NEW: TOURNAMENT PRIZE INPUT */}
                             <div>
                                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Tournament Grand Prize</label>
                                 <input 
@@ -251,7 +316,7 @@ export default function AdminCampaignManager() {
                                 <div key={camp.id} className={`p-4 rounded-2xl border transition-all ${camp.is_active ? 'bg-white border-orange-200 shadow-md ring-1 ring-orange-50' : 'bg-slate-50 border-slate-200 opacity-70'}`}>
                                     <div className="flex justify-between items-start mb-2">
                                         <h4 className="font-black text-slate-800 text-sm line-clamp-1">{camp.title}</h4>
-                                        <button onClick={() => toggleActive(camp.id, camp.is_active)} className={`text-[8px] font-black px-2 py-1 rounded uppercase ${camp.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'}`}>
+                                        <button onClick={() => toggleActive(camp)} className={`text-[8px] font-black px-2 py-1 rounded uppercase ${camp.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'}`}>
                                             {camp.is_active ? 'Active' : 'Offline'}
                                         </button>
                                     </div>
