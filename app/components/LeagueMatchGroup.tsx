@@ -39,18 +39,26 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
         });
     }, [matches]);
 
-    const activeLiveMatches = liveMatches.filter(m => 
-        ['LIVE', 'IN_PLAY', 'HT', '1H', '2H', 'ET', 'P'].includes((m.status || '').toUpperCase()) && m.espn_id
-    );
+    // 🟢 FIX: Find matches that are live OR scheduled within 1 hour so they actually transition!
+    const pollableMatches = liveMatches.filter(m => {
+        if (!m.espn_id) return false;
+        const status = (m.status || '').toUpperCase();
+        if (['FT', 'FINISHED', 'ABD', 'AET', 'PEN'].includes(status)) return false;
+        if (['LIVE', 'IN_PLAY', 'HT', '1H', '2H', 'ET', 'P'].includes(status)) return true;
+        
+        // If it's scheduled, check if it's within 1 hour of kickoff
+        const matchTime = new Date(m.match_date).getTime();
+        const now = Date.now();
+        return (matchTime - now) < 3600000; 
+    });
 
     const fetchUpdates = async () => {
-        if (isFetching.current || activeLiveMatches.length === 0) return;
+        if (isFetching.current || pollableMatches.length === 0) return;
 
         isFetching.current = true;
         try {
-            const updatePromises = activeLiveMatches.map(async (m) => {
+            const updatePromises = pollableMatches.map(async (m) => {
                 try {
-                    // 🟢 USES THE GLOBAL DEDUPLICATOR
                     const data = await fetchLiveMatchDeduplicated(m.espn_id);
                     if (data && !data.error) {
                         return { id: m.id, status: data.status, home_score: data.home_score, away_score: data.away_score, displayClock: data.displayClock };
@@ -79,8 +87,13 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
         }
     };
 
-    // 🟢 10 SECONDS FOR LIST VIEWS
-    useSmartInterval(fetchUpdates, activeLiveMatches.length > 0 ? 10000 : null);
+    // 🟢 FIX: Instant fetch on mount to bust stale Next.js router cache
+    useEffect(() => {
+        fetchUpdates();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useSmartInterval(fetchUpdates, pollableMatches.length > 0 ? 10000 : null);
 
     const fixtures = liveMatches
         .filter(m => !['FT', 'FINISHED', 'ABD'].includes((m.status || '').toUpperCase()))

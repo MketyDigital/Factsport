@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useRef } from 'react';
+import { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { useSmartInterval } from '@/app/hooks/useSmartInterval';
 import { fetchLiveMatchDeduplicated } from '@/app/utils/liveFetcher';
 
@@ -54,6 +54,19 @@ export function MatchLiveProvider({ espnId, initialData, children }: { espnId: s
             isFetching.current = false;
         }
     };
+
+    // 🟢 FIX 1: Sync if Next.js Router soft-navigates and provides newer server data
+    useEffect(() => {
+        setLiveData(initialData);
+    }, [initialData]);
+
+    // 🟢 FIX 2: Force an immediate fetch on mount to overwrite stale Next.js cache
+    useEffect(() => {
+        if (espnId && !isFinished) {
+            fetchUpdates();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [espnId]);
 
     let pollInterval = null;
     if (!isFinished && espnId) {
