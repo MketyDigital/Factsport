@@ -29,6 +29,31 @@ export async function GET(request: Request) {
     }
     
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    
+    // =======================================================================
+    // 🧹 THE PIGGYBACK CLEANUP: Sweep expired tournaments silently (0 cost)
+    // =======================================================================
+    try {
+        const nowIso = new Date().toISOString();
+        const { data: expiredCamps } = await supabase
+            .from('campaigns')
+            .select('id')
+            .eq('is_active', true)
+            .lt('end_date', nowIso);
+
+        if (expiredCamps && expiredCamps.length > 0) {
+            const expiredIds = expiredCamps.map(c => c.id);
+            // 1. Unlink the matches safely
+            await supabase.from('matches').update({ campaign_id: null }).in('campaign_id', expiredIds);
+            // 2. Turn the campaigns offline
+            await supabase.from('campaigns').update({ is_active: false }).in('id', expiredIds);
+        }
+    } catch (cleanupError) {
+        // If cleanup fails for some reason, ignore it and still post the morning schedule!
+        console.error("Cleanup sweep failed, but continuing post...", cleanupError);
+    }
+    // =======================================================================
+
     const today = new Date().toISOString().split('T')[0];
     const lockKey = `${today}-morning`;
     
@@ -100,7 +125,7 @@ export async function GET(request: Request) {
     }
     fb1Text += `⏰ All kick-off times are in GMT.\nCatch all live scores and stats on: ${frontendUrl}/matches 🏆`;
 
-    // 🟢 X/TWITTER FORMAT
+    // 🟢 X/TWITTER FORMAT (With your custom edits!)
     let dynamicXText = `📅 ${todayString} Matchday is here!\n\nWe have ${validMatches.length} massive games lined up today. What are your Predictions for the day? Full fixtures on: ${frontendUrl}/matches 👇🏼`;
 
     // 🖼️ IMAGE GENERATION
