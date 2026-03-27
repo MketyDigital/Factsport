@@ -28,18 +28,25 @@ export default function SocialSettingsManager() {
     const [newLeague, setNewLeague] = useState('');
     const [statusMsg, setStatusMsg] = useState({ text: '', type: '' });
 
+    // 🟢 NEW: Dynamic state to hold unique leagues and teams from your DB
+    const [dbLeagues, setDbLeagues] = useState<string[]>([]);
+    const [dbTeams, setDbTeams] = useState<string[]>([]);
+
     useEffect(() => {
-        loadSettings();
+        loadSettingsAndData();
     }, []);
 
-    const loadSettings = async () => {
-        const { data, error } = await supabase.from('site_settings').select('social_config').single();
-        if (data?.social_config) {
-            setVipTeams(data.social_config.vip_teams || []);
-            setVipLeagues(data.social_config.vip_leagues || []);
+    const loadSettingsAndData = async () => {
+        setIsLoading(true);
+
+        // 1. Fetch Social Settings
+        const { data: settingsData } = await supabase.from('site_settings').select('social_config').single();
+        if (settingsData?.social_config) {
+            setVipTeams(settingsData.social_config.vip_teams || []);
+            setVipLeagues(settingsData.social_config.vip_leagues || []);
             
             // Merge saved event toggles with defaults to preserve labels
-            const savedEvents = data.social_config.events || {};
+            const savedEvents = settingsData.social_config.events || {};
             const mergedEvents = { ...DEFAULT_EVENTS };
             Object.keys(mergedEvents).forEach(key => {
                 if (savedEvents[key]) {
@@ -49,6 +56,24 @@ export default function SocialSettingsManager() {
             });
             setEvents(mergedEvents);
         }
+
+        // 2. 🟢 DYNAMIC DB SCAN: Fetch all leagues and teams from the matches table
+        const { data: matchData } = await supabase.from('matches').select('league, home_team, away_team');
+        if (matchData) {
+            const uniqueLeagues = new Set<string>();
+            const uniqueTeams = new Set<string>();
+            
+            matchData.forEach(match => {
+                if (match.league) uniqueLeagues.add(match.league);
+                if (match.home_team) uniqueTeams.add(match.home_team);
+                if (match.away_team) uniqueTeams.add(match.away_team);
+            });
+
+            // Sort them alphabetically for the dropdowns
+            setDbLeagues(Array.from(uniqueLeagues).sort());
+            setDbTeams(Array.from(uniqueTeams).sort());
+        }
+
         setIsLoading(false);
     };
 
@@ -140,17 +165,23 @@ export default function SocialSettingsManager() {
                             <h3 className="font-black text-slate-800 text-sm">VIP Teams & Nations</h3>
                         </div>
                         <div className="flex gap-2 mb-4">
+                            {/* 🟢 NEW: Input with DataList for dynamic DB teams */}
                             <input 
                                 type="text" 
+                                list="db-teams-list"
                                 value={newTeam} 
                                 onChange={(e) => setNewTeam(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && addItem('team')}
-                                placeholder="e.g. Arsenal, Brazil..." 
+                                placeholder="Search DB or type a new team..." 
                                 className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 transition-colors"
                             />
+                            <datalist id="db-teams-list">
+                                {dbTeams.map(team => <option key={team} value={team} />)}
+                            </datalist>
+
                             <button onClick={() => addItem('team')} className="bg-slate-800 text-white p-2 rounded-lg hover:bg-slate-700 transition-colors"><Plus size={20}/></button>
                         </div>
-                        <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1">
+                        <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1 styled-scrollbar">
                             {vipTeams.map(team => (
                                 <span key={team} className="inline-flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-black px-3 py-1.5 rounded-full shadow-sm">
                                     {team}
@@ -168,17 +199,23 @@ export default function SocialSettingsManager() {
                         </div>
                         <p className="text-[10px] text-slate-500 font-bold mb-3 uppercase tracking-wider">Overrides teams. Posts ALL matches in these leagues.</p>
                         <div className="flex gap-2 mb-4">
+                            {/* 🟢 NEW: Input with DataList for dynamic DB leagues */}
                             <input 
                                 type="text" 
+                                list="db-leagues-list"
                                 value={newLeague} 
                                 onChange={(e) => setNewLeague(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && addItem('league')}
-                                placeholder="e.g. World Cup..." 
+                                placeholder="Search DB or type a new league..." 
                                 className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 transition-colors"
                             />
+                            <datalist id="db-leagues-list">
+                                {dbLeagues.map(league => <option key={league} value={league} />)}
+                            </datalist>
+
                             <button onClick={() => addItem('league')} className="bg-slate-800 text-white p-2 rounded-lg hover:bg-slate-700 transition-colors"><Plus size={20}/></button>
                         </div>
-                        <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1">
+                        <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1 styled-scrollbar">
                             {vipLeagues.map(league => (
                                 <span key={league} className="inline-flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-black px-3 py-1.5 rounded-full shadow-sm">
                                     {league}

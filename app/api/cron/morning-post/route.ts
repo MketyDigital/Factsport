@@ -98,10 +98,10 @@ export async function GET(request: Request) {
         });
         fb1Text += `\n`; 
     }
-    fb1Text += `⏰ All kick-off times are in GMT.\nCatch all live scores and stats on: ${frontendUrl} 🏆`;
+    fb1Text += `⏰ All kick-off times are in GMT.\nCatch all live scores and stats on: ${frontendUrl}/matches 🏆`;
 
-    // 🟢 X/TWITTER FORMAT (Kept exactly as you wrote it)
-    let dynamicXText = `📅 ${todayString} Matchday is here!\n\nWe have ${validMatches.length} massive games lined up today. Who are you backing? Drop your predictions below 👇`;
+    // 🟢 X/TWITTER FORMAT
+    let dynamicXText = `📅 ${todayString} Matchday is here!\n\nWe have ${validMatches.length} massive games lined up today. What are your Predictions for the day? Full fixtures on: ${frontendUrl}/matches 👇🏼`;
 
     // 🖼️ IMAGE GENERATION
     const topMatches = validMatches.slice(0, 10).map(m => {
@@ -117,8 +117,19 @@ export async function GET(request: Request) {
     const safeBase64 = encodeBase64Safe(ogPayload);
     const scheduleOgUrl = `${frontendUrl}/api/og?data=${safeBase64}`;
 
-    // 🟢 PRE-WARM CACHE
-    try { await fetch(scheduleOgUrl); } catch (e) { }
+    // 🟢 UPDATED: SAFE PRE-WARM CACHE (Strict render wait with fallback)
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second max wait
+
+        const res = await fetch(scheduleOgUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        // Force Vercel to pull the image file fully into memory
+        if (res.ok) await res.arrayBuffer(); 
+    } catch (e) {
+        console.error(`Cache warm timeout/error for Morning Post. Firing webhook anyway.`);
+    }
     
     try {
         await postToSocials({ fb1Message: fb1Text, xMessage: dynamicXText, xImageUrl: scheduleOgUrl }); 

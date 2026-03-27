@@ -1,67 +1,115 @@
 'use server'; 
 
 import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
 
 // ====================================================
-// ACTION 1: YOUR EXISTING AUDIT TRIGGER
+// ACTION 1: THE BULLETPROOF AUDIT TRIGGER
 // ====================================================
 export async function triggerAuditAction() {
-    const CRON_KEY = process.env.CRON_KEY;
-    // Fallback directly to your live URL just in case the env variable is missing
-    const SITE_URL = process.env.PRODUCTION_SITE_URL || 'https://factsport.com';
-
+    // Uses Service Role to bypass RLS for administrative backend tasks
+    const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!, 
+        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    
     try {
-        const res = await fetch(`${SITE_URL}/api/admin/run-audit?key=${CRON_KEY}`, {
-            cache: 'no-store',
-            headers: {
-                // 🟢 NEW: Disguise the request as a normal Chrome browser to bypass Cloudflare Bot Fight Mode
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Accept': 'application/json'
-            }
-        });
-        
-        // 🟢 NEW: Read as raw text first so it doesn't crash if Cloudflare sends an HTML error page
-        const rawText = await res.text(); 
-        
-        try {
-            const data = JSON.parse(rawText);
+        const { data: settings } = await supabase.from('site_settings').select('target_exact_scores, min_points_floor').limit(1).single();
+        const targetCS = settings?.target_exact_scores || 4;
+        const floorPts = settings?.min_points_floor || 100;
+
+        const { data: topUsers } = await supabase
+            .from('profiles')
+            .select('id, full_name, is_vip, eligible_monthly_points, eligible_monthly_correct_scores')
+            .order('eligible_monthly_points', { ascending: false })
+            .limit(5);
+
+        if (!topUsers || topUsers.length === 0) return { success: false, error: "No eligible users found." };
+
+        const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+        await supabase.from('monthly_winners').delete().eq('month_year', currentMonthYear).eq('is_approved', false);
+
+        for (let i = 0; i < topUsers.length; i++) {
+            const user = topUsers[i];
             
-            if (!res.ok) {
-                return { success: false, error: data.error || "Unauthorized or failed." };
-            }
-            return { success: true, message: data.message };
+            const { data: preds } = await supabase
+                .from('user_predictions')
+                .select('predicted_home_score, predicted_away_score, created_at, matches(league)')
+                .eq('user_id', user.id)
+                .gte('points_awarded', 10); 
+
+            const exactScores = preds || [];
             
-        } catch (parseError) {
-            console.error("Blocked Response from Cloudflare:", rawText);
-            return { success: false, error: "Cloudflare blocked the internal request. Use the GitHub Action or check your WAF settings." };
+            // 🚨 ZERO PREDICTIONS = INSTANT FAIL
+            const hasPredictions = exactScores.length > 0;
+
+            const vipAndFloor = user.is_vip && user.eligible_monthly_points >= floorPts;
+
+            const weeksPlayed = new Set(exactScores.map(p => {
+                const d = new Date(p.created_at);
+                const firstDayOfYear = new Date(d.getFullYear(), 0, 1);
+                const pastDaysOfYear = (d.getTime() - firstDayOfYear.getTime()) / 86400000;
+                return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+            }));
+            const isActivePlayer = hasPredictions && weeksPlayed.size >= 3;
+
+            const uniqueLeagues = new Set(exactScores.map(p => (p.matches as any)?.league));
+            const fourLeagues = hasPredictions && uniqueLeagues.size >= targetCS;
+
+            const perfectMix = hasPredictions && 
+                exactScores.some(p => p.predicted_home_score > p.predicted_away_score) && 
+                exactScores.some(p => p.predicted_home_score < p.predicted_away_score) && 
+                exactScores.some(p => p.predicted_home_score === p.predicted_away_score); 
+
+            const scoreStrings = exactScores.map(p => `${p.predicted_home_score}-${p.predicted_away_score}`);
+            const uniqueScoreStrings = new Set(scoreStrings);
+            const zeroZeroCount = scoreStrings.filter(s => s === '0-0').length;
+            
+            const scoreVariety = hasPredictions && uniqueScoreStrings.size > 1 && zeroZeroCount <= 1;
+
+            const isPassed = vipAndFloor && isActivePlayer && fourLeagues && perfectMix && scoreVariety;
+
+            await supabase.from('monthly_winners').insert({
+                user_id: user.id,
+                month_year: currentMonthYear,
+                points: user.eligible_monthly_points,
+                rank: i + 1,
+                prize_amount: i === 0 ? '$500 Cash' : i === 1 ? '$200 Cash' : 'Free VIP',
+                is_approved: false,
+                audit_report: {
+                    vip_and_floor: vipAndFloor,
+                    active_player: isActivePlayer,
+                    four_leagues: fourLeagues,
+                    perfect_mix: perfectMix,
+                    score_variety: scoreVariety,
+                    is_passed: isPassed
+                }
+            });
         }
-        
+
+        return { success: true, message: "Audit generated successfully! Check the dashboard." };
     } catch (error: any) {
-        return { success: false, error: error.message || "Failed to reach the audit server." };
+        console.error("Audit Execution Error:", error);
+        return { success: false, error: error.message || "Failed to execute the audit engine." };
     }
 }
 
 // ====================================================
-// ACTION 2: THE NEW GLOBAL VAULT UNLOCKER
+// ACTION 2: THE GLOBAL VAULT UNLOCKER
 // ====================================================
 export async function verifyAdminPin(pin: string) {
-    // 1. Get the actual secret PIN from your hidden .env file
     const correctPin = process.env.ADMIN_PIN;
 
-    // 2. Fail-safe: If no PIN is set in .env, block access entirely to be safe
     if (!correctPin) {
         return { success: false, error: 'System configuration error. Vault sealed.' };
     }
 
-    // 3. Check if the input matches
     if (pin === correctPin) {
-        // 4. Issue an HTTP-Only, Secure cookie valid for 12 hours. 
-        // JavaScript CANNOT read this cookie, making it completely secure.
         cookies().set('admin_vault_unlocked', 'true', {
             secure: process.env.NODE_ENV === 'production',
             httpOnly: true,
             path: '/admin',
-            maxAge: 60 * 60 * 12 // 12 hours
+            maxAge: 60 * 60 * 12 
         });
         
         return { success: true };

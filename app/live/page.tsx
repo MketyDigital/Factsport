@@ -74,10 +74,6 @@ export default async function LiveMediaPage() {
       <div className="p-4 space-y-8 max-w-7xl mx-auto mt-4">
         <AdsterraStandardBanner />
 
-        <div className="max-w-2xl mx-auto">
-            <BettingPromo affiliateLink={null} />
-        </div>
-
         {isStudioActive && globalMediaUrl && (
             <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="lg:col-span-2 flex flex-col h-full">
@@ -137,8 +133,6 @@ export default async function LiveMediaPage() {
                         )}
                     </div>
 
-                    <AdsterraStandardBanner />
-
                     <div>
                         <div className="flex items-center gap-2 mb-4 pl-1 mt-4 border-t border-white/10 pt-8">
                             <Activity size={14} className="text-red-500 animate-pulse"/>
@@ -166,7 +160,7 @@ export default async function LiveMediaPage() {
                 </>
             )}
 
-            <AdsterraStandardBanner />
+            <BettingPromo affiliateLink={null} />
         </div>
       </div>
     </div>

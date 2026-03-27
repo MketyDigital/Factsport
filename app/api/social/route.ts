@@ -30,10 +30,132 @@ const parseTime = (t: any) => {
     return (parseInt(parts[0]) || 0) * 100 + (parseInt(parts[1]) || 0); 
 };
 
+// 🟢 KNOWN TEAM ABBREVIATIONS DICTIONARY (The "Smart Alias" Mapping)
+const KNOWN_TEAMS: Record<string, string> = {
+    // 🏴󠁧󠁢󠁥󠁮󠁧󠁿 PREMIER LEAGUE
+    'manchester city': 'MCI', 'man city': 'MCI', 'm. city': 'MCI',
+    'manchester united': 'MUN', 'man united': 'MUN', 'man utd': 'MUN',
+    'arsenal': 'ARS', 'arsenal fc': 'ARS',
+    'chelsea': 'CHE', 'chelsea fc': 'CHE',
+    'liverpool': 'LIV', 'liverpool fc': 'LIV',
+    'tottenham hotspur': 'TOT', 'tottenham': 'TOT', 'spurs': 'TOT',
+    'newcastle united': 'NEW', 'newcastle': 'NEW', 'newcastle utd': 'NEW',
+    'aston villa': 'AVL', 'villa': 'AVL',
+    'west ham united': 'WHU', 'west ham': 'WHU',
+    'brighton & hove albion': 'BHA', 'brighton': 'BHA', 'brighton hove': 'BHA',
+    'wolverhampton wanderers': 'WOL', 'wolverhampton': 'WOL', 'wolves': 'WOL',
+    'nottingham forest': 'NFO', 'nottm forest': 'NFO', 'nottingham': 'NFO',
+    'leicester city': 'LEI', 'leicester': 'LEI',
+    'everton': 'EVE', 'everton fc': 'EVE',
+    'crystal palace': 'CRY', 'palace': 'CRY',
+    'brentford': 'BRE', 'brentford fc': 'BRE',
+    'fulham': 'FUL', 'fulham fc': 'FUL',
+    'afc bournemouth': 'BOU', 'bournemouth': 'BOU',
+    'southampton': 'SOU', 'saints': 'SOU',
+    'ipswich town': 'IPS', 'ipswich': 'IPS',
+
+    // 🇪🇸 LA LIGA
+    'real madrid': 'RMA', 'madrid': 'RMA',
+    'barcelona': 'BAR', 'barca': 'BAR', 'fc barcelona': 'BAR',
+    'atletico madrid': 'ATM', 'atlético': 'ATM', 'atletico': 'ATM', 'atlético de madrid': 'ATM',
+    'athletic club': 'ATH', 'athletic bilbao': 'ATH', 'athletic': 'ATH',
+    'real sociedad': 'RSO', 'sociedad': 'RSO',
+    'real betis': 'BET', 'betis': 'BET',
+    'sevilla': 'SEV', 'sevilla fc': 'SEV',
+    'valencia': 'VAL', 'valencia cf': 'VAL',
+    'villarreal': 'VIL', 'villarreal cf': 'VIL',
+    'celta vigo': 'CEL', 'celta': 'CEL', 'celta de vigo': 'CEL',
+    'girona': 'GIR', 'girona fc': 'GIR',
+    'osasuna': 'OSA', 'ca osasuna': 'OSA',
+    'mallorca': 'MLL', 'rcd mallorca': 'MLL',
+
+    // 🇮🇹 SERIE A
+    'juventus': 'JUV', 'juve': 'JUV',
+    'ac milan': 'MIL', 'milan': 'MIL',
+    'inter milan': 'INT', 'inter': 'INT', 'internazionale': 'INT',
+    'ssc napoli': 'NAP', 'napoli': 'NAP',
+    'as roma': 'ROM', 'roma': 'ROM',
+    'ss lazio': 'LAZ', 'lazio': 'LAZ',
+    'atalanta': 'ATA', 'atalanta bc': 'ATA',
+    'fiorentina': 'FIO', 'acf fiorentina': 'FIO',
+    'bologna': 'BOL', 'bologna fc': 'BOL',
+    'torino': 'TOR', 'torino fc': 'TOR',
+
+    // 🇩🇪 BUNDESLIGA
+    'bayern munich': 'BAY', 'bayern': 'BAY', 'fc bayern': 'BAY', 'bayern münchen': 'BAY',
+    'borussia dortmund': 'BVB', 'dortmund': 'BVB',
+    'bayer 04 leverkusen': 'B04', 'leverkusen': 'B04', 'bayer leverkusen': 'B04',
+    'rb leipzig': 'RBL', 'leipzig': 'RBL',
+    'eintracht frankfurt': 'SGE', 'frankfurt': 'SGE', 'eintracht': 'SGE',
+    'borussia monchengladbach': 'BMG', 'gladbach': 'BMG', 'mgladbach': 'BMG', 'mönchengladbach': 'BMG',
+    'vfb stuttgart': 'VFB', 'stuttgart': 'VFB',
+    'wolfsburg': 'WOB', 'vfl wolfsburg': 'WOB',
+    'sc freiburg': 'SCF', 'freiburg': 'SCF',
+    'union berlin': 'FCU', 'fc union berlin': 'FCU',
+
+    // 🇫🇷 LIGUE 1
+    'paris saint germain': 'PSG', 'psg': 'PSG', 'paris sg': 'PSG', 'paris saint-germain': 'PSG',
+    'olympique de marseille': 'MAR', 'marseille': 'MAR', 'om': 'MAR',
+    'olympique lyonnais': 'LYO', 'lyon': 'LYO', 'ol': 'LYO',
+    'as monaco': 'ASM', 'monaco': 'ASM',
+    'lille osc': 'LOSC', 'lille': 'LOSC',
+    'rc lens': 'RCL', 'lens': 'RCL',
+    'ogc nice': 'OGCN', 'nice': 'OGCN',
+
+    // 🌍 OTHER EURO GIANTS
+    'ajax': 'AJA', 'afc ajax': 'AJA',
+    'psv eindhoven': 'PSV', 'psv': 'PSV',
+    'feyenoord': 'FEY',
+    'sporting cp': 'SCP', 'sporting': 'SCP', 'sporting lisbon': 'SCP',
+    'sl benfica': 'SLB', 'benfica': 'SLB',
+    'fc porto': 'FCP', 'porto': 'FCP',
+    'celtic': 'CEL', 'celtic fc': 'CEL',
+    'rangers': 'RAN', 'rangers fc': 'RAN',
+    'galatasaray': 'GAL', 'galatasaray sk': 'GAL',
+    'fenerbahce': 'FEN', 'fenerbahçe': 'FEN',
+    'besiktas': 'BES', 'beşiktaş': 'BES',
+
+    // 🌐 INTERNATIONAL NATIONS
+    'argentina': 'ARG',
+    'brazil': 'BRA', 'brasil': 'BRA',
+    'france': 'FRA',
+    'england': 'ENG',
+    'spain': 'ESP', 'españa': 'ESP',
+    'germany': 'GER', 'deutschland': 'GER',
+    'italy': 'ITA', 'italia': 'ITA',
+    'portugal': 'POR',
+    'netherlands': 'NED', 'holland': 'NED',
+    'belgium': 'BEL',
+    'croatia': 'CRO',
+    'uruguay': 'URU',
+    'colombia': 'COL',
+    'united states': 'USA', 'usa': 'USA', 'usmnt': 'USA',
+    'mexico': 'MEX',
+    'nigeria': 'NGA', 'super eagles': 'NGA',
+    'senegal': 'SEN',
+    'morocco': 'MAR',
+    'egypt': 'EGY',
+    'ghana': 'GHA',
+    'ivory coast': 'CIV', 'cote d\'ivoire': 'CIV',
+    'japan': 'JPN',
+    'south korea': 'KOR', 'korea republic': 'KOR'
+};
+
 const getMatchHashtag = (home: string, away: string, homeTla?: string, awayTla?: string) => {
-    const cleanH = homeTla || home.replace(/ fc| cf| united| city/ig, '').replace(/[^a-zA-Z]/g, '').substring(0, 3);
-    const cleanA = awayTla || away.replace(/ fc| cf| united| city/ig, '').replace(/[^a-zA-Z]/g, '').substring(0, 3);
-    return `#${cleanH.toUpperCase()}${cleanA.toUpperCase()} #FactSportLive`;
+    const getTla = (name: string, fallbackTla?: string) => {
+        // Strip quotes, weird characters, and force lowercase to match our dictionary keys perfectly
+        const normalized = name.replace(/['"]/g, '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        
+        if (KNOWN_TEAMS[normalized]) return KNOWN_TEAMS[normalized];
+        if (fallbackTla) return fallbackTla.toUpperCase();
+        
+        // Final fallback: Strip "FC", "City", "United", etc., and grab the first 3 letters
+        return name.replace(/ fc| cf| united| city/ig, '').replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase();
+    };
+
+    const cleanH = getTla(home, homeTla);
+    const cleanA = getTla(away, awayTla);
+    return `#${cleanH}${cleanA} #FactSportLive`;
 };
 
 // 🟢 CLOUDFLARE EDGE-SAFE ENCODER
@@ -271,17 +393,31 @@ export async function POST(request: Request) {
 
     if (!payload.fb1Message && !payload.xMessage) return NextResponse.json({ message: "Event suppressed by Social Admin config." });
 
-    // 🟢 PRE-WARM CACHE (Safely filtering array for TS)
+    // 🟢 UPDATED: PRE-WARM CACHE (Forces Vercel to physically draw the image, but ALWAYS fires the webhook)
     const rawUrls = [payload.xImageUrl, payload.fb1ImageUrl].filter(Boolean) as string[];
     const urlsToWarm = rawUrls.filter((url, index) => rawUrls.indexOf(url) === index);
     
     if (urlsToWarm.length > 0) {
-        try {
-            await Promise.all(urlsToWarm.map(url => fetch(url)));
-        } catch (e) {}
+        await Promise.all(urlsToWarm.map(async (url) => {
+            try {
+                // Set an 8-second timeout so it never hangs the webhook indefinitely
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 8000); 
+
+                const res = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                
+                // Force Vercel to pull the image into memory, ensuring it caches
+                if (res.ok) await res.arrayBuffer(); 
+            } catch (e) {
+                // If it times out, we just log it and move on.
+                // We DO NOT delete the payload. We let Make.com retry catch it!
+                console.error(`Cache warm timeout/error for ${url}. Firing webhook anyway.`);
+            }
+        }));
     }
 
-    // Ping the Delivery Driver
+    // Ping the Delivery Driver (Make.com & FB)
     await postToSocials(payload);
 
     try {
