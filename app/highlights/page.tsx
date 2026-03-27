@@ -116,10 +116,6 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
         
         <AdsterraStandardBanner />
 
-        <div className="max-w-xl mx-auto mb-8 mt-4">
-            <BettingPromo affiliateLink={null} />
-        </div>
-
         {safeHighlights.length > 0 ? (
             <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
@@ -162,7 +158,6 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
                     
                     {safeHighlights.length > 0 && (
                         <div className="col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-4 py-4">
-                            <AdsterraStandardBanner />
                         </div>
                     )}
 
@@ -222,7 +217,7 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
                     </div>
                 )}
 
-                <AdsterraStandardBanner />
+                 <BettingPromo />
 
                 <div className="mt-10 max-w-3xl mx-auto bg-[#0f1c3a] rounded-2xl p-4 md:p-5 border border-yellow-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 opacity-10 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
