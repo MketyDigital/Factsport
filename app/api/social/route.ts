@@ -32,7 +32,6 @@ const parseTime = (t: any) => {
 
 // 🟢 KNOWN TEAM ABBREVIATIONS DICTIONARY (The "Smart Alias" Mapping)
 const KNOWN_TEAMS: Record<string, string> = {
-    // 🏴󠁧󠁢󠁥󠁮󠁧󠁿 PREMIER LEAGUE
     'manchester city': 'MCI', 'man city': 'MCI', 'm. city': 'MCI',
     'manchester united': 'MUN', 'man united': 'MUN', 'man utd': 'MUN',
     'arsenal': 'ARS', 'arsenal fc': 'ARS',
@@ -53,8 +52,6 @@ const KNOWN_TEAMS: Record<string, string> = {
     'afc bournemouth': 'BOU', 'bournemouth': 'BOU',
     'southampton': 'SOU', 'saints': 'SOU',
     'ipswich town': 'IPS', 'ipswich': 'IPS',
-
-    // 🇪🇸 LA LIGA
     'real madrid': 'RMA', 'madrid': 'RMA',
     'barcelona': 'BAR', 'barca': 'BAR', 'fc barcelona': 'BAR',
     'atletico madrid': 'ATM', 'atlético': 'ATM', 'atletico': 'ATM', 'atlético de madrid': 'ATM',
@@ -68,8 +65,6 @@ const KNOWN_TEAMS: Record<string, string> = {
     'girona': 'GIR', 'girona fc': 'GIR',
     'osasuna': 'OSA', 'ca osasuna': 'OSA',
     'mallorca': 'MLL', 'rcd mallorca': 'MLL',
-
-    // 🇮🇹 SERIE A
     'juventus': 'JUV', 'juve': 'JUV',
     'ac milan': 'MIL', 'milan': 'MIL',
     'inter milan': 'INT', 'inter': 'INT', 'internazionale': 'INT',
@@ -80,8 +75,6 @@ const KNOWN_TEAMS: Record<string, string> = {
     'fiorentina': 'FIO', 'acf fiorentina': 'FIO',
     'bologna': 'BOL', 'bologna fc': 'BOL',
     'torino': 'TOR', 'torino fc': 'TOR',
-
-    // 🇩🇪 BUNDESLIGA
     'bayern munich': 'BAY', 'bayern': 'BAY', 'fc bayern': 'BAY', 'bayern münchen': 'BAY',
     'borussia dortmund': 'BVB', 'dortmund': 'BVB',
     'bayer 04 leverkusen': 'B04', 'leverkusen': 'B04', 'bayer leverkusen': 'B04',
@@ -92,8 +85,6 @@ const KNOWN_TEAMS: Record<string, string> = {
     'wolfsburg': 'WOB', 'vfl wolfsburg': 'WOB',
     'sc freiburg': 'SCF', 'freiburg': 'SCF',
     'union berlin': 'FCU', 'fc union berlin': 'FCU',
-
-    // 🇫🇷 LIGUE 1
     'paris saint germain': 'PSG', 'psg': 'PSG', 'paris sg': 'PSG', 'paris saint-germain': 'PSG',
     'olympique de marseille': 'MAR', 'marseille': 'MAR', 'om': 'MAR',
     'olympique lyonnais': 'LYO', 'lyon': 'LYO', 'ol': 'LYO',
@@ -101,8 +92,6 @@ const KNOWN_TEAMS: Record<string, string> = {
     'lille osc': 'LOSC', 'lille': 'LOSC',
     'rc lens': 'RCL', 'lens': 'RCL',
     'ogc nice': 'OGCN', 'nice': 'OGCN',
-
-    // 🌍 OTHER EURO GIANTS
     'ajax': 'AJA', 'afc ajax': 'AJA',
     'psv eindhoven': 'PSV', 'psv': 'PSV',
     'feyenoord': 'FEY',
@@ -114,8 +103,6 @@ const KNOWN_TEAMS: Record<string, string> = {
     'galatasaray': 'GAL', 'galatasaray sk': 'GAL',
     'fenerbahce': 'FEN', 'fenerbahçe': 'FEN',
     'besiktas': 'BES', 'beşiktaş': 'BES',
-
-    // 🌐 INTERNATIONAL NATIONS
     'argentina': 'ARG',
     'brazil': 'BRA', 'brasil': 'BRA',
     'france': 'FRA',
@@ -143,13 +130,9 @@ const KNOWN_TEAMS: Record<string, string> = {
 
 const getMatchHashtag = (home: string, away: string, homeTla?: string, awayTla?: string) => {
     const getTla = (name: string, fallbackTla?: string) => {
-        // Strip quotes, weird characters, and force lowercase to match our dictionary keys perfectly
         const normalized = name.replace(/['"]/g, '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-        
         if (KNOWN_TEAMS[normalized]) return KNOWN_TEAMS[normalized];
         if (fallbackTla) return fallbackTla.toUpperCase();
-        
-        // Final fallback: Strip "FC", "City", "United", etc., and grab the first 3 letters
         return name.replace(/ fc| cf| united| city/ig, '').replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase();
     };
 
@@ -169,7 +152,6 @@ function encodeBase64Safe(obj: any) {
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-// 🟢 HELPER TO GENERATE MATCH IMAGES
 const getMatchImageUrl = (label: string, state: any, baseUrl: string) => {
     const payload = { 
         type: 'versus', label: label, 
@@ -180,15 +162,19 @@ const getMatchImageUrl = (label: string, state: any, baseUrl: string) => {
     return `${baseUrl}/api/og?data=${encodeBase64Safe(payload)}`;
 };
 
-// ADDED context: any HERE FOR CLOUDFLARE WAITUNTIL
-export async function POST(request: Request, context: any) {
+export async function POST(request: Request) {
     const authHeader = request.headers.get('Authorization');
     if (authHeader !== `Bearer ${process.env.CRON_KEY}`) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
     const newState = body.record;
     const oldState = body.old_record || { home_score: 0, away_score: 0, status: 'PRE_MATCH', lineups: { home: [], away: [] }, match_events: [] };
-    if (!newState) return NextResponse.json({ message: "No record found" });
+    
+    // Safety check to avoid silent crashes
+    if (!newState) {
+        console.error("WEBHOOK ERROR: Missing record payload.");
+        return NextResponse.json({ message: "No record found" }, { status: 400 });
+    }
 
     const oldStatus = String(oldState.status).toUpperCase();
     const newStatus = String(newState.status).toUpperCase();
@@ -200,12 +186,8 @@ export async function POST(request: Request, context: any) {
 
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     
-    // ===================================================================
-    // 🟢 FETCH DYNAMIC ADMIN SETTINGS
-    // ===================================================================
     const { data: settingsData } = await supabase.from('site_settings').select('social_config').single();
     
-    // Safe Fallback defaults if the database is empty
     const config = settingsData?.social_config || {
         vip_teams: ['Arsenal', 'Chelsea', 'Liverpool', 'Man City', 'Man United', 'Tottenham', 'Barcelona', 'Real Madrid', 'Bayern', 'PSG', 'Juventus', 'Inter'],
         vip_leagues: ['World Cup', 'Euro Championship'],
@@ -220,7 +202,6 @@ export async function POST(request: Request, context: any) {
         }
     };
 
-    // Check VIP Status using the dynamic arrays
     const isVipTeam = config.vip_teams.includes(newState.home_team) || config.vip_teams.includes(newState.away_team);
     const isVipLeague = config.vip_leagues.includes(newState.league);
     let isVIP = isVipTeam || isVipLeague;
@@ -228,15 +209,12 @@ export async function POST(request: Request, context: any) {
     if (!isVIP) {
         const today = new Date().toISOString().split('T')[0];
         const { data: todaysMatches } = await supabase.from('matches').select('id, home_team, away_team, league').like('match_date', `${today}%`).order('match_date', { ascending: true });
-        
-        // Check if ANY match today is a VIP match
         const hasVIPToday = todaysMatches?.some(m => config.vip_teams.includes(m.home_team) || config.vip_teams.includes(m.away_team) || config.vip_leagues.includes(m.league));
         
         if (hasVIPToday) return NextResponse.json({ message: "Not a VIP team or league." });
-        if (todaysMatches && todaysMatches.length > 0 && newState.id === todaysMatches[0].id) isVIP = true; // Fallback
+        if (todaysMatches && todaysMatches.length > 0 && newState.id === todaysMatches[0].id) isVIP = true;
         else return NextResponse.json({ message: "Not the fallback match." });
     }
-    // ===================================================================
 
     const frontendUrl = 'https://factsport.com'; 
     const matchUrl = `${frontendUrl}/match/${newState.id}`; 
@@ -262,16 +240,10 @@ export async function POST(request: Request, context: any) {
     const htStatuses = ['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME', 'PAUSED'];
     const live2HStatuses = ['2H', 'SECOND_HALF', 'SECOND HALF'];
 
-    // 🟢 1. VAR DECISIONS
     if (newTotal < oldTotal) {
-        if (config.events.var_overturn.fb) {
-            payload.fb1Message = `❌ VAR DECISION: OVERTURNED - Previous G/Event has been canceled.\n\nThe score returns to:\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
-        }
-        if (config.events.var_overturn.x) {
-            payload.xMessage = `❌ VAR DECISION: OVERTURNED - Previous G/Event canceled.\n\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}\n\n${hashtags}`;
-        }
+        if (config.events.var_overturn.fb) payload.fb1Message = `❌ VAR DECISION: OVERTURNED - Previous G/Event has been canceled.\n\nThe score returns to:\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
+        if (config.events.var_overturn.x) payload.xMessage = `❌ VAR DECISION: OVERTURNED - Previous G/Event canceled.\n\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}\n\n${hashtags}`;
     } 
-    // 🟢 2. GOALS 
     else if (newTotal > oldTotal || newGoalsList.length > oldGoalsList.length) {
         if (newGoalsList.length < newTotal) return NextResponse.json({ message: "Facts data lagging behind scoreboard. Waiting for next ping." });
         let statusText = live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus) ? '' : ` (${newState.status})`;
@@ -287,45 +259,30 @@ export async function POST(request: Request, context: any) {
         if (!scorerText.trim()) scorerText = `\n⚽ GOAL - Confirmed! Tap the link below for full details! 👇\n`;
 
         if (['PEN', 'PEN_SHOOT_OUT'].includes(newStatus)) {
-            if (config.events.goals.fb) {
-                payload.fb1Message = `🥅 PENALTY SCORED!\n\nShootout Update: ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
-            }
+            if (config.events.goals.fb) payload.fb1Message = `🥅 PENALTY SCORED!\n\nShootout Update: ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
             if (config.events.goals.x) {
                 payload.xMessage = `🥅 PENALTY SCORED!\n\nShootout: ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}\n\n${hashtags}`;
                 payload.xImageUrl = getMatchImageUrl('PENALTY SCORED', newState, frontendUrl);
             }
         } else {
-            if (config.events.goals.fb) {
-                payload.fb1Message = `🚨 GOAL ALERT!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\n${matchUrl}`;
-            }
+            if (config.events.goals.fb) payload.fb1Message = `🚨 GOAL ALERT!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\n${matchUrl}`;
             if (config.events.goals.x) {
                 payload.xMessage = `🚨 GOAL ALERT!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\n👇\n${matchUrl}\n\n${hashtags}`;
                 payload.xImageUrl = getMatchImageUrl('GOAL ALERT!', newState, frontendUrl); 
             }
         }
     } 
-    // 🟢 3. PENALTY AWARDED
     else if (newTotal === oldTotal && newPenaltiesList.length > oldPenaltiesList.length) {
         const sortedPens = [...newPenaltiesList].sort((a, b) => parseTime(b.time || b.minute) - parseTime(a.time || a.minute));
         const time = sortedPens[0].time || sortedPens[0].minute ? `${sortedPens[0].time || sortedPens[0].minute}'` : '';
         
-        if (config.events.penalty_awarded.fb) {
-            payload.fb1Message = `⚠️ PENALTY AWARDED - (Confirmed by Referee/VAR) ${time}\n\nMassive moment in the match! Will they convert it?\n\n👇\n${matchUrl}`;
-        }
-        if (config.events.penalty_awarded.x) {
-            payload.xMessage = `⚠️ PENALTY AWARDED - ${time}\n\nMassive moment in the match! Will they convert it?\n\n👇\n${matchUrl}\n\n${hashtags}`;
-        }
+        if (config.events.penalty_awarded.fb) payload.fb1Message = `⚠️ PENALTY AWARDED - (Confirmed by Referee/VAR) ${time}\n\nMassive moment in the match! Will they convert it?\n\n👇\n${matchUrl}`;
+        if (config.events.penalty_awarded.x) payload.xMessage = `⚠️ PENALTY AWARDED - ${time}\n\nMassive moment in the match! Will they convert it?\n\n👇\n${matchUrl}\n\n${hashtags}`;
     }
-    // 🟢 4. LINEUPS
     else if (oldWasIncomplete && newIsComplete) {
-        if (config.events.lineups.fb) {
-            payload.fb1Message = `📋 STARTING XI ANNOUNCED!\n\n${newState.home_team} vs ${newState.away_team}\n\n👇 See the tactical setup & subs here!\n${matchUrl}`;
-        }
-        if (config.events.lineups.x) {
-            payload.xMessage = `🚨 STARTING XI: ${newState.home_team} vs ${newState.away_team}! 👇\n${matchUrl}\n\n${hashtags}`;
-        }
+        if (config.events.lineups.fb) payload.fb1Message = `📋 STARTING XI ANNOUNCED!\n\n${newState.home_team} vs ${newState.away_team}\n\n👇 See the tactical setup & subs here!\n${matchUrl}`;
+        if (config.events.lineups.x) payload.xMessage = `🚨 STARTING XI: ${newState.home_team} vs ${newState.away_team}! 👇\n${matchUrl}\n\n${hashtags}`;
         
-        // Generate Image only if at least one platform wants it
         if (config.events.lineups.fb || config.events.lineups.x) {
             const lineupOg = { 
                 type: 'pitch', label: 'STARTING XI', 
@@ -335,7 +292,6 @@ export async function POST(request: Request, context: any) {
                 homeXI: newValidH.slice(0, 11), awayXI: newValidA.slice(0, 11)
             };
             const finalUrl = `${frontendUrl}/api/og?data=${encodeBase64Safe(lineupOg)}`;
-            
             if (config.events.lineups.x) payload.xImageUrl = finalUrl;
             if (config.events.lineups.fb) payload.fb1ImageUrl = finalUrl; 
         }
@@ -343,14 +299,9 @@ export async function POST(request: Request, context: any) {
     else if (oldWasIncomplete && !newIsComplete && (newValidH.length > 0 || newValidA.length > 0)) {
         return NextResponse.json({ message: "Lineups still incomplete." });
     } 
-    // 🟢 5. KICK OFF
     else if (preStatuses.includes(oldStatus) && live1HStatuses.includes(newStatus)) {
-        if (config.events.kickoff.fb) {
-            payload.fb1Message = `⏱️ KICK-OFF!\n\nWe are officially underway: ${newState.home_team} vs ${newState.away_team}.\n\nFollow live updates here:\n👇\n${matchUrl}`;
-        }
-        if (config.events.kickoff.x) {
-            payload.xMessage = `⏱️ KICK-OFF!\n\nWe are officially underway.\n\n👇 Live updates:\n${matchUrl}\n\n${hashtags}`;
-        }
+        if (config.events.kickoff.fb) payload.fb1Message = `⏱️ KICK-OFF!\n\nWe are officially underway: ${newState.home_team} vs ${newState.away_team}.\n\nFollow live updates here:\n👇\n${matchUrl}`;
+        if (config.events.kickoff.x) payload.xMessage = `⏱️ KICK-OFF!\n\nWe are officially underway.\n\n👇 Live updates:\n${matchUrl}\n\n${hashtags}`;
         
         if (config.events.kickoff.fb || config.events.kickoff.x) {
             const kickoffUrl = getMatchImageUrl('KICK-OFF', newState, frontendUrl);
@@ -358,32 +309,17 @@ export async function POST(request: Request, context: any) {
             if (config.events.kickoff.fb) payload.fb1ImageUrl = kickoffUrl; 
         }
     }
-    // 🟢 6. HALF TIME
     else if (!htStatuses.includes(oldStatus) && htStatuses.includes(newStatus)) {
-        if (config.events.halftime.fb) {
-            payload.fb1Message = `⏸️ HALF TIME.\n\nHow do you rate the first half performance?\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇 Match Stats so far:\n${matchUrl}`;
-        }
-        if (config.events.halftime.x) {
-            payload.xMessage = `⏸️ HALF TIME.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇 Match Stats so far:\n${matchUrl}\n\n${hashtags}`;
-        }
+        if (config.events.halftime.fb) payload.fb1Message = `⏸️ HALF TIME.\n\nHow do you rate the first half performance?\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇 Match Stats so far:\n${matchUrl}`;
+        if (config.events.halftime.x) payload.xMessage = `⏸️ HALF TIME.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇 Match Stats so far:\n${matchUrl}\n\n${hashtags}`;
     }
-    // 🟢 7. SECOND HALF (Treating as Kickoff config)
     else if (htStatuses.includes(oldStatus) && (live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus))) {
-        if (config.events.kickoff.fb) {
-            payload.fb1Message = `⏱️ SECOND HALF KICK-OFF!\n\nWe are back underway: ${newState.home_team} vs ${newState.away_team}.\n\nFollow the action here:\n👇\n${matchUrl}`;
-        }
-        if (config.events.kickoff.x) {
-            payload.xMessage = `⏱️ SECOND HALF KICK-OFF!\n\nWe are back underway.\n\n👇 Follow the action:\n${matchUrl}\n\n${hashtags}`;
-        }
+        if (config.events.kickoff.fb) payload.fb1Message = `⏱️ SECOND HALF KICK-OFF!\n\nWe are back underway: ${newState.home_team} vs ${newState.away_team}.\n\nFollow the action here:\n👇\n${matchUrl}`;
+        if (config.events.kickoff.x) payload.xMessage = `⏱️ SECOND HALF KICK-OFF!\n\nWe are back underway.\n\n👇 Follow the action:\n${matchUrl}\n\n${hashtags}`;
     }
-    // 🟢 8. FULL TIME
     else if (!strictlyFinishedStatuses.includes(oldStatus) && strictlyFinishedStatuses.includes(newStatus)) {
-        if (config.events.fulltime.fb) {
-            payload.fb1Message = `⏹️ FULL TIME!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\nMatch stats and ratings available now:\n👇\n${matchUrl}`;
-        }
-        if (config.events.fulltime.x) {
-            payload.xMessage = `⏹️ FULL TIME.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}.\n\n👇 Stats:\n${matchUrl}\n\n${hashtags}`;
-        }
+        if (config.events.fulltime.fb) payload.fb1Message = `⏹️ FULL TIME!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\nMatch stats and ratings available now:\n👇\n${matchUrl}`;
+        if (config.events.fulltime.x) payload.xMessage = `⏹️ FULL TIME.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}.\n\n👇 Stats:\n${matchUrl}\n\n${hashtags}`;
 
         if (config.events.fulltime.fb || config.events.fulltime.x) {
             const ftUrl = getMatchImageUrl('FULL TIME', newState, frontendUrl);
@@ -394,46 +330,21 @@ export async function POST(request: Request, context: any) {
 
     if (!payload.fb1Message && !payload.xMessage) return NextResponse.json({ message: "Event suppressed by Social Admin config." });
 
-    // 🟢 NEW: ISOLATED BACKGROUND TASK FOR CLOUDFLARE
-    const processSocialsAndCache = async () => {
-        const rawUrls = [payload.xImageUrl, payload.fb1ImageUrl].filter(Boolean) as string[];
-        const urlsToWarm = rawUrls.filter((url, index) => rawUrls.indexOf(url) === index);
-        
-        if (urlsToWarm.length > 0) {
-            await Promise.all(urlsToWarm.map(async (url) => {
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 8000); 
-
-                    const res = await fetch(url, { signal: controller.signal });
-                    clearTimeout(timeoutId);
-                    
-                    if (res.ok) await res.arrayBuffer(); 
-                } catch (e) {
-                    console.error(`Cache warm timeout/error for ${url}. Firing webhook anyway.`);
-                }
-            }));
-        }
-
-        // Ping the Delivery Driver (Make.com & FB)
+    // 🟢 INSTANT DELIVERY TO MAKE.COM
+    // By awaiting postToSocials, Cloudflare keeps the worker alive just long enough to send the JSON.
+    // Make.com will receive the URL, wait 20 seconds (via your module), and then fetch the image safely.
+    try {
         await postToSocials(payload);
+        
+        fetch(`${frontendUrl}/api/index-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
+            body: JSON.stringify({ url: matchUrl, type: 'URL_UPDATED' })
+        }).catch(() => {});
 
-        try {
-            await fetch(`${frontendUrl}/api/index-url`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
-                body: JSON.stringify({ url: matchUrl, type: 'URL_UPDATED' })
-            });
-        } catch (e) {}
-    };
-
-    // 🟢 TELL CLOUDFLARE WORKER TO NOT DIE WHEN RESPONSE IS SENT
-    if (context?.waitUntil) {
-        context.waitUntil(processSocialsAndCache());
-    } else {
-        processSocialsAndCache();
+    } catch (err) {
+        console.error("Critical error firing socials:", err);
     }
 
-    // 🟢 IMMEDIATELY RESPOND TO SUPABASE TO PREVENT TIMEOUT
-    return NextResponse.json({ success: true, event: "Webhook accepted, processing in background" });
+    return NextResponse.json({ success: true, event: "Webhook successfully fired." });
 }
