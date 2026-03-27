@@ -39,13 +39,13 @@ export default function AuditManager() {
     const handleApprove = async (draft: any) => {
         if (!confirm(`Approve this winner and award them: ${draft.prize_amount}?`)) return;
         
-        // 1. Approve the Draft
+        // 1. Approve the Draft with the ADMIN EDITED PRIZE
         await supabase.from('monthly_winners').update({ 
             is_approved: true, 
             prize_amount: draft.prize_amount 
         }).eq('id', draft.id);
 
-        // 2. 🔥 LINK THE SYSTEMS: Give the user the permanent Golden Badge in their Profile!
+        // 2. Give the user the permanent Golden Badge in their Profile!
         await supabase.from('profiles').update({ 
             is_winner: true 
         }).eq('id', draft.user_id);
@@ -87,7 +87,7 @@ export default function AuditManager() {
                 <button 
                     onClick={manuallyRunAudit} 
                     disabled={runningAudit}
-                    className="bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-black transition flex items-center gap-2"
+                    className="bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-black transition flex items-center gap-2 disabled:opacity-50"
                 >
                     {runningAudit ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} 
                     Force Run Audit
