@@ -72,7 +72,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ message: "Only ghost/postponed matches found. Lock removed." });
     }
 
-    const frontendUrl = 'https://factsport.com/matches'; 
+    const frontendUrl = 'https://factsport.com'; 
     const todayString = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
     const leagues: Record<string, any[]> = {};
     
@@ -98,10 +98,10 @@ export async function GET(request: Request) {
         });
         fb1Text += `\n`; 
     }
-    fb1Text += `⏰ All kick-off times are in GMT.\nCatch all live scores and stats on: ${frontendUrl} 🏆`;
+    fb1Text += `⏰ All kick-off times are in GMT.\nCatch all live scores and stats on: ${frontendUrl}/matches 🏆`;
 
     // 🟢 X/TWITTER FORMAT
-    let dynamicXText = `📅 ${todayString} Matchday is here!\n\nWe have ${validMatches.length} massive games lined up today. What are your Predictions for the day? Full fixtures on: ${frontendUrl} 👇🏼`;
+    let dynamicXText = `📅 ${todayString} Matchday is here!\n\nWe have ${validMatches.length} massive games lined up today. What are your Predictions for the day? Full fixtures on: ${frontendUrl}/matches 👇🏼`;
 
     // 🖼️ IMAGE GENERATION
     const topMatches = validMatches.slice(0, 10).map(m => {
