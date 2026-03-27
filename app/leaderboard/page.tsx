@@ -18,7 +18,6 @@ export default async function LeaderboardPage() {
   const targetCS = settings?.target_exact_scores || 4;
   const floorPts = settings?.min_points_floor || 100;
 
-  // 🟢 INCREASED TO TOP 100
   const { data: users } = await supabase
     .from('profiles')
     .select('full_name, monthly_points, points, monthly_correct_scores, eligible_monthly_points, eligible_monthly_correct_scores, is_vip')
@@ -40,18 +39,57 @@ export default async function LeaderboardPage() {
     .eq('is_active', true)
     .order('created_at', { ascending: false });
 
+  // 1. Fetch Monthly Winners
   const { data: approvedWinners } = await supabase
     .from('monthly_winners')
-    .select('month_year, points, prize_amount, rank, user:profiles(full_name)')
+    .select('month_year, points, prize_amount, rank, created_at, user:profiles(full_name)')
     .eq('is_approved', true)
-    .order('created_at', { ascending: false })
-    .limit(15);
+    .order('created_at', { ascending: false });
   
-  const pastWinners = approvedWinners?.map(w => {
-    let winnerName = 'Champion';
-    if (w.user) winnerName = Array.isArray(w.user) ? w.user[0]?.full_name : (w.user as any).full_name;
-    return { month: w.month_year, name: winnerName, points: w.points, prize: w.prize_amount || 'Mystery Prize', rank: w.rank };
-  }) || [];
+  // 2. Fetch Inactive Campaigns (Past Tournaments)
+  const { data: pastCampaigns } = await supabase
+    .from('campaigns')
+    .select(`title, end_date, rules, leaderboard:campaign_leaderboards(total_points, user:profiles(full_name))`) // 🟢 Fetch rules to get prize
+    .eq('is_active', false)
+    .order('end_date', { ascending: false });
+
+  // 3. Combine and Sort the Hall of Fame
+  let allPastWinners: any[] = [];
+
+  if (approvedWinners) {
+      approvedWinners.forEach(w => {
+        let winnerName = 'Champion';
+        if (w.user) winnerName = Array.isArray(w.user) ? w.user[0]?.full_name : (w.user as any).full_name;
+        allPastWinners.push({ 
+            title: w.month_year, 
+            name: winnerName, 
+            points: w.points, 
+            prize: w.prize_amount || 'Monthly Prize', 
+            isCampaign: false,
+            date: new Date(w.created_at).getTime()
+        });
+      });
+  }
+
+  if (pastCampaigns) {
+      pastCampaigns.forEach(camp => {
+          if (camp.leaderboard && camp.leaderboard.length > 0) {
+              const topPlayer = camp.leaderboard.sort((a:any, b:any) => b.total_points - a.total_points)[0];
+              if (topPlayer.user) {
+                  allPastWinners.push({
+                      title: camp.title,
+                      name: topPlayer.user.full_name,
+                      points: topPlayer.total_points,
+                      prize: camp.rules?.prize || 'Tournament Champion', // 🟢 Uses Admin defined custom Prize!
+                      isCampaign: true,
+                      date: new Date(camp.end_date).getTime()
+                  });
+              }
+          }
+      });
+  }
+
+  allPastWinners.sort((a, b) => b.date - a.date);
 
   const TELEGRAM_LINK = "https://t.me/factsportlive"; 
   const BETTING_LINK = "https://melbet.com";
@@ -134,7 +172,6 @@ export default async function LeaderboardPage() {
             </p>
         </div>
 
-        {/* 🟢 MAIN LEADERBOARD - SCROLLABLE UP TO 100 */}
         <div className="bg-white/5 rounded-3xl border border-white/10 overflow-hidden mb-12 shadow-2xl">
             <div className="p-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
                 <h3 className="font-bold text-sm flex items-center gap-2"><TrendingUp size={16} /> Live Standings (Top 100)</h3>
@@ -182,7 +219,6 @@ export default async function LeaderboardPage() {
             )}
         </div>
 
-        {/* 🟢 CAMPAIGN LEADERBOARDS - SCROLLABLE UP TO 100 */}
         {activeCampaigns && activeCampaigns.length > 0 && (
             <div className="mb-12">
                 <h3 className="text-xl font-black italic flex items-center justify-center gap-2 mb-6 uppercase tracking-widest text-orange-500">
@@ -191,7 +227,6 @@ export default async function LeaderboardPage() {
                 
                 <div className="grid gap-6">
                     {activeCampaigns.map(camp => {
-                        // 🟢 INCREASED LIMIT TO 100 FOR CAMPAIGNS
                         const sortedLeaders = camp.leaderboard
                             ?.filter((l: any) => l.total_points > 0)
                             .sort((a:any, b:any) => b.total_points - a.total_points)
@@ -263,26 +298,26 @@ export default async function LeaderboardPage() {
         <div>
              <h3 className="text-sm font-black uppercase text-slate-500 mb-4 flex items-center gap-2 pl-2"><History size={16} /> Hall of Fame</h3>
              <div className="grid gap-3">
-                {pastWinners.length === 0 ? (
+                {allPastWinners.length === 0 ? (
                     <div className="text-center text-slate-500 text-xs py-8">No winners approved yet. Be the first!</div>
                 ) : (
-                    pastWinners.map((winner, i) => (
-                        <div key={i} className="bg-gradient-to-r from-slate-800 to-slate-900 p-4 rounded-xl border border-slate-700 flex items-center justify-between relative overflow-hidden group">
+                    allPastWinners.map((winner, i) => (
+                        <div key={i} className={`p-4 rounded-xl border flex items-center justify-between relative overflow-hidden group ${winner.isCampaign ? 'bg-gradient-to-r from-orange-900/40 to-[#0a1428] border-orange-500/30' : 'bg-gradient-to-r from-slate-800 to-slate-900 border-slate-700'}`}>
                             <div className="absolute top-0 right-0 w-24 h-full bg-white/5 -skew-x-12 translate-x-12 group-hover:translate-x-0 transition duration-700"></div>
                             <div className="flex items-center gap-4 relative z-10">
-                                <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center border border-yellow-500/30 text-yellow-500">
-                                    <Trophy size={18} />
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${winner.isCampaign ? 'bg-orange-500/20 border-orange-500/30 text-orange-400' : 'bg-yellow-500/20 border-yellow-500/30 text-yellow-500'}`}>
+                                    {winner.isCampaign ? <Zap size={18} /> : <Trophy size={18} />}
                                 </div>
                                 <div>
-                                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-0.5 flex items-center gap-1">
-                                        <Calendar size={10} /> {winner.month}
+                                    <p className={`text-[10px] uppercase font-bold tracking-wider mb-0.5 flex items-center gap-1 ${winner.isCampaign ? 'text-orange-300' : 'text-slate-400'}`}>
+                                        <Calendar size={10} /> {winner.title}
                                     </p>
                                     <p className="font-bold text-white text-sm">{winner.name}</p>
                                 </div>
                             </div>
                             <div className="text-right relative z-10">
-                                <div className="text-xl font-black text-yellow-400 italic">{winner.points} pts</div>
-                                <div className="text-[9px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full inline-block mt-1 border border-green-500/20">
+                                <div className={`text-xl font-black italic ${winner.isCampaign ? 'text-orange-400' : 'text-yellow-400'}`}>{winner.points} pts</div>
+                                <div className={`text-[9px] px-2 py-0.5 rounded-full inline-block mt-1 border ${winner.isCampaign ? 'bg-orange-500/20 text-orange-300 border-orange-500/20' : 'bg-green-500/20 text-green-400 border-green-500/20'}`}>
                                     Won {winner.prize}
                                 </div>
                             </div>
