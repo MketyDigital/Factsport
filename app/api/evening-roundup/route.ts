@@ -76,7 +76,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ message: "Only ghost/postponed matches found. Lock removed." });
     }
 
-    const frontendUrl = 'https://factsport.com'; 
+    const frontendUrl = 'https://factsport.com/matches'; 
     const leagues: Record<string, any[]> = {};
     validMatches.forEach(m => {
         if (!leagues[m.league]) leagues[m.league] = [];
@@ -84,7 +84,7 @@ export async function GET(request: Request) {
     });
 
     // 🟢 FACEBOOK FORMAT
-    let fb1Text = `🏁 DAILY ROUNDUP!\n\nHere is the state of play across today's fixtures:\n\n`;
+    let fb1Text = `🏁 DAILY ROUNDUP!\n\nHere is the result sheet across today's fixtures:\n\n`;
     for (const [leagueName, leagueMatches] of Object.entries(leagues)) {
         fb1Text += `🏆 ${leagueName.toUpperCase()}\n`;
         leagueMatches.forEach(m => {
@@ -100,7 +100,7 @@ export async function GET(request: Request) {
         });
         fb1Text += `\n`;
     }
-    fb1Text += `Full stats, player ratings & tactical news: ${frontendUrl} 🏆`;
+    fb1Text += `Full results, stats, player ratings & tactical news: ${frontendUrl} 🏆`;
 
     // 🟢 X/TWITTER FORMAT
     let xText = `🏁 DAILY ROUNDUP!\n\n`;
@@ -115,7 +115,7 @@ export async function GET(request: Request) {
             xText += `• ⏳ ${m.home_team} vs ${m.away_team} (${time})\n`;
         }
     });
-    xText += `\nFull stats & news: ${frontendUrl}`;
+    xText += `\nFull results & stats : ${frontendUrl}`;
 
     // 🖼️ IMAGE GENERATION
     const topMatches = validMatches.slice(0, 10).map(m => {
