@@ -271,17 +271,31 @@ export async function POST(request: Request) {
 
     if (!payload.fb1Message && !payload.xMessage) return NextResponse.json({ message: "Event suppressed by Social Admin config." });
 
-    // 🟢 PRE-WARM CACHE (Safely filtering array for TS)
+    // 🟢 UPDATED: PRE-WARM CACHE (Forces Vercel to physically draw the image, but ALWAYS fires the webhook)
     const rawUrls = [payload.xImageUrl, payload.fb1ImageUrl].filter(Boolean) as string[];
     const urlsToWarm = rawUrls.filter((url, index) => rawUrls.indexOf(url) === index);
     
     if (urlsToWarm.length > 0) {
-        try {
-            await Promise.all(urlsToWarm.map(url => fetch(url)));
-        } catch (e) {}
+        await Promise.all(urlsToWarm.map(async (url) => {
+            try {
+                // Set an 8-second timeout so it never hangs the webhook indefinitely
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 8000); 
+
+                const res = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                
+                // Force Vercel to pull the image into memory, ensuring it caches
+                if (res.ok) await res.arrayBuffer(); 
+            } catch (e) {
+                // If it times out, we just log it and move on.
+                // We DO NOT delete the payload. We let Make.com retry catch it!
+                console.error(`Cache warm timeout/error for ${url}. Firing webhook anyway.`);
+            }
+        }));
     }
 
-    // Ping the Delivery Driver
+    // Ping the Delivery Driver (Make.com & FB)
     await postToSocials(payload);
 
     try {
