@@ -19,6 +19,7 @@ import MiniStandings from '@/app/components/MiniStandings';
 import BetOfTheDay from '@/app/components/BetOfTheDay'; 
 
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
+const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
 export const metadata: Metadata = {
@@ -58,12 +59,11 @@ const sortMatches = (matches: any[]) => {
     const timeA = new Date(a.match_date).getTime();
     const timeB = new Date(b.match_date).getTime();
 
-    if (isFinishedA && isFinishedB) return timeB - timeA; // Most recent finished first
-    return timeA - timeB; // Earliest scheduled first
+    if (isFinishedA && isFinishedB) return timeB - timeA;
+    return timeA - timeB;
   });
 };
 
-// 🟢 SMART MIXING LOGIC: Mixes matches strictly for the "For You" tab (Max 3 per league, max 20 total)
 const getMixedTodayMatches = (allTodayMatches: any[], limit: number) => {
     const leagues: Record<string, any[]> = {};
     allTodayMatches.forEach(m => {
@@ -86,7 +86,6 @@ const getMixedTodayMatches = (allTodayMatches: any[], limit: number) => {
                 added = true;
             }
         }
-        // If we hit the cap of 3 per league but still need matches to reach 20, loosen the cap
         if (!added && mixed.length < limit && allTodayMatches.length > mixed.length) {
             for (const league of Object.keys(leagues)) {
                  if (mixed.length >= limit) break;
@@ -103,7 +102,6 @@ const getMixedTodayMatches = (allTodayMatches: any[], limit: number) => {
 async function getHomepageData(leagueFilter: string | undefined) {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     
-  // 🟢 STRICT TODAY BOUNDARIES (00:00 to 23:59)
   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
   const todayEnd = new Date(todayStart); todayEnd.setHours(23,59,59,999);
 
@@ -117,7 +115,6 @@ async function getHomepageData(leagueFilter: string | undefined) {
   ]);
 
   if (leagueFilter) {
-      // LEAGUE TAB: Fetch strictly today's matches for this league (Max 5)
       const { data: todayLeagueMatches } = await supabase.from('matches')
           .select('*')
           .ilike('league', `%${leagueFilter}%`)
@@ -129,7 +126,6 @@ async function getHomepageData(leagueFilter: string | undefined) {
       if (todayLeagueMatches && todayLeagueMatches.length > 0) {
           matches = todayLeagueMatches;
       } else {
-          // If zero matches today, fallback to closest past/future matches (Max 5)
           const { data: fallbackMatches } = await supabase.from('matches')
               .select('*')
               .ilike('league', `%${leagueFilter}%`)
@@ -144,18 +140,15 @@ async function getHomepageData(leagueFilter: string | undefined) {
       matches = sortMatches(matches);
 
   } else {
-      // FOR YOU TAB: Fetch strictly today's matches across ALL leagues
       const { data: todayAllMatches } = await supabase.from('matches').select('*')
         .gte('match_date', todayStart.toISOString())
         .lte('match_date', todayEnd.toISOString())
         .order('match_date', { ascending: true })
-        .limit(100); // Fetch a wide pool to mix from
+        .limit(100); 
       
       if (todayAllMatches && todayAllMatches.length > 0) {
-          // 🟢 Applies the 3-per-league, max-20 logic
           matches = getMixedTodayMatches(todayAllMatches, 20); 
       } else {
-          // Absolute fallback if there are 0 matches globally today (Season Break)
           const { data: recentMatches } = await supabase.from('matches').select('*')
             .order('match_date', { ascending: false })
             .limit(10);
@@ -178,32 +171,61 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
     
   const { matches, news, highlights, featuredMatches, isShowingFallbackResults } = await getHomepageData(selectedLeague);
 
-  // NEWS LOGIC
   const finalHeadlines = news.filter(n => n.is_headline).slice(0, 3);
   const nonHeadlineNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id));
   const latestNews = nonHeadlineNews.slice(0, 5);
   const rawTicker = nonHeadlineNews.slice(0, 20);
   const tickerNews = [...rawTicker, ...rawTicker];
 
-  // HERO MATCHES LOGIC (Restricted to today's matches in the pool)
+  // 🟢 STRICT HERO MATCHES LOGIC (Admin -> Media -> Big Teams -> Any Today) Max 5
   let heroMatches: any[] = [...featuredMatches];
+  
+  // 1. Add matches with Media URLs from TODAY
   const mediaMatches = matches.filter(m => m.livestream_url || m.audio_url || m.video_url);
   mediaMatches.forEach(m => {
       if (!heroMatches.find(h => h.id === m.id) && heroMatches.length < 5) heroMatches.push(m);
   });
 
+  // 2. Fallback to Big Teams from TODAY
   if (heroMatches.length < 5) {
       const bigTeams = ['Arsenal', 'Chelsea', 'Liverpool', 'Man City', 'Manchester City', 'Man United', 'Manchester United', 'Tottenham', 'Real Madrid', 'Barcelona', 'Atletico', 'Bayern', 'Dortmund', 'Leverkusen', 'Juventus', 'Inter', 'AC Milan', 'Napoli', 'PSG'];
       const activeMatches = matches.filter(m => !FINISHED_STATUSES.includes((m.status || '').toUpperCase()));
       const candidates = activeMatches.length > 0 ? activeMatches : matches;
+      
       const bigMatches = candidates.filter(m => { return bigTeams.some(giant => (m.home_team && m.home_team.toLowerCase().includes(giant.toLowerCase())) || (m.away_team && m.away_team.toLowerCase().includes(giant.toLowerCase()))); });
       
       bigMatches.forEach(m => {
           if (!heroMatches.find(h => h.id === m.id) && heroMatches.length < 5) heroMatches.push(m);
       });
+
+      // 3. Absolute Fallback: Any available match for the day
+      candidates.forEach(m => {
+          if (!heroMatches.find(h => h.id === m.id) && heroMatches.length < 5) heroMatches.push(m);
+      });
   }
 
   heroMatches = heroMatches.slice(0, 5);
+
+  // 🟢 STABLE BET OF THE DAY LOGIC (Locks to one match per day)
+  let betOfTheDayMatch = null;
+  if (matches.length > 0) {
+      // Prioritize Admin Featured match first
+      if (featuredMatches.length > 0) {
+          betOfTheDayMatch = featuredMatches[featuredMatches.length - 1]; 
+      } else {
+          // Sort today's matches by time descending (Latest matches first) to prefer afternoon/evening matches
+          const sortedByTimeDesc = [...matches].sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
+          
+          const bigTeams = ['Arsenal', 'Chelsea', 'Liverpool', 'Man City', 'Manchester City', 'Man United', 'Manchester United', 'Tottenham', 'Real Madrid', 'Barcelona', 'Atletico', 'Bayern', 'Dortmund', 'Leverkusen', 'Juventus', 'Inter', 'AC Milan', 'Napoli', 'PSG'];
+          
+          // Find the latest BIG match of the day
+          const latestBigMatch = sortedByTimeDesc.find(m => bigTeams.some(giant => (m.home_team && m.home_team.toLowerCase().includes(giant.toLowerCase())) || (m.away_team && m.away_team.toLowerCase().includes(giant.toLowerCase()))));
+          
+          // If no big match, just pick the latest match of the day. If completely empty, fallback.
+          betOfTheDayMatch = latestBigMatch || sortedByTimeDesc[0] || matches[0];
+      }
+  }
+
   const displayMatches = matches.filter(m => !heroMatches.some(h => h.id === m.id));
   const groupedMatches = groupByDate(displayMatches);
 
@@ -213,7 +235,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       {/* 1. Ticker */}
       <NewsTicker tickerNews={tickerNews} />
 
-      {/* 2. Hero Matches */}
+      {/* 2. Hero Matches (Immediately under Ticker) */}
       {!selectedLeague && heroMatches.length > 0 && (
           <div className="bg-[#0f1c3a] pt-3 pb-4 border-b border-slate-800">
             <HeroMatchCards heroMatches={heroMatches} />
@@ -255,7 +277,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
                     <div className="flex items-center gap-2 text-amber-800">
                         <Info size={16} className="text-amber-600 shrink-0" />
-                        <p className="text-[10px] sm:text-xs font-bold">No upcoming fixtures for today. Showing nearest results.</p>
+                        <p className="text-[10px] sm:text-xs font-bold">No upcoming fixtures right now. Showing latest results.</p>
                     </div>
                 </div>
             </div>
@@ -263,7 +285,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
 
         <div className="px-2 md:px-4 py-0 flex flex-col lg:flex-row gap-4 mt-2">
             
-            {/* MATCHES COLUMN */}
             <div className="flex-1 space-y-4">
                 <FreeTipsBanner />
 
@@ -287,7 +308,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                     ))}
                     
                     <Link href="/matches" className="block w-full text-center bg-white border border-slate-200 text-slate-600 font-black text-[10px] uppercase tracking-widest py-3.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition shadow-sm mb-4">
-                        View Full Fixtures <ArrowRight size={12} className="inline ml-1 -mt-0.5" />
+                        View All Fixtures <ArrowRight size={12} className="inline ml-1 -mt-0.5" />
                     </Link>
                     </>
                 ) : (
@@ -299,7 +320,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                 )}
             </div>
 
-            {/* 🟢 CONDITIONAL MINI STANDINGS WIDGET COLUMN (ONLY SHOWS ON LEAGUE TABS) */}
             {selectedLeague && (
                 <div className="w-full lg:w-80 shrink-0">
                     <div className="sticky top-[120px]">
@@ -310,28 +330,15 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
         </div>
       </section>
 
-      {/* 7. Bet of the Day */}
-      <div className="px-4"><BetOfTheDay initialMatch={heroMatches[0] || matches[0]} /></div>
+      {/* 7. Bet of the Day (Using the Stable Match Selection) */}
+      {betOfTheDayMatch && <div className="px-4"><BetOfTheDay initialMatch={betOfTheDayMatch} /></div>}
 
       {/* 8. Highlights */}
       <div className="mt-8">
           <HighlightsSlider highlights={highlights} />
       </div>
 
-      <div className="mx-4 mb-4 mt-8 max-w-4xl md:mx-auto">
-        <div className="rounded-2xl overflow-hidden relative shadow-2xl group cursor-pointer bg-black p-6 text-center">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 blur-[60px] opacity-20 group-hover:opacity-30 transition"></div>
-            <div className="relative z-10">
-                <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-[0_0_15px_rgba(234,179,8,0.4)]">
-                    <Trophy className="text-black fill-black" size={24} />
-                </div>
-                <h2 className="text-white font-black text-xl uppercase italic tracking-tighter mb-2">Predict & Win <span className="text-yellow-500">Fantastic Prices</span></h2>
-                <Link href="/vip/upgrade" className="inline-flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-sm uppercase px-8 py-3 rounded-xl transition shadow-lg active:scale-95">Join Winners Circle <ArrowRight size={16} /></Link>
-            </div>
-        </div>
-      </div>
-
-      <div className="max-w-4xl mx-auto"><AdsterraStandardBanner /></div>
+      <div className="max-w-4xl mx-auto mt-8"><AdsterraStandardBanner /></div>
 
       <div className="grid grid-cols-4 gap-3 px-4 py-6 max-w-4xl mx-auto">
           <Link href="/matches" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">

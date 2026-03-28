@@ -1,32 +1,61 @@
 'use client';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Zap, Ticket, Trophy } from 'lucide-react';
 import MatchTime from './MatchTime';
 import LiveScoreLabel from './LiveScoreLabel';
+import { useSmartInterval } from '@/app/hooks/useSmartInterval';
+import { fetchLiveMatchDeduplicated } from '@/app/utils/liveFetcher';
 
+const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
+const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599";
 
-export default function CompactMatchRow({ match, disablePolling = false, showLeague = false }: { match: any, disablePolling?: boolean, showLeague?: boolean }) {
-    const rawStatus = (match.status || '').toUpperCase();
-    const isLive = ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'P', 'PENALTIES'].includes(rawStatus);
-    const isScheduled = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'].includes(rawStatus);
-    const isFinished = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(rawStatus);
+export default function CompactMatchRow({ match: initialMatch, disablePolling = false, showLeague = false }: { match: any, disablePolling?: boolean, showLeague?: boolean }) {
+    const [match, setMatch] = useState(initialMatch);
+    const isFetching = useRef(false);
+
+    const fetchUpdates = async () => {
+        if (disablePolling || isFetching.current || !match.espn_id) return;
+        if (FINISHED_STATUSES.includes((match.status || '').toUpperCase())) return;
+
+        isFetching.current = true;
+        try {
+            const data = await fetchLiveMatchDeduplicated(match.espn_id);
+            if (data && !data.error) {
+                setMatch((prev: any) => ({ ...prev, status: data.status, home_score: data.home_score, away_score: data.away_score, displayClock: data.displayClock }));
+            }
+        } catch (e) {} finally {
+            isFetching.current = false;
+        }
+    };
+
+    useEffect(() => { setMatch(initialMatch); }, [initialMatch]);
+
+    const status = (match.status || '').toUpperCase();
+    const isLive = LIVE_STATUSES.includes(status);
+    const isFinished = FINISHED_STATUSES.includes(status);
+    const isScheduled = !isLive && !isFinished;
+    const isHT = status === 'HT' || status === 'HALFTIME';
+
+    useSmartInterval(fetchUpdates, isLive && !disablePolling ? 10000 : 60000);
 
     return (
-        <div className="bg-white border-b border-slate-100 hover:bg-slate-50 transition-colors group flex flex-col">
-            {showLeague && (
-                <div className="px-3 py-1.5 bg-slate-50/80 border-b border-slate-100 flex items-center gap-1.5">
-                    <Trophy size={10} className="text-slate-400"/>
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{match.league}</span>
+        <div className="bg-white hover:bg-slate-50 transition-colors group flex flex-col h-full rounded-lg">
+            {showLeague && match.league && (
+                <div className="px-2 py-1 bg-slate-50/80 border-b border-slate-100 flex items-center gap-1">
+                    <Trophy size={8} className="text-slate-400"/>
+                    <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest line-clamp-1">{match.league}</span>
                 </div>
             )}
-            <div className="flex items-stretch p-2 md:p-3">
-                {/* 🟢 Time / Status Column */}
-                <div className="w-[45px] md:w-[50px] shrink-0 flex flex-col items-center justify-center border-r border-slate-100 pr-2 mr-2">
+            
+            <div className="flex items-stretch p-1.5 flex-1">
+                {/* 🟢 Time / Status Column (Left) */}
+                <div className="w-[35px] shrink-0 flex flex-col items-center justify-center border-r border-slate-100 pr-1.5 mr-1.5">
                     {isScheduled ? (
-                        <span className="text-[10px] md:text-xs font-bold text-slate-500"><MatchTime date={match.match_date} /></span>
+                        <span className="text-[8px] font-bold text-slate-500"><MatchTime date={match.match_date} /></span>
                     ) : isFinished ? (
-                        <span className="text-[10px] md:text-xs font-black text-slate-400">FT</span>
+                        <span className="text-[9px] font-black text-slate-400">FT</span>
                     ) : (
                         <LiveScoreLabel 
                             matchId={match.id} espnId={match.espn_id} initialStatus={match.status} 
@@ -35,36 +64,37 @@ export default function CompactMatchRow({ match, disablePolling = false, showLea
                     )}
                 </div>
 
-                {/* 🟢 Teams Column */}
-                <Link href={`/match/${match.id}`} className="flex-1 flex flex-col justify-center gap-1.5 min-w-0 py-1">
+                {/* 🟢 Teams & Scores Column (Middle) */}
+                <Link href={`/match/${match.id}`} className="flex-1 flex flex-col justify-center gap-1 min-w-0 py-0.5">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 min-w-0">
-                            {match.home_logo ? <img src={match.home_logo} className="w-3.5 h-3.5 md:w-4 md:h-4 object-contain shrink-0" alt=""/> : <div className="w-3.5 h-3.5 bg-slate-200 rounded-full shrink-0"/>}
-                            <span className={`text-[11px] md:text-[13px] font-bold truncate ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-700'}`}>{match.home_team}</span>
+                        <div className="flex items-center gap-1 min-w-0">
+                            {match.home_logo ? <img src={match.home_logo} className="w-3 h-3 object-contain shrink-0" alt=""/> : <div className="w-3 h-3 bg-slate-200 rounded-full shrink-0"/>}
+                            <span className={`text-[9px] sm:text-[10px] font-bold truncate ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-700'}`}>{match.home_team}</span>
                         </div>
-                        {!isScheduled && <span className={`text-xs md:text-sm font-black ml-2 ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-500'}`}>{match.home_score}</span>}
+                        {!isScheduled && <span className={`text-[10px] sm:text-xs font-black ml-1 ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-500'}`}>{match.home_score}</span>}
                     </div>
+                    
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 min-w-0">
-                            {match.away_logo ? <img src={match.away_logo} className="w-3.5 h-3.5 md:w-4 md:h-4 object-contain shrink-0" alt=""/> : <div className="w-3.5 h-3.5 bg-slate-200 rounded-full shrink-0"/>}
-                            <span className={`text-[11px] md:text-[13px] font-bold truncate ${isFinished && match.away_score > match.home_score ? 'text-slate-900' : 'text-slate-700'}`}>{match.away_team}</span>
+                        <div className="flex items-center gap-1 min-w-0">
+                            {match.away_logo ? <img src={match.away_logo} className="w-3 h-3 object-contain shrink-0" alt=""/> : <div className="w-3 h-3 bg-slate-200 rounded-full shrink-0"/>}
+                            <span className={`text-[9px] sm:text-[10px] font-bold truncate ${isFinished && match.away_score > match.home_score ? 'text-slate-900' : 'text-slate-700'}`}>{match.away_team}</span>
                         </div>
-                        {!isScheduled && <span className={`text-xs md:text-sm font-black ml-2 ${isFinished && match.away_score > match.home_score ? 'text-slate-900' : 'text-slate-500'}`}>{match.away_score}</span>}
+                        {!isScheduled && <span className={`text-[10px] sm:text-xs font-black ml-1 ${isFinished && match.away_score > match.home_score ? 'text-slate-900' : 'text-slate-500'}`}>{match.away_score}</span>}
                     </div>
                 </Link>
 
-                {/* 🟢 Micro Actions Column (With Tiny Text!) */}
+                {/* 🟢 Micro Actions Column (Right) */}
                 {!isFinished && (
-                    <div className="w-[45px] md:w-[50px] shrink-0 flex flex-col items-center justify-center pl-2 ml-2 border-l border-slate-100 gap-1.5">
+                    <div className="w-[32px] shrink-0 flex flex-col items-center justify-center pl-1 ml-1.5 border-l border-slate-100 gap-1">
                         {isScheduled && (
-                            <Link href={`/match/${match.id}#predictions`} className="w-full bg-blue-50 hover:bg-blue-100 rounded flex flex-col items-center justify-center text-blue-600 transition-colors shadow-sm py-1 pb-1.5" title="Predict">
-                                <Zap size={10} className="fill-blue-600 mb-0.5" />
-                                <span className="text-[6px] md:text-[7px] font-black uppercase tracking-widest leading-none">Predict</span>
+                            <Link href={`/match/${match.id}#predictions`} className="w-full bg-blue-50 hover:bg-blue-100 rounded flex flex-col items-center justify-center text-blue-600 transition-colors shadow-sm py-1" title="Predict">
+                                <Zap size={8} className="fill-blue-600 mb-0.5" />
+                                <span className="text-[5px] font-black uppercase tracking-widest leading-none">Pick</span>
                             </Link>
                         )}
-                        <a href={match.booking_code ? '#' : (match.affiliate_link || DEFAULT_AFFILIATE_LINK)} target="_blank" rel="noopener noreferrer" className="w-full bg-green-50 hover:bg-green-100 rounded flex flex-col items-center justify-center text-green-600 transition-colors shadow-sm py-1 pb-1.5" title={match.booking_code ? `Code: ${match.booking_code}` : 'Bet Now'}>
-                            <Ticket size={10} className="mb-0.5" />
-                            <span className="text-[6px] md:text-[7px] font-black uppercase tracking-widest leading-none">Bet</span>
+                        <a href={match.booking_code ? '#' : (match.affiliate_link || DEFAULT_AFFILIATE_LINK)} target="_blank" rel="noopener noreferrer" className="w-full bg-green-50 hover:bg-green-100 rounded flex flex-col items-center justify-center text-green-600 transition-colors shadow-sm py-1" title={match.booking_code ? `Code: ${match.booking_code}` : 'Bet Now'}>
+                            <Ticket size={8} className="mb-0.5" />
+                            <span className="text-[5px] font-black uppercase tracking-widest leading-none">Bet</span>
                         </a>
                     </div>
                 )}
