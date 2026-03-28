@@ -7,7 +7,7 @@ import { Metadata } from 'next';
 import { ArrowRight, Youtube, Newspaper, TrendingUp, Calendar, Award, Trophy, Info } from "lucide-react";
 
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
-import InstallAppBanner from '@/app/components/InstallAppBanner'; // 🟢 NEW
+import InstallAppBanner from '@/app/components/InstallAppBanner'; 
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 import NewsTicker from '@/app/components/NewsTicker'; 
 import LatestNewsList from '@/app/components/LatestNewsList'; 
@@ -15,11 +15,10 @@ import HighlightsSlider from '@/app/components/HighlightsSlider';
 import HeroMatchCards from '@/app/components/HeroMatchCards'; 
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import CompactMatchRow from '@/app/components/CompactMatchRow';
-import MiniStandings from '@/app/components/MiniStandings'; // 🟢 NEW
-import BetOfTheDay from '@/app/components/BetOfTheDay'; // 🟢 NEW
+import MiniStandings from '@/app/components/MiniStandings'; 
+import BetOfTheDay from '@/app/components/BetOfTheDay'; 
 
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
-const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
 export const metadata: Metadata = {
@@ -59,44 +58,54 @@ const sortMatches = (matches: any[]) => {
     const timeA = new Date(a.match_date).getTime();
     const timeB = new Date(b.match_date).getTime();
 
-    if (isFinishedA && isFinishedB) return timeB - timeA;
-    return timeA - timeB;
+    if (isFinishedA && isFinishedB) return timeB - timeA; // Most recent finished first
+    return timeA - timeB; // Earliest scheduled first
   });
 };
 
-const getDiverseMatches = (allMatches: any[], limit: number) => {
-    const live = allMatches.filter(m => LIVE_STATUSES.includes((m.status || '').toUpperCase()));
-    const scheduled = allMatches.filter(m => !LIVE_STATUSES.includes((m.status || '').toUpperCase()));
-
-    const leagues: { [key: string]: any[] } = {};
-    scheduled.forEach(m => {
+// 🟢 SMART MIXING LOGIC: Mixes matches strictly for the "For You" tab (Max 3 per league, max 20 total)
+const getMixedTodayMatches = (allTodayMatches: any[], limit: number) => {
+    const leagues: Record<string, any[]> = {};
+    allTodayMatches.forEach(m => {
         if (!leagues[m.league]) leagues[m.league] = [];
         leagues[m.league].push(m);
     });
 
-    const mixedScheduled: any[] = [];
-    const leagueKeys = Object.keys(leagues);
-    let hasMore = true;
+    const mixed: any[] = [];
+    const leagueCounters: Record<string, number> = {};
+    Object.keys(leagues).forEach(k => leagueCounters[k] = 0);
 
-    while (hasMore && mixedScheduled.length < limit) {
-        hasMore = false;
-        for (const league of leagueKeys) {
-            if (leagues[league].length > 0) {
-                mixedScheduled.push(leagues[league].shift());
-                hasMore = true;
+    let added = true;
+    while (added && mixed.length < limit) {
+        added = false;
+        for (const league of Object.keys(leagues)) {
+            if (mixed.length >= limit) break;
+            if (leagueCounters[league] < 3 && leagues[league].length > 0) {
+                mixed.push(leagues[league].shift());
+                leagueCounters[league]++;
+                added = true;
+            }
+        }
+        // If we hit the cap of 3 per league but still need matches to reach 20, loosen the cap
+        if (!added && mixed.length < limit && allTodayMatches.length > mixed.length) {
+            for (const league of Object.keys(leagues)) {
+                 if (mixed.length >= limit) break;
+                 if (leagues[league].length > 0) {
+                     mixed.push(leagues[league].shift());
+                     added = true;
+                 }
             }
         }
     }
-    return sortMatches([...live, ...mixedScheduled].slice(0, limit));
+    return sortMatches(mixed);
 };
 
 async function getHomepageData(leagueFilter: string | undefined) {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     
+  // 🟢 STRICT TODAY BOUNDARIES (00:00 to 23:59)
   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-  const tomorrowEnd = new Date(); 
-  tomorrowEnd.setDate(tomorrowEnd.getDate() + 1); 
-  tomorrowEnd.setHours(23,59,59,999);
+  const todayEnd = new Date(todayStart); todayEnd.setHours(23,59,59,999);
 
   let matches: any[] = [];
   let isShowingFallbackResults = false;
@@ -104,50 +113,53 @@ async function getHomepageData(leagueFilter: string | undefined) {
   const [newsRes, highlightsRes, featuredRes] = await Promise.all([
     supabase.from('news').select('*').order('created_at', { ascending: false }).limit(25),
     supabase.from('matches').select('*').not('video_url', 'is', null).neq('video_url', '').order('match_date', { ascending: false }).limit(5),
-    supabase.from('matches').select('*').eq('is_featured', true).gte('match_date', todayStart.toISOString()).order('match_date', { ascending: true }).limit(5)
+    supabase.from('matches').select('*').eq('is_featured', true).gte('match_date', todayStart.toISOString()).lte('match_date', todayEnd.toISOString()).order('match_date', { ascending: true }).limit(5)
   ]);
 
   if (leagueFilter) {
-      const { data: activeMatches } = await supabase.from('matches')
+      // LEAGUE TAB: Fetch strictly today's matches for this league (Max 5)
+      const { data: todayLeagueMatches } = await supabase.from('matches')
           .select('*')
           .ilike('league', `%${leagueFilter}%`)
-          .not('status', 'in', '("FT","FINISHED","AET","PEN","AWARDED","ABD","POST","ENDED")')
+          .gte('match_date', todayStart.toISOString())
+          .lte('match_date', todayEnd.toISOString())
           .order('match_date', { ascending: true })
-          .limit(5); // 🟢 Limit strictly to 5 per league tab
+          .limit(5); 
 
-      if (activeMatches && activeMatches.length > 0) {
-          matches = activeMatches;
+      if (todayLeagueMatches && todayLeagueMatches.length > 0) {
+          matches = todayLeagueMatches;
       } else {
-          const { data: pastMatches } = await supabase.from('matches')
+          // If zero matches today, fallback to closest past/future matches (Max 5)
+          const { data: fallbackMatches } = await supabase.from('matches')
               .select('*')
               .ilike('league', `%${leagueFilter}%`)
-              .in('status', ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD', 'POST', 'ENDED'])
               .order('match_date', { ascending: false }) 
-              .limit(5); // 🟢 Limit strictly to 5 per league tab
+              .limit(5); 
 
-          if (pastMatches && pastMatches.length > 0) {
-              matches = pastMatches;
+          if (fallbackMatches && fallbackMatches.length > 0) {
+              matches = fallbackMatches;
               isShowingFallbackResults = true; 
           }
       }
       matches = sortMatches(matches);
 
   } else {
-      const { data: defaultMatches } = await supabase.from('matches').select('*')
-        .or(`status.eq.LIVE,status.eq.IN_PLAY,status.eq.HT,status.eq.in,match_date.gte.${todayStart.toISOString()}`)
+      // FOR YOU TAB: Fetch strictly today's matches across ALL leagues
+      const { data: todayAllMatches } = await supabase.from('matches').select('*')
+        .gte('match_date', todayStart.toISOString())
+        .lte('match_date', todayEnd.toISOString())
         .order('match_date', { ascending: true })
-        .limit(50); 
+        .limit(100); // Fetch a wide pool to mix from
       
-      matches = defaultMatches || [];
-
-      if (matches.length > 0) {
-          matches = getDiverseMatches(matches, 15); // 🟢 Limit strictly to 15 for "For You"
+      if (todayAllMatches && todayAllMatches.length > 0) {
+          // 🟢 Applies the 3-per-league, max-20 logic
+          matches = getMixedTodayMatches(todayAllMatches, 20); 
       } else {
-          const { data: finishedMatches } = await supabase.from('matches').select('*')
-            .in('status', ['FT', 'FINISHED', 'ABD', 'post', 'POST', 'ENDED', 'AET', 'PEN']) 
+          // Absolute fallback if there are 0 matches globally today (Season Break)
+          const { data: recentMatches } = await supabase.from('matches').select('*')
             .order('match_date', { ascending: false })
             .limit(10);
-          if (finishedMatches) matches = finishedMatches;
+          if (recentMatches) matches = recentMatches;
       }
   }
 
@@ -166,13 +178,14 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
     
   const { matches, news, highlights, featuredMatches, isShowingFallbackResults } = await getHomepageData(selectedLeague);
 
+  // NEWS LOGIC
   const finalHeadlines = news.filter(n => n.is_headline).slice(0, 3);
   const nonHeadlineNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id));
   const latestNews = nonHeadlineNews.slice(0, 5);
-  
   const rawTicker = nonHeadlineNews.slice(0, 20);
   const tickerNews = [...rawTicker, ...rawTicker];
 
+  // HERO MATCHES LOGIC (Restricted to today's matches in the pool)
   let heroMatches: any[] = [...featuredMatches];
   const mediaMatches = matches.filter(m => m.livestream_url || m.audio_url || m.video_url);
   mediaMatches.forEach(m => {
@@ -202,19 +215,19 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
 
       {/* 2. Hero Matches */}
       {!selectedLeague && heroMatches.length > 0 && (
-          <div className="bg-[#0f1c3a] pt-3 pb-4">
+          <div className="bg-[#0f1c3a] pt-3 pb-4 border-b border-slate-800">
             <HeroMatchCards heroMatches={heroMatches} />
           </div>
       )}
 
-      <AdsterraStandardBanner />
-
-      {/* 3. Main Headlines */}
-      {finalHeadlines.length > 0 && <div className="mt-0 md:mt-4 md:px-4"><HeadlinesSlider headlines={finalHeadlines} /></div>}
-      
-      {/* 🟢 NEW: 4. PWA Install Prompt */}
+      {/* 3. PWA App Install Banner */}
       <div className="mt-4 max-w-4xl mx-auto"><InstallAppBanner /></div>
 
+      <AdsterraStandardBanner />
+
+      {/* 4. Main Headlines */}
+      {finalHeadlines.length > 0 && <div className="mt-0 md:mt-4 md:px-4"><HeadlinesSlider headlines={finalHeadlines} /></div>}
+      
       {/* 5. Latest News */}
       <LatestNewsList latestNews={latestNews} />
 
@@ -242,13 +255,14 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
                     <div className="flex items-center gap-2 text-amber-800">
                         <Info size={16} className="text-amber-600 shrink-0" />
-                        <p className="text-[10px] sm:text-xs font-bold">No upcoming fixtures right now. Showing latest results.</p>
+                        <p className="text-[10px] sm:text-xs font-bold">No upcoming fixtures for today. Showing nearest results.</p>
                     </div>
                 </div>
             </div>
         )}
 
         <div className="px-2 md:px-4 py-0 flex flex-col lg:flex-row gap-4 mt-2">
+            
             {/* MATCHES COLUMN */}
             <div className="flex-1 space-y-4">
                 <FreeTipsBanner />
@@ -262,7 +276,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                                 <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">{dateKey}</span>
                             </div>
 
-                            {/* 🟢 THE 2-COLUMN GRID ON ALL SCREENS */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 bg-[#f8fafc]">
                                 {groupedMatches[dateKey].map((match) => (
                                     <div key={match.id} className="bg-white rounded-lg shadow-sm border border-slate-100 overflow-hidden">
@@ -274,36 +287,37 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
                     ))}
                     
                     <Link href="/matches" className="block w-full text-center bg-white border border-slate-200 text-slate-600 font-black text-[10px] uppercase tracking-widest py-3.5 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition shadow-sm mb-4">
-                        View All Fixtures <ArrowRight size={12} className="inline ml-1 -mt-0.5" />
+                        View Full Fixtures <ArrowRight size={12} className="inline ml-1 -mt-0.5" />
                     </Link>
                     </>
                 ) : (
                     <div className="text-center py-16 px-4 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
                         <Calendar size={32} className="mx-auto mb-3 text-slate-300"/>
                         <p className="text-sm font-black text-slate-700 mb-1">Season Break</p>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">No active fixtures found in the database. Check back soon for the new season schedule.</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">No active fixtures found. Check back soon for the new schedule.</p>
                     </div>
                 )}
             </div>
 
-            {/* 🟢 NEW: MINI STANDINGS WIDGET COLUMN */}
-            <div className="w-full lg:w-80 shrink-0">
-                <div className="sticky top-[120px]">
-                    <MiniStandings leagueName={selectedLeague || 'Premier League'} />
+            {/* 🟢 CONDITIONAL MINI STANDINGS WIDGET COLUMN (ONLY SHOWS ON LEAGUE TABS) */}
+            {selectedLeague && (
+                <div className="w-full lg:w-80 shrink-0">
+                    <div className="sticky top-[120px]">
+                        <MiniStandings leagueName={selectedLeague} />
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
       </section>
 
-      {/* 🟢 NEW: 7. Bet of the Day (After Match Center) */}
-      <div className="px-4"><BetOfTheDay match={heroMatches[0] || matches[0]} /></div>
+      {/* 7. Bet of the Day */}
+      <div className="px-4"><BetOfTheDay initialMatch={heroMatches[0] || matches[0]} /></div>
 
       {/* 8. Highlights */}
       <div className="mt-8">
           <HighlightsSlider highlights={highlights} />
       </div>
 
-      {/* 9. VIP / Leaders / Footer Links */}
       <div className="mx-4 mb-4 mt-8 max-w-4xl md:mx-auto">
         <div className="rounded-2xl overflow-hidden relative shadow-2xl group cursor-pointer bg-black p-6 text-center">
             <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 blur-[60px] opacity-20 group-hover:opacity-30 transition"></div>
