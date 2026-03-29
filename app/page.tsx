@@ -61,18 +61,18 @@ async function getHomepageData(leagueFilter: string | undefined) {
   const [newsRes, highlightsRes, featuredRes] = await Promise.all([
     supabase.from('news').select('*').order('created_at', { ascending: false }).limit(25),
     supabase.from('matches').select('*').not('video_url', 'is', null).neq('video_url', '').order('match_date', { ascending: false }).limit(5),
-    supabase.from('matches').select('*').eq('is_featured', true).gte('match_date', wideWindowStart).lte('match_date', wideWindowEnd).order('match_date', { ascending: true }).limit(5)
+    supabase.from('matches').select('*').eq('is_featured', true).gte('match_date', wideWindowStart).lte('match_date', wideWindowEnd).order('match_date', { ascending: true }).limit(10)
   ]);
 
   if (leagueFilter) {
-      // 🟢 THE SOLUTION: Fetch closest upcoming AND closest past simultaneously
       const nowStr = new Date().toISOString();
       const [{ data: upcoming }, { data: past }] = await Promise.all([
           supabase.from('matches').select('*').ilike('league', `%${leagueFilter}%`).gte('match_date', nowStr).order('match_date', { ascending: true }).limit(5),
           supabase.from('matches').select('*').ilike('league', `%${leagueFilter}%`).lt('match_date', nowStr).order('match_date', { ascending: false }).limit(5)
       ]);
       
-      matches = sortMatches([...(upcoming || []), ...(past || [])]);
+      const combined = [...(upcoming || []), ...(past || [])];
+      if (combined.length > 0) matches = sortMatches(combined);
 
   } else {
       const { data: allMatches } = await supabase.from('matches').select('*')
@@ -84,9 +84,7 @@ async function getHomepageData(leagueFilter: string | undefined) {
       if (allMatches && allMatches.length > 0) {
           matches = allMatches; 
       } else {
-          const { data: recentMatches } = await supabase.from('matches').select('*')
-            .order('match_date', { ascending: false })
-            .limit(10);
+          const { data: recentMatches } = await supabase.from('matches').select('*').order('match_date', { ascending: false }).limit(10);
           if (recentMatches) matches = recentMatches;
       }
   }
@@ -109,47 +107,39 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-0 overflow-x-hidden">
       
-      {/* 1. Ticker */}
+      {/* 1. TICKER */}
       <NewsTicker tickerNews={tickerNews} />
 
-      {/* 2. TIMEZONE-AWARE DASHBOARD */}
+      {/* 2 -> 7. ORCHESTRATED DASHBOARD (Hero -> Headlines -> Banner -> News -> Match Center -> Bet of the Day) */}
       <HomeDashboardClient 
           globalMatches={matches} 
           featuredMatches={featuredMatches} 
           selectedLeague={selectedLeague} 
+          
+          /* 🟢 INJECTING SERVER COMPONENTS TO GUARANTEE EXACT REQUESTED ORDER */
+          headlinesNode={
+              finalHeadlines.length > 0 ? (
+                  <div className="mt-0 md:mt-4 md:px-4"><HeadlinesSlider headlines={finalHeadlines} /></div>
+              ) : null
+          }
+          installBannerNode={
+              <div className="mt-6 max-w-4xl mx-auto"><InstallAppBanner /></div>
+          }
+          latestNewsNode={
+              <div className="mt-2"><LatestNewsList latestNews={latestNews} /></div>
+          }
           miniStandingsNode={<MiniStandings leagueName={selectedLeague || 'Premier League'} />} 
       />
 
-      <div className="mt-4 max-w-4xl mx-auto"><InstallAppBanner /></div>
-      <AdsterraStandardBanner />
-
-      {/* 3. Main Headlines (Separated Layout) */}
-      {finalHeadlines.length > 0 && <div className="mt-0 md:mt-4 md:px-4"><HeadlinesSlider headlines={finalHeadlines} /></div>}
-      
-      {/* 4. Latest News */}
-      <LatestNewsList latestNews={latestNews} />
-
-      {/* 5. Highlights */}
+      {/* 8. HIGHLIGHTS VIDEOS (After Bet of the Day) */}
       <div className="mt-8">
           <HighlightsSlider highlights={highlights} />
       </div>
 
-      {/* 6. VIP & Footer Links */}
-      <div className="mx-4 mb-4 mt-8 max-w-4xl md:mx-auto">
-        <div className="rounded-2xl overflow-hidden relative shadow-2xl group cursor-pointer bg-black p-6 text-center">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 blur-[60px] opacity-20 group-hover:opacity-30 transition"></div>
-            <div className="relative z-10">
-                <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-3 shadow-[0_0_15px_rgba(234,179,8,0.4)]">
-                    <Trophy className="text-black fill-black" size={24} />
-                </div>
-                <h2 className="text-white font-black text-xl uppercase italic tracking-tighter mb-2">Predict & Win <span className="text-yellow-500">Fantastic Prices</span></h2>
-                <Link href="/vip/upgrade" className="inline-flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-black text-sm uppercase px-8 py-3 rounded-xl transition shadow-lg active:scale-95">Join Winners Circle <ArrowRight size={16} /></Link>
-            </div>
-        </div>
-      </div>
+      {/* FINAL AD BANNER */}
+      <div className="max-w-4xl mx-auto mt-8"><AdsterraStandardBanner /></div>
 
-      <div className="max-w-4xl mx-auto"><AdsterraStandardBanner /></div>
-
+      {/* FOOTER LINKS */}
       <div className="grid grid-cols-4 gap-3 px-4 py-6 max-w-4xl mx-auto">
           <Link href="/matches" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
               <Trophy className="text-yellow-500" size={20} />
