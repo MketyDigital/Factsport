@@ -69,14 +69,14 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
     if (!liveMatches || liveMatches.length === 0) return null;
 
     return (
-        <div className="w-full overflow-hidden">
+        <div className="w-full overflow-hidden pt-3 pb-3 bg-transparent">
             <div className="flex items-center justify-between px-4 mb-2">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Top Matches</h3>
-                <ChevronRight size={14} className="text-slate-500 opacity-50" />
+                <h3 className="text-xs md:text-sm font-black uppercase tracking-widest text-slate-800">Top Matches</h3>
+                <ChevronRight size={14} className="text-slate-400 opacity-50" />
             </div>
 
             {/* 🟢 HORIZONTAL SCROLL CONTAINER */}
-            <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide px-4 gap-3 pb-2">
+            <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide px-4 gap-2.5 pb-1">
                  {liveMatches.map((match) => {
                     const rawStatus = (match.status || '').toUpperCase();
                     const isLive = LIVE_STATUSES.includes(rawStatus);
@@ -87,10 +87,10 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                         <Link 
                             key={match.id} 
                             href={`/match/${match.id}`} 
-                            // 🟢 FIXED WIDTH CARDS
-                            className="block relative z-10 w-[260px] md:w-[300px] shrink-0 snap-center"
+                            // 🟢 FIXED COMPACT WIDTH (Allows 2 side-by-side on mobile)
+                            className="block relative z-10 w-[185px] md:w-[240px] shrink-0 snap-center"
                         >
-                            <div className="bg-[#14234b] rounded-xl p-3 shadow-lg border border-slate-700 relative overflow-hidden group hover:border-blue-500 transition-all duration-300 h-[85px] md:h-[95px]">
+                            <div className="bg-[#14234b] rounded-xl p-2 shadow-md border border-slate-300 relative overflow-hidden group hover:border-blue-500 transition-all duration-300 h-[80px]">
                                 
                                 {match.home_fanart || match.home_stadium ? (
                                     <>
@@ -102,58 +102,48 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                                 )}
 
                                 <div className="relative z-10 h-full flex flex-col justify-between">
-                                    {/* Top Row: Status & Media Badges */}
                                     <div className="flex justify-between items-start">
-                                        <div className="flex items-center gap-1.5">
+                                        <div className="flex items-center gap-1">
                                             {isLive ? (
                                                 <div className="bg-red-600 text-white text-[7px] font-black px-1.5 py-0.5 rounded animate-pulse flex items-center gap-1 shadow-sm">
                                                     <span className="w-1 h-1 bg-white rounded-full"></span> LIVE
                                                 </div>
                                             ) : (
-                                                <span className="text-[8px] font-bold text-slate-300 uppercase bg-black/30 px-1.5 py-0.5 rounded">
+                                                <span className="text-[7px] font-bold text-slate-300 uppercase bg-black/30 px-1.5 py-0.5 rounded">
                                                     {isScheduled ? <MatchTime date={match.match_date} /> : 'FT'}
                                                 </span>
                                             )}
                                             
-                                            {/* Media Tag Injection */}
                                             {hasMedia && (
-                                                <div className="bg-blue-600 border border-blue-500 text-white text-[7px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                                                <div className="bg-blue-600 border border-blue-500 text-white text-[6px] font-bold px-1 py-0.5 rounded flex items-center gap-1 shadow-sm">
                                                     {match.livestream_url || match.video_url ? <Video size={8} /> : <Radio size={8} />}
-                                                    {match.livestream_url || match.video_url ? 'WATCH' : 'AUDIO'}
                                                 </div>
                                             )}
                                         </div>
                                         
-                                        {/* Match Clock if Live */}
                                         {isLive && (
-                                            <span className="text-[9px] font-black text-red-400">
+                                            <span className="text-[8px] font-black text-red-400">
                                                 {rawStatus === 'HT' || rawStatus === 'HALFTIME' ? 'HT' : match.displayClock || 'ON GOING'}
                                             </span>
                                         )}
                                     </div>
                                     
-                                    {/* Bottom Row: Teams & Score */}
-                                    <div className="flex items-center justify-between w-full mt-auto">
-                                        <div className="flex flex-col gap-1 flex-1">
-                                            <div className="flex items-center gap-1.5">
-                                                {match.home_logo ? <img src={match.home_logo} className="w-4 h-4 object-contain"/> : <div className="w-4 h-4 bg-white/10 rounded-full flex items-center justify-center text-[7px] font-bold text-white">H</div>}
-                                                <span className="text-[10px] font-bold text-white uppercase truncate max-w-[80px] md:max-w-[100px]">{match.home_team}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5">
-                                                {match.away_logo ? <img src={match.away_logo} className="w-4 h-4 object-contain"/> : <div className="w-4 h-4 bg-white/10 rounded-full flex items-center justify-center text-[7px] font-bold text-white">A</div>}
-                                                <span className="text-[10px] font-bold text-white uppercase truncate max-w-[80px] md:max-w-[100px]">{match.away_team}</span>
+                                    {/* Squeezed Horizontal Teams */}
+                                    <div className="flex justify-between items-center mt-auto gap-0.5">
+                                        <div className="flex flex-col items-center w-[35%]">
+                                            {match.home_logo ? <img src={match.home_logo} className="w-5 h-5 object-contain mb-0.5"/> : <div className="w-5 h-5 bg-white/10 rounded-full mb-0.5 flex items-center justify-center text-[7px] font-bold text-white">H</div>}
+                                            <span className="text-[7px] font-bold text-center text-white truncate w-full">{match.home_team}</span>
+                                        </div>
+                                        
+                                        <div className="flex flex-col items-center justify-center w-[30%]">
+                                            <div className="text-[10px] font-black tabular-nums bg-black/50 px-1 py-0.5 rounded backdrop-blur-md text-white">
+                                                {isScheduled ? <span className="opacity-60 text-[7px]">VS</span> : `${match.home_score}-${match.away_score}`}
                                             </div>
                                         </div>
 
-                                        <div className="flex flex-col items-end justify-center shrink-0 border-l border-white/10 pl-3">
-                                            {isScheduled ? (
-                                                <span className="text-xs font-black text-slate-500 italic">VS</span>
-                                            ) : (
-                                                <>
-                                                    <span className={`text-sm font-black tabular-nums leading-none mb-1 ${isLive ? 'text-yellow-400' : 'text-white'}`}>{match.home_score}</span>
-                                                    <span className={`text-sm font-black tabular-nums leading-none ${isLive ? 'text-yellow-400' : 'text-white'}`}>{match.away_score}</span>
-                                                </>
-                                            )}
+                                        <div className="flex flex-col items-center w-[35%]">
+                                            {match.away_logo ? <img src={match.away_logo} className="w-5 h-5 object-contain mb-0.5"/> : <div className="w-5 h-5 bg-white/10 rounded-full mb-0.5 flex items-center justify-center text-[7px] font-bold text-white">A</div>}
+                                            <span className="text-[7px] font-bold text-center text-white truncate w-full">{match.away_team}</span>
                                         </div>
                                     </div>
                                 </div>
