@@ -23,8 +23,9 @@ export default function NewsTicker({ tickerNews }: { tickerNews: any[] }) {
                 <div className="animate-scroll flex items-center">
                     {tickerNews.map((n, i) => ( 
                         <div key={`${n.id}-${i}`} className="ticker-item flex items-center mx-4">
+                            {/* 🟢 THUMBNAIL RENDERED HERE */}
                             {n.image_url && (
-                                <img src={n.image_url} className="w-5 h-5 rounded object-cover mr-2 shadow-sm border border-yellow-600/30" alt="" />
+                                <img src={n.image_url} className="w-5 h-5 rounded-full object-cover mr-2 shadow-sm border border-yellow-600/30" alt="News thumbnail" />
                             )}
                             <Link href={`/news/${n.slug}`} className="uppercase tracking-wide hover:underline hover:text-red-700 transition text-slate-900">
                                 {n.is_breaking && <span className="text-red-600 animate-pulse mr-1">🚨 BREAKING:</span>} 

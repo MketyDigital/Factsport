@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import Link from "next/link";
-import { Video, Radio, ChevronRight } from "lucide-react";
+import { Video, Radio } from "lucide-react";
 import MatchTime from '@/app/components/MatchTime';
 import { useSmartInterval } from '@/app/hooks/useSmartInterval'; 
 import { fetchLiveMatchDeduplicated } from '@/app/utils/liveFetcher';
@@ -46,37 +46,27 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                 return m;
             }));
             
-            if (JSON.stringify(updated) !== JSON.stringify(liveMatches)) {
-                setLiveMatches(updated);
-            }
+            if (JSON.stringify(updated) !== JSON.stringify(liveMatches)) setLiveMatches(updated);
         } finally {
             isFetching.current = false;
         }
     };
 
-    useEffect(() => {
-        fetchUpdates();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    useEffect(() => { fetchUpdates(); }, []);
 
-    const hasActiveMatches = liveMatches.some(m => 
-        LIVE_STATUSES.includes((m.status || '').toUpperCase()) || 
-        SCHEDULED_STATUSES.includes((m.status || '').toUpperCase())
-    );
-
+    const hasActiveMatches = liveMatches.some(m => LIVE_STATUSES.includes((m.status || '').toUpperCase()) || SCHEDULED_STATUSES.includes((m.status || '').toUpperCase()));
     useSmartInterval(fetchUpdates, hasActiveMatches ? 10000 : null);
 
     if (!liveMatches || liveMatches.length === 0) return null;
 
     return (
-        <div className="w-full overflow-hidden pt-3 pb-3 bg-transparent">
-            <div className="flex items-center justify-between px-4 mb-2">
-                <h3 className="text-xs md:text-sm font-black uppercase tracking-widest text-slate-800">Top Matches</h3>
-                <ChevronRight size={14} className="text-slate-400 opacity-50" />
+        <div className="w-full overflow-hidden bg-[#0f1c3a]">
+            {/* 🟢 Tiny Title, No extra margins */}
+            <div className="px-3 pt-2 pb-1">
+                <h3 className="text-[9px] md:text-[11px] font-black uppercase tracking-widest text-slate-400">Top Matches</h3>
             </div>
 
-            {/* 🟢 HORIZONTAL SCROLL CONTAINER */}
-            <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide px-4 gap-2.5 pb-1">
+            <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide px-3 gap-2 pb-2">
                  {liveMatches.map((match) => {
                     const rawStatus = (match.status || '').toUpperCase();
                     const isLive = LIVE_STATUSES.includes(rawStatus);
@@ -84,17 +74,11 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                     const hasMedia = match.livestream_url || match.audio_url || match.video_url;
 
                     return (
-                        <Link 
-                            key={match.id} 
-                            href={`/match/${match.id}`} 
-                            // 🟢 FIXED COMPACT WIDTH (Allows 2 side-by-side on mobile)
-                            className="block relative z-10 w-[185px] md:w-[240px] shrink-0 snap-center"
-                        >
-                            <div className="bg-[#14234b] rounded-xl p-2 shadow-md border border-slate-300 relative overflow-hidden group hover:border-blue-500 transition-all duration-300 h-[80px]">
-                                
+                        <Link key={match.id} href={`/match/${match.id}`} className="block relative z-10 w-[185px] md:w-[240px] shrink-0 snap-center">
+                            <div className="bg-[#14234b] rounded-lg p-2 shadow-md border border-slate-700 relative overflow-hidden group h-[75px]">
                                 {match.home_fanart || match.home_stadium ? (
                                     <>
-                                        <img src={match.home_fanart || match.home_stadium} className="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:opacity-30 transition duration-700 ease-out mix-blend-overlay" />
+                                        <img src={match.home_fanart || match.home_stadium} className="absolute inset-0 w-full h-full object-cover opacity-20" />
                                         <div className="absolute inset-0 bg-gradient-to-r from-[#14234b]/90 to-transparent"></div>
                                     </>
                                 ) : (
@@ -109,40 +93,29 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                                                     <span className="w-1 h-1 bg-white rounded-full"></span> LIVE
                                                 </div>
                                             ) : (
-                                                <span className="text-[7px] font-bold text-slate-300 uppercase bg-black/30 px-1.5 py-0.5 rounded">
-                                                    {isScheduled ? <MatchTime date={match.match_date} /> : 'FT'}
-                                                </span>
+                                                <span className="text-[7px] font-bold text-slate-300 uppercase bg-black/30 px-1.5 py-0.5 rounded">{isScheduled ? <MatchTime date={match.match_date} /> : 'FT'}</span>
                                             )}
-                                            
                                             {hasMedia && (
                                                 <div className="bg-blue-600 border border-blue-500 text-white text-[6px] font-bold px-1 py-0.5 rounded flex items-center gap-1 shadow-sm">
                                                     {match.livestream_url || match.video_url ? <Video size={8} /> : <Radio size={8} />}
                                                 </div>
                                             )}
                                         </div>
-                                        
-                                        {isLive && (
-                                            <span className="text-[8px] font-black text-red-400">
-                                                {rawStatus === 'HT' || rawStatus === 'HALFTIME' ? 'HT' : match.displayClock || 'ON GOING'}
-                                            </span>
-                                        )}
+                                        {isLive && <span className="text-[8px] font-black text-red-400">{rawStatus === 'HT' || rawStatus === 'HALFTIME' ? 'HT' : match.displayClock || 'ON GOING'}</span>}
                                     </div>
                                     
-                                    {/* Squeezed Horizontal Teams */}
                                     <div className="flex justify-between items-center mt-auto gap-0.5">
                                         <div className="flex flex-col items-center w-[35%]">
-                                            {match.home_logo ? <img src={match.home_logo} className="w-5 h-5 object-contain mb-0.5"/> : <div className="w-5 h-5 bg-white/10 rounded-full mb-0.5 flex items-center justify-center text-[7px] font-bold text-white">H</div>}
+                                            {match.home_logo ? <img src={match.home_logo} className="w-4 h-4 object-contain mb-0.5"/> : <div className="w-4 h-4 bg-white/10 rounded-full mb-0.5 flex items-center justify-center text-[7px] font-bold text-white">H</div>}
                                             <span className="text-[7px] font-bold text-center text-white truncate w-full">{match.home_team}</span>
                                         </div>
-                                        
                                         <div className="flex flex-col items-center justify-center w-[30%]">
-                                            <div className="text-[10px] font-black tabular-nums bg-black/50 px-1 py-0.5 rounded backdrop-blur-md text-white">
+                                            <div className="text-[9px] font-black tabular-nums bg-black/50 px-1 py-0.5 rounded backdrop-blur-md text-white">
                                                 {isScheduled ? <span className="opacity-60 text-[7px]">VS</span> : `${match.home_score}-${match.away_score}`}
                                             </div>
                                         </div>
-
                                         <div className="flex flex-col items-center w-[35%]">
-                                            {match.away_logo ? <img src={match.away_logo} className="w-5 h-5 object-contain mb-0.5"/> : <div className="w-5 h-5 bg-white/10 rounded-full mb-0.5 flex items-center justify-center text-[7px] font-bold text-white">A</div>}
+                                            {match.away_logo ? <img src={match.away_logo} className="w-4 h-4 object-contain mb-0.5"/> : <div className="w-4 h-4 bg-white/10 rounded-full mb-0.5 flex items-center justify-center text-[7px] font-bold text-white">A</div>}
                                             <span className="text-[7px] font-bold text-center text-white truncate w-full">{match.away_team}</span>
                                         </div>
                                     </div>
@@ -152,10 +125,7 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                     );
                  })}
             </div>
-            <style dangerouslySetInnerHTML={{__html: `
-                .scrollbar-hide::-webkit-scrollbar { display: none; }
-                .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-            `}} />
+            <style dangerouslySetInnerHTML={{__html: `.scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }`}} />
         </div>
     );
 }

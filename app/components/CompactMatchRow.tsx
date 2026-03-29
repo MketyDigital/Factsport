@@ -50,10 +50,10 @@ export default function CompactMatchRow({ match: initialMatch, disablePolling = 
             )}
             
             <div className="flex items-stretch p-1 flex-1">
-                {/* Time / Status */}
-                <div className="w-[30px] shrink-0 flex flex-col items-center justify-center border-r border-slate-100 pr-1 mr-1">
+                {/* 🟢 TWEAKED: Time / Status (Width increased to 34px, text size reduced to 7px, tighter tracking) */}
+                <div className="w-[34px] shrink-0 flex flex-col items-center justify-center border-r border-slate-100 pr-1 mr-1 overflow-hidden">
                     {isScheduled ? (
-                        <span className="text-[8px] font-bold text-slate-500 leading-none"><MatchTime date={match.match_date} /></span>
+                        <span className="text-[7px] tracking-tighter font-bold text-slate-500 leading-none text-center"><MatchTime date={match.match_date} /></span>
                     ) : isFinished ? (
                         <span className="text-[8px] font-black text-slate-400 leading-none">FT</span>
                     ) : (
