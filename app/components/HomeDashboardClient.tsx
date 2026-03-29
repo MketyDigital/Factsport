@@ -14,14 +14,18 @@ export default function HomeDashboardClient({
     globalMatches, 
     featuredMatches, 
     selectedLeague, 
+    headlinesNode,        // 🟢 INJECTED SLOT
+    installBannerNode,    // 🟢 INJECTED SLOT
+    latestNewsNode,       // 🟢 INJECTED SLOT
     miniStandingsNode 
 }: { 
-    globalMatches: any[], featuredMatches: any[], selectedLeague?: string, miniStandingsNode: React.ReactNode 
+    globalMatches: any[], featuredMatches: any[], selectedLeague?: string, 
+    headlinesNode: React.ReactNode, installBannerNode: React.ReactNode, latestNewsNode: React.ReactNode, miniStandingsNode: React.ReactNode 
 }) {
     const [localData, setLocalData] = useState<any>(null);
 
     useEffect(() => {
-        // 1. DETERMINE LOCAL MIDNIGHT TO MIDNIGHT
+        // 1. TIMEZONE MATH
         const now = new Date();
         const startOfLocalDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
         const endOfLocalDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
@@ -29,10 +33,8 @@ export default function HomeDashboardClient({
         let displayPool = [];
         let fallbackTriggered = false;
 
-        // 2. APPLY RULES BASED ON TAB
+        // 2. TAB LOGIC
         if (selectedLeague) {
-            // LEAGUE TAB LOGIC:
-            // Does this league have matches TODAY in the user's timezone?
             const todayLeagueMatches = globalMatches.filter(m => {
                 const matchTime = new Date(m.match_date).getTime();
                 const isLive = LIVE_STATUSES.includes((m.status || '').toUpperCase());
@@ -40,27 +42,20 @@ export default function HomeDashboardClient({
             });
 
             if (todayLeagueMatches.length > 0) {
-                displayPool = todayLeagueMatches.slice(0, 5); // Max 5
+                displayPool = todayLeagueMatches.slice(0, 5); 
             } else {
-                // FALLBACK: Tab is empty for today. Show the closest upcoming/past matches the server found.
                 displayPool = globalMatches.slice(0, 5);
                 fallbackTriggered = true;
             }
         } else {
-            // FOR YOU TAB LOGIC:
-            // Strictly Local Today matches across ALL leagues
             let localTodayMatches = globalMatches.filter(m => {
                 const matchTime = new Date(m.match_date).getTime();
                 const isLive = LIVE_STATUSES.includes((m.status || '').toUpperCase());
                 return isLive || (matchTime >= startOfLocalDay && matchTime <= endOfLocalDay);
             });
 
-            if (localTodayMatches.length === 0) {
-                // Absolute Season Break fallback (if absolutely 0 matches globally today)
-                localTodayMatches = globalMatches.slice(0, 10);
-            }
+            if (localTodayMatches.length === 0) localTodayMatches = globalMatches.slice(0, 10);
 
-            // Mix max 3 per league, up to 20
             const leagues: Record<string, any[]> = {};
             localTodayMatches.forEach(m => {
                 if (!leagues[m.league]) leagues[m.league] = [];
@@ -82,7 +77,6 @@ export default function HomeDashboardClient({
                         added = true;
                     }
                 }
-                // Loosen constraint if we need more matches to hit 20
                 if (!added && mixed.length < 20 && localTodayMatches.length > mixed.length) {
                     for (const league of Object.keys(leagues)) {
                         if (mixed.length >= 20) break;
@@ -96,13 +90,12 @@ export default function HomeDashboardClient({
             displayPool = mixed;
         }
 
-        // 3. COMPUTE HERO MATCHES (Admin -> Media -> Big Teams -> Any) Max 5
+        // 3. HERO MATCHES Max 5
         let computedHero: any[] = [...featuredMatches.filter(m => {
             const t = new Date(m.match_date).getTime();
             return t >= startOfLocalDay && t <= endOfLocalDay;
         })];
         
-        // Filter media to Local Today
         const todayMedia = globalMatches.filter(m => {
             const t = new Date(m.match_date).getTime();
             return t >= startOfLocalDay && t <= endOfLocalDay;
@@ -122,7 +115,7 @@ export default function HomeDashboardClient({
         }
         computedHero = computedHero.slice(0, 5);
 
-        // 4. COMPUTE BET OF THE DAY (Latest big match of local today)
+        // 4. BET OF THE DAY
         let computedBetMatch = null;
         if (todayMedia.length > 0) {
             if (featuredMatches.length > 0) {
@@ -134,7 +127,7 @@ export default function HomeDashboardClient({
                 computedBetMatch = latestBigMatch || sortedByTimeDesc[0];
             }
         } else if (globalMatches.length > 0) {
-            computedBetMatch = globalMatches[0]; // Absolute fallback if no matches today
+            computedBetMatch = globalMatches[0]; 
         }
 
         // 5. GROUP MATCHES
@@ -149,18 +142,27 @@ export default function HomeDashboardClient({
         setLocalData({ heroMatches: computedHero, betMatch: computedBetMatch, groupedMatches: grouped, fallbackTriggered });
     }, [globalMatches, featuredMatches, selectedLeague]);
 
-    if (!localData) return <div className="w-full h-64 animate-pulse bg-slate-200/50 rounded-2xl max-w-6xl mx-auto mt-8"></div>;
+    if (!localData) return <div className="w-full h-96 animate-pulse bg-slate-200/50 rounded-2xl max-w-6xl mx-auto mt-8"></div>;
 
     return (
         <>
-            {/* HERO CARDS */}
+            {/* 🟢 ORDER 2: HERO CARDS */}
             {!selectedLeague && localData.heroMatches.length > 0 && (
                 <div className="bg-[#0f1c3a] pt-3 pb-4 border-b border-slate-800">
                     <HeroMatchCards heroMatches={localData.heroMatches} />
                 </div>
             )}
 
-            {/* MATCH CENTER */}
+            {/* 🟢 ORDER 3: HEADLINES SLIDER */}
+            {headlinesNode}
+
+            {/* 🟢 ORDER 4: APP INSTALL BANNER */}
+            {installBannerNode}
+
+            {/* 🟢 ORDER 5: LATEST NEWS */}
+            {latestNewsNode}
+
+            {/* 🟢 ORDER 6: MATCH CENTER */}
             <section className="mt-8 max-w-6xl mx-auto">
                 <div className="px-4 flex justify-between items-center mb-3">
                     <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2"><TrendingUp className="text-red-500" size={14}/> Match Center</h3>
@@ -179,7 +181,6 @@ export default function HomeDashboardClient({
                     </div>
                 </div>
 
-                {/* 🟢 DYNAMIC FALLBACK BANNER */}
                 {selectedLeague && localData.fallbackTriggered && (
                     <div className="px-4 mb-4">
                         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
@@ -204,7 +205,7 @@ export default function HomeDashboardClient({
                                         <span className="text-[10px] font-black text-slate-600 uppercase tracking-wider">{dateKey}</span>
                                     </div>
 
-                                    {/* 🟢 GLOBALLY FORCED 2-COLUMN GRID ON MOBILE */}
+                                    {/* GLOBALLY FORCED 2-COLUMN GRID ON MOBILE */}
                                     <div className="grid grid-cols-2 gap-1.5 md:gap-2 p-1.5 md:p-2 bg-[#f8fafc]">
                                         {localData.groupedMatches[dateKey].map((match: any) => (
                                             <div key={match.id}>
@@ -239,7 +240,7 @@ export default function HomeDashboardClient({
                 </div>
             </section>
 
-            {/* 🟢 BET OF THE DAY */}
+            {/* 🟢 ORDER 7: BET OF THE DAY */}
             {localData.betMatch && <div className="px-4"><BetOfTheDay initialMatch={localData.betMatch} /></div>}
         </>
     );
