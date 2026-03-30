@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-export const revalidate = 5; 
+export const revalidate = 3; 
 
 import { createClient } from '@supabase/supabase-js'; 
 import Link from "next/link";
