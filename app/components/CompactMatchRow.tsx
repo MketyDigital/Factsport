@@ -36,7 +36,6 @@ export default function CompactMatchRow({ match: initialMatch, disablePolling = 
     const isLive = LIVE_STATUSES.includes(status);
     const isFinished = FINISHED_STATUSES.includes(status);
     const isScheduled = !isLive && !isFinished;
-    const isHT = status === 'HT' || status === 'HALFTIME';
 
     useSmartInterval(fetchUpdates, isLive && !disablePolling ? 10000 : 60000);
 
@@ -50,29 +49,29 @@ export default function CompactMatchRow({ match: initialMatch, disablePolling = 
             )}
             
             <div className="flex items-stretch p-1 flex-1">
-                {/* 🟢 TWEAKED: Time / Status (Width increased to 34px, text size reduced to 7px, tighter tracking) */}
-                <div className="w-[34px] shrink-0 flex flex-col items-center justify-center border-r border-slate-100 pr-1 mr-1 overflow-hidden">
+                {/* 🟢 FIXED TIME COLUMN: Zero inner margin/padding, 38px pure width */}
+                <div className="w-[38px] shrink-0 flex flex-col items-center justify-center border-r border-slate-100 bg-slate-50/30">
                     {isScheduled ? (
-                        <span className="text-[7px] tracking-tighter font-bold text-slate-500 leading-none text-center"><MatchTime date={match.match_date} /></span>
+                        <span className="text-[8px] font-bold text-slate-500 tracking-tighter text-center w-full whitespace-nowrap"><MatchTime date={match.match_date} /></span>
                     ) : isFinished ? (
-                        <span className="text-[8px] font-black text-slate-400 leading-none">FT</span>
+                        <span className="text-[8px] font-black text-slate-400">FT</span>
                     ) : (
                         <LiveScoreLabel matchId={match.id} espnId={match.espn_id} initialStatus={match.status} displayClock={match.displayClock} variant="badge" disablePolling={disablePolling} />
                     )}
                 </div>
 
-                {/* Teams & Scores (Zero Middle Gap) */}
-                <Link href={`/match/${match.id}`} className="flex-1 flex flex-col justify-center gap-0.5 min-w-0">
+                {/* Teams & Scores (Padding moved here via pl-1) */}
+                <Link href={`/match/${match.id}`} className="flex-1 flex flex-col justify-center gap-0.5 min-w-0 pl-1.5 pr-0.5">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1 min-w-0 pr-1">
+                        <div className="flex items-center gap-1 min-w-0">
                             {match.home_logo ? <img src={match.home_logo} className="w-3 h-3 object-contain shrink-0" alt=""/> : <div className="w-3 h-3 bg-slate-200 rounded-full shrink-0"/>}
                             <span className={`text-[9px] md:text-[10px] font-bold truncate ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-600'}`}>{match.home_team}</span>
                         </div>
                         {!isScheduled && <span className={`text-[10px] font-black leading-none ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-500'}`}>{match.home_score}</span>}
                     </div>
                     
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1 min-w-0 pr-1">
+                    <div className="flex items-center justify-between mt-0.5">
+                        <div className="flex items-center gap-1 min-w-0">
                             {match.away_logo ? <img src={match.away_logo} className="w-3 h-3 object-contain shrink-0" alt=""/> : <div className="w-3 h-3 bg-slate-200 rounded-full shrink-0"/>}
                             <span className={`text-[9px] md:text-[10px] font-bold truncate ${isFinished && match.away_score > match.home_score ? 'text-slate-900' : 'text-slate-600'}`}>{match.away_team}</span>
                         </div>
@@ -82,7 +81,7 @@ export default function CompactMatchRow({ match: initialMatch, disablePolling = 
 
                 {/* Micro Actions */}
                 {!isFinished && (
-                    <div className="w-[24px] shrink-0 flex flex-col items-center justify-center pl-1 ml-1 border-l border-slate-100 gap-1">
+                    <div className="w-[24px] shrink-0 flex flex-col items-center justify-center pl-1 border-l border-slate-100 gap-1">
                         {isScheduled && (
                             <Link href={`/match/${match.id}#predictions`} className="w-full bg-blue-50 rounded flex items-center justify-center text-blue-600 py-1" title="Predict">
                                 <Zap size={10} className="fill-blue-600" />

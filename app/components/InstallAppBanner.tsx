@@ -44,7 +44,7 @@ export default function InstallAppBanner() {
     if (!isVisible) return null;
 
     return (
-        <div className="bg-blue-600 text-white mx-3 md:mx-0 rounded-md px-2.5 py-1.5 shadow-sm flex items-center justify-between text-[9px] md:text-[10px] font-bold mb-3 mt-1 border border-blue-500">
+        <div className="bg-blue-600 text-white w-full px-3 py-1.5 shadow-sm flex items-center justify-between text-[9px] md:text-[10px] font-bold border-y border-blue-500 m-0">
             <div className="flex items-center gap-1.5 truncate pr-2">
                 <Download size={10} className="shrink-0 animate-bounce text-yellow-300" />
                 <span className="truncate">Install FactSport to Home for fast live updates</span>

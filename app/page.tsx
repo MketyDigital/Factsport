@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-export const revalidate = 3; 
+export const revalidate = 5; 
 
 import { createClient } from '@supabase/supabase-js'; 
 import Link from "next/link";
@@ -107,39 +107,34 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans pb-0 overflow-x-hidden">
       
-      {/* 1. TICKER */}
       <NewsTicker tickerNews={tickerNews} />
 
-      {/* 2 -> 7. ORCHESTRATED DASHBOARD (Hero -> Headlines -> Banner -> News -> Match Center -> Bet of the Day) */}
       <HomeDashboardClient 
           globalMatches={matches} 
           featuredMatches={featuredMatches} 
           selectedLeague={selectedLeague} 
           
-          /* 🟢 INJECTING SERVER COMPONENTS TO GUARANTEE EXACT REQUESTED ORDER */
+          /* 🟢 ZERO MARGINS BETWEEN THESE THREE COMPONENTS */
           headlinesNode={
               finalHeadlines.length > 0 ? (
-                  <div className="mt-0 md:mt-4 md:px-4"><HeadlinesSlider headlines={finalHeadlines} /></div>
+                  <div className="w-full m-0 p-0"><HeadlinesSlider headlines={finalHeadlines} /></div>
               ) : null
           }
           installBannerNode={
-              <div className="mt-6 max-w-4xl mx-auto"><InstallAppBanner /></div>
+              <div className="w-full m-0 p-0 max-w-4xl mx-auto"><InstallAppBanner /></div>
           }
           latestNewsNode={
-              <div className="mt-2"><LatestNewsList latestNews={latestNews} /></div>
+              <div className="w-full m-0 p-0"><LatestNewsList latestNews={latestNews} /></div>
           }
           miniStandingsNode={<MiniStandings leagueName={selectedLeague || 'Premier League'} />} 
       />
 
-      {/* 8. HIGHLIGHTS VIDEOS (After Bet of the Day) */}
       <div className="mt-8">
           <HighlightsSlider highlights={highlights} />
       </div>
 
-      {/* FINAL AD BANNER */}
       <div className="max-w-4xl mx-auto mt-8"><AdsterraStandardBanner /></div>
 
-      {/* FOOTER LINKS */}
       <div className="grid grid-cols-4 gap-3 px-4 py-6 max-w-4xl mx-auto">
           <Link href="/matches" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
               <Trophy className="text-yellow-500" size={20} />
