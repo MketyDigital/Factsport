@@ -8,6 +8,117 @@ import { fetchLiveMatchDeduplicated } from '@/app/utils/liveFetcher';
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
+// 🟢 COMPREHENSIVE PREMIUM BROADCAST DICTIONARY
+const TEAM_ABBREVIATIONS: Record<string, string> = {
+    'manchester city': 'MCI', 'man city': 'MCI', 'm. city': 'MCI',
+    'manchester united': 'MUN', 'man united': 'MUN', 'man utd': 'MUN',
+    'arsenal': 'ARS', 'arsenal fc': 'ARS',
+    'chelsea': 'CHE', 'chelsea fc': 'CHE',
+    'liverpool': 'LIV', 'liverpool fc': 'LIV',
+    'tottenham hotspur': 'TOT', 'tottenham': 'TOT', 'spurs': 'TOT',
+    'newcastle united': 'NEW', 'newcastle': 'NEW', 'newcastle utd': 'NEW',
+    'aston villa': 'AVL', 'villa': 'AVL',
+    'west ham united': 'WHU', 'west ham': 'WHU',
+    'brighton & hove albion': 'BHA', 'brighton': 'BHA', 'brighton hove': 'BHA',
+    'wolverhampton wanderers': 'WOL', 'wolverhampton': 'WOL', 'wolves': 'WOL',
+    'nottingham forest': 'NFO', 'nottm forest': 'NFO', 'nottingham': 'NFO',
+    'leicester city': 'LEI', 'leicester': 'LEI',
+    'everton': 'EVE', 'everton fc': 'EVE',
+    'crystal palace': 'CRY', 'palace': 'CRY',
+    'brentford': 'BRE', 'brentford fc': 'BRE',
+    'fulham': 'FUL', 'fulham fc': 'FUL',
+    'afc bournemouth': 'BOU', 'bournemouth': 'BOU',
+    'southampton': 'SOU', 'saints': 'SOU',
+    'ipswich town': 'IPS', 'ipswich': 'IPS',
+    'real madrid': 'RMA', 'madrid': 'RMA',
+    'barcelona': 'BAR', 'barca': 'BAR', 'fc barcelona': 'BAR',
+    'atletico madrid': 'ATM', 'atlético': 'ATM', 'atletico': 'ATM', 'atlético de madrid': 'ATM',
+    'athletic club': 'ATH', 'athletic bilbao': 'ATH', 'athletic': 'ATH',
+    'real sociedad': 'RSO', 'sociedad': 'RSO',
+    'real betis': 'BET', 'betis': 'BET',
+    'sevilla': 'SEV', 'sevilla fc': 'SEV',
+    'valencia': 'VAL', 'valencia cf': 'VAL',
+    'villarreal': 'VIL', 'villarreal cf': 'VIL',
+    'celta vigo': 'CEL', 'celta': 'CEL', 'celta de vigo': 'CEL',
+    'girona': 'GIR', 'girona fc': 'GIR',
+    'osasuna': 'OSA', 'ca osasuna': 'OSA',
+    'mallorca': 'MLL', 'rcd mallorca': 'MLL',
+    'juventus': 'JUV', 'juve': 'JUV',
+    'ac milan': 'MIL', 'milan': 'MIL',
+    'inter milan': 'INT', 'inter': 'INT', 'internazionale': 'INT',
+    'ssc napoli': 'NAP', 'napoli': 'NAP',
+    'as roma': 'ROM', 'roma': 'ROM',
+    'ss lazio': 'LAZ', 'lazio': 'LAZ',
+    'atalanta': 'ATA', 'atalanta bc': 'ATA',
+    'fiorentina': 'FIO', 'acf fiorentina': 'FIO',
+    'bologna': 'BOL', 'bologna fc': 'BOL',
+    'torino': 'TOR', 'torino fc': 'TOR',
+    'bayern munich': 'BAY', 'bayern': 'BAY', 'fc bayern': 'BAY', 'bayern münchen': 'BAY',
+    'borussia dortmund': 'BVB', 'dortmund': 'BVB',
+    'bayer 04 leverkusen': 'B04', 'leverkusen': 'B04', 'bayer leverkusen': 'B04',
+    'rb leipzig': 'RBL', 'leipzig': 'RBL',
+    'eintracht frankfurt': 'SGE', 'frankfurt': 'SGE', 'eintracht': 'SGE',
+    'borussia monchengladbach': 'BMG', 'gladbach': 'BMG', 'mgladbach': 'BMG', 'mönchengladbach': 'BMG',
+    'vfb stuttgart': 'VFB', 'stuttgart': 'VFB',
+    'wolfsburg': 'WOB', 'vfl wolfsburg': 'WOB',
+    'sc freiburg': 'SCF', 'freiburg': 'SCF',
+    'union berlin': 'FCU', 'fc union berlin': 'FCU',
+    'paris saint germain': 'PSG', 'psg': 'PSG', 'paris sg': 'PSG', 'paris saint-germain': 'PSG',
+    'olympique de marseille': 'MAR', 'marseille': 'MAR', 'om': 'MAR',
+    'olympique lyonnais': 'LYO', 'lyon': 'LYO', 'ol': 'LYO',
+    'as monaco': 'ASM', 'monaco': 'ASM',
+    'lille osc': 'LOSC', 'lille': 'LOSC',
+    'rc lens': 'RCL', 'lens': 'RCL',
+    'ogc nice': 'OGCN', 'nice': 'OGCN',
+    'ajax': 'AJA', 'afc ajax': 'AJA',
+    'psv eindhoven': 'PSV', 'psv': 'PSV',
+    'feyenoord': 'FEY',
+    'sporting cp': 'SCP', 'sporting': 'SCP', 'sporting lisbon': 'SCP',
+    'sl benfica': 'SLB', 'benfica': 'SLB',
+    'fc porto': 'FCP', 'porto': 'FCP',
+    'celtic': 'CEL', 'celtic fc': 'CEL',
+    'rangers': 'RAN', 'rangers fc': 'RAN',
+    'galatasaray': 'GAL', 'galatasaray sk': 'GAL',
+    'fenerbahce': 'FEN', 'fenerbahçe': 'FEN',
+    'besiktas': 'BES', 'beşiktaş': 'BES',
+    'argentina': 'ARG',
+    'brazil': 'BRA', 'brasil': 'BRA',
+    'france': 'FRA',
+    'england': 'ENG',
+    'spain': 'ESP', 'españa': 'ESP',
+    'germany': 'GER', 'deutschland': 'GER',
+    'italy': 'ITA', 'italia': 'ITA',
+    'portugal': 'POR',
+    'netherlands': 'NED', 'holland': 'NED',
+    'belgium': 'BEL',
+    'croatia': 'CRO',
+    'uruguay': 'URU',
+    'colombia': 'COL',
+    'united states': 'USA', 'usa': 'USA', 'usmnt': 'USA',
+    'mexico': 'MEX',
+    'nigeria': 'NGA', 'super eagles': 'NGA',
+    'senegal': 'SEN',
+    'morocco': 'MAR',
+    'egypt': 'EGY',
+    'ghana': 'GHA',
+    'ivory coast': 'CIV', "cote d'ivoire": 'CIV',
+    'japan': 'JPN',
+    'south korea': 'KOR', 'korea republic': 'KOR'
+};
+
+const getShortName = (name: string) => {
+    if (!name) return 'TBA';
+    const normalizedName = name.toLowerCase().trim();
+    
+    // Check dictionary first
+    if (TEAM_ABBREVIATIONS[normalizedName]) {
+        return TEAM_ABBREVIATIONS[normalizedName];
+    }
+    
+    // Smart Fallback if not in dictionary
+    return name.toUpperCase().replace(/[^A-Z]/g, '').substring(0, 3);
+};
+
 // 🟢 LIGHTWEIGHT TICKER ITEM
 function TickerItem({ initialMatch }: { initialMatch: any }) {
     const [match, setMatch] = useState(initialMatch);
@@ -44,7 +155,7 @@ function TickerItem({ initialMatch }: { initialMatch: any }) {
                 {isLive && <span className="w-1 h-1 bg-red-500 rounded-full animate-pulse mr-1.5 shadow-[0_0_5px_rgba(239,68,68,0.8)]"></span>}
                 
                 <div className="flex items-center gap-1.5">
-                    <span className="text-white font-bold text-[8px] md:text-[9px] uppercase tracking-wider">{match.home_team.substring(0, 3)}</span>
+                    <span className="text-white font-bold text-[8px] md:text-[9px] uppercase tracking-wider">{getShortName(match.home_team)}</span>
                     
                     {isScheduled ? (
                         <span className="text-slate-400 font-bold text-[7px] md:text-[8px] bg-white/10 px-1 py-0.5 rounded leading-none">
@@ -58,7 +169,7 @@ function TickerItem({ initialMatch }: { initialMatch: any }) {
                         </div>
                     )}
 
-                    <span className="text-white font-bold text-[8px] md:text-[9px] uppercase tracking-wider">{match.away_team.substring(0, 3)}</span>
+                    <span className="text-white font-bold text-[8px] md:text-[9px] uppercase tracking-wider">{getShortName(match.away_team)}</span>
                     
                     {isLive && <span className="text-red-400 font-black text-[7px] md:text-[8px] ml-1 tracking-tighter">{match.displayClock || 'LIVE'}</span>}
                     {isFinished && <span className="text-slate-500 font-black text-[7px] md:text-[8px] ml-1">FT</span>}
