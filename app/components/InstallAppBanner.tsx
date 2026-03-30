@@ -47,7 +47,7 @@ export default function InstallAppBanner() {
         <div className="bg-blue-600 text-white w-full px-3 py-1.5 shadow-sm flex items-center justify-between text-[9px] md:text-[10px] font-bold border-y border-blue-500 m-0">
             <div className="flex items-center gap-1.5 truncate pr-2">
                 <Download size={10} className="shrink-0 animate-bounce text-yellow-300" />
-                <span className="truncate">Install FactSport to Home for fast live updates</span>
+                <span className="truncate">Install FactSport to Home for fast lives & News updates</span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
                 <button onClick={handleInstall} className="bg-white text-blue-600 px-2 py-0.5 rounded shadow-sm font-black uppercase text-[8px] active:scale-95 transition">Install</button>
