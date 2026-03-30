@@ -1,9 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Video, Mic, Calendar, Radio, Trophy, Activity, PlayCircle, ArrowRight } from 'lucide-react';
+import { Video, Mic, Calendar, Trophy, Activity, PlayCircle, ArrowRight } from 'lucide-react';
 import LiveScoreLabel from '@/app/components/LiveScoreLabel'; 
 import BettingPromo from '@/app/components/BettingPromo';
+import MatchTime from '@/app/components/MatchTime'; // 🟢 INJECTED LOCAL TIME COMPONENT
 
 export default function LiveMediaClient({ matches }: { matches: any[] }) {
     const [localData, setLocalData] = useState<any>(null);
@@ -21,7 +22,7 @@ export default function LiveMediaClient({ matches }: { matches: any[] }) {
         matches.forEach(m => {
             const matchTime = new Date(m.match_date).getTime();
             const status = (m.status || '').toUpperCase();
-            const isLiveNow = ['LIVE','IN_PLAY','1H','2H','HT','ET','P','PENALTIES'].includes(status);
+            const isLiveNow = ['LIVE','IN_PLAY','IN','1H','2H','HT','HALFTIME','ET','EXTRA TIME','P','PENALTIES'].includes(status);
             const isToday = matchTime >= startOfLocalDay && matchTime <= endOfLocalDay;
 
             // Only show if it's currently live OR it is scheduled for LOCAL TODAY
@@ -132,8 +133,9 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
                     {/* Time / Status */}
                     <div className="w-[34px] shrink-0 flex flex-col items-center justify-center border-r border-white/10 pr-1.5 mr-1.5 overflow-hidden">
                         {isScheduled ? (
-                            <span className="text-[7px] tracking-tighter font-bold text-slate-400 leading-none text-center">
-                                {match.match_date ? new Date(match.match_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                            /* 🟢 PERFECT LOCAL TIMEZONE RENDERING */
+                            <span className="text-[7px] tracking-tighter font-bold text-slate-400 leading-none text-center w-full whitespace-nowrap">
+                                {match.match_date ? <MatchTime date={match.match_date} /> : '--:--'}
                             </span>
                         ) : isFinished ? (
                             <span className="text-[8px] font-black text-slate-500 leading-none">FT</span>
@@ -176,6 +178,14 @@ function MatchCard({ match, hasCoverage }: { match: any, hasCoverage: boolean })
                      <Trophy size={10} className="text-yellow-400"/>
                      {match.league || 'Competition'}
                  </div>
+                 
+                 {/* 🟢 TOP-RIGHT LOCAL TIME INJECTION FOR COVERED MATCHES */}
+                 {isScheduled && match.match_date && (
+                     <div className="text-[9px] font-bold text-slate-400 flex items-center gap-1 bg-black/30 px-2 py-0.5 rounded shadow-inner">
+                         <Calendar size={9} className="text-slate-500"/>
+                         <MatchTime date={match.match_date} />
+                     </div>
+                 )}
             </div>
             
             <Link href={`/match/${match.id}`} className="block p-5 flex-1 hover:bg-white/5 transition-colors">

@@ -40,7 +40,8 @@ export default function CompactMatchRow({ match: initialMatch, disablePolling = 
     useSmartInterval(fetchUpdates, isLive && !disablePolling ? 10000 : 60000);
 
     return (
-        <div className="bg-white hover:bg-slate-50 transition-colors group flex flex-col h-full rounded-md border border-slate-100 shadow-sm overflow-hidden">
+        // 🟢 THE FIX: Stronger individual background and shadow
+        <div className="bg-white hover:bg-slate-50 transition-colors group flex flex-col h-full rounded-md border border-slate-200 shadow-md overflow-hidden">
             {showLeague && match.league && (
                 <div className="px-1.5 py-0.5 bg-slate-50/80 border-b border-slate-100 flex items-center gap-1">
                     <Trophy size={8} className="text-slate-400"/>
@@ -49,10 +50,10 @@ export default function CompactMatchRow({ match: initialMatch, disablePolling = 
             )}
             
             <div className="flex items-stretch p-1 flex-1">
-                {/* 🟢 FIXED TIME COLUMN: Zero inner margin/padding, 38px pure width */}
+                {/* 🟢 THE FIX: Font size uses inheriting wrapper so it relies purely on local scaling */}
                 <div className="w-[38px] shrink-0 flex flex-col items-center justify-center border-r border-slate-100 bg-slate-50/30">
                     {isScheduled ? (
-                        <span className="text-[8px] font-bold text-slate-500 tracking-tighter text-center w-full whitespace-nowrap"><MatchTime date={match.match_date} /></span>
+                        <span className="text-[8px] md:text-[9px] font-bold text-slate-500 tracking-tighter text-center w-full whitespace-nowrap"><MatchTime date={match.match_date} /></span>
                     ) : isFinished ? (
                         <span className="text-[8px] font-black text-slate-400">FT</span>
                     ) : (
@@ -60,7 +61,6 @@ export default function CompactMatchRow({ match: initialMatch, disablePolling = 
                     )}
                 </div>
 
-                {/* Teams & Scores (Padding moved here via pl-1) */}
                 <Link href={`/match/${match.id}`} className="flex-1 flex flex-col justify-center gap-0.5 min-w-0 pl-1.5 pr-0.5">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1 min-w-0">
@@ -79,7 +79,6 @@ export default function CompactMatchRow({ match: initialMatch, disablePolling = 
                     </div>
                 </Link>
 
-                {/* Micro Actions */}
                 {!isFinished && (
                     <div className="w-[24px] shrink-0 flex flex-col items-center justify-center pl-1 border-l border-slate-100 gap-1">
                         {isScheduled && (

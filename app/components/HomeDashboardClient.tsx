@@ -17,7 +17,7 @@ export default function HomeDashboardClient({
     headlinesNode: React.ReactNode, installBannerNode: React.ReactNode, latestNewsNode: React.ReactNode, miniStandingsNode: React.ReactNode 
 }) {
     const [localData, setLocalData] = useState<any>(null);
-    const [leagueTab, setLeagueTab] = useState<'matches'|'table'>('matches'); // 🟢 NEW TOGGLE STATE
+    const [leagueTab, setLeagueTab] = useState<'matches'|'table'>('matches');
 
     useEffect(() => { setLeagueTab('matches'); }, [selectedLeague]);
 
@@ -82,7 +82,6 @@ export default function HomeDashboardClient({
             displayPool = mixed;
         }
 
-        // 🟢 PREVENT DISAPPEARING HERO CARDS
         let computedHero: any[] = [...featuredMatches.filter(m => {
             const t = new Date(m.match_date).getTime();
             return t >= startOfLocalDay && t <= endOfLocalDay;
@@ -106,7 +105,6 @@ export default function HomeDashboardClient({
             candidates.forEach(m => { if (!computedHero.find(h => h.id === m.id) && computedHero.length < 5) computedHero.push(m); });
         }
         
-        // Absolute safety net: if completely empty, just grab first 5 global matches
         if (computedHero.length === 0) computedHero = globalMatches.slice(0, 5);
         computedHero = computedHero.slice(0, 5);
 
@@ -124,7 +122,13 @@ export default function HomeDashboardClient({
             computedBetMatch = globalMatches[0]; 
         }
 
-        const remainingMatches = displayPool.filter(m => !computedHero.some(h => h.id === m.id));
+        let remainingMatches = displayPool.filter(m => !computedHero.some(h => h.id === m.id));
+        
+        // 🟢 THE FIX: If Hero Cards ate all the matches, show them in the match center anyway so it's not empty!
+        if (remainingMatches.length === 0 && displayPool.length > 0) {
+            remainingMatches = displayPool;
+        }
+
         const grouped: Record<string, any[]> = {};
         remainingMatches.forEach(m => {
             const dateKey = new Date(m.match_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -141,8 +145,9 @@ export default function HomeDashboardClient({
         <>
             {!selectedLeague && localData.heroMatches.length > 0 && <HeroMatchCards heroMatches={localData.heroMatches} />}
 
-            {installBannerNode}
+            {/* 🟢 THE FIX: Exact requested node ordering */}
             {headlinesNode}
+            {installBannerNode}
             {latestNewsNode}
 
             <section className="mt-6 max-w-6xl mx-auto">
@@ -162,7 +167,6 @@ export default function HomeDashboardClient({
                     </div>
                 </div>
 
-                {/* 🟢 TOGGLE TABS (Only visible if a league is selected) */}
                 {selectedLeague && (
                     <div className="mx-3 mb-4 bg-slate-100 p-1 rounded-lg flex shadow-inner">
                         <button onClick={() => setLeagueTab('matches')} className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${leagueTab === 'matches' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>Matches</button>
@@ -171,7 +175,6 @@ export default function HomeDashboardClient({
                 )}
 
                 <div className="px-2 md:px-4 py-0 flex flex-col lg:flex-row gap-4 mt-2">
-                    
                     <div className="flex-1 space-y-3">
                         <FreeTipsBanner />
 
@@ -212,7 +215,6 @@ export default function HomeDashboardClient({
                                 )}
                             </>
                         ) : (
-                            /* 🟢 MINI STANDINGS RENDERED FULL WIDTH IN TAB */
                             <div className="w-full animation-fade-in">
                                 {miniStandingsNode}
                             </div>
