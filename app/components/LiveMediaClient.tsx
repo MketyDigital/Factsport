@@ -16,7 +16,7 @@ export default function LiveMediaClient({ matches }: { matches: any[] }) {
 
         const coveredMatches: any[] = [];
         const liveUncoveredMatches: any[] = [];
-        let nextUpcomingMatch any = null;
+        let nextUpcomingMatch: any = null;
 
         matches.forEach(m => {
             const matchTime = new Date(m.match_date).getTime();
