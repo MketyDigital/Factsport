@@ -23,6 +23,9 @@ import { getExternalData } from '@/app/lib/matchService';
 import { getTeamForm } from '@/app/lib/teamForm';
 import { MatchLiveProvider } from '@/app/providers/MatchLiveProvider';
 
+// 🟢 NEW: Import the GPU-accelerated Goal Rush Ticker
+import GoalRushTicker from '@/app/components/GoalRushTicker';
+
 const sanitizeUrl = (url: string | null | undefined) => {
     if (!url) return null;
     if (url.trim().toLowerCase().startsWith('javascript:')) return '#';
@@ -139,9 +142,25 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       ]
   };
 
+  // 🟢 NEW: Fetch a 24-hour window for the Goal Rush Ticker (Highly optimized DB call)
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const windowEnd = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+  
+  const publicSupabase = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  const { data: tickerMatches } = await publicSupabase
+      .from('matches')
+      .select('id, espn_id, home_team, away_team, status, home_score, away_score, match_date, displayClock')
+      .gte('match_date', windowStart)
+      .lte('match_date', windowEnd)
+      .limit(50); // Kept strictly capped to prevent RAM/DB bloat
+
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+
+      {/* 🟢 NEW: Ultra-slim ticker at the absolute top edge of the page */}
+      <GoalRushTicker allMatches={tickerMatches || []} currentMatchId={dbData.id} />
 
       <MatchLiveProvider espnId={dbData.espn_id} initialData={data}>
           {!hasWidget ? (
