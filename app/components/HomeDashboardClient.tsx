@@ -108,18 +108,26 @@ export default function HomeDashboardClient({
         if (computedHero.length === 0) computedHero = globalMatches.slice(0, 5);
         computedHero = computedHero.slice(0, 5);
 
+        // --- NEW BET OF THE DAY LOGIC ---
         let computedBetMatch = null;
-        if (todayMedia.length > 0) {
-            if (featuredMatches.length > 0) {
-                computedBetMatch = featuredMatches[featuredMatches.length - 1]; 
+        const todayMatches = globalMatches.filter(m => {
+            const t = new Date(m.match_date).getTime();
+            return t >= startOfLocalDay && t <= endOfLocalDay;
+        });
+
+        if (todayMatches.length > 0) {
+            // Check for Admin Selected Bet of the Day specifically for TODAY
+            const adminBet = todayMatches.find(m => m.is_bet_of_the_day);
+            if (adminBet) {
+                computedBetMatch = adminBet;
             } else {
-                const sortedByTimeDesc = [...todayMedia].sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
-                const bigTeams = ['Arsenal', 'Chelsea', 'Liverpool', 'Man City', 'Manchester City', 'Man United', 'Manchester United', 'Tottenham', 'Real Madrid', 'Barcelona', 'Atletico', 'Bayern', 'Dortmund', 'Leverkusen', 'Juventus', 'Inter', 'AC Milan', 'Napoli', 'PSG'];
-                const latestBigMatch = sortedByTimeDesc.find(m => bigTeams.some(giant => (m.home_team && m.home_team.toLowerCase().includes(giant.toLowerCase())) || (m.away_team && m.away_team.toLowerCase().includes(giant.toLowerCase()))));
-                computedBetMatch = latestBigMatch || sortedByTimeDesc[0];
+                // Fallback to random last match of the day (sorting by time descending)
+                const sortedByTimeDesc = [...todayMatches].sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
+                computedBetMatch = sortedByTimeDesc[0];
             }
         } else if (globalMatches.length > 0) {
-            computedBetMatch = globalMatches[0]; 
+            // Absolute fallback if no games exist today at all
+            computedBetMatch = globalMatches.find(m => m.is_bet_of_the_day) || globalMatches[0]; 
         }
 
         let remainingMatches = displayPool.filter(m => !computedHero.some(h => h.id === m.id));
