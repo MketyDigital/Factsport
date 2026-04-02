@@ -105,29 +105,35 @@ export default function HomeDashboardClient({
             candidates.forEach(m => { if (!computedHero.find(h => h.id === m.id) && computedHero.length < 5) computedHero.push(m); });
         }
         
-        if (computedHero.length === 0) computedHero = globalMatches.slice(0, 5);
+        // Changed from globalMatches to todayMedia to strictly enforce local time appear/disappear rules for Hero cards
+        if (computedHero.length === 0) computedHero = todayMedia.slice(0, 5); 
         computedHero = computedHero.slice(0, 5);
 
-        // --- NEW BET OF THE DAY LOGIC ---
         let computedBetMatch = null;
-        const todayMatches = globalMatches.filter(m => {
+        const allLocalTodayMatches = globalMatches.filter(m => {
             const t = new Date(m.match_date).getTime();
             return t >= startOfLocalDay && t <= endOfLocalDay;
         });
 
-        if (todayMatches.length > 0) {
-            // Check for Admin Selected Bet of the Day specifically for TODAY
-            const adminBet = todayMatches.find(m => m.is_bet_of_the_day);
-            if (adminBet) {
-                computedBetMatch = adminBet;
+        if (allLocalTodayMatches.length > 0) {
+            const adminBetMatches = allLocalTodayMatches.filter(m => m.is_bet_of_the_day);
+            
+            if (adminBetMatches.length > 0) {
+                // Pick the first one selected from the admin dashboard
+                computedBetMatch = adminBetMatches[0];
             } else {
-                // Fallback to random last match of the day (sorting by time descending)
-                const sortedByTimeDesc = [...todayMatches].sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
-                computedBetMatch = sortedByTimeDesc[0];
+                // Fallback to random last match of the day (stable sort to prevent changing on page refresh)
+                const sortedByTimeDesc = [...allLocalTodayMatches].sort((a, b) => {
+                    const timeDiff = new Date(b.match_date).getTime() - new Date(a.match_date).getTime();
+                    if (timeDiff !== 0) return timeDiff;
+                    return String(b.id || '').localeCompare(String(a.id || '')); // Stable fallback sort
+                });
+                
+                // Use a seeded index (the day of the month) so it remains the "same match of the day for everyone" and survives refreshes
+                const poolSize = Math.min(3, sortedByTimeDesc.length);
+                const pseudoRandomIndex = now.getDate() % poolSize;
+                computedBetMatch = sortedByTimeDesc[pseudoRandomIndex];
             }
-        } else if (globalMatches.length > 0) {
-            // Absolute fallback if no games exist today at all
-            computedBetMatch = globalMatches.find(m => m.is_bet_of_the_day) || globalMatches[0]; 
         }
 
         let remainingMatches = displayPool.filter(m => !computedHero.some(h => h.id === m.id));
