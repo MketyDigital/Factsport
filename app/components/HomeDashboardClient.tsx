@@ -105,21 +105,35 @@ export default function HomeDashboardClient({
             candidates.forEach(m => { if (!computedHero.find(h => h.id === m.id) && computedHero.length < 5) computedHero.push(m); });
         }
         
-        if (computedHero.length === 0) computedHero = globalMatches.slice(0, 5);
+        // Changed from globalMatches to todayMedia to strictly enforce local time appear/disappear rules for Hero cards
+        if (computedHero.length === 0) computedHero = todayMedia.slice(0, 5); 
         computedHero = computedHero.slice(0, 5);
 
         let computedBetMatch = null;
-        if (todayMedia.length > 0) {
-            if (featuredMatches.length > 0) {
-                computedBetMatch = featuredMatches[featuredMatches.length - 1]; 
+        const allLocalTodayMatches = globalMatches.filter(m => {
+            const t = new Date(m.match_date).getTime();
+            return t >= startOfLocalDay && t <= endOfLocalDay;
+        });
+
+        if (allLocalTodayMatches.length > 0) {
+            const adminBetMatches = allLocalTodayMatches.filter(m => m.is_bet_of_the_day);
+            
+            if (adminBetMatches.length > 0) {
+                // Pick the first one selected from the admin dashboard
+                computedBetMatch = adminBetMatches[0];
             } else {
-                const sortedByTimeDesc = [...todayMedia].sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
-                const bigTeams = ['Arsenal', 'Chelsea', 'Liverpool', 'Man City', 'Manchester City', 'Man United', 'Manchester United', 'Tottenham', 'Real Madrid', 'Barcelona', 'Atletico', 'Bayern', 'Dortmund', 'Leverkusen', 'Juventus', 'Inter', 'AC Milan', 'Napoli', 'PSG'];
-                const latestBigMatch = sortedByTimeDesc.find(m => bigTeams.some(giant => (m.home_team && m.home_team.toLowerCase().includes(giant.toLowerCase())) || (m.away_team && m.away_team.toLowerCase().includes(giant.toLowerCase()))));
-                computedBetMatch = latestBigMatch || sortedByTimeDesc[0];
+                // Fallback to random last match of the day (stable sort to prevent changing on page refresh)
+                const sortedByTimeDesc = [...allLocalTodayMatches].sort((a, b) => {
+                    const timeDiff = new Date(b.match_date).getTime() - new Date(a.match_date).getTime();
+                    if (timeDiff !== 0) return timeDiff;
+                    return String(b.id || '').localeCompare(String(a.id || '')); // Stable fallback sort
+                });
+                
+                // Use a seeded index (the day of the month) so it remains the "same match of the day for everyone" and survives refreshes
+                const poolSize = Math.min(3, sortedByTimeDesc.length);
+                const pseudoRandomIndex = now.getDate() % poolSize;
+                computedBetMatch = sortedByTimeDesc[pseudoRandomIndex];
             }
-        } else if (globalMatches.length > 0) {
-            computedBetMatch = globalMatches[0]; 
         }
 
         let remainingMatches = displayPool.filter(m => !computedHero.some(h => h.id === m.id));

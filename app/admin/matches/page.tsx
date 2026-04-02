@@ -105,6 +105,7 @@ export default function AdminMatchesPage() {
             audio_url: sanitize(match.audio_url), 
             is_featured: match.is_featured, 
             is_featured_video: match.is_featured_video, 
+            is_bet_of_the_day: match.is_bet_of_the_day, // 🟢 Added Bet of the Day mapping
             points_distributed: match.points_distributed,
             pro_analysis: match.pro_analysis, 
             campaign_id: match.campaign_id || null, // 🟢 Campaign Link
@@ -192,6 +193,16 @@ export default function AdminMatchesPage() {
                                 className="w-3 h-3 md:w-4 md:h-4 rounded text-blue-600"
                             /> 
                             Featured
+                        </label>
+                        {/* 🟢 NEW: Bet of the Day Toggle */}
+                        <label className="flex items-center gap-1.5 text-[10px] md:text-xs font-bold bg-purple-50 text-purple-700 p-1.5 px-3 rounded-lg border border-purple-100 cursor-pointer hover:bg-purple-100 transition">
+                            <input 
+                                type="checkbox" 
+                                checked={match.is_bet_of_the_day || false} 
+                                onChange={(e) => handleUpdateChange(match.id, 'is_bet_of_the_day', e.target.checked)} 
+                                className="w-3 h-3 md:w-4 md:h-4 rounded text-purple-600"
+                            /> 
+                            Bet of the Day
                         </label>
                     </div>
                 </div>

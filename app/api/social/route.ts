@@ -162,6 +162,12 @@ const getMatchImageUrl = (label: string, state: any, baseUrl: string) => {
     return `${baseUrl}/api/og?data=${encodeBase64Safe(payload)}`;
 };
 
+// 🟢 IMAGEKIT PROXY FOR X/BUFFER ONLY
+const getImageKitProxyUrl = (rawUrl: string) => {
+    const endpoint = process.env.IMAGEKIT_URL_ENDPOINT!.replace(/\/+$/, '');
+    return `${endpoint}/tr:f-png/${encodeURIComponent(rawUrl)}`;
+};
+
 export async function POST(request: Request) {
     const authHeader = request.headers.get('Authorization');
     if (authHeader !== `Bearer ${process.env.CRON_KEY}`) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -262,13 +268,13 @@ export async function POST(request: Request) {
             if (config.events.goals.fb) payload.fb1Message = `🥅 PENALTY SCORED!\n\nShootout Update: ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}`;
             if (config.events.goals.x) {
                 payload.xMessage = `🥅 PENALTY SCORED!\n\nShootout: ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇\n${matchUrl}\n\n${hashtags}`;
-                payload.xImageUrl = getMatchImageUrl('PENALTY SCORED', newState, frontendUrl);
+                payload.xImageUrl = getImageKitProxyUrl(getMatchImageUrl('PENALTY SCORED', newState, frontendUrl));
             }
         } else {
             if (config.events.goals.fb) payload.fb1Message = `🚨 GOAL ALERT!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\n${matchUrl}`;
             if (config.events.goals.x) {
                 payload.xMessage = `🚨 GOAL ALERT!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\n👇\n${matchUrl}\n\n${hashtags}`;
-                payload.xImageUrl = getMatchImageUrl('GOAL ALERT!', newState, frontendUrl); 
+                payload.xImageUrl = getImageKitProxyUrl(getMatchImageUrl('GOAL ALERT!', newState, frontendUrl)); 
             }
         }
     } 
@@ -291,9 +297,9 @@ export async function POST(request: Request) {
                 awayFormation: newState.lineups?.formations?.away || '4-3-3',
                 homeXI: newValidH.slice(0, 11), awayXI: newValidA.slice(0, 11)
             };
-            const finalUrl = `${frontendUrl}/api/og?data=${encodeBase64Safe(lineupOg)}`;
-            if (config.events.lineups.x) payload.xImageUrl = finalUrl;
-            if (config.events.lineups.fb) payload.fb1ImageUrl = finalUrl; 
+            const rawLineupUrl = `${frontendUrl}/api/og?data=${encodeBase64Safe(lineupOg)}`;
+            if (config.events.lineups.x) payload.xImageUrl = getImageKitProxyUrl(rawLineupUrl);
+            if (config.events.lineups.fb) payload.fb1ImageUrl = rawLineupUrl; 
         }
     } 
     else if (oldWasIncomplete && !newIsComplete && (newValidH.length > 0 || newValidA.length > 0)) {
@@ -305,7 +311,7 @@ export async function POST(request: Request) {
         
         if (config.events.kickoff.fb || config.events.kickoff.x) {
             const kickoffUrl = getMatchImageUrl('KICK-OFF', newState, frontendUrl);
-            if (config.events.kickoff.x) payload.xImageUrl = kickoffUrl;
+            if (config.events.kickoff.x) payload.xImageUrl = getImageKitProxyUrl(kickoffUrl);
             if (config.events.kickoff.fb) payload.fb1ImageUrl = kickoffUrl; 
         }
     }
@@ -323,7 +329,7 @@ export async function POST(request: Request) {
 
         if (config.events.fulltime.fb || config.events.fulltime.x) {
             const ftUrl = getMatchImageUrl('FULL TIME', newState, frontendUrl);
-            if (config.events.fulltime.x) payload.xImageUrl = ftUrl;
+            if (config.events.fulltime.x) payload.xImageUrl = getImageKitProxyUrl(ftUrl);
             if (config.events.fulltime.fb) payload.fb1ImageUrl = ftUrl; 
         }
     }
@@ -332,7 +338,6 @@ export async function POST(request: Request) {
 
     // 🟢 INSTANT DELIVERY TO MAKE.COM
     // By awaiting postToSocials, Cloudflare keeps the worker alive just long enough to send the JSON.
-    // Make.com will receive the URL, wait 20 seconds (via your module), and then fetch the image safely.
     try {
         await postToSocials(payload);
         
