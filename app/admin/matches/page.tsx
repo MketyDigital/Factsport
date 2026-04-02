@@ -105,6 +105,7 @@ export default function AdminMatchesPage() {
             audio_url: sanitize(match.audio_url), 
             is_featured: match.is_featured, 
             is_featured_video: match.is_featured_video, 
+            is_bet_of_the_day: match.is_bet_of_the_day, // 🟢 Included in payload
             points_distributed: match.points_distributed,
             pro_analysis: match.pro_analysis, 
             campaign_id: match.campaign_id || null, // 🟢 Campaign Link
@@ -184,6 +185,16 @@ export default function AdminMatchesPage() {
                         />
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* 🟢 MODIFIED: Added Bet of the Day Checkbox alongside Featured */}
+                        <label className="flex items-center gap-1.5 text-[10px] md:text-xs font-bold bg-green-50 text-green-700 p-1.5 px-3 rounded-lg border border-green-100 cursor-pointer hover:bg-green-100 transition">
+                            <input 
+                                type="checkbox" 
+                                checked={match.is_bet_of_the_day || false} 
+                                onChange={(e) => handleUpdateChange(match.id, 'is_bet_of_the_day', e.target.checked)} 
+                                className="w-3 h-3 md:w-4 md:h-4 rounded text-green-600"
+                            /> 
+                            Bet of the Day
+                        </label>
                         <label className="flex items-center gap-1.5 text-[10px] md:text-xs font-bold bg-blue-50 text-blue-700 p-1.5 px-3 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition">
                             <input 
                                 type="checkbox" 
@@ -295,137 +306,67 @@ export default function AdminMatchesPage() {
                                      <input type="text" className="w-full border rounded p-2 text-xs" value={match.away_logo || ''} onChange={(e) => handleUpdateChange(match.id, 'away_logo', e.target.value)} />
                                  </div>
                                  <div>
-                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">API-Football ID</label>
+                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">API ID (Live-score)</label>
                                      <input type="text" className="w-full border rounded p-2 text-xs" value={match.api_id || ''} onChange={(e) => handleUpdateChange(match.id, 'api_id', e.target.value)} />
                                  </div>
                                  <div>
-                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">ESPN ID</label>
+                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">ESPN ID (Match Center)</label>
                                      <input type="text" className="w-full border rounded p-2 text-xs" value={match.espn_id || ''} onChange={(e) => handleUpdateChange(match.id, 'espn_id', e.target.value)} />
                                  </div>
                              </div>
 
-                             {/* Venue & Details */}
-                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 pb-4 border-b border-slate-100">
+                             {/* Media Links */}
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                  <div>
-                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">Venue / Stadium</label>
-                                     <input type="text" className="w-full border rounded p-2 text-xs" value={match.venue || ''} onChange={(e) => handleUpdateChange(match.id, 'venue', e.target.value)} />
+                                     <label className="text-[10px] font-bold text-slate-500 block mb-1 flex items-center gap-1"><Video size={10} className="text-red-500"/> YouTube Stream URL</label>
+                                     <input type="url" className="w-full border rounded p-2 text-xs focus:border-red-400" value={match.livestream_url || ''} onChange={(e) => handleUpdateChange(match.id, 'livestream_url', e.target.value)} />
                                  </div>
                                  <div>
-                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">Stage (e.g. Final, Group Stage)</label>
-                                     <input type="text" className="w-full border rounded p-2 text-xs" value={match.stage || ''} onChange={(e) => handleUpdateChange(match.id, 'stage', e.target.value)} />
+                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">Highlight Video URL</label>
+                                     <input type="url" className="w-full border rounded p-2 text-xs" value={match.video_url || ''} onChange={(e) => handleUpdateChange(match.id, 'video_url', e.target.value)} />
                                  </div>
                                  <div>
-                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">Match Group (e.g. Group A)</label>
-                                     <input type="text" className="w-full border rounded p-2 text-xs" value={match.match_group || ''} onChange={(e) => handleUpdateChange(match.id, 'match_group', e.target.value)} />
+                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">Affiliate Bookmaker Link</label>
+                                     <input type="url" className="w-full border rounded p-2 text-xs focus:border-green-400" value={match.affiliate_link || ''} onChange={(e) => handleUpdateChange(match.id, 'affiliate_link', e.target.value)} />
                                  </div>
-                             </div>
-
-                             {/* Media & Affiliates */}
-                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                 <div>
-                                     <label className="text-[10px] font-bold text-slate-500 block mb-1 flex items-center gap-1"><Video size={10}/> Livestream URL (M3U8/Iframe)</label>
-                                     <input type="text" className="w-full border rounded p-2 text-xs" value={match.livestream_url || ''} onChange={(e) => handleUpdateChange(match.id, 'livestream_url', e.target.value)} />
-                                 </div>
-                                 <div>
-                                     <label className="text-[10px] font-bold text-slate-500 block mb-1 flex items-center gap-1"><Video size={10}/> Highlights Video URL</label>
-                                     <input type="text" className="w-full border rounded p-2 text-xs" value={match.video_url || ''} onChange={(e) => handleUpdateChange(match.id, 'video_url', e.target.value)} />
-                                 </div>
-                                 <div>
-                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">Live Audio URL</label>
-                                     <input type="text" className="w-full border rounded p-2 text-xs" value={match.audio_url || ''} onChange={(e) => handleUpdateChange(match.id, 'audio_url', e.target.value)} />
-                                 </div>
-                                 <div>
-                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">Widget ID (ScoreAxis)</label>
-                                     <input type="text" className="w-full border rounded p-2 text-xs" value={match.widget_id || ''} onChange={(e) => handleUpdateChange(match.id, 'widget_id', e.target.value)} />
-                                 </div>
-                                 <div>
-                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">Booking Code (e.g. 1xBet)</label>
-                                     <input type="text" className="w-full border rounded p-2 text-xs" value={match.booking_code || ''} onChange={(e) => handleUpdateChange(match.id, 'booking_code', e.target.value)} />
-                                 </div>
-                                 <div>
-                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">Affiliate Link</label>
-                                     <input type="text" className="w-full border rounded p-2 text-xs" value={match.affiliate_link || ''} onChange={(e) => handleUpdateChange(match.id, 'affiliate_link', e.target.value)} />
-                                 </div>
-                             </div>
-
-                             <div className="mt-4 pt-4 border-t border-slate-100">
-                                 <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
-                                     <input type="checkbox" checked={match.is_featured_video || false} onChange={(e) => handleUpdateChange(match.id, 'is_featured_video', e.target.checked)} className="w-4 h-4 rounded text-blue-600"/> 
-                                     Feature this Video in Highlights section
-                                 </label>
                              </div>
                          </div>
                      </details>
                 </div>
-
-                {/* ACCORDION 2: Pro Analysis */}
-                <div className="p-3 md:p-4 border-b border-slate-100 bg-emerald-50/30">
-                     <details className="group">
-                         <summary className="text-xs font-black uppercase text-emerald-700 cursor-pointer flex items-center gap-2 hover:text-emerald-800 transition outline-none p-2 bg-white border border-emerald-200 rounded-lg shadow-sm">
-                             <TrendingUp size={14} className="text-emerald-500" /> Edit Pro Analysis Data
-                         </summary>
-                         <div className="mt-3 p-4 border border-emerald-100 rounded-xl bg-white shadow-inner">
-                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                                 <div>
-                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">Primary Prediction</label>
-                                     <input type="text" placeholder="e.g. Over 3.5 Goals" className="w-full border rounded p-2 text-xs" value={match.pro_analysis?.primary || ''} onChange={(e) => handleAnalysisChange(match.id, 'primary', e.target.value)} />
-                                 </div>
-                                 <div>
-                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">Primary Odds</label>
-                                     <input type="text" placeholder="e.g. 2.1" className="w-full border rounded p-2 text-xs" value={match.pro_analysis?.odds || ''} onChange={(e) => handleAnalysisChange(match.id, 'odds', e.target.value)} />
-                                 </div>
-                                 <div>
-                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">Safe Prediction</label>
-                                     <input type="text" placeholder="e.g. Over 2.5 Goals" className="w-full border rounded p-2 text-xs" value={match.pro_analysis?.safe || ''} onChange={(e) => handleAnalysisChange(match.id, 'safe', e.target.value)} />
-                                 </div>
-                                 <div>
-                                     <label className="text-[10px] font-bold text-slate-500 block mb-1">Safe Odds</label>
-                                     <input type="text" placeholder="e.g. 1.35" className="w-full border rounded p-2 text-xs" value={match.pro_analysis?.safeOdds || ''} onChange={(e) => handleAnalysisChange(match.id, 'safeOdds', e.target.value)} />
-                                 </div>
-                             </div>
-                             <div>
-                                 <label className="text-[10px] font-bold text-slate-500 block mb-1">Rationale / Analysis</label>
-                                 <textarea placeholder="Historical H2H indicates..." className="w-full border rounded p-2 text-xs h-20 resize-y" value={match.pro_analysis?.rationale || ''} onChange={(e) => handleAnalysisChange(match.id, 'rationale', e.target.value)} />
-                             </div>
-                         </div>
-                     </details>
+                
+                {/* ACTION BAR */}
+                <div className="bg-slate-100 p-3 md:p-4 flex flex-wrap justify-end gap-2 items-center">
+                    {!match.points_distributed && FINISHED_STATUSES.includes((match.status || '').toUpperCase()) && (
+                        <button onClick={() => settlePoints(match)} className="text-xs font-bold text-green-700 bg-green-100 border border-green-300 px-4 py-2 rounded-lg hover:bg-green-200 transition shadow-sm mr-auto">
+                            Distribute Points
+                        </button>
+                    )}
+                    {match.points_distributed && (
+                        <span className="text-xs font-bold text-slate-400 bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-300 mr-auto">
+                            Points Settled
+                        </span>
+                    )}
+                    <button onClick={() => deleteMatch(match.id)} className="text-xs font-bold text-red-600 bg-red-50 px-4 py-2 rounded-lg hover:bg-red-100 border border-red-200 transition shadow-sm">
+                        <Trash2 size={14} className="inline mr-1" /> Delete
+                    </button>
+                    <button disabled={savingId === match.id} onClick={() => saveMatch(match)} className="text-xs font-bold text-white bg-blue-600 px-6 py-2 rounded-lg hover:bg-blue-700 transition shadow-md disabled:bg-slate-400 flex items-center gap-1">
+                        <Save size={14} /> {savingId === match.id ? 'Saving...' : 'Save Match'}
+                    </button>
                 </div>
-
-                {/* BOTTOM SECTION: Actions */}
-                <div className="p-4 bg-white flex flex-col sm:flex-row items-center justify-between gap-4">
-                     <button onClick={() => deleteMatch(match.id)} className="w-full sm:w-auto p-2 md:px-4 text-red-500 hover:bg-red-50 rounded-lg transition flex justify-center items-center gap-1.5 text-[10px] md:text-xs font-bold border border-transparent hover:border-red-100">
-                         <Trash2 size={14} /> Delete Match
-                     </button>
-                     
-                     <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                         {!match.points_distributed && ['FT', 'FINISHED'].includes(match.status) && (
-                             <button onClick={() => settlePoints(match)} className="w-full sm:w-auto px-4 py-2.5 rounded-lg font-black text-[10px] md:text-xs flex justify-center items-center gap-2 transition shadow-sm bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-200">
-                                 <Calculator size={14} /> Distribute Points
-                             </button>
-                         )}
-                         {match.points_distributed && (
-                             <span className="w-full sm:w-auto px-4 py-2.5 rounded-lg font-black text-[10px] md:text-xs flex justify-center items-center gap-2 bg-slate-100 text-slate-400 cursor-not-allowed">
-                                 <Calculator size={14} /> Points Settled
-                             </span>
-                         )}
-
-                         <button onClick={() => saveMatch(match)} disabled={savingId === match.id} className={`w-full sm:w-auto px-6 py-2.5 rounded-lg font-black text-[10px] md:text-xs flex justify-center items-center gap-2 transition shadow-md ${savingId === match.id ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-                            <Save size={16} /> {savingId === match.id ? 'Saved Successfully!' : 'Save All Changes'}
-                         </button>
-                     </div>
-                </div>
-
             </div>
         ))}
       </div>
       
-      {totalPages > 1 && (
-          <div className="flex items-center justify-between bg-white p-4 rounded-xl shadow-sm border mt-8">
-              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold transition disabled:opacity-50">Prev</button>
-              <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest">Page {currentPage} of {totalPages}</span>
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold transition disabled:opacity-50">Next</button>
-          </div>
-      )}
+      {/* PAGINATION */}
+      <div className="flex justify-between items-center mt-8 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 border rounded hover:bg-slate-50 disabled:opacity-50">
+            <ChevronLeft size={16} />
+        </button>
+        <span className="text-sm font-bold text-slate-600">Page {currentPage} of {totalPages}</span>
+        <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2 border rounded hover:bg-slate-50 disabled:opacity-50">
+            <ChevronRight size={16} />
+        </button>
+      </div>
     </div>
   );
 }
