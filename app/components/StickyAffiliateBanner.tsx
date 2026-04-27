@@ -19,7 +19,6 @@ export default function StickyAffiliateBanner() {
     // 3. Media parsing logic (Only runs IF media is supposed to show)
     const isYouTube = videoUrl?.includes('youtube.com') || videoUrl?.includes('youtu.be') || videoUrl?.includes('embed/');
     const isRawMedia = !!videoUrl?.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
-    const isRawAudio = !!videoUrl?.match(/\.(mp3|wav)$/i);
 
     const getAutoPlayUrl = (url: string) => {
         if (!url) return '';
@@ -30,11 +29,15 @@ export default function StickyAffiliateBanner() {
     return (
         <div className="fixed bottom-4 left-0 right-0 z-[100] w-full flex flex-col items-center justify-end px-4 pointer-events-none gap-3">
             
-            {/* 🟢 UNIVERSAL BACKGROUND AUDIO PLAYER (Hidden loop for audio) */}
+            {/* 🟢 UNIVERSAL BACKGROUND AUDIO PLAYER 
+                Moved from 'hidden' to 'opacity-0' outside viewport. 
+                This bypasses browser battery-saving policies that kill display:none media!
+            */}
             {showFloatingAudio && (
-                <div className="hidden">
-                    {isRawAudio && <audio src={videoUrl!} autoPlay />}
-                    {isYouTube && <iframe src={getAutoPlayUrl(videoUrl!)} allow="autoplay" title="Background Audio" />}
+                <div className="absolute top-[-9999px] left-[-9999px] w-[1px] h-[1px] opacity-0 overflow-hidden pointer-events-none">
+                    {/* Using video tag securely forces iOS and Android to respect background audio streams like m3u8 */}
+                    {isRawMedia && <video src={videoUrl!} autoPlay playsInline controls={false} />}
+                    {isYouTube && <iframe src={getAutoPlayUrl(videoUrl!)} allow="autoplay; encrypted-media" title="Background Audio" />}
                 </div>
             )}
 
