@@ -66,6 +66,27 @@ export default function FactSportPlayer({
       return () => setIsPageActive(false);
   }, [activeMatchId, matchId, setIsPageActive]);
 
+  // 🟢 NEW GLOBAL REGISTRATION SHIELD: 
+  // Automatically syncs Audio, Highlights, and Raw Media to the background provider!
+  useEffect(() => {
+      if (isTimeLocked || !mediaUrl || mediaUrl === 'streamio' || activeMatchId === matchId) return;
+
+      const shouldAutoRegister = mode === 'audio' || isFinished || isRawMedia;
+
+      if (shouldAutoRegister) {
+          let finalUrl = mediaUrl;
+          if (isYouTube) {
+              let videoId = '';
+              if (mediaUrl.includes('v=')) videoId = mediaUrl.split('v=')[1]?.split('&')[0];
+              else if (mediaUrl.includes('.be/')) videoId = mediaUrl.split('.be/')[1];
+              else if (mediaUrl.includes('embed/')) videoId = mediaUrl.split('embed/')[1];
+              finalUrl = `https://www.youtube.com/embed/${videoId}`;
+          }
+          // Pass the mode to ensure the GlobalMediaProvider knows it's audio or video
+          tuneInVideo(matchId, finalUrl, mode);
+      }
+  }, [isTimeLocked, mediaUrl, matchId, activeMatchId, mode, isFinished, isYouTube, isRawMedia, tuneInVideo]);
+
   const togglePlay = () => {
     if (mediaRef.current) {
       if (isPlaying) mediaRef.current.pause();
@@ -147,7 +168,7 @@ export default function FactSportPlayer({
         return (
             <div className="w-full aspect-video bg-[#0a1428] relative flex flex-col items-center justify-center border-b border-slate-800 animate-in fade-in duration-500">
                 <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-sm"></div>
-                <button onClick={() => tuneInVideo(matchId, embedUrl)} className="relative z-10 flex items-center gap-2 px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-black tracking-widest uppercase rounded-full shadow-lg transition-all active:scale-95">
+                <button onClick={() => tuneInVideo(matchId, embedUrl, mode)} className="relative z-10 flex items-center gap-2 px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-black tracking-widest uppercase rounded-full shadow-lg transition-all active:scale-95">
                     <Play size={18} fill="currentColor" /> Watch Live TV
                 </button>
             </div>
