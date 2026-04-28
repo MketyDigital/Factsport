@@ -5,18 +5,20 @@ import { useGlobalMedia } from '@/app/providers/GlobalMediaProvider';
 import Link from 'next/link';
 
 export default function StickyAffiliateBanner() {
-    // 1. Subscribe only to the required Global Media context
-    const { activeMatchId, mediaType, videoUrl, isPageActive, stopMedia } = useGlobalMedia();
+    const { activeMatchId, mediaType: contextMediaType, videoUrl: rawVideoUrl, isPageActive, stopMedia } = useGlobalMedia();
 
-    // 2. Determine if the floating player should actually be visible
+    // 🔥 THE GHOST PROTOCOL: Extract the hidden tag to accurately detect forced audio mode
+    const isForcedAudio = rawVideoUrl?.includes('#is-audio-mode');
+    const videoUrl = rawVideoUrl?.replace('#is-audio-mode', ''); // Strip the tag so it doesn't break the iframe
+    
+    // Override the context's mediaType if the URL explicitly demands audio UI
+    const mediaType = isForcedAudio ? 'audio' : contextMediaType;
+
     const showFloatingAudio = mediaType === 'audio' && !isPageActive && !!videoUrl;
     const showFloatingVideo = mediaType === 'video' && !isPageActive && !!videoUrl;
 
-    // 🛑 THE GHOST PROTOCOL: If no media is playing, this component returns NOTHING. 
-    // It consumes zero memory, zero CSS, and zero loops.
     if (!showFloatingAudio && !showFloatingVideo) return null;
 
-    // 3. Media parsing logic (Only runs IF media is supposed to show)
     const isYouTube = videoUrl?.includes('youtube.com') || videoUrl?.includes('youtu.be') || videoUrl?.includes('embed/');
     const isRawMedia = !!videoUrl?.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
 
@@ -30,12 +32,11 @@ export default function StickyAffiliateBanner() {
         <div className="fixed bottom-4 left-0 right-0 z-[100] w-full flex flex-col items-center justify-end px-4 pointer-events-none gap-3">
             
             {/* 🟢 UNIVERSAL BACKGROUND AUDIO PLAYER 
-                Moved from 'hidden' to 'opacity-0' outside viewport. 
-                This bypasses browser battery-saving policies that kill display:none media!
+                Opacity is 0.01 instead of 0. True '0' causes desktop browsers 
+                to immediately pause the iframe. This keeps it technically visible to the DOM.
             */}
             {showFloatingAudio && (
-                <div className="absolute top-[-9999px] left-[-9999px] w-[1px] h-[1px] opacity-0 overflow-hidden pointer-events-none">
-                    {/* Using video tag securely forces iOS and Android to respect background audio streams like m3u8 */}
+                <div className="absolute top-[-9999px] left-[-9999px] w-[10px] h-[10px] opacity-[0.01] overflow-hidden pointer-events-none">
                     {isRawMedia && <video src={videoUrl!} autoPlay playsInline controls={false} />}
                     {isYouTube && <iframe src={getAutoPlayUrl(videoUrl!)} allow="autoplay; encrypted-media" title="Background Audio" />}
                 </div>
