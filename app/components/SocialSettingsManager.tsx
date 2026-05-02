@@ -27,7 +27,6 @@ export default function SocialSettingsManager() {
     const [vipLeagues, setVipLeagues] = useState<string[]>([]);
     const [events, setEvents] = useState<any>(DEFAULT_EVENTS);
     
-    // 🟢 FIXED: Removed the old single-channel IDs to satisfy TypeScript
     const [credentials, setCredentials] = useState({
         fb1_id: '', fb1_token: '',
         fb2_id: '', fb2_token: '',
@@ -80,17 +79,15 @@ export default function SocialSettingsManager() {
             setTgVipChannels(savedCreds.tg_vip_channels || []);
             
             const savedEvents = settingsData.social_config.events || {};
-            const mergedEvents = { ...DEFAULT_EVENTS };
+            
+            // 🟢 FIXED: Defined mergedEvents as 'any' to bypass strict TS checking on missing properties
+            const mergedEvents: any = JSON.parse(JSON.stringify(DEFAULT_EVENTS)); 
             Object.keys(mergedEvents).forEach(key => {
                 if (savedEvents[key]) {
-                    mergedEvents[key as keyof typeof DEFAULT_EVENTS].fb = savedEvents[key].fb ?? mergedEvents[key as keyof typeof DEFAULT_EVENTS].fb;
-                    mergedEvents[key as keyof typeof DEFAULT_EVENTS].x = savedEvents[key].x ?? mergedEvents[key as keyof typeof DEFAULT_EVENTS].x;
-                    if (mergedEvents[key as keyof typeof DEFAULT_EVENTS].tg_general !== undefined) {
-                        mergedEvents[key as keyof typeof DEFAULT_EVENTS].tg_general = savedEvents[key].tg_general ?? mergedEvents[key as keyof typeof DEFAULT_EVENTS].tg_general;
-                    }
-                    if (mergedEvents[key as keyof typeof DEFAULT_EVENTS].tg_vip !== undefined) {
-                        mergedEvents[key as keyof typeof DEFAULT_EVENTS].tg_vip = savedEvents[key].tg_vip ?? mergedEvents[key as keyof typeof DEFAULT_EVENTS].tg_vip;
-                    }
+                    if (savedEvents[key].fb !== undefined) mergedEvents[key].fb = savedEvents[key].fb;
+                    if (savedEvents[key].x !== undefined) mergedEvents[key].x = savedEvents[key].x;
+                    if (savedEvents[key].tg_general !== undefined) mergedEvents[key].tg_general = savedEvents[key].tg_general;
+                    if (savedEvents[key].tg_vip !== undefined) mergedEvents[key].tg_vip = savedEvents[key].tg_vip;
                 }
             });
             setEvents(mergedEvents);
