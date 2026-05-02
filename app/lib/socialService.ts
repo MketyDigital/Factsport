@@ -90,14 +90,16 @@ export async function postToSocials({ fb1Message, fb2Message, xMessage, xImageUr
         const fullXMessage = xMessage && link ? `${xMessage}\n\n👇\n${link}` : xMessage;
 
         if (makeWebhook1) {
-            await postToMakeRouter(makeWebhook1, fullFb2Message, fullXMessage, xImageUrl || null);
+            // 🔥 FIXED: Added "|| null" to satisfy TypeScript's strict rules
+            await postToMakeRouter(makeWebhook1, fullFb2Message || null, fullXMessage || null, xImageUrl || null);
         } else {
             console.log("⚠️ Make.com 1 skipped: Missing URL.");
         }
 
         // If a second Make.com router is configured, blast it there too!
         if (makeWebhook2) {
-            await postToMakeRouter(makeWebhook2, fullFb2Message, fullXMessage, xImageUrl || null);
+            // 🔥 FIXED: Added "|| null" here as well
+            await postToMakeRouter(makeWebhook2, fullFb2Message || null, fullXMessage || null, xImageUrl || null);
         }
     }
 }
