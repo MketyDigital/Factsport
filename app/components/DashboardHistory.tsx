@@ -70,6 +70,11 @@ export default function DashboardHistory({ predictions, pastWins }: { prediction
                         const totalEarned = mthPts + campPts;
                         const isPending = pred.status?.toLowerCase() === 'pending';
 
+                        // 🟢 LOGIC: 3-WAY LABEL CHECK
+                        const isEligible = pred.is_eligible_for_prize;
+                        const isCampaign = !!pred.campaign?.title;
+                        const isForFun = !isEligible && !isCampaign;
+
                         return (
                             <div key={pred.id} className="p-4 flex flex-col hover:bg-slate-50 transition">
                                 <div className="flex justify-between items-start w-full">
@@ -111,8 +116,16 @@ export default function DashboardHistory({ predictions, pastWins }: { prediction
                                                     <span className="text-[9px] font-black px-2 py-0.5 rounded border bg-red-50 text-red-500 border-red-100">LOST</span>
                                                 ) : (
                                                     <div className="flex items-center gap-1">
-                                                        {mthPts > 0 && <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200 flex items-center gap-0.5"><Trophy size={8}/> MTH: +{mthPts}</span>}
-                                                        {campPts > 0 && <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200 flex items-center gap-0.5"><Zap size={8}/> CMP: +{campPts}</span>}
+                                                        {mthPts > 0 && (
+                                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border flex items-center gap-0.5 ${isEligible ? 'bg-green-50 text-green-700 border-green-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                                                <Trophy size={8}/> {isEligible ? 'MTH:' : 'FUN:'} +{mthPts}
+                                                            </span>
+                                                        )}
+                                                        {campPts > 0 && (
+                                                            <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200 flex items-center gap-0.5">
+                                                                <Zap size={8}/> CMP: +{campPts}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
@@ -120,11 +133,21 @@ export default function DashboardHistory({ predictions, pastWins }: { prediction
                                         
                                         {pred.campaign?.title && <div className="text-[7px] font-black text-orange-400 uppercase mt-1 line-clamp-1 max-w-[80px] text-right">{pred.campaign.title}</div>}
                                         
-                                        <div className="flex justify-end mt-1.5">
-                                            {pred.is_eligible_for_prize ? (
-                                                <span className="flex items-center gap-1 text-[7px] font-bold text-green-600 bg-green-50 px-1 py-0.5 rounded border border-green-100"><Target size={8} /> ELIGIBLE</span>
-                                            ) : (
-                                                <span className="flex items-center gap-1 text-[7px] font-bold text-slate-500 bg-slate-100 px-1 py-0.5 rounded border border-slate-200"><Gamepad2 size={8} /> FOR FUN</span>
+                                        <div className="flex justify-end mt-1.5 flex-wrap gap-1">
+                                            {isEligible && (
+                                                <span className="flex items-center gap-1 text-[7px] font-bold text-green-600 bg-green-50 px-1 py-0.5 rounded border border-green-100" title="Counts towards your Monthly Prizes">
+                                                    <Target size={8} /> MTH ELIGIBLE
+                                                </span>
+                                            )}
+                                            {isCampaign && (
+                                                <span className="flex items-center gap-1 text-[7px] font-bold text-orange-600 bg-orange-50 px-1 py-0.5 rounded border border-orange-100" title="Tournament Match Entry">
+                                                    <Zap size={8} /> CAMP ENTRY
+                                                </span>
+                                            )}
+                                            {isForFun && (
+                                                <span className="flex items-center gap-1 text-[7px] font-bold text-slate-500 bg-slate-100 px-1 py-0.5 rounded border border-slate-200" title="Daily limit reached. Fun points awarded.">
+                                                    <Gamepad2 size={8} /> FOR FUN
+                                                </span>
                                             )}
                                         </div>
                                     </div>
