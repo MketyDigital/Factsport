@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from "next/link";
 import { ArrowRight, TrendingUp, Calendar, Info, BarChart2 } from "lucide-react";
+import { createClient } from '@/app/lib/supabase/client'; // 🟢 NEW: Needed to check Admin Override
 import HeroMatchCards from '@/app/components/HeroMatchCards'; 
 import CompactMatchRow from '@/app/components/CompactMatchRow';
 import BetOfTheDay from '@/app/components/BetOfTheDay'; 
@@ -18,10 +19,28 @@ export default function HomeDashboardClient({
 }) {
     const [localData, setLocalData] = useState<any>(null);
     const [leagueTab, setLeagueTab] = useState<'matches'|'table'>('matches');
+    const [featuredMatchId, setFeaturedMatchId] = useState<string | null>(null); // 🟢 NEW: Admin Override State
 
     useEffect(() => { setLeagueTab('matches'); }, [selectedLeague]);
 
+    // 🟢 NEW: Fetch the Admin Override ID once when the page loads
     useEffect(() => {
+        const fetchSettings = async () => {
+            const supabase = createClient();
+            const { data } = await supabase.from('site_settings').select('social_config').single();
+            if (data?.social_config?.featured_match_id) {
+                setFeaturedMatchId(data.social_config.featured_match_id);
+            } else {
+                setFeaturedMatchId(''); // Explicitly empty so we know it loaded successfully
+            }
+        };
+        fetchSettings();
+    }, []);
+
+    useEffect(() => {
+        // Wait until we have checked the database for an Admin Override before rendering the matches
+        if (featuredMatchId === null) return; 
+
         const now = new Date();
         const startOfLocalDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
         const endOfLocalDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
@@ -105,40 +124,62 @@ export default function HomeDashboardClient({
             candidates.forEach(m => { if (!computedHero.find(h => h.id === m.id) && computedHero.length < 5) computedHero.push(m); });
         }
         
-        // Changed from globalMatches to todayMedia to strictly enforce local time appear/disappear rules for Hero cards
         if (computedHero.length === 0) computedHero = todayMedia.slice(0, 5); 
         computedHero = computedHero.slice(0, 5);
 
+
+        // ---------------------------------------------------------------------
+        // 🟢 THE STRICT SYNC FIX: BET OF THE DAY LOGIC
+        // This math is now 100% identical to the Telegram Node.js background script
+        // ---------------------------------------------------------------------
         let computedBetMatch = null;
         const allLocalTodayMatches = globalMatches.filter(m => {
             const t = new Date(m.match_date).getTime();
             return t >= startOfLocalDay && t <= endOfLocalDay;
         });
 
-        if (allLocalTodayMatches.length > 0) {
-            const adminBetMatches = allLocalTodayMatches.filter(m => m.is_bet_of_the_day);
-            
-            if (adminBetMatches.length > 0) {
-                // Pick the first one selected from the admin dashboard
-                computedBetMatch = adminBetMatches[0];
-            } else {
-                // Fallback to random last match of the day (stable sort to prevent changing on page refresh)
-                const sortedByTimeDesc = [...allLocalTodayMatches].sort((a, b) => {
-                    const timeDiff = new Date(b.match_date).getTime() - new Date(a.match_date).getTime();
-                    if (timeDiff !== 0) return timeDiff;
-                    return String(b.id || '').localeCompare(String(a.id || '')); // Stable fallback sort
-                });
+        // 1. Only look at matches that actually have AI Analysis completed
+        const analyzedMatches = allLocalTodayMatches.filter(m => {
+            if (!m.pro_analysis) return false;
+            if (typeof m.pro_analysis === 'object' && Object.keys(m.pro_analysis).length === 0) return false;
+            if (typeof m.pro_analysis === 'string' && m.pro_analysis.trim() === '') return false;
+            return true; 
+        });
+
+        if (analyzedMatches.length > 0) {
+            // Tier 1 Check: Did the Admin explicitly choose a match in the dashboard?
+            if (featuredMatchId) {
+                computedBetMatch = analyzedMatches.find(m => String(m.id) === String(featuredMatchId));
+            }
+
+            // Tier 2 Fallback: Run the exact same Giants + Time math as the Telegram Bot
+            if (!computedBetMatch) {
+                const giants = ['Arsenal','Chelsea','Liverpool','Man City','Man United','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG', 'Inter', 'AC Milan', 'Atletico'];
                 
-                // Use a seeded index (the day of the month) so it remains the "same match of the day for everyone" and survives refreshes
-                const poolSize = Math.min(3, sortedByTimeDesc.length);
-                const pseudoRandomIndex = now.getDate() % poolSize;
-                computedBetMatch = sortedByTimeDesc[pseudoRandomIndex];
+                const sortedSlips = [...analyzedMatches].sort((a, b) => {
+                    const aHomeGiant = giants.some(t => a.home_team?.includes(t));
+                    const aAwayGiant = giants.some(t => a.away_team?.includes(t));
+                    const aScore = (aHomeGiant ? 1 : 0) + (aAwayGiant ? 1 : 0);
+
+                    const bHomeGiant = giants.some(t => b.home_team?.includes(t));
+                    const bAwayGiant = giants.some(t => b.away_team?.includes(t));
+                    const bScore = (bHomeGiant ? 1 : 0) + (bAwayGiant ? 1 : 0);
+
+                    if (bScore !== aScore) return bScore - aScore; // Highest giant score first
+
+                    // Tie-breaker: "Last match of the day" (Latest Kickoff Time)
+                    const aTime = new Date(a.match_date).getTime();
+                    const bTime = new Date(b.match_date).getTime();
+                    return bTime - aTime; // Latest time first
+                });
+
+                computedBetMatch = sortedSlips[0];
             }
         }
+        // ---------------------------------------------------------------------
 
         let remainingMatches = displayPool.filter(m => !computedHero.some(h => h.id === m.id));
         
-        // 🟢 THE FIX: If Hero Cards ate all the matches, show them in the match center anyway so it's not empty!
         if (remainingMatches.length === 0 && displayPool.length > 0) {
             remainingMatches = displayPool;
         }
@@ -151,7 +192,7 @@ export default function HomeDashboardClient({
         });
 
         setLocalData({ heroMatches: computedHero, betMatch: computedBetMatch, groupedMatches: grouped, fallbackTriggered });
-    }, [globalMatches, featuredMatches, selectedLeague]);
+    }, [globalMatches, featuredMatches, selectedLeague, featuredMatchId]); // 🟢 NEW: Re-runs when featuredMatchId is loaded
 
     if (!localData) return <div className="w-full h-96 animate-pulse bg-slate-200/50 rounded-2xl max-w-6xl mx-auto mt-8"></div>;
 
@@ -159,7 +200,6 @@ export default function HomeDashboardClient({
         <>
             {!selectedLeague && localData.heroMatches.length > 0 && <HeroMatchCards heroMatches={localData.heroMatches} />}
 
-            {/* 🟢 THE FIX: Exact requested node ordering */}
             {headlinesNode}
             {installBannerNode}
             {latestNewsNode}

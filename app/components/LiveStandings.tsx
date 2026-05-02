@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import { Trophy, ChevronUp, ChevronDown, Minus } from 'lucide-react';
 
 const LEAGUE_MAP: Record<string, string> = {
@@ -91,6 +91,7 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
         }
     }
 
+    // Sort live table
     liveTable.sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points;
         return b.goal_difference - a.goal_difference;
@@ -103,17 +104,47 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
     const homeIndex = liveTable.findIndex(t => normalizeName(t.team_short_name || t.team_name) === normHome || normalizeName(t.team_name).includes(normHome));
     const awayIndex = liveTable.findIndex(t => normalizeName(t.team_short_name || t.team_name) === normAway || normalizeName(t.team_name).includes(normAway));
     
+    // ---------------------------------------------------------
+    // 🟢 NEW: SMART CONTEXT SNIPPET LOGIC
+    // ---------------------------------------------------------
     let displayTable = liveTable;
-    if (liveTable.length > 8 && homeIndex !== -1 && awayIndex !== -1) {
-        const minIdx = Math.min(homeIndex, awayIndex);
-        const maxIdx = Math.max(homeIndex, awayIndex);
-        
-        if (maxIdx - minIdx > 6) {
-             displayTable = liveTable.slice(0, 8); 
+    
+    if (liveTable.length > 8) {
+        if (homeIndex !== -1 && awayIndex !== -1) {
+            const minIdx = Math.min(homeIndex, awayIndex);
+            const maxIdx = Math.max(homeIndex, awayIndex);
+
+            if (maxIdx - minIdx <= 5) {
+                // Teams are close enough, show them in one continuous block
+                let start = Math.max(0, minIdx - 1);
+                let end = Math.min(liveTable.length, maxIdx + 2);
+                
+                // Expand to show about 6-8 rows to keep the UI looking full
+                while (end - start < 6 && start > 0) start--;
+                while (end - start < 6 && end < liveTable.length) end++;
+                
+                displayTable = liveTable.slice(start, end); 
+            } else {
+                // Teams are far apart! Show two distinct blocks of context
+                const indicesToKeep = new Set<number>();
+                
+                // Block 1: Surround the Higher Team
+                indicesToKeep.add(Math.max(0, minIdx - 1));
+                indicesToKeep.add(minIdx);
+                indicesToKeep.add(Math.min(liveTable.length - 1, minIdx + 1));
+
+                // Block 2: Surround the Lower Team
+                indicesToKeep.add(Math.max(0, maxIdx - 1));
+                indicesToKeep.add(maxIdx);
+                indicesToKeep.add(Math.min(liveTable.length - 1, maxIdx + 1));
+
+                // Extract, sort, and map to teams
+                const sortedIndices = Array.from(indicesToKeep).sort((a, b) => a - b);
+                displayTable = sortedIndices.map(idx => liveTable[idx]);
+            }
         } else {
-             const start = Math.max(0, minIdx - 2);
-             const end = Math.min(liveTable.length, maxIdx + 3);
-             displayTable = liveTable.slice(start, end);
+            // Fallback if the teams aren't strictly found
+            displayTable = liveTable.slice(0, 8);
         }
     }
 
@@ -142,34 +173,50 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
                         </tr>
                     </thead>
                     <tbody>
-                        {displayTable.map((team) => {
+                        {displayTable.map((team, index) => {
                             const isPlaying = normalizeName(team.team_short_name || team.team_name) === normHome || normalizeName(team.team_short_name || team.team_name) === normAway;
                             const posChange = team.original_position - team.live_position;
+                            
+                            // 🟢 Checks if there is a massive jump in the table (e.g. from position 3 to 14)
+                            const showGap = index > 0 && (team.live_position - displayTable[index - 1].live_position > 1);
 
                             return (
-                                <tr key={team.id} className={`border-b border-slate-50 text-[10px] md:text-xs font-bold transition-colors ${isPlaying ? 'bg-blue-50/60' : 'hover:bg-slate-50'}`}>
-                                    <td className="p-2.5 text-center flex flex-col items-center justify-center">
-                                        <span className={`${isPlaying ? 'text-blue-700 font-black' : 'text-slate-600'}`}>{team.live_position}</span>
-                                        {isLive && isPlaying && posChange > 0 && <span className="text-green-500 text-[8px] flex items-center mt-0.5 font-black"><ChevronUp size={10} strokeWidth={3}/>{posChange}</span>}
-                                        {isLive && isPlaying && posChange < 0 && <span className="text-red-500 text-[8px] flex items-center mt-0.5 font-black"><ChevronDown size={10} strokeWidth={3}/>{Math.abs(posChange)}</span>}
-                                        {isLive && isPlaying && posChange === 0 && <span className="text-slate-300 text-[8px] flex items-center mt-0.5"><Minus size={10}/></span>}
-                                    </td>
-                                    <td className="p-2.5">
-                                        <div className="flex items-center gap-2">
-                                            {team.team_crest ? (
-                                                <img src={team.team_crest} alt="" className="w-4 h-4 object-contain" />
-                                            ) : (
-                                                <div className="w-4 h-4 bg-slate-200 rounded-full"></div>
-                                            )}
-                                            <span className={`${isPlaying ? 'text-blue-700 font-black' : 'text-slate-700'} truncate max-w-[120px] md:max-w-[180px]`}>
-                                                {team.team_short_name || team.team_name}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td className="p-2.5 text-center text-slate-500">{team.played_games}</td>
-                                    <td className="p-2.5 text-center text-slate-500 font-medium">{(team.goal_difference > 0 ? '+' : '')}{team.goal_difference}</td>
-                                    <td className="p-2.5 text-center font-black text-slate-800">{team.points}</td>
-                                </tr>
+                                <Fragment key={team.id}>
+                                    {showGap && (
+                                        <tr className="bg-slate-50/50 border-b border-slate-100">
+                                            <td colSpan={5} className="py-2 text-center">
+                                                <div className="flex justify-center gap-1.5 opacity-40">
+                                                    <span className="w-1 h-1 rounded-full bg-slate-400"></span>
+                                                    <span className="w-1 h-1 rounded-full bg-slate-400"></span>
+                                                    <span className="w-1 h-1 rounded-full bg-slate-400"></span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    <tr className={`border-b border-slate-50 text-[10px] md:text-xs font-bold transition-colors ${isPlaying ? 'bg-blue-50/60' : 'hover:bg-slate-50'}`}>
+                                        <td className="p-2.5 text-center flex flex-col items-center justify-center">
+                                            <span className={`${isPlaying ? 'text-blue-700 font-black' : 'text-slate-600'}`}>{team.live_position}</span>
+                                            {isLive && isPlaying && posChange > 0 && <span className="text-green-500 text-[8px] flex items-center mt-0.5 font-black"><ChevronUp size={10} strokeWidth={3}/>{posChange}</span>}
+                                            {isLive && isPlaying && posChange < 0 && <span className="text-red-500 text-[8px] flex items-center mt-0.5 font-black"><ChevronDown size={10} strokeWidth={3}/>{Math.abs(posChange)}</span>}
+                                            {isLive && isPlaying && posChange === 0 && <span className="text-slate-300 text-[8px] flex items-center mt-0.5"><Minus size={10}/></span>}
+                                        </td>
+                                        <td className="p-2.5">
+                                            <div className="flex items-center gap-2">
+                                                {team.team_crest ? (
+                                                    <img src={team.team_crest} alt="" className="w-4 h-4 object-contain" />
+                                                ) : (
+                                                    <div className="w-4 h-4 bg-slate-200 rounded-full"></div>
+                                                )}
+                                                <span className={`${isPlaying ? 'text-blue-700 font-black' : 'text-slate-700'} truncate max-w-[120px] md:max-w-[180px]`}>
+                                                    {team.team_short_name || team.team_name}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="p-2.5 text-center text-slate-500">{team.played_games}</td>
+                                        <td className="p-2.5 text-center text-slate-500 font-medium">{(team.goal_difference > 0 ? '+' : '')}{team.goal_difference}</td>
+                                        <td className="p-2.5 text-center font-black text-slate-800">{team.points}</td>
+                                    </tr>
+                                </Fragment>
                             );
                         })}
                     </tbody>

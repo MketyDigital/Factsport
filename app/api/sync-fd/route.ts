@@ -75,6 +75,15 @@ export async function GET(request: Request) {
                 const fdAwayScore = m.score?.fullTime?.away ?? 0;
                 let shouldUpdateMatch = false;
 
+                // 🟢 NEW SHIELD: Ensure standings update if the league is active today, 
+                // regardless of whether ESPN beat Football-Data to the 'FT' update!
+                const matchDateObj = new Date(m.utcDate);
+                const isToday = matchDateObj.toDateString() === today.toDateString();
+                
+                if (['LIVE', 'HT'].includes(fdStatusMapped) || isDbLive || (fdStatusMapped === 'FT' && isToday)) {
+                    leaguesNeedingStandingsUpdate.add(compCode);
+                }
+
                 // 🟢 THE MASTER SHIELD LOGIC
                 if (fdStatusMapped === 'FT') {
                     // 1. Always audit and confirm FT scores
@@ -119,10 +128,11 @@ export async function GET(request: Request) {
             logs.push("Admin forced a full standings sync.");
         }
 
-        // 🟢 STANDINGS SYNC (Safe and delayed)
+        // 🟢 STANDINGS SYNC (Safe, delayed, and clean insert)
         for (const leagueId of Array.from(leaguesNeedingStandingsUpdate)) {
             if (leagueId === 'EC' || leagueId === 'WC') continue; 
 
+            // Prevent Football-Data rate limiting (Edge friendly)
             await new Promise(resolve => setTimeout(resolve, 1500)); 
 
             const standRes = await fetch(`https://api.football-data.org/v4/competitions/${leagueId}/standings`, { 
@@ -132,15 +142,16 @@ export async function GET(request: Request) {
             if (!standRes.ok) continue;
 
             const standData = await standRes.json();
-            const table = standData?.standings?.[0]?.table || [];
+            // Ensure we are grabbing the 'TOTAL' standings, not HOME or AWAY splits
+            const table = standData?.standings?.find((s: any) => s.type === 'TOTAL')?.table || [];
 
-            for (const entry of table) {
-                await supabase.from('standings').upsert({
+            if (table.length > 0) {
+                const standingsToInsert = table.map((entry: any) => ({
                     league_code: leagueId,
                     position: entry.position,
                     team_id: entry.team.id,
                     team_name: entry.team.name,
-                    team_short_name: entry.team.shortName,
+                    team_short_name: entry.team.shortName || entry.team.name,
                     team_crest: entry.team.crest,
                     played_games: entry.playedGames,
                     won: entry.won,
@@ -149,10 +160,19 @@ export async function GET(request: Request) {
                     goal_difference: entry.goalDifference,
                     points: entry.points,
                     updated_at: new Date().toISOString()
-                }, { onConflict: 'league_code, team_id' });
-                standingsUpdated++;
+                }));
+
+                // Safe approach: Wipe the old league data and insert perfectly fresh data to avoid conflicts
+                await supabase.from('standings').delete().eq('league_code', leagueId);
+                const { error: stdErr } = await supabase.from('standings').insert(standingsToInsert);
+                
+                if (!stdErr) {
+                    standingsUpdated += table.length;
+                    logs.push(`Standings Updated: ${leagueId}`);
+                } else {
+                    logs.push(`Standings Error (${leagueId}): ${stdErr.message}`);
+                }
             }
-            logs.push(`Standings Updated: ${leagueId}`);
         }
 
         return NextResponse.json({ 

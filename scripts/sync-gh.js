@@ -100,63 +100,6 @@ async function run() {
     console.log(`\n.. Processing ${league.name}`);
     
     // ==========================================
-    // 🟢 NEW: FETCH AND UPDATE STANDINGS
-    // ==========================================
-    try {
-        const stdUrl = `${BASE_URL}/competitions/${league.id}/standings`;
-        let stdRes = await fetch(stdUrl, { headers: { 'X-Auth-Token': API_KEY } });
-        
-        if (stdRes.status === 429) {
-            console.error(`   ⚠️ Rate limit hit on standings. Backing off 60s...`);
-            await delay(60000);
-            stdRes = await fetch(stdUrl, { headers: { 'X-Auth-Token': API_KEY } });
-        }
-
-        if (stdRes.ok) {
-            const stdData = await stdRes.json();
-            const totalStandings = stdData.standings?.find((s) => s.type === 'TOTAL');
-            
-            if (totalStandings && totalStandings.table) {
-                const standingsToInsert = [];
-                for (const row of totalStandings.table) {
-                    const safeCrest = await getSafeLogo(row.team.shortName || row.team.name, row.team.crest, supabase);
-
-                    standingsToInsert.push({
-                        league_code: league.id,
-                        team_id: row.team.id,
-                        position: row.position,
-                        team_name: row.team.name,
-                        team_short_name: row.team.shortName || row.team.name,
-                        team_crest: safeCrest,
-                        played_games: row.playedGames,
-                        won: row.won,
-                        draw: row.draw,
-                        lost: row.lost,
-                        goal_difference: row.goalDifference,
-                        points: row.points,
-                        updated_at: new Date().toISOString()
-                    });
-                }
-                
-                if (standingsToInsert.length > 0) {
-                    // Safe approach: clear old league table data and insert fresh accurate data
-                    await supabase.from('standings').delete().eq('league_code', league.id);
-                    const { error: stdErr } = await supabase.from('standings').insert(standingsToInsert);
-                    if (stdErr) console.error(`   ❌ DB Error saving standings: ${stdErr.message}`);
-                    else console.log(`   ✅ Synced Standings for ${league.name}`);
-                }
-            }
-        } else {
-             console.error(`   ❌ Failed to fetch standings: ${stdRes.status} ${stdRes.statusText}`);
-        }
-    } catch (e) {
-        console.error(`   🔥 Exception during standings sync: ${e.message}`);
-    }
-    
-    // Give the API a breather before fetching matches
-    await delay(2000);
-
-    // ==========================================
     // 🟢 EXISTING MATCHES SYNC LOGIC
     // ==========================================
     try {
