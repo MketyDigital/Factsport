@@ -14,8 +14,31 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function postToTelegram(botToken, chatId, text, parseMode = 'HTML') {
+    if (!botToken || !chatId) return;
+    try {
+        const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+        await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: parseMode, disable_web_page_preview: false })
+        });
+    } catch (e) {
+        console.error("❌ Telegram Post Error:", e.message);
+    }
+}
+
 async function generateDailyPreview() {
     console.log("☀️ Starting Daily Preview...");
+
+    const { data: settingsData } = await supabase.from('site_settings').select('social_config').single();
+    const config = settingsData?.social_config || {};
+    const creds = config.credentials || {};
+    const events = config.events || {};
+
+    const tgGeneralChannels = creds.tg_general_channels || [];
 
     const now = new Date();
     const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
@@ -101,35 +124,46 @@ async function generateDailyPreview() {
         if (error) console.error(`   ❌ Supabase DB Error:`, error.message);
         else {
             console.log(`   ✅ Published Preview: ${headline}`);
-            
             const articleUrl = `https://factsport.com/news/${reportSlug}`;
 
+            // PING GOOGLE
             try {
-                const pingRes = await fetch('https://factsport.com/api/index-url', {
+                fetch('https://factsport.com/api/index-url', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${process.env.CRON_KEY}`
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
                     body: JSON.stringify({ url: articleUrl, type: 'URL_UPDATED' })
-                });
-                if (pingRes.ok) console.log(`   🚀 Successfully pinged Google Indexing API`);
-                else console.error(`   ⚠️ Google Ping failed:`, pingRes.status);
-            } catch (pingError) { // 🟢 FIX: Removed ": any"
-                console.error(`   ❌ Google Ping Network Error:`, pingError.message);
-            }
+                }).catch(()=>{});
+            } catch (e) {}
 
-            if (process.env.MAKE_WEBHOOK_URL) {
-                await fetch(process.env.MAKE_WEBHOOK_URL, {
+            // 🟢 SOCIAL POSTING BLOCK
+            const isFbEnabled = events.daily_preview?.fb !== false;
+            const isXEnabled = events.daily_preview?.x !== false;
+            const isTgEnabled = events.daily_preview?.tg_general !== false;
+
+            const makeUrl = creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL;
+            
+            if (makeUrl && (isFbEnabled || isXEnabled)) {
+                await fetch(makeUrl, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        fb2_text: `${generatedFbText}\n\n👇 Read the full breakdown here:\n${articleUrl} 🏆`,
-                        x_text: null, x_image_url: null
+                        fb2_text: isFbEnabled ? `${generatedFbText}\n\n👇 Read the full breakdown here:\n${articleUrl} 🏆` : null,
+                        x_text: isXEnabled ? `☀️ MATCHDAY PREVIEW\n\n${headline}\n\n👇 Read our tactical breakdown here:\n${articleUrl} 🏆` : null, 
+                        x_image_url: null
                     })
                 });
             }
+
+            // Loop through all registered Telegram General Channels
+            if (isTgEnabled && creds.telegram_bot_token && tgGeneralChannels.length > 0) {
+                for (const channel of tgGeneralChannels) {
+                    const tgMessage = `☀️ <b>MATCHDAY PREVIEW</b>\n\n<b>${headline}</b>\n\n${generatedFbText}\n\n👇 <b>Read the full tactical breakdown here:</b>\n${articleUrl} 🏆`;
+                    await postToTelegram(creds.telegram_bot_token, channel.chatId, tgMessage);
+                    console.log(`   ✅ Posted Preview to TG Channel: ${channel.chatId}`);
+                    await delay(1500); // Safe delay
+                }
+            }
         }
-    } catch (e) { // 🟢 FIX: Removed ": any"
+    } catch (e) { 
         console.error(`   🔥 Gemini Error: ${e.message}`);
     }
 }
