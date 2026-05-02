@@ -27,11 +27,12 @@ export default function SocialSettingsManager() {
     const [vipLeagues, setVipLeagues] = useState<string[]>([]);
     const [events, setEvents] = useState<any>(DEFAULT_EVENTS);
     
+    // 🟢 FIXED: Removed the old single-channel IDs to satisfy TypeScript
     const [credentials, setCredentials] = useState({
         fb1_id: '', fb1_token: '',
         fb2_id: '', fb2_token: '',
         make_webhook_1: '', make_webhook_2: '',
-        telegram_bot_token: '', telegram_general_chat_id: '', telegram_vip_chat_id: '',
+        telegram_bot_token: '',
         betting_partner_link: '' 
     });
 
@@ -50,7 +51,6 @@ export default function SocialSettingsManager() {
     const [dbLeagues, setDbLeagues] = useState<string[]>([]);
     const [dbTeams, setDbTeams] = useState<string[]>([]);
     
-    // 🟢 NEW: Admin Override States
     const [upcomingMatches, setUpcomingMatches] = useState<any[]>([]);
     const [featuredMatchId, setFeaturedMatchId] = useState<string>('');
 
@@ -65,7 +65,7 @@ export default function SocialSettingsManager() {
         if (settingsData?.social_config) {
             setVipTeams(settingsData.social_config.vip_teams || []);
             setVipLeagues(settingsData.social_config.vip_leagues || []);
-            setFeaturedMatchId(settingsData.social_config.featured_match_id || ''); // 🟢 Load featured match
+            setFeaturedMatchId(settingsData.social_config.featured_match_id || ''); 
             
             const savedCreds = settingsData.social_config.credentials || {};
             setCredentials({
@@ -127,7 +127,7 @@ export default function SocialSettingsManager() {
             vip_teams: vipTeams,
             vip_leagues: vipLeagues,
             events: events,
-            featured_match_id: featuredMatchId || null, // 🟢 Save featured match
+            featured_match_id: featuredMatchId || null, 
             credentials: {
                 ...credentials,
                 tg_general_channels: tgGeneralChannels,
@@ -227,7 +227,7 @@ export default function SocialSettingsManager() {
                 
                 {/* LEFT COLUMN */}
                 <div className="space-y-6">
-                    {/* 🟢 NEW: FEATURED MATCH OVERRIDE */}
+                    {/* FEATURED MATCH OVERRIDE */}
                     <div className="bg-amber-50 p-5 rounded-2xl border border-amber-200">
                         <div className="flex items-center gap-2 mb-4">
                             <Target size={16} className="text-amber-600" />
