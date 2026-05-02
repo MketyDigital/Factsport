@@ -39,14 +39,12 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
         });
     }, [matches]);
 
-    // 🟢 FIX: Find matches that are live OR scheduled within 1 hour so they actually transition!
     const pollableMatches = liveMatches.filter(m => {
         if (!m.espn_id) return false;
         const status = (m.status || '').toUpperCase();
         if (['FT', 'FINISHED', 'ABD', 'AET', 'PEN'].includes(status)) return false;
         if (['LIVE', 'IN_PLAY', 'HT', '1H', '2H', 'ET', 'P'].includes(status)) return true;
         
-        // If it's scheduled, check if it's within 1 hour of kickoff
         const matchTime = new Date(m.match_date).getTime();
         const now = Date.now();
         return (matchTime - now) < 3600000; 
@@ -61,7 +59,7 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                 try {
                     const data = await fetchLiveMatchDeduplicated(m.espn_id);
                     if (data && !data.error) {
-                        return { id: m.id, status: data.status, home_score: data.home_score, away_score: data.away_score, displayClock: data.displayClock };
+                        return { id: m.id, status: data.status, home_score: data.home_score, away_score: data.away_score, displayClock: data.displayClock, stats: data.stats };
                     }
                 } catch (e) {}
                 return null;
@@ -72,9 +70,10 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
             let hasChanges = false;
             const newLiveMatches = liveMatches.map(m => {
                 const update = results.find(r => r && r.id === m.id);
-                if (update && (update.status !== m.status || update.home_score !== m.home_score || update.away_score !== m.away_score || update.displayClock !== m.displayClock)) {
+                // 🟢 Includes check for stats update (penalties/aggregate)
+                if (update && (update.status !== m.status || update.home_score !== m.home_score || update.away_score !== m.away_score || update.displayClock !== m.displayClock || JSON.stringify(update.stats) !== JSON.stringify(m.stats))) {
                     hasChanges = true;
-                    return { ...m, status: update.status, home_score: update.home_score, away_score: update.away_score, displayClock: update.displayClock };
+                    return { ...m, status: update.status, home_score: update.home_score, away_score: update.away_score, displayClock: update.displayClock, stats: update.stats };
                 }
                 return m;
             });
@@ -87,7 +86,6 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
         }
     };
 
-    // 🟢 FIX: Instant fetch on mount to bust stale Next.js router cache
     useEffect(() => {
         fetchUpdates();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,6 +161,12 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                 const stageText = match.match_group ? match.match_group.replace(/_/g, ' ') : (match.stage && match.stage !== 'REGULAR_SEASON' ? match.stage.replace(/_/g, ' ') : null);
                                 const isKnockout = match.stage && (match.stage.includes('FINAL') || match.stage.includes('KNOCKOUT'));
 
+                                // 🟢 EXTRACT PENS & AGGREGATE
+                                const homePens = match.stats?.home_penalties;
+                                const awayPens = match.stats?.away_penalties;
+                                const hasPens = homePens !== null && homePens !== undefined;
+                                const aggregateText = match.stats?.aggregate;
+
                                 return (
                                 <div key={match.id} className={`block hover:bg-slate-50 transition p-4 ${isKnockout ? 'bg-amber-50/30' : ''}`}>
                                     <Link href={`/match/${match.id}`} className="flex items-center justify-between mb-3">
@@ -181,7 +185,12 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                                 <span className={`text-sm font-black uppercase tracking-tight truncate max-w-[120px] sm:max-w-none ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-500'}`}>
                                                     {match.home_team}
                                                 </span>
-                                                {!isScheduled && <span className={`ml-auto font-black text-lg ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-400'}`}>{match.home_score}</span>}
+                                                {!isScheduled && (
+                                                    <div className="ml-auto flex items-baseline gap-1.5">
+                                                        {hasPens && <span className="text-[9px] font-bold text-amber-500">({homePens})</span>}
+                                                        <span className={`font-black text-lg ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-400'}`}>{match.home_score}</span>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className="flex items-center gap-3">
@@ -191,8 +200,19 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                                 <span className={`text-sm font-black uppercase tracking-tight truncate max-w-[120px] sm:max-w-none ${isFinished && match.away_score > match.home_score ? 'text-slate-900' : 'text-slate-500'}`}>
                                                     {match.away_team}
                                                 </span>
-                                                {!isScheduled && <span className={`ml-auto font-black text-lg ${isFinished && match.away_score > match.home_score ? 'text-slate-900' : 'text-slate-400'}`}>{match.away_score}</span>}
+                                                {!isScheduled && (
+                                                    <div className="ml-auto flex items-baseline gap-1.5">
+                                                        {hasPens && <span className="text-[9px] font-bold text-amber-500">({awayPens})</span>}
+                                                        <span className={`font-black text-lg ${isFinished && match.away_score > match.home_score ? 'text-slate-900' : 'text-slate-400'}`}>{match.away_score}</span>
+                                                    </div>
+                                                )}
                                             </div>
+
+                                            {aggregateText && (
+                                                <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                                    {aggregateText}
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="flex flex-col items-end justify-center pl-4 border-l border-slate-100 ml-4 w-16 shrink-0">

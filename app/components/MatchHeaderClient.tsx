@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget'; 
 import { getLeagueAssets } from '@/app/lib/league-assets';
@@ -32,7 +32,6 @@ export default function MatchHeaderClient({ dbData }: any) {
   const prevHomeScore = useRef(liveData?.home_score || 0);
   const prevAwayScore = useRef(liveData?.away_score || 0);
 
-  // Trigger flash animations when context updates
   useEffect(() => {
       if (liveData?.home_score > prevHomeScore.current) {
           setHomeFlash(true); setTimeout(() => setHomeFlash(false), 5000);
@@ -68,6 +67,12 @@ export default function MatchHeaderClient({ dbData }: any) {
   const events = liveData?.match_events || liveData?.events || [];
   const homeGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'home' || (e.player && e.player.toLowerCase().includes(homeTeamName.toLowerCase()))));
   const awayGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'away' || (e.player && e.player.toLowerCase().includes(awayTeamName.toLowerCase()))));
+
+  // 🟢 EXTRACT PENS & AGGREGATE
+  const homePens = liveData?.stats?.home_penalties;
+  const awayPens = liveData?.stats?.away_penalties;
+  const hasPens = homePens !== null && homePens !== undefined;
+  const aggregateText = liveData?.stats?.aggregate;
 
   return (
     <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
@@ -118,10 +123,24 @@ export default function MatchHeaderClient({ dbData }: any) {
                     {isUpcoming ? (
                          <div className="text-xl md:text-2xl font-black text-white/30 italic">VS</div>
                     ) : (
-                        <div className="text-2xl md:text-3xl font-black tracking-tighter flex gap-1 items-center drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
-                            <span className={`transition-all duration-300 ${homeFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{liveData?.home_score ?? 0}</span>
-                            <span className="text-white/40 text-xl md:text-2xl pb-1">-</span>
-                            <span className={`transition-all duration-300 ${awayFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{liveData?.away_score ?? 0}</span>
+                        <div className="flex flex-col items-center">
+                            <div className="text-2xl md:text-3xl font-black tracking-tighter flex gap-1 items-center drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
+                                <span className={`transition-all duration-300 ${homeFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{liveData?.home_score ?? 0}</span>
+                                <span className="text-white/40 text-xl md:text-2xl pb-1">-</span>
+                                <span className={`transition-all duration-300 ${awayFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{liveData?.away_score ?? 0}</span>
+                            </div>
+                            
+                            {/* 🟢 NEW: PENALTY & AGGREGATE DISPLAY */}
+                            {hasPens && (
+                                <span className="text-[10px] md:text-xs font-black text-amber-400 tracking-widest drop-shadow-md mt-0.5">
+                                    (PENS: {homePens}-{awayPens})
+                                </span>
+                            )}
+                            {aggregateText && (
+                                <span className="text-[8px] md:text-[9px] font-bold text-slate-300 uppercase tracking-widest mt-1 bg-white/10 px-2 py-0.5 rounded-sm">
+                                    {aggregateText}
+                                </span>
+                            )}
                         </div>
                     )}
                 </div>

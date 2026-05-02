@@ -11,7 +11,7 @@ const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET'
 export default function LiveScoreLabel({ 
     matchId, espnId, initialStatus, homeScore, awayScore, displayClock, matchDate, variant = 'small', homeTeam, awayTeam, disablePolling = false 
 }: any) {
-  const [data, setData] = useState({ status: initialStatus, home: homeScore, away: awayScore, clock: displayClock || '' });
+  const [data, setData] = useState({ status: initialStatus, home: homeScore, away: awayScore, clock: displayClock || '', stats: null as any });
   
   const hasFetchedLive = useRef(false);
   const isFetching = useRef(false);
@@ -20,7 +20,7 @@ export default function LiveScoreLabel({
 
   useEffect(() => {
       if (disablePolling) {
-          setData({ status: initialStatus, home: homeScore, away: awayScore, clock: displayClock || '' });
+          setData({ status: initialStatus, home: homeScore, away: awayScore, clock: displayClock || '', stats: null });
       } else if (!hasFetchedLive.current) {
           setData(prev => ({ ...prev, status: initialStatus, home: homeScore, away: awayScore, clock: displayClock || '' }));
       }
@@ -38,14 +38,15 @@ export default function LiveScoreLabel({
               hasFetchedLive.current = true; 
               
               setData(prev => {
-                  if (prev.status === matchData.status && prev.home === matchData.home_score && prev.away === matchData.away_score && prev.clock === matchData.displayClock) {
+                  if (prev.status === matchData.status && prev.home === matchData.home_score && prev.away === matchData.away_score && prev.clock === matchData.displayClock && prev.stats === matchData.stats) {
                       return prev; 
                   }
                   return { 
                       status: matchData.status, 
                       home: matchData.home_score, 
                       away: matchData.away_score,
-                      clock: matchData.displayClock
+                      clock: matchData.displayClock,
+                      stats: matchData.stats
                   };
               });
 
@@ -75,9 +76,14 @@ export default function LiveScoreLabel({
   const isHT = HT_STATUSES.includes(cleanStatus);
   const isFinished = FINISHED_STATUSES.includes(cleanStatus);
 
+  // 🟢 EXTRACT PENS
+  const homePens = data.stats?.home_penalties;
+  const awayPens = data.stats?.away_penalties;
+  const hasPens = homePens !== null && homePens !== undefined;
+
   if (variant === 'badge') {
       if (isHT) return <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded shadow-sm tracking-widest border border-amber-600">HT</span>;
-      if (isLiveNow) return <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded animate-pulse shadow-sm tracking-widest border border-red-500">{data.clock || 'LIVE'}</span>;
+      if (isLiveNow) return <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded animate-pulse shadow-sm tracking-widest border border-red-50">{data.clock || 'LIVE'}</span>;
       if (isFinished) return <span className="bg-slate-200 text-slate-600 text-[9px] font-black px-2 py-0.5 rounded tracking-widest shadow-inner border border-slate-300">FT</span>;
       return <span className="bg-slate-100 text-slate-500 text-[9px] font-bold px-2 py-0.5 rounded shadow-inner uppercase tracking-widest border border-slate-200">UPCOMING</span>;
   }
@@ -93,6 +99,7 @@ export default function LiveScoreLabel({
                   <div className="text-slate-300 font-black text-lg italic mb-1">VS</div>
                   {isHT && <span className="bg-amber-100 text-amber-700 text-[9px] px-2 py-0.5 rounded font-black border border-amber-200">HT</span>}
                   {isLiveNow && !isHT && data.clock && <span className="text-red-500 text-[10px] font-black animate-pulse bg-red-50 px-2 py-0.5 rounded">{data.clock}</span>}
+                  {hasPens && <span className="text-[9px] font-black text-amber-500 mt-1">(Pens: {homePens}-{awayPens})</span>}
               </div>
               <div className="text-center w-1/3">
                   <div className="text-3xl font-black text-slate-800 tracking-tighter">{data.away ?? 0}</div>
@@ -109,11 +116,18 @@ export default function LiveScoreLabel({
                 {isHT ? <span className="text-[8px] mr-1">HT</span> : null} 
                 {data.home} - {data.away}
             </span>
+            {hasPens && <span className="text-[9px] text-amber-500 font-black mt-0.5">(Pens: {homePens}-{awayPens})</span>}
             {data.clock && !isHT && <span className="text-[9px] text-red-500 font-bold mt-1">{data.clock}</span>}
         </div>
     );
   }
   
-  if (isFinished) return <span className="text-slate-700 font-black text-[11px] bg-slate-100 border border-slate-200 px-2 py-0.5 rounded shadow-sm">{data.home} - {data.away}</span>;
+  if (isFinished) return (
+      <div className="flex flex-col items-center">
+          <span className="text-slate-700 font-black text-[11px] bg-slate-100 border border-slate-200 px-2 py-0.5 rounded shadow-sm">{data.home} - {data.away}</span>
+          {hasPens && <span className="text-[8px] text-amber-600 font-bold mt-0.5">(Pens: {homePens}-{awayPens})</span>}
+      </div>
+  );
+  
   return <span className="text-slate-500 text-[10px] font-bold bg-white border border-slate-100 px-2 py-0.5 rounded shadow-sm">{userTime}</span>;
 }

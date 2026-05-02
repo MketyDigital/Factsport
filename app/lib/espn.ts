@@ -66,6 +66,11 @@ export async function fetchEspnDetails(gameId: string) {
     const homeTeamName = homeCompetitor.team.displayName;
     const awayTeamName = awayCompetitor.team.displayName;
 
+    // 🟢 NEW: EXTRACT PENALTY & AGGREGATE DATA FOR SUPABASE STORAGE
+    const homePens = homeCompetitor?.shootoutScore;
+    const awayPens = awayCompetitor?.shootoutScore;
+    const aggSummary = data.header?.series?.summary || null;
+
     // 🟢 1. EXTRACT VENUE & REFEREES & PREDICTOR
     const venue = data.gameInfo?.venue?.fullName || null;
     const referees = data.gameInfo?.officials?.map((o: any) => o.displayName || o.fullName) || [];
@@ -81,7 +86,14 @@ export async function fetchEspnDetails(gameId: string) {
 
     // 🟢 2. PARSE STATS
     const boxscore = data.boxscore;
-    const stats: any = { home: {}, away: {} };
+    const stats: any = { 
+        home: {}, 
+        away: {},
+        home_penalties: homePens !== undefined ? parseInt(homePens) : null,
+        away_penalties: awayPens !== undefined ? parseInt(awayPens) : null,
+        aggregate: aggSummary
+    };
+    
     if (boxscore?.teams) {
        boxscore.teams.forEach((t: any) => {
           const side = String(t.team.id) === homeId ? 'home' : 'away';
