@@ -1,9 +1,7 @@
 export const runtime = 'edge';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { postToSocials, SocialPayload } from '@/app/lib/socialService';
 
-// 🟢 STRICT ACCURACY SHIELDS
 const getValidGoals = (eventsArr: any[]) => {
     if (!Array.isArray(eventsArr)) return [];
     return eventsArr.filter((e: any) => {
@@ -20,7 +18,6 @@ const getPenaltyEvents = (eventsArr: any[]) => {
     return eventsArr.filter((e: any) => {
         if (!e) return false;
         const type = String(e.type || '').toLowerCase();
-        // 🔥 STRICT FIX: Must explicitly be the awarded type. Ignores 'penalty missed' or 'saved'
         return type === 'penalty_awarded'; 
     });
 };
@@ -31,113 +28,46 @@ const parseTime = (t: any) => {
     return (parseInt(parts[0]) || 0) * 100 + (parseInt(parts[1]) || 0); 
 };
 
-// 🟢 EXPANDED KNOWN TEAMS DICTIONARY
 const KNOWN_TEAMS: Record<string, string> = {
-    // Premier League
-    'manchester city': 'MCI', 'man city': 'MCI', 'm. city': 'MCI',
-    'manchester united': 'MUN', 'man united': 'MUN', 'man utd': 'MUN',
-    'arsenal': 'ARS', 'arsenal fc': 'ARS',
-    'chelsea': 'CHE', 'chelsea fc': 'CHE',
-    'liverpool': 'LIV', 'liverpool fc': 'LIV',
-    'tottenham hotspur': 'TOT', 'tottenham': 'TOT', 'spurs': 'TOT',
-    'newcastle united': 'NEW', 'newcastle': 'NEW', 'newcastle utd': 'NEW',
-    'aston villa': 'AVL', 'villa': 'AVL',
-    'west ham united': 'WHU', 'west ham': 'WHU',
-    'brighton & hove albion': 'BHA', 'brighton': 'BHA', 'brighton hove': 'BHA',
-    'wolverhampton wanderers': 'WOL', 'wolverhampton': 'WOL', 'wolves': 'WOL',
-    'nottingham forest': 'NFO', 'nottm forest': 'NFO', 'nottingham': 'NFO',
-    'leicester city': 'LEI', 'leicester': 'LEI',
-    'everton': 'EVE', 'everton fc': 'EVE',
-    'crystal palace': 'CRY', 'palace': 'CRY',
-    'brentford': 'BRE', 'brentford fc': 'BRE',
-    'fulham': 'FUL', 'fulham fc': 'FUL',
-    'afc bournemouth': 'BOU', 'bournemouth': 'BOU',
-    'southampton': 'SOU', 'saints': 'SOU',
-    'ipswich town': 'IPS', 'ipswich': 'IPS',
-    // La Liga
-    'real madrid': 'RMA', 'madrid': 'RMA',
-    'barcelona': 'BAR', 'barca': 'BAR', 'fc barcelona': 'BAR',
-    'atletico madrid': 'ATM', 'atlético': 'ATM', 'atletico': 'ATM', 'atlético de madrid': 'ATM',
-    'athletic club': 'ATH', 'athletic bilbao': 'ATH', 'athletic': 'ATH',
-    'real sociedad': 'RSO', 'sociedad': 'RSO',
-    'real betis': 'BET', 'betis': 'BET',
-    'sevilla': 'SEV', 'sevilla fc': 'SEV',
-    'valencia': 'VAL', 'valencia cf': 'VAL',
-    'villarreal': 'VIL', 'villarreal cf': 'VIL',
-    'celta vigo': 'CEL', 'celta': 'CEL', 'celta de vigo': 'CEL',
-    'girona': 'GIR', 'girona fc': 'GIR',
-    'osasuna': 'OSA', 'ca osasuna': 'OSA',
-    'mallorca': 'MLL', 'rcd mallorca': 'MLL',
-    // Serie A
-    'juventus': 'JUV', 'juve': 'JUV',
-    'ac milan': 'MIL', 'milan': 'MIL',
-    'inter milan': 'INT', 'inter': 'INT', 'internazionale': 'INT',
-    'ssc napoli': 'NAP', 'napoli': 'NAP',
-    'as roma': 'ROM', 'roma': 'ROM',
-    'ss lazio': 'LAZ', 'lazio': 'LAZ',
-    'atalanta': 'ATA', 'atalanta bc': 'ATA',
-    'fiorentina': 'FIO', 'acf fiorentina': 'FIO',
-    'bologna': 'BOL', 'bologna fc': 'BOL',
-    'torino': 'TOR', 'torino fc': 'TOR',
-    // Bundesliga
-    'bayern munich': 'BAY', 'bayern': 'BAY', 'fc bayern': 'BAY', 'bayern münchen': 'BAY',
-    'borussia dortmund': 'BVB', 'dortmund': 'BVB',
-    'bayer 04 leverkusen': 'B04', 'leverkusen': 'B04', 'bayer leverkusen': 'B04',
-    'rb leipzig': 'RBL', 'leipzig': 'RBL',
-    'eintracht frankfurt': 'SGE', 'frankfurt': 'SGE', 'eintracht': 'SGE',
-    'borussia monchengladbach': 'BMG', 'gladbach': 'BMG', 'mgladbach': 'BMG', 'mönchengladbach': 'BMG',
-    'vfb stuttgart': 'VFB', 'stuttgart': 'VFB',
-    'wolfsburg': 'WOB', 'vfl wolfsburg': 'WOB',
-    'sc freiburg': 'SCF', 'freiburg': 'SCF',
-    'union berlin': 'FCU', 'fc union berlin': 'FCU',
-    // Ligue 1 & Others
-    'paris saint germain': 'PSG', 'psg': 'PSG', 'paris sg': 'PSG', 'paris saint-germain': 'PSG',
-    'olympique de marseille': 'MAR', 'marseille': 'MAR', 'om': 'MAR',
-    'olympique lyonnais': 'LYO', 'lyon': 'LYO', 'ol': 'LYO',
-    'as monaco': 'ASM', 'monaco': 'ASM',
-    'lille osc': 'LOSC', 'lille': 'LOSC',
-    'rc lens': 'RCL', 'lens': 'RCL',
-    'ogc nice': 'OGCN', 'nice': 'OGCN',
-    'ajax': 'AJA', 'afc ajax': 'AJA',
-    'psv eindhoven': 'PSV', 'psv': 'PSV',
-    'feyenoord': 'FEY',
-    'sporting cp': 'SCP', 'sporting': 'SCP', 'sporting lisbon': 'SCP',
-    'sl benfica': 'SLB', 'benfica': 'SLB',
-    'fc porto': 'FCP', 'porto': 'FCP',
-    'celtic': 'CEL', 'celtic fc': 'CEL',
-    'rangers': 'RAN', 'rangers fc': 'RAN',
-    'galatasaray': 'GAL', 'galatasaray sk': 'GAL',
-    'fenerbahce': 'FEN', 'fenerbahçe': 'FEN',
-    'besiktas': 'BES', 'beşiktaş': 'BES',
-    'club brugge': 'BRU',
-    'boca juniors': 'BOC', 'river plate': 'RIV',
-    'flamengo': 'FLA', 'palmeiras': 'PAL',
-    'al nassr': 'ALN', 'al hilal': 'ALH', 'inter miami': 'MIA',
-    // Nations
-    'argentina': 'ARG', 'brazil': 'BRA', 'brasil': 'BRA', 'france': 'FRA',
-    'england': 'ENG', 'spain': 'ESP', 'españa': 'ESP', 'germany': 'GER', 'deutschland': 'GER',
-    'italy': 'ITA', 'italia': 'ITA', 'portugal': 'POR', 'netherlands': 'NED', 'holland': 'NED',
-    'belgium': 'BEL', 'croatia': 'CRO', 'uruguay': 'URU', 'colombia': 'COL',
-    'united states': 'USA', 'usa': 'USA', 'usmnt': 'USA', 'mexico': 'MEX',
-    'nigeria': 'NGA', 'super eagles': 'NGA', 'senegal': 'SEN', 'morocco': 'MAR',
-    'egypt': 'EGY', 'ghana': 'GHA', 'ivory coast': 'CIV', 'cote d\'ivoire': 'CIV',
-    'japan': 'JPN', 'south korea': 'KOR', 'korea republic': 'KOR'
+    'manchester city': 'MCI', 'man city': 'MCI', 'm. city': 'MCI', 'manchester united': 'MUN', 'man united': 'MUN', 'man utd': 'MUN',
+    'arsenal': 'ARS', 'arsenal fc': 'ARS', 'chelsea': 'CHE', 'chelsea fc': 'CHE', 'liverpool': 'LIV', 'liverpool fc': 'LIV',
+    'tottenham hotspur': 'TOT', 'tottenham': 'TOT', 'spurs': 'TOT', 'newcastle united': 'NEW', 'newcastle': 'NEW', 'newcastle utd': 'NEW',
+    'aston villa': 'AVL', 'villa': 'AVL', 'west ham united': 'WHU', 'west ham': 'WHU', 'brighton & hove albion': 'BHA', 'brighton': 'BHA', 'brighton hove': 'BHA',
+    'wolverhampton wanderers': 'WOL', 'wolverhampton': 'WOL', 'wolves': 'WOL', 'nottingham forest': 'NFO', 'nottm forest': 'NFO', 'nottingham': 'NFO',
+    'leicester city': 'LEI', 'leicester': 'LEI', 'everton': 'EVE', 'everton fc': 'EVE', 'crystal palace': 'CRY', 'palace': 'CRY',
+    'brentford': 'BRE', 'brentford fc': 'BRE', 'fulham': 'FUL', 'fulham fc': 'FUL', 'afc bournemouth': 'BOU', 'bournemouth': 'BOU',
+    'southampton': 'SOU', 'saints': 'SOU', 'ipswich town': 'IPS', 'ipswich': 'IPS', 'real madrid': 'RMA', 'madrid': 'RMA',
+    'barcelona': 'BAR', 'barca': 'BAR', 'fc barcelona': 'BAR', 'atletico madrid': 'ATM', 'atlético': 'ATM', 'atletico': 'ATM', 'atlético de madrid': 'ATM',
+    'athletic club': 'ATH', 'athletic bilbao': 'ATH', 'athletic': 'ATH', 'real sociedad': 'RSO', 'sociedad': 'RSO', 'real betis': 'BET', 'betis': 'BET',
+    'sevilla': 'SEV', 'sevilla fc': 'SEV', 'valencia': 'VAL', 'valencia cf': 'VAL', 'villarreal': 'VIL', 'villarreal cf': 'VIL',
+    'celta vigo': 'CEL', 'celta': 'CEL', 'celta de vigo': 'CEL', 'girona': 'GIR', 'girona fc': 'GIR', 'osasuna': 'OSA', 'ca osasuna': 'OSA',
+    'mallorca': 'MLL', 'rcd mallorca': 'MLL', 'juventus': 'JUV', 'juve': 'JUV', 'ac milan': 'MIL', 'milan': 'MIL',
+    'inter milan': 'INT', 'inter': 'INT', 'internazionale': 'INT', 'ssc napoli': 'NAP', 'napoli': 'NAP', 'as roma': 'ROM', 'roma': 'ROM',
+    'ss lazio': 'LAZ', 'lazio': 'LAZ', 'atalanta': 'ATA', 'atalanta bc': 'ATA', 'fiorentina': 'FIO', 'acf fiorentina': 'FIO',
+    'bologna': 'BOL', 'bologna fc': 'BOL', 'torino': 'TOR', 'torino fc': 'TOR', 'bayern munich': 'BAY', 'bayern': 'BAY', 'fc bayern': 'BAY', 'bayern münchen': 'BAY',
+    'borussia dortmund': 'BVB', 'dortmund': 'BVB', 'bayer 04 leverkusen': 'B04', 'leverkusen': 'B04', 'bayer leverkusen': 'B04',
+    'rb leipzig': 'RBL', 'leipzig': 'RBL', 'eintracht frankfurt': 'SGE', 'frankfurt': 'SGE', 'eintracht': 'SGE',
+    'borussia monchengladbach': 'BMG', 'gladbach': 'BMG', 'mgladbach': 'BMG', 'mönchengladbach': 'BMG', 'vfb stuttgart': 'VFB', 'stuttgart': 'VFB',
+    'wolfsburg': 'WOB', 'vfl wolfsburg': 'WOB', 'sc freiburg': 'SCF', 'freiburg': 'SCF', 'union berlin': 'FCU', 'fc union berlin': 'FCU',
+    'paris saint germain': 'PSG', 'psg': 'PSG', 'paris sg': 'PSG', 'paris saint-germain': 'PSG', 'olympique de marseille': 'MAR', 'marseille': 'MAR', 'om': 'MAR',
+    'olympique lyonnais': 'LYO', 'lyon': 'LYO', 'ol': 'LYO', 'as monaco': 'ASM', 'monaco': 'ASM', 'lille osc': 'LOSC', 'lille': 'LOSC',
+    'rc lens': 'RCL', 'lens': 'RCL', 'ogc nice': 'OGCN', 'nice': 'OGCN', 'ajax': 'AJA', 'afc ajax': 'AJA', 'psv eindhoven': 'PSV', 'psv': 'PSV',
+    'feyenoord': 'FEY', 'sporting cp': 'SCP', 'sporting': 'SCP', 'sporting lisbon': 'SCP', 'sl benfica': 'SLB', 'benfica': 'SLB',
+    'fc porto': 'FCP', 'porto': 'FCP', 'celtic': 'CEL', 'celtic fc': 'CEL', 'rangers': 'RAN', 'rangers fc': 'RAN', 'galatasaray': 'GAL', 'galatasaray sk': 'GAL',
+    'fenerbahce': 'FEN', 'fenerbahçe': 'FEN', 'besiktas': 'BES', 'beşiktaş': 'BES', 'club brugge': 'BRU', 'boca juniors': 'BOC', 'river plate': 'RIV',
+    'flamengo': 'FLA', 'palmeiras': 'PAL', 'al nassr': 'ALN', 'al hilal': 'ALH', 'inter miami': 'MIA',
+    'argentina': 'ARG', 'brazil': 'BRA', 'brasil': 'BRA', 'france': 'FRA', 'england': 'ENG', 'spain': 'ESP', 'españa': 'ESP', 'germany': 'GER', 'deutschland': 'GER',
+    'italy': 'ITA', 'italia': 'ITA', 'portugal': 'POR', 'netherlands': 'NED', 'holland': 'NED', 'belgium': 'BEL', 'croatia': 'CRO', 'uruguay': 'URU', 'colombia': 'COL',
+    'united states': 'USA', 'usa': 'USA', 'usmnt': 'USA', 'mexico': 'MEX', 'nigeria': 'NGA', 'super eagles': 'NGA', 'senegal': 'SEN', 'morocco': 'MAR',
+    'egypt': 'EGY', 'ghana': 'GHA', 'ivory coast': 'CIV', 'cote d\'ivoire': 'CIV', 'japan': 'JPN', 'south korea': 'KOR', 'korea republic': 'KOR'
 };
 
 const getLeagueHashtags = (leagueName: string) => {
     const map: Record<string, string> = {
-        'Premier League': '#PremierLeague #EPL',
-        'La Liga': '#LaLiga',
-        'Bundesliga': '#Bundesliga',
-        'Serie A': '#SerieA',
-        'Ligue 1': '#Ligue1',
-        'Champions League': '#UCL #ChampionsLeague',
-        'Europa League': '#UEL',
-        'World Cup': '#WorldCup #FIFAWorldCup',
-        'Euros': '#Euro2024 #UEFA'
+        'Premier League': '#PremierLeague #EPL', 'La Liga': '#LaLiga', 'Bundesliga': '#Bundesliga', 'Serie A': '#SerieA',
+        'Ligue 1': '#Ligue1', 'Champions League': '#UCL #ChampionsLeague', 'Europa League': '#UEL', 'World Cup': '#WorldCup #FIFAWorldCup', 'Euros': '#Euro2024 #UEFA'
     };
-    const fallback = `#${String(leagueName).replace(/[^a-zA-Z0-9]/g, '')}`;
-    return map[leagueName] || fallback;
+    return map[leagueName] || `#${String(leagueName).replace(/[^a-zA-Z0-9]/g, '')}`;
 };
 
 const getMatchHashtag = (home: string, away: string, league: string, homeTla?: string, awayTla?: string) => {
@@ -147,32 +77,19 @@ const getMatchHashtag = (home: string, away: string, league: string, homeTla?: s
         if (fallbackTla) return fallbackTla.toUpperCase();
         return name.replace(/ fc| cf| united| city/ig, '').replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase();
     };
-
-    const cleanH = getTla(home, homeTla);
-    const cleanA = getTla(away, awayTla);
-    const leagueTags = getLeagueHashtags(league);
-    
-    return `#${cleanH}${cleanA} ${leagueTags} #Football #LiveScores`;
+    return `#${getTla(home, homeTla)}${getTla(away, awayTla)} ${getLeagueHashtags(league)} #Football #LiveScores`;
 };
 
-// 🟢 CLOUDFLARE EDGE-SAFE ENCODER
 function encodeBase64Safe(obj: any) {
     const str = JSON.stringify(obj);
     const bytes = new TextEncoder().encode(str);
     let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 const getMatchImageUrl = (label: string, state: any, baseUrl: string) => {
-    const payload = { 
-        type: 'versus', label: label, 
-        home: state.home_team, away: state.away_team, 
-        hScore: state.home_score, aScore: state.away_score,
-        homeLogo: state.home_logo, awayLogo: state.away_logo
-    };
+    const payload = { type: 'versus', label: label, home: state.home_team, away: state.away_team, hScore: state.home_score, aScore: state.away_score, homeLogo: state.home_logo, awayLogo: state.away_logo };
     return `${baseUrl}/api/og?data=${encodeBase64Safe(payload)}`;
 };
 
@@ -180,6 +97,23 @@ const getImageKitProxyUrl = (rawUrl: string) => {
     const endpoint = process.env.IMAGEKIT_URL_ENDPOINT!.replace(/\/+$/, '');
     return `${endpoint}/tr:f-png/${encodeURIComponent(rawUrl)}`;
 };
+
+// 🟢 THE NEW TEMPLATE PARSER ENGINE
+function parseTemplate(text: string, state: any, matchUrl: string, extra: any) {
+    if (!text) return '';
+    return text
+        .replace(/\[HOME\]/g, state.home_team || '')
+        .replace(/\[AWAY\]/g, state.away_team || '')
+        .replace(/\[H_SCORE\]/g, state.home_score || 0)
+        .replace(/\[A_SCORE\]/g, state.away_score || 0)
+        .replace(/\[LINK\]/g, matchUrl)
+        .replace(/\[TIME\]/g, extra.time || '')
+        .replace(/\[SCORER\]/g, extra.scorer || '')
+        .replace(/\[STATUS\]/g, extra.statusText || '')
+        .replace(/\[CTA\]/g, extra.ctaText || '')
+        .replace(/\[PRE_CTA\]/g, extra.preMatchCta || '')
+        .replace(/\[HASHTAGS\]/g, extra.hashtags || '');
+}
 
 export async function POST(request: Request) {
     const authHeader = request.headers.get('Authorization');
@@ -189,47 +123,30 @@ export async function POST(request: Request) {
     const newState = body.record;
     const oldState = body.old_record || { home_score: 0, away_score: 0, status: 'PRE_MATCH', lineups: { home: [], away: [] }, match_events: [] };
     
-    if (!newState) {
-        console.error("WEBHOOK ERROR: Missing record payload.");
-        return NextResponse.json({ message: "No record found" }, { status: 400 });
-    }
+    if (!newState) return NextResponse.json({ message: "No record found" }, { status: 400 });
 
     const oldStatus = String(oldState.status).toUpperCase();
     const newStatus = String(newState.status).toUpperCase();
-
     const strictlyFinishedStatuses = ['FT', 'FINISHED', 'ABD', 'AET', 'AWARDED'];
     if (strictlyFinishedStatuses.includes(oldStatus) && strictlyFinishedStatuses.includes(newStatus)) {
         return NextResponse.json({ message: "Match already finished. Ignoring late correction." });
     }
 
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-    
     const { data: settingsData } = await supabase.from('site_settings').select('social_config').single();
     
     const config = settingsData?.social_config || {
-        credentials: {},
-        vip_teams: ['Arsenal', 'Chelsea', 'Liverpool', 'Man City', 'Man United', 'Tottenham', 'Barcelona', 'Real Madrid', 'Bayern', 'PSG', 'Juventus', 'Inter'],
-        vip_leagues: ['World Cup', 'Euro Championship'],
-        events: {
-            goals: { fb: true, x: true },
-            var_overturn: { fb: true, x: false },
-            penalty_awarded: { fb: true, x: false },
-            lineups: { fb: true, x: true },
-            kickoff: { fb: true, x: true },
-            halftime: { fb: true, x: false },
-            fulltime: { fb: true, x: true }
-        }
+        credentials: {}, vip_teams: [], vip_leagues: [], events: {}, templates: {}
     };
 
-    const isVipTeam = config.vip_teams.includes(newState.home_team) || config.vip_teams.includes(newState.away_team);
-    const isVipLeague = config.vip_leagues.includes(newState.league);
+    const isVipTeam = (config.vip_teams || []).includes(newState.home_team) || (config.vip_teams || []).includes(newState.away_team);
+    const isVipLeague = (config.vip_leagues || []).includes(newState.league);
     let isVIP = isVipTeam || isVipLeague;
     
     if (!isVIP) {
         const today = new Date().toISOString().split('T')[0];
         const { data: todaysMatches } = await supabase.from('matches').select('id, home_team, away_team, league').like('match_date', `${today}%`).order('match_date', { ascending: true });
-        const hasVIPToday = todaysMatches?.some(m => config.vip_teams.includes(m.home_team) || config.vip_teams.includes(m.away_team) || config.vip_leagues.includes(m.league));
-        
+        const hasVIPToday = todaysMatches?.some(m => (config.vip_teams || []).includes(m.home_team) || (config.vip_teams || []).includes(m.away_team) || (config.vip_leagues || []).includes(m.league));
         if (hasVIPToday) return NextResponse.json({ message: "Not a VIP team or league." });
         if (todaysMatches && todaysMatches.length > 0 && newState.id === todaysMatches[0].id) isVIP = true;
         else return NextResponse.json({ message: "Not the fallback match." });
@@ -239,21 +156,12 @@ export async function POST(request: Request) {
     const matchUrl = `${frontendUrl}/match/${newState.id}`; 
     const hashtags = getMatchHashtag(newState.home_team, newState.away_team, newState.league, newState.home_tla, newState.away_tla); 
     
-    let payload: SocialPayload = { credentials: config.credentials }; 
-
-    // 🔥 SMART MEDIA CTA LOGIC (Differentiates Audio vs Video)
     let ctaText = "👇 Match Stats & Updates:\n";
     let preMatchCta = "👇 See the tactical setup & subs here!\n";
-    
     if (newState.media_url || newState.stream_url) {
         const isAudio = newState.media_mode === 'audio' || String(newState.media_url).includes('audio') || String(newState.media_url).includes('radio');
-        if (isAudio) {
-            ctaText = "🎧 Listen to Live Commentary:\n👇\n";
-            preMatchCta = "🎧 Live radio coverage begins at kick-off!\n👇\n";
-        } else {
-            ctaText = "📺 Watch Live Match Stream:\n👇\n";
-            preMatchCta = "📺 Live stream begins at kick-off!\n👇\n";
-        }
+        if (isAudio) { ctaText = "🎧 Listen to Live Commentary:\n👇\n"; preMatchCta = "🎧 Live radio coverage begins at kick-off!\n👇\n"; } 
+        else { ctaText = "📺 Watch Live Match Stream:\n👇\n"; preMatchCta = "📺 Live stream begins at kick-off!\n👇\n"; }
     }
 
     const oldTotal = (oldState.home_score || 0) + (oldState.away_score || 0);
@@ -275,118 +183,111 @@ export async function POST(request: Request) {
     const htStatuses = ['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME', 'PAUSED'];
     const live2HStatuses = ['2H', 'SECOND_HALF', 'SECOND HALF'];
 
+    let eventKey = null;
+    let extraData: any = { ctaText, preMatchCta, hashtags };
+    let ogImageUrl = null;
+
     // -------------------------------------------------------------
     // 🚀 EVENT EVALUATION HIERARCHY
     // -------------------------------------------------------------
-
-    // 1. FULL TIME
     if (!strictlyFinishedStatuses.includes(oldStatus) && strictlyFinishedStatuses.includes(newStatus)) {
-        if (config.events.fulltime.fb) payload.fb1Message = `⏹️ FULL TIME!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n👇 Final Match Stats & Ratings:\n${matchUrl}`;
-        if (config.events.fulltime.x) payload.xMessage = `⏹️ FULL TIME.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}.\n\n👇 Final Stats:\n${matchUrl}\n\n${hashtags}`;
-
-        if (config.events.fulltime.fb || config.events.fulltime.x) {
-            const ftUrl = getMatchImageUrl('FULL TIME', newState, frontendUrl);
-            if (config.events.fulltime.x) payload.xImageUrl = getImageKitProxyUrl(ftUrl);
-            if (config.events.fulltime.fb) payload.fb1ImageUrl = ftUrl; 
-        }
-    }
-    // 2. VAR OVERTURN
-    else if (newTotal < oldTotal) {
-        if (config.events.var_overturn.fb) payload.fb1Message = `❌ VAR DECISION: OVERTURNED - Previous G/Event has been canceled.\n\nThe score returns to:\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n${ctaText}${matchUrl}`;
-        if (config.events.var_overturn.x) payload.xMessage = `❌ VAR DECISION: OVERTURNED - Previous G/Event canceled.\n\n⚽ ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n${ctaText}${matchUrl}\n\n${hashtags}`;
+        eventKey = 'fulltime';
+        ogImageUrl = getMatchImageUrl('FULL TIME', newState, frontendUrl);
     } 
-    // 3. GOAL OR SHOOTOUT SCORED
+    else if (newTotal < oldTotal) {
+        eventKey = 'var_overturn';
+    } 
     else if (newTotal > oldTotal || newGoalsList.length > oldGoalsList.length) {
         if (newGoalsList.length < newTotal) return NextResponse.json({ message: "Facts data lagging behind scoreboard. Waiting for next ping." });
-        let statusText = live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus) ? '' : ` (${newState.status})`;
-        let scorerText = "";
+        eventKey = 'goals';
+        extraData.statusText = live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus) ? '' : ` (${newState.status})`;
         
         if (newGoalsList.length > 0) {
             const sortedGoals = [...newGoalsList].sort((a, b) => parseTime(b.time || b.minute) - parseTime(a.time || a.minute));
             const latest = sortedGoals[0];
             const player = latest.player || latest.playerName || latest.name || "Unknown Player";
             const time = latest.time || latest.minute ? `${latest.time || latest.minute}' ` : '';
-            scorerText = `\n⚽ GOAL - ${player} (${time.trim()})\n`;
+            extraData.scorer = `\n⚽ GOAL - ${player} (${time.trim()})\n`;
         } 
-        if (!scorerText.trim()) scorerText = `\n⚽ GOAL - Confirmed! Tap the link below for full details!\n`;
+        if (!extraData.scorer) extraData.scorer = `\n⚽ GOAL - Confirmed! Tap the link below for full details!\n`;
 
-        if (['PEN', 'PEN_SHOOT_OUT'].includes(newStatus)) {
-            if (config.events.goals.fb) payload.fb1Message = `🥅 PENALTY SCORED!\n\nShootout Update: ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n${ctaText}${matchUrl}`;
-            if (config.events.goals.x) {
-                payload.xMessage = `🥅 PENALTY SCORED!\n\nShootout: ${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n${ctaText}${matchUrl}\n\n${hashtags}`;
-                payload.xImageUrl = getImageKitProxyUrl(getMatchImageUrl('PENALTY SCORED', newState, frontendUrl));
-            }
-        } else {
-            if (config.events.goals.fb) payload.fb1Message = `🚨 GOAL ALERT!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\n${ctaText}${matchUrl}`;
-            if (config.events.goals.x) {
-                payload.xMessage = `🚨 GOAL ALERT!\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}${statusText}\n${scorerText}\n${ctaText}${matchUrl}\n\n${hashtags}`;
-                payload.xImageUrl = getImageKitProxyUrl(getMatchImageUrl('GOAL ALERT!', newState, frontendUrl)); 
-            }
-        }
+        if (['PEN', 'PEN_SHOOT_OUT'].includes(newStatus)) ogImageUrl = getMatchImageUrl('PENALTY SCORED', newState, frontendUrl);
+        else ogImageUrl = getMatchImageUrl('GOAL ALERT!', newState, frontendUrl); 
     } 
-    // 4. PENALTY AWARDED (Strict Filter Applied Above)
     else if (newTotal === oldTotal && newPenaltiesList.length > oldPenaltiesList.length) {
+        eventKey = 'penalty_awarded';
         const sortedPens = [...newPenaltiesList].sort((a, b) => parseTime(b.time || b.minute) - parseTime(a.time || a.minute));
-        const time = sortedPens[0].time || sortedPens[0].minute ? `${sortedPens[0].time || sortedPens[0].minute}'` : '';
-        
-        if (config.events.penalty_awarded.fb) payload.fb1Message = `⚠️ PENALTY AWARDED - (Confirmed by Referee/VAR) ${time}\n\nMassive moment in the match! Will they convert it?\n\n${ctaText}${matchUrl}`;
-        if (config.events.penalty_awarded.x) payload.xMessage = `⚠️ PENALTY AWARDED - ${time}\n\nMassive moment in the match! Will they convert it?\n\n${ctaText}${matchUrl}\n\n${hashtags}`;
-    }
-    // 5. HALF TIME
-    else if (!htStatuses.includes(oldStatus) && htStatuses.includes(newStatus)) {
-        if (config.events.halftime.fb) payload.fb1Message = `⏸️ HALF TIME.\n\nHow do you rate the first half performance?\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n${ctaText}${matchUrl}`;
-        if (config.events.halftime.x) payload.xMessage = `⏸️ HALF TIME.\n\n${newState.home_team} ${newState.home_score} - ${newState.away_score} ${newState.away_team}\n\n${ctaText}${matchUrl}\n\n${hashtags}`;
-    }
-    // 6. SECOND HALF KICK OFF
-    else if (htStatuses.includes(oldStatus) && (live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus))) {
-        if (config.events.kickoff.fb) payload.fb1Message = `⏱️ SECOND HALF KICK-OFF!\n\nWe are back underway: ${newState.home_team} vs ${newState.away_team}.\n\n${ctaText}${matchUrl}`;
-        if (config.events.kickoff.x) payload.xMessage = `⏱️ SECOND HALF KICK-OFF!\n\nWe are back underway.\n\n${ctaText}${matchUrl}\n\n${hashtags}`;
-    }
-    // 7. MATCH KICK OFF
-    else if (preStatuses.includes(oldStatus) && live1HStatuses.includes(newStatus)) {
-        if (config.events.kickoff.fb) payload.fb1Message = `⏱️ KICK-OFF!\n\nWe are officially underway: ${newState.home_team} vs ${newState.away_team}.\n\n${ctaText}${matchUrl}`;
-        if (config.events.kickoff.x) payload.xMessage = `⏱️ KICK-OFF!\n\nWe are officially underway.\n\n${ctaText}${matchUrl}\n\n${hashtags}`;
-        
-        if (config.events.kickoff.fb || config.events.kickoff.x) {
-            const kickoffUrl = getMatchImageUrl('KICK-OFF', newState, frontendUrl);
-            if (config.events.kickoff.x) payload.xImageUrl = getImageKitProxyUrl(kickoffUrl);
-            if (config.events.kickoff.fb) payload.fb1ImageUrl = kickoffUrl; 
-        }
-    }
-    // 8. LINEUPS (Now independent of the HT status bug)
-    else if (oldWasIncomplete && newIsComplete) {
-        if (config.events.lineups.fb) payload.fb1Message = `📋 STARTING XI ANNOUNCED!\n\n${newState.home_team} vs ${newState.away_team}\n\n${preMatchCta}${matchUrl}`;
-        if (config.events.lineups.x) payload.xMessage = `🚨 STARTING XI: ${newState.home_team} vs ${newState.away_team}!\n\n${preMatchCta}${matchUrl}\n\n${hashtags}`;
-        
-        if (config.events.lineups.fb || config.events.lineups.x) {
-            const lineupOg = { 
-                type: 'pitch', label: 'STARTING XI', 
-                home: newState.home_team, away: newState.away_team, 
-                homeFormation: newState.lineups?.formations?.home || '4-3-3',
-                awayFormation: newState.lineups?.formations?.away || '4-3-3',
-                homeXI: newValidH.slice(0, 11), awayXI: newValidA.slice(0, 11)
-            };
-            const rawLineupUrl = `${frontendUrl}/api/og?data=${encodeBase64Safe(lineupOg)}`;
-            if (config.events.lineups.x) payload.xImageUrl = getImageKitProxyUrl(rawLineupUrl);
-            if (config.events.lineups.fb) payload.fb1ImageUrl = rawLineupUrl; 
-        }
+        extraData.time = sortedPens[0].time || sortedPens[0].minute ? `${sortedPens[0].time || sortedPens[0].minute}'` : '';
     } 
+    else if (!htStatuses.includes(oldStatus) && htStatuses.includes(newStatus)) {
+        eventKey = 'halftime';
+    } 
+    else if (htStatuses.includes(oldStatus) && (live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus))) {
+        eventKey = 'kickoff';
+    } 
+    else if (preStatuses.includes(oldStatus) && live1HStatuses.includes(newStatus)) {
+        eventKey = 'kickoff';
+        ogImageUrl = getMatchImageUrl('KICK-OFF', newState, frontendUrl);
+    } 
+    else if (oldWasIncomplete && newIsComplete) {
+        eventKey = 'lineups';
+        const lineupOg = { 
+            type: 'pitch', label: 'STARTING XI', 
+            home: newState.home_team, away: newState.away_team, 
+            homeFormation: newState.lineups?.formations?.home || '4-3-3',
+            awayFormation: newState.lineups?.formations?.away || '4-3-3',
+            homeXI: newValidH.slice(0, 11), awayXI: newValidA.slice(0, 11)
+        };
+        ogImageUrl = `${frontendUrl}/api/og?data=${encodeBase64Safe(lineupOg)}`;
+    }
 
-    if (!payload.fb1Message && !payload.xMessage) return NextResponse.json({ message: "Event suppressed by Social Admin config or no relevant trigger." });
+    if (!eventKey) return NextResponse.json({ message: "No relevant trigger." });
 
-    // 🟢 INSTANT DELIVERY TO MAKE.COM
+    // -------------------------------------------------------------
+    // 🚀 DYNAMIC MULTI-ACCOUNT BROADCASTER
+    // -------------------------------------------------------------
+    const evtConfig = config.events[eventKey] || {};
+    const tpl = config.templates?.[eventKey] || {};
+
+    // Generate specific text for every enabled platform
+    const fb1Text = evtConfig.fb1 ? parseTemplate(tpl.fb1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]`, newState, matchUrl, extraData) : null;
+    const fb2Text = evtConfig.fb2 ? parseTemplate(tpl.fb2 || fb1Text || '', newState, matchUrl, extraData) : null;
+    const make1Text = evtConfig.make1 ? parseTemplate(tpl.make1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]\n[HASHTAGS]`, newState, matchUrl, extraData) : null;
+    const make2Text = evtConfig.make2 ? parseTemplate(tpl.make2 || make1Text || '', newState, matchUrl, extraData) : null;
+    const tgMsg = evtConfig.tg_general ? parseTemplate(tpl.tg_general || `<b>[HOME] [H_SCORE] - [A_SCORE] [AWAY]</b>\n<a href="[LINK]">Match Center</a>`, newState, matchUrl, extraData) : null;
+
+    const creds = config.credentials || {};
+    const proxiedImage = ogImageUrl ? getImageKitProxyUrl(ogImageUrl) : null;
+
     try {
-        await postToSocials(payload);
-        
+        if (evtConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
+            await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb1Text, x_text: make1Text, x_image_url: proxiedImage }) }).catch(()=>{});
+        }
+        if (evtConfig.make2 && creds.make_webhook_2) {
+            await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb2Text, x_text: make2Text, x_image_url: proxiedImage }) }).catch(()=>{});
+        }
+        if (evtConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
+            const pageId = creds.fb1_id || process.env.FB_PAGE_ID; const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
+            const url = ogImageUrl ? `https://graph.facebook.com/v19.0/${pageId}/photos?url=${encodeURIComponent(ogImageUrl)}&message=${encodeURIComponent(fb1Text!)}&access_token=${token}` : `https://graph.facebook.com/v19.0/${pageId}/feed?message=${encodeURIComponent(fb1Text!)}&access_token=${token}`;
+            await fetch(url, { method: 'POST' }).catch(()=>{});
+        }
+        if (evtConfig.fb2 && creds.fb2_id && creds.fb2_token) {
+            const url = ogImageUrl ? `https://graph.facebook.com/v19.0/${creds.fb2_id}/photos?url=${encodeURIComponent(ogImageUrl)}&message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}` : `https://graph.facebook.com/v19.0/${creds.fb2_id}/feed?message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}`;
+            await fetch(url, { method: 'POST' }).catch(()=>{});
+        }
+        if (evtConfig.tg_general && creds.telegram_bot_token && creds.tg_general_channels) {
+            for (const channel of creds.tg_general_channels) {
+                await fetch(`https://api.telegram.org/bot${creds.telegram_bot_token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: channel.chatId, text: tgMsg, parse_mode: 'HTML', disable_web_page_preview: false }) }).catch(()=>{});
+            }
+        }
+
+        // Auto-Index the URL on Google
         fetch(`${frontendUrl}/api/index-url`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
             body: JSON.stringify({ url: matchUrl, type: 'URL_UPDATED' })
         }).catch(() => {});
 
-    } catch (err) {
-        console.error("Critical error firing socials:", err);
-    }
+    } catch (err) { console.error("Critical error firing socials:", err); }
 
-    return NextResponse.json({ success: true, event: "Webhook successfully fired." });
+    return NextResponse.json({ success: true, event: eventKey });
 }

@@ -37,6 +37,23 @@ const isStrongMatch = (dbName, espnName) => {
     return s1.includes(s2) || s2.includes(s1);
 };
 
+// 🟢 DYNAMIC TEMPLATE PARSER
+function parseTemplate(templateText, match, analysis, link, dateStr) {
+    if (!templateText) return null;
+    let text = templateText;
+    if (match) {
+        text = text.replace(/\[HOME\]/g, match.home_team).replace(/\[AWAY\]/g, match.away_team);
+    }
+    if (analysis) {
+        text = text.replace(/\[PICK\]/g, analysis.primary)
+                   .replace(/\[ODDS\]/g, analysis.odds)
+                   .replace(/\[RATIONALE\]/g, analysis.rationale);
+    }
+    if (link) text = text.replace(/\[LINK\]/g, link);
+    if (dateStr) text = text.replace(/\[DATE\]/g, dateStr);
+    return text;
+}
+
 async function postToTelegram(botToken, chatId, text, parseMode = 'HTML') {
     if (!botToken || !chatId) return;
     try {
@@ -133,6 +150,7 @@ async function runProSlipEngine() {
     const tgGeneralChannels = creds.tg_general_channels || [];
     const tgVipChannels = creds.tg_vip_channels || [];
     const freeTipsConfig = eventsConfig.free_tips || {};
+    const templates = config.templates?.free_tips || {};
 
     const now = new Date();
     const todayDateString = now.toISOString().split('T')[0];
@@ -220,15 +238,20 @@ async function runProSlipEngine() {
         const matchLink = `https://factsport.com/match/${freeTipMatch.id}`;
         const matchDateObj = formatDate(freeTipMatch.match_date); 
         
-        const fbText = `🎁 FREE BET OF THE DAY 🎁\n\n📅 Date: ${matchDateObj}\n⚽️ ${freeTipMatch.home_team} vs ${freeTipMatch.away_team}\n🎯 Prediction: ${freeTipMatch.pro_analysis.primary}\n🔥 Odds: ${freeTipMatch.pro_analysis.odds}\n\n👇 See full stats and place your bet!\n${matchLink}`;
-        const xText = `🎁 FREE BET OF THE DAY!\n\n📅 ${matchDateObj}\n⚽️ ${freeTipMatch.home_team} vs ${freeTipMatch.away_team}\n🎯 Pick: ${freeTipMatch.pro_analysis.primary} (${freeTipMatch.pro_analysis.odds})\n\n👇 Full stats:\n${matchLink}`;
+        // 🟢 APPLY DASHBOARD TEMPLATES (With Fallbacks)
+        const fb1Text = parseTemplate(templates.fb1 || `🎁 FREE BET OF THE DAY 🎁\n\n📅 Date: [DATE]\n⚽️ [HOME] vs [AWAY]\n🎯 Prediction: [PICK]\n🔥 Odds: [ODDS]\n\n👇 See full stats and place your bet!\n[LINK]`, freeTipMatch, freeTipMatch.pro_analysis, matchLink, matchDateObj);
+        const fb2Text = parseTemplate(templates.fb2 || fb1Text, freeTipMatch, freeTipMatch.pro_analysis, matchLink, matchDateObj);
+        
+        const make1Text = parseTemplate(templates.make1 || `🎁 FREE BET OF THE DAY!\n\n📅 [DATE]\n⚽️ [HOME] vs [AWAY]\n🎯 Pick: [PICK] ([ODDS])\n\n👇 Full stats:\n[LINK]`, freeTipMatch, freeTipMatch.pro_analysis, matchLink, matchDateObj);
+        const make2Text = parseTemplate(templates.make2 || make1Text, freeTipMatch, freeTipMatch.pro_analysis, matchLink, matchDateObj);
 
         // TELEGRAM ROUTING
         if (freeTipsConfig.tg_general && tgGeneralChannels.length > 0) {
             for (const channel of tgGeneralChannels) {
                 if (channel.wants_freetips) {
                     const linkToUse = channel.link || matchLink; 
-                    const freeTgMsg = `🎁 <b>FREE BET OF THE DAY</b> 🎁\n\n📅 <b>Date:</b> ${matchDateObj}\n⚽️ <b>${freeTipMatch.home_team} vs ${freeTipMatch.away_team}</b>\n\n🎯 <b>Prediction:</b> ${freeTipMatch.pro_analysis.primary}\n🔥 <b>Odds:</b> ${freeTipMatch.pro_analysis.odds}\n\n🧠 <b>Why?:</b> <i>${freeTipMatch.pro_analysis.rationale}</i>\n\n👉 <a href="${linkToUse}">Bet on this match here!</a>`;
+                    const rawTgMsg = templates.tg_general || `🎁 <b>FREE BET OF THE DAY</b> 🎁\n\n📅 <b>Date:</b> [DATE]\n⚽️ <b>[HOME] vs [AWAY]</b>\n\n🎯 <b>Prediction:</b> [PICK]\n🔥 <b>Odds:</b> [ODDS]\n\n🧠 <b>Why?:</b> <i>[RATIONALE]</i>\n\n👉 <a href="[LINK]">Bet on this match here!</a>`;
+                    const freeTgMsg = parseTemplate(rawTgMsg, freeTipMatch, freeTipMatch.pro_analysis, linkToUse, matchDateObj);
                     await postToTelegram(creds.telegram_bot_token, channel.chatId, freeTgMsg);
                     successfullyPosted = true; await delay(1500);
                 }
@@ -237,20 +260,20 @@ async function runProSlipEngine() {
 
         // MAKE.COM 1
         if (freeTipsConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
-            await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fbText, x_text: xText }) }).then(() => successfullyPosted = true).catch(()=>{});
+            await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb1Text, x_text: make1Text }) }).then(() => successfullyPosted = true).catch(()=>{});
         }
         // MAKE.COM 2
         if (freeTipsConfig.make2 && creds.make_webhook_2) {
-            await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fbText, x_text: xText }) }).then(() => successfullyPosted = true).catch(()=>{});
+            await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb2Text, x_text: make2Text }) }).then(() => successfullyPosted = true).catch(()=>{});
         }
         // FACEBOOK 1
         if (freeTipsConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
             const pageId = creds.fb1_id || process.env.FB_PAGE_ID; const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
-            await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed?message=${encodeURIComponent(fbText)}&access_token=${token}`, { method: 'POST' }).then(() => successfullyPosted = true).catch(()=>{});
+            await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed?message=${encodeURIComponent(fb1Text)}&access_token=${token}`, { method: 'POST' }).then(() => successfullyPosted = true).catch(()=>{});
         }
         // FACEBOOK 2
         if (freeTipsConfig.fb2 && creds.fb2_id && creds.fb2_token) {
-            await fetch(`https://graph.facebook.com/v19.0/${creds.fb2_id}/feed?message=${encodeURIComponent(fbText)}&access_token=${creds.fb2_token}`, { method: 'POST' }).then(() => successfullyPosted = true).catch(()=>{});
+            await fetch(`https://graph.facebook.com/v19.0/${creds.fb2_id}/feed?message=${encodeURIComponent(fb2Text)}&access_token=${creds.fb2_token}`, { method: 'POST' }).then(() => successfullyPosted = true).catch(()=>{});
         }
 
         if (successfullyPosted) {
