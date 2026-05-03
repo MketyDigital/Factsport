@@ -17,7 +17,14 @@ function encodeBase64Safe(obj: any) {
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-// 🟢 TS FIX: Added : string
+// 🟢 ORIGINAL IMAGEKIT LOGIC RESTORED
+const getImageKitProxyUrl = (rawUrl: string) => {
+    const endpoint = process.env.IMAGEKIT_URL_ENDPOINT?.replace(/\/+$/, '');
+    if (!endpoint) return rawUrl;
+    return `${endpoint}/tr:f-png/${encodeURIComponent(rawUrl)}`;
+};
+
+// 🟢 TS TYPES ADDED SO VERCEL BUILDS CORRECTLY
 function parseArticleTemplate(templateText: string, generatedContent: string, link: string) {
     if (!templateText) return null;
     return templateText.replace(/\[AI_TEXT\]/g, generatedContent).replace(/\[LINK\]/g, link);
@@ -98,6 +105,9 @@ export async function GET(request: Request) {
     const ogPayload = { type: 'schedule', label: 'DAILY ROUNDUP', matches: topMatches };
     const safeBase64 = encodeBase64Safe(ogPayload);
     const resultsOgUrl = `${frontendUrl}/api/og?data=${safeBase64}`;
+    
+    // 🟢 Proxy the URL via ImageKit
+    const proxiedImage = getImageKitProxyUrl(resultsOgUrl);
 
     try {
         const controller = new AbortController();
@@ -122,19 +132,22 @@ export async function GET(request: Request) {
         const make1Text = parseArticleTemplate(templates.make1 || `[AI_TEXT]\n\nFull results & stats : [LINK] 👇🏼`, rawXText, link);
         const make2Text = parseArticleTemplate(templates.make2 || make1Text!, rawXText, link);
 
+        const makePayload1: any = { fb2_text: fb1Text, x_text: make1Text, x_image_url: proxiedImage };
+        const makePayload2: any = { fb2_text: fb2Text, x_text: make2Text, x_image_url: proxiedImage };
+
         if (summaryConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
-            await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb1Text, x_text: make1Text, x_image_url: resultsOgUrl }) }).catch(()=>{});
+            await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makePayload1) }).catch(()=>{});
         }
         if (summaryConfig.make2 && creds.make_webhook_2) {
-            await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb2Text, x_text: make2Text, x_image_url: resultsOgUrl }) }).catch(()=>{});
+            await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makePayload2) }).catch(()=>{});
         }
         if (summaryConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
             const pageId = creds.fb1_id || process.env.FB_PAGE_ID;
             const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
-            await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos?url=${encodeURIComponent(resultsOgUrl)}&message=${encodeURIComponent(fb1Text!)}&access_token=${token}`, { method: 'POST' }).catch(()=>{});
+            await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos?url=${encodeURIComponent(proxiedImage)}&message=${encodeURIComponent(fb1Text!)}&access_token=${token}`, { method: 'POST' }).catch(()=>{});
         }
         if (summaryConfig.fb2 && creds.fb2_id && creds.fb2_token) {
-            await fetch(`https://graph.facebook.com/v19.0/${creds.fb2_id}/photos?url=${encodeURIComponent(resultsOgUrl)}&message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}`, { method: 'POST' }).catch(()=>{});
+            await fetch(`https://graph.facebook.com/v19.0/${creds.fb2_id}/photos?url=${encodeURIComponent(proxiedImage)}&message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}`, { method: 'POST' }).catch(()=>{});
         }
         if (summaryConfig.tg_general && creds.telegram_bot_token && creds.tg_general_channels) {
             for (const channel of creds.tg_general_channels) {
