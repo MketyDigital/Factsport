@@ -249,7 +249,6 @@ export async function POST(request: Request) {
     const evtConfig = config.events[eventKey] || {};
     const tpl = config.templates?.[eventKey] || {};
 
-    // Generate specific text for every enabled platform
     const fb1Text = evtConfig.fb1 ? parseTemplate(tpl.fb1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]`, newState, matchUrl, extraData) : null;
     const fb2Text = evtConfig.fb2 ? parseTemplate(tpl.fb2 || fb1Text || '', newState, matchUrl, extraData) : null;
     const make1Text = evtConfig.make1 ? parseTemplate(tpl.make1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]\n[HASHTAGS]`, newState, matchUrl, extraData) : null;
@@ -281,7 +280,6 @@ export async function POST(request: Request) {
             }
         }
 
-        // Auto-Index the URL on Google
         fetch(`${frontendUrl}/api/index-url`, {
             method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
             body: JSON.stringify({ url: matchUrl, type: 'URL_UPDATED' })

@@ -17,7 +17,8 @@ function encodeBase64Safe(obj: any) {
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function parseArticleTemplate(templateText, generatedContent, link) {
+// 🟢 TS FIX: Added : string
+function parseArticleTemplate(templateText: string, generatedContent: string, link: string) {
     if (!templateText) return null;
     return templateText.replace(/\[AI_TEXT\]/g, generatedContent).replace(/\[LINK\]/g, link);
 }
@@ -116,11 +117,10 @@ export async function GET(request: Request) {
 
         const link = `${frontendUrl}/matches`;
 
-        // 🟢 APPLY DASHBOARD TEMPLATES
         const fb1Text = parseArticleTemplate(templates.fb1 || `[AI_TEXT]\n\nFull results, stats, player ratings & tactical news: [LINK] 🏆`, rawFbText, link);
-        const fb2Text = parseArticleTemplate(templates.fb2 || fb1Text, rawFbText, link);
+        const fb2Text = parseArticleTemplate(templates.fb2 || fb1Text!, rawFbText, link);
         const make1Text = parseArticleTemplate(templates.make1 || `[AI_TEXT]\n\nFull results & stats : [LINK] 👇🏼`, rawXText, link);
-        const make2Text = parseArticleTemplate(templates.make2 || make1Text, rawXText, link);
+        const make2Text = parseArticleTemplate(templates.make2 || make1Text!, rawXText, link);
 
         if (summaryConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
             await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb1Text, x_text: make1Text, x_image_url: resultsOgUrl }) }).catch(()=>{});
@@ -131,10 +131,10 @@ export async function GET(request: Request) {
         if (summaryConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
             const pageId = creds.fb1_id || process.env.FB_PAGE_ID;
             const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
-            await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos?url=${encodeURIComponent(resultsOgUrl)}&message=${encodeURIComponent(fb1Text)}&access_token=${token}`, { method: 'POST' }).catch(()=>{});
+            await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos?url=${encodeURIComponent(resultsOgUrl)}&message=${encodeURIComponent(fb1Text!)}&access_token=${token}`, { method: 'POST' }).catch(()=>{});
         }
         if (summaryConfig.fb2 && creds.fb2_id && creds.fb2_token) {
-            await fetch(`https://graph.facebook.com/v19.0/${creds.fb2_id}/photos?url=${encodeURIComponent(resultsOgUrl)}&message=${encodeURIComponent(fb2Text)}&access_token=${creds.fb2_token}`, { method: 'POST' }).catch(()=>{});
+            await fetch(`https://graph.facebook.com/v19.0/${creds.fb2_id}/photos?url=${encodeURIComponent(resultsOgUrl)}&message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}`, { method: 'POST' }).catch(()=>{});
         }
         if (summaryConfig.tg_general && creds.telegram_bot_token && creds.tg_general_channels) {
             for (const channel of creds.tg_general_channels) {

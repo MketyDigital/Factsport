@@ -18,7 +18,6 @@ const DEFAULT_EVENTS = {
     vip_tips: { tg_vip: true, label: "Pro AI Analysis (VIP Only)" }
 };
 
-// 🟢 ALL DEFAULT TEMPLATES LOADED FOR THE MODAL
 const DEFAULT_TEMPLATES: Record<string, Record<string, string>> = {
     goals: {
         fb1: "🚨 GOAL ALERT!\n\n[HOME] [H_SCORE] - [A_SCORE] [AWAY][STATUS]\n[SCORER]\n[CTA][LINK]",
@@ -346,6 +345,7 @@ export default function SocialSettingsManager() {
                         </div>
                     </div>
                 </div>
+
             </div>
         </div>
     );
