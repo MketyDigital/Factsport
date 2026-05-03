@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
+// 🟢 STRICT ACCURACY SHIELDS (Original)
 const getValidGoals = (eventsArr: any[]) => {
     if (!Array.isArray(eventsArr)) return [];
     return eventsArr.filter((e: any) => {
@@ -28,6 +29,7 @@ const parseTime = (t: any) => {
     return (parseInt(parts[0]) || 0) * 100 + (parseInt(parts[1]) || 0); 
 };
 
+// 🟢 EXPANDED KNOWN TEAMS DICTIONARY (Original)
 const KNOWN_TEAMS: Record<string, string> = {
     'manchester city': 'MCI', 'man city': 'MCI', 'm. city': 'MCI', 'manchester united': 'MUN', 'man united': 'MUN', 'man utd': 'MUN',
     'arsenal': 'ARS', 'arsenal fc': 'ARS', 'chelsea': 'CHE', 'chelsea fc': 'CHE', 'liverpool': 'LIV', 'liverpool fc': 'LIV',
@@ -93,12 +95,13 @@ const getMatchImageUrl = (label: string, state: any, baseUrl: string) => {
     return `${baseUrl}/api/og?data=${encodeBase64Safe(payload)}`;
 };
 
+// 🟢 ORIGINAL IMAGEKIT LOGIC RESTORED (Works specifically for Buffer)
 const getImageKitProxyUrl = (rawUrl: string) => {
-    const endpoint = process.env.IMAGEKIT_URL_ENDPOINT!.replace(/\/+$/, '');
+    const endpoint = process.env.IMAGEKIT_URL_ENDPOINT?.replace(/\/+$/, '');
+    if (!endpoint) return rawUrl;
     return `${endpoint}/tr:f-png/${encodeURIComponent(rawUrl)}`;
 };
 
-// 🟢 THE NEW TEMPLATE PARSER ENGINE
 function parseTemplate(text: string, state: any, matchUrl: string, extra: any) {
     if (!text) return '';
     return text
@@ -135,9 +138,7 @@ export async function POST(request: Request) {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     const { data: settingsData } = await supabase.from('site_settings').select('social_config').single();
     
-    const config = settingsData?.social_config || {
-        credentials: {}, vip_teams: [], vip_leagues: [], events: {}, templates: {}
-    };
+    const config = settingsData?.social_config || { credentials: {}, vip_teams: [], vip_leagues: [], events: {}, templates: {} };
 
     const isVipTeam = (config.vip_teams || []).includes(newState.home_team) || (config.vip_teams || []).includes(newState.away_team);
     const isVipLeague = (config.vip_leagues || []).includes(newState.league);
@@ -156,6 +157,7 @@ export async function POST(request: Request) {
     const matchUrl = `${frontendUrl}/match/${newState.id}`; 
     const hashtags = getMatchHashtag(newState.home_team, newState.away_team, newState.league, newState.home_tla, newState.away_tla); 
     
+    // 🟢 SMART MEDIA CTA LOGIC (Original)
     let ctaText = "👇 Match Stats & Updates:\n";
     let preMatchCta = "👇 See the tactical setup & subs here!\n";
     if (newState.media_url || newState.stream_url) {
@@ -187,9 +189,7 @@ export async function POST(request: Request) {
     let extraData: any = { ctaText, preMatchCta, hashtags };
     let ogImageUrl = null;
 
-    // -------------------------------------------------------------
-    // 🚀 EVENT EVALUATION HIERARCHY
-    // -------------------------------------------------------------
+    // 🟢 EVENT EVALUATION HIERARCHY (Original)
     if (!strictlyFinishedStatuses.includes(oldStatus) && strictlyFinishedStatuses.includes(newStatus)) {
         eventKey = 'fulltime';
         ogImageUrl = getMatchImageUrl('FULL TIME', newState, frontendUrl);
@@ -201,7 +201,6 @@ export async function POST(request: Request) {
         if (newGoalsList.length < newTotal) return NextResponse.json({ message: "Facts data lagging behind scoreboard. Waiting for next ping." });
         eventKey = 'goals';
         extraData.statusText = live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus) ? '' : ` (${newState.status})`;
-        
         if (newGoalsList.length > 0) {
             const sortedGoals = [...newGoalsList].sort((a, b) => parseTime(b.time || b.minute) - parseTime(a.time || a.minute));
             const latest = sortedGoals[0];
@@ -243,9 +242,6 @@ export async function POST(request: Request) {
 
     if (!eventKey) return NextResponse.json({ message: "No relevant trigger." });
 
-    // -------------------------------------------------------------
-    // 🚀 DYNAMIC MULTI-ACCOUNT BROADCASTER
-    // -------------------------------------------------------------
     const evtConfig = config.events[eventKey] || {};
     const tpl = config.templates?.[eventKey] || {};
 
@@ -256,14 +252,23 @@ export async function POST(request: Request) {
     const tgMsg = evtConfig.tg_general ? parseTemplate(tpl.tg_general || `<b>[HOME] [H_SCORE] - [A_SCORE] [AWAY]</b>\n<a href="[LINK]">Match Center</a>`, newState, matchUrl, extraData) : null;
 
     const creds = config.credentials || {};
+    
+    // 🟢 Apply ImageKit proxy only if an image exists
     const proxiedImage = ogImageUrl ? getImageKitProxyUrl(ogImageUrl) : null;
+
+    // 🟢 SAFELY CONSTRUCT PAYLOAD (Fixes Make.com null error)
+    const makePayload1: any = { fb2_text: fb1Text, x_text: make1Text };
+    if (proxiedImage) makePayload1.x_image_url = proxiedImage;
+
+    const makePayload2: any = { fb2_text: fb2Text, x_text: make2Text };
+    if (proxiedImage) makePayload2.x_image_url = proxiedImage;
 
     try {
         if (evtConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
-            await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb1Text, x_text: make1Text, x_image_url: proxiedImage }) }).catch(()=>{});
+            await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makePayload1) }).catch(()=>{});
         }
         if (evtConfig.make2 && creds.make_webhook_2) {
-            await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb2Text, x_text: make2Text, x_image_url: proxiedImage }) }).catch(()=>{});
+            await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makePayload2) }).catch(()=>{});
         }
         if (evtConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
             const pageId = creds.fb1_id || process.env.FB_PAGE_ID; const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
