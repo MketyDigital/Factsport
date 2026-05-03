@@ -39,6 +39,14 @@ function cleanText(str: string) {
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
 }
 
+// Fallback Player SVG Icon
+const PlayerIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+    </svg>
+);
+
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
@@ -92,10 +100,22 @@ export async function GET(req: NextRequest) {
                                     {renderHomeRows.map((row, i) => (
                                         <div key={i} style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-around', width: '100%' }}>
                                             {row.map((player: string, j: number) => {
-                                                const lastName = player ? player.trim().split(' ').pop() : '';
+                                                // Extract Number & Name
+                                                const playerStr = player ? player.trim() : '';
+                                                const numberMatch = playerStr.match(/\b(\d{1,2})\b/);
+                                                const playerNumber = numberMatch ? numberMatch[0] : '';
+                                                const nameCleaned = playerStr.replace(/\b\d{1,2}\b/g, '').replace(/[()]/g, '').trim();
+                                                const lastName = nameCleaned ? nameCleaned.split(' ').pop() : '';
+
                                                 return (
                                                     <div key={j} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                                        <div style={{ display: 'flex', width: 34, height: 34, borderRadius: 17, backgroundColor: '#2563eb', borderWidth: 3, borderStyle: 'solid', borderColor: '#ffffff' }}></div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 17, backgroundColor: '#2563eb', borderWidth: 3, borderStyle: 'solid', borderColor: '#ffffff' }}>
+                                                            {playerNumber ? (
+                                                                <span style={{ fontSize: 14, fontWeight: 900, color: 'white', marginTop: 2 }}>{playerNumber}</span>
+                                                            ) : (
+                                                                <PlayerIcon />
+                                                            )}
+                                                        </div>
                                                         {lastName && (
                                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 6, backgroundColor: '#00000099', paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6, borderRadius: 4 }}>
                                                                 <div style={{ display: 'flex', fontSize: 13, fontWeight: 800, color: 'white' }}>
@@ -128,10 +148,22 @@ export async function GET(req: NextRequest) {
                                     {renderAwayRows.map((row, i) => (
                                         <div key={i} style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-around', width: '100%' }}>
                                             {row.map((player: string, j: number) => {
-                                                const lastName = player ? player.trim().split(' ').pop() : '';
+                                                // Extract Number & Name
+                                                const playerStr = player ? player.trim() : '';
+                                                const numberMatch = playerStr.match(/\b(\d{1,2})\b/);
+                                                const playerNumber = numberMatch ? numberMatch[0] : '';
+                                                const nameCleaned = playerStr.replace(/\b\d{1,2}\b/g, '').replace(/[()]/g, '').trim();
+                                                const lastName = nameCleaned ? nameCleaned.split(' ').pop() : '';
+
                                                 return (
                                                     <div key={j} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                                        <div style={{ display: 'flex', width: 34, height: 34, borderRadius: 17, backgroundColor: '#dc2626', borderWidth: 3, borderStyle: 'solid', borderColor: '#ffffff' }}></div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 17, backgroundColor: '#dc2626', borderWidth: 3, borderStyle: 'solid', borderColor: '#ffffff' }}>
+                                                            {playerNumber ? (
+                                                                <span style={{ fontSize: 14, fontWeight: 900, color: 'white', marginTop: 2 }}>{playerNumber}</span>
+                                                            ) : (
+                                                                <PlayerIcon />
+                                                            )}
+                                                        </div>
                                                         {lastName && (
                                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 6, backgroundColor: '#00000099', paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6, borderRadius: 4 }}>
                                                                 <div style={{ display: 'flex', fontSize: 13, fontWeight: 800, color: 'white' }}>
