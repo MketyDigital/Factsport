@@ -141,31 +141,51 @@ async function generateDailySummaries() {
                 }).catch(()=>{});
             } catch (e) {}
 
-            // 🟢 SOCIAL POSTING BLOCK
-            const isFbEnabled = events.daily_summary?.fb !== false;
-            const isXEnabled = events.daily_summary?.x !== false;
-            const isTgEnabled = events.daily_summary?.tg_general !== false;
-
-            const makeUrl = creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL;
+            // ====================================================================================
+            // 🟢 MULTI-ACCOUNT SOCIAL POSTING BLOCK
+            // ====================================================================================
+            const summaryConfig = events.daily_summary || {};
             
-            if (makeUrl && (isFbEnabled || isXEnabled)) {
-                await fetch(makeUrl, {
+            const fbText = `${generatedFbText}\n\n👇 Full stats and analysis here:\n${articleUrl} 🏆`;
+            const xText = `🌙 MATCHDAY ROUND-UP\n\n${headline}\n\n👇 Full stats & analysis here:\n${articleUrl} 🏆`;
+
+            // 1. MAKE 1
+            if (summaryConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
+                await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        fb2_text: isFbEnabled ? `${generatedFbText}\n\n👇 Full stats and analysis here:\n${articleUrl} 🏆` : null,
-                        x_text: isXEnabled ? `🌙 MATCHDAY ROUND-UP\n\n${headline}\n\n👇 Full stats & analysis here:\n${articleUrl} 🏆` : null, 
-                        x_image_url: null
-                    })
-                });
+                    body: JSON.stringify({ fb2_text: fbText, x_text: xText, x_image_url: null })
+                }).catch(()=>{});
             }
 
-            // Loop through all registered Telegram General Channels
-            if (isTgEnabled && creds.telegram_bot_token && tgGeneralChannels.length > 0) {
+            // 2. MAKE 2
+            if (summaryConfig.make2 && creds.make_webhook_2) {
+                await fetch(creds.make_webhook_2, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fb2_text: fbText, x_text: xText, x_image_url: null })
+                }).catch(()=>{});
+            }
+
+            // 3. FB 1 (Direct API)
+            if (summaryConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
+                const pageId = creds.fb1_id || process.env.FB_PAGE_ID;
+                const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
+                await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed?message=${encodeURIComponent(fbText)}&access_token=${token}`, { method: 'POST' }).catch(()=>{});
+            }
+
+            // 4. FB 2 (Direct API)
+            if (summaryConfig.fb2 && creds.fb2_id && creds.fb2_token) {
+                await fetch(`https://graph.facebook.com/v19.0/${creds.fb2_id}/feed?message=${encodeURIComponent(fbText)}&access_token=${creds.fb2_token}`, { method: 'POST' }).catch(()=>{});
+            }
+
+            // 5. TG GENERAL (Checking Checkboxes)
+            if (summaryConfig.tg_general && creds.telegram_bot_token && tgGeneralChannels.length > 0) {
                 for (const channel of tgGeneralChannels) {
-                    const tgMessage = `🌙 <b>MATCHDAY ROUND-UP</b>\n\n<b>${headline}</b>\n\n${generatedFbText}\n\n👇 <b>Full stats and analysis here:</b>\n${articleUrl} 🏆`;
-                    await postToTelegram(creds.telegram_bot_token, channel.chatId, tgMessage);
-                    console.log(`   ✅ Posted Summary to TG Channel: ${channel.chatId}`);
-                    await delay(1500); // Safe delay
+                    if (channel.wants_summary !== false) { 
+                        const tgMessage = `🌙 <b>MATCHDAY ROUND-UP</b>\n\n<b>${headline}</b>\n\n${generatedFbText}\n\n👇 <b>Full stats and analysis here:</b>\n${articleUrl} 🏆`;
+                        await postToTelegram(creds.telegram_bot_token, channel.chatId, tgMessage);
+                        console.log(`   ✅ Posted Summary to TG Channel: ${channel.chatId}`);
+                        await delay(1500); 
+                    }
                 }
             }
         }

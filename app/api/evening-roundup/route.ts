@@ -4,36 +4,33 @@ export const fetchCache = 'force-no-store';
 
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { postToSocials } from '@/app/lib/socialService';
 
-// 🟢 STATUS LISTS
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'];
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
 const INVALID_STATUSES = ['POSTPONED', 'PST', 'CANC', 'CANCELLED', 'TBD', 'ABD'];
 
-// 🟢 CLOUDFLARE EDGE-SAFE ENCODER
 function encodeBase64Safe(obj: any) {
     const str = JSON.stringify(obj);
     const bytes = new TextEncoder().encode(str);
     let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// 🟢 TS FIX: Added : string
+function parseArticleTemplate(templateText: string, generatedContent: string, link: string) {
+    if (!templateText) return null;
+    return templateText.replace(/\[AI_TEXT\]/g, generatedContent).replace(/\[LINK\]/g, link);
 }
 
 export async function GET(request: Request) {
     const url = new URL(request.url);
-    if (url.searchParams.get('key') !== process.env.CRON_KEY) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (url.searchParams.get('key') !== process.env.CRON_KEY) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     
     const now = new Date();
-    if (now.getUTCHours() < 6) {
-        now.setUTCDate(now.getUTCDate() - 1);
-    }
+    if (now.getUTCHours() < 6) now.setUTCDate(now.getUTCDate() - 1);
     const targetDate = now.toISOString().split('T')[0];
     const lockKey = `${targetDate}-evening`; 
     
@@ -43,31 +40,16 @@ export async function GET(request: Request) {
     const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
     const endOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999)).toISOString();
 
-    const { data: matches, error } = await supabase
-        .from('matches')
-        .select('*')
-        .gte('match_date', startOfDay)
-        .lte('match_date', endOfDay)
-        .order('match_date', { ascending: true });
+    const { data: matches, error } = await supabase.from('matches').select('*').gte('match_date', startOfDay).lte('match_date', endOfDay).order('match_date', { ascending: true });
 
     if (error || !matches || matches.length === 0) {
         await supabase.from('cron_logs').delete().eq('run_date', lockKey);
         return NextResponse.json({ message: "No games found for today. Lock removed." });
     }
 
-    // 👻 THE GHOST FILTER
     const validMatches = matches.filter(m => {
         const status = (m.status || '').toUpperCase();
         if (INVALID_STATUSES.includes(status)) return false;
-        
-        const isMidnight = m.match_date.includes('T00:00:00');
-        const isZeroZero = m.home_score === 0 && m.away_score === 0;
-        
-        if (FINISHED_STATUSES.includes(status) && isMidnight && isZeroZero) {
-            const hasEvents = m.match_events && Array.isArray(m.match_events) && m.match_events.length > 0;
-            const hasLineups = m.lineups && m.lineups.home && Array.isArray(m.lineups.home) && m.lineups.home.length > 0;
-            if (!hasEvents && !hasLineups) return false; 
-        }
         return true;
     });
 
@@ -83,41 +65,27 @@ export async function GET(request: Request) {
         leagues[m.league].push(m);
     });
 
-    // 🟢 FACEBOOK FORMAT
-    let fb1Text = `🏁 DAILY ROUNDUP!\n\nHere is the result sheet across today's fixtures:\n\n`;
+    let rawFbText = `🏁 DAILY ROUNDUP!\n\nHere is the result sheet across today's fixtures:\n\n`;
     for (const [leagueName, leagueMatches] of Object.entries(leagues)) {
-        fb1Text += `🏆 ${leagueName.toUpperCase()}\n`;
+        rawFbText += `🏆 ${leagueName.toUpperCase()}\n`;
         leagueMatches.forEach(m => {
             const status = (m.status || '').toUpperCase();
             if (FINISHED_STATUSES.includes(status)) {
-                fb1Text += `⚽ ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team}\n`;
-            } else if (LIVE_STATUSES.includes(status)) {
-                fb1Text += `🔴 ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} (${m.displayClock || 'LIVE'})\n`;
+                rawFbText += `⚽ ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team}\n`;
             } else {
-                const time = new Date(m.match_date).toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute:'2-digit' });
-                fb1Text += `⏳ ${m.home_team} vs ${m.away_team} (${time})\n`;
+                rawFbText += `⏳ ${m.home_team} vs ${m.away_team}\n`;
             }
         });
-        fb1Text += `\n`;
+        rawFbText += `\n`;
     }
-    fb1Text += `Full results, stats, player ratings & tactical news: ${frontendUrl}/matches 🏆`;
 
-    // 🟢 X/TWITTER FORMAT
-    let xText = `🏁 DAILY ROUNDUP!\n\n`;
+    let rawXText = `🏁 DAILY ROUNDUP!\n\n`;
     validMatches.slice(0, 8).forEach(m => {
         const status = (m.status || '').toUpperCase();
-        if (FINISHED_STATUSES.includes(status)) {
-            xText += `• ${m.home_team} ${m.home_score}-${m.away_score} ${m.away_team}\n`;
-        } else if (LIVE_STATUSES.includes(status)) {
-            xText += `• 🔴 ${m.home_team} ${m.home_score}-${m.away_score} ${m.away_team} (${m.displayClock || 'LIVE'})\n`;
-        } else {
-            const time = new Date(m.match_date).toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute:'2-digit' });
-            xText += `• ⏳ ${m.home_team} vs ${m.away_team} (${time})\n`;
-        }
+        if (FINISHED_STATUSES.includes(status)) rawXText += `• ${m.home_team} ${m.home_score}-${m.away_score} ${m.away_team}\n`;
+        else rawXText += `• ⏳ ${m.home_team} vs ${m.away_team}\n`;
     });
-    xText += `\nFull results & stats : ${frontendUrl}/matches 👇🏼`;
 
-    // 🖼️ IMAGE GENERATION
     const topMatches = validMatches.slice(0, 10).map(m => {
         const status = (m.status || '').toUpperCase();
         let displayScore = `${m.home_score} - ${m.away_score}`;
@@ -131,22 +99,51 @@ export async function GET(request: Request) {
     const safeBase64 = encodeBase64Safe(ogPayload);
     const resultsOgUrl = `${frontendUrl}/api/og?data=${safeBase64}`;
 
-    // 🟢 UPDATED: SAFE PRE-WARM CACHE (Strict render wait with fallback)
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second max wait
-
+        const timeoutId = setTimeout(() => controller.abort(), 8000); 
         const res = await fetch(resultsOgUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
-        
-        // Force Vercel to pull the image file fully into memory
         if (res.ok) await res.arrayBuffer(); 
-    } catch (e) {
-        console.error(`Cache warm timeout/error for Evening Roundup. Firing webhook anyway.`);
-    }
+    } catch (e) { }
 
     try {
-        await postToSocials({ fb1Message: fb1Text, xMessage: xText, xImageUrl: resultsOgUrl }); 
+        const { data: settingsData } = await supabase.from('site_settings').select('social_config').single();
+        const config = settingsData?.social_config || {};
+        const creds = config.credentials || {};
+        const events = config.events || {};
+        const summaryConfig = events.daily_summary || {};
+        const templates = config.templates?.daily_summary || {};
+
+        const link = `${frontendUrl}/matches`;
+
+        const fb1Text = parseArticleTemplate(templates.fb1 || `[AI_TEXT]\n\nFull results, stats, player ratings & tactical news: [LINK] 🏆`, rawFbText, link);
+        const fb2Text = parseArticleTemplate(templates.fb2 || fb1Text!, rawFbText, link);
+        const make1Text = parseArticleTemplate(templates.make1 || `[AI_TEXT]\n\nFull results & stats : [LINK] 👇🏼`, rawXText, link);
+        const make2Text = parseArticleTemplate(templates.make2 || make1Text!, rawXText, link);
+
+        if (summaryConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
+            await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb1Text, x_text: make1Text, x_image_url: resultsOgUrl }) }).catch(()=>{});
+        }
+        if (summaryConfig.make2 && creds.make_webhook_2) {
+            await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb2Text, x_text: make2Text, x_image_url: resultsOgUrl }) }).catch(()=>{});
+        }
+        if (summaryConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
+            const pageId = creds.fb1_id || process.env.FB_PAGE_ID;
+            const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
+            await fetch(`https://graph.facebook.com/v19.0/${pageId}/photos?url=${encodeURIComponent(resultsOgUrl)}&message=${encodeURIComponent(fb1Text!)}&access_token=${token}`, { method: 'POST' }).catch(()=>{});
+        }
+        if (summaryConfig.fb2 && creds.fb2_id && creds.fb2_token) {
+            await fetch(`https://graph.facebook.com/v19.0/${creds.fb2_id}/photos?url=${encodeURIComponent(resultsOgUrl)}&message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}`, { method: 'POST' }).catch(()=>{});
+        }
+        if (summaryConfig.tg_general && creds.telegram_bot_token && creds.tg_general_channels) {
+            for (const channel of creds.tg_general_channels) {
+                if (channel.wants_summary) {
+                    const tgMsg = parseArticleTemplate(templates.tg_general || `🌙 <b>MATCHDAY ROUND-UP</b>\n\n[AI_TEXT]\n\n👇 <b>Full stats here:</b>\n[LINK] 🏆`, rawFbText, link);
+                    await fetch(`https://api.telegram.org/bot${creds.telegram_bot_token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: channel.chatId, text: tgMsg, parse_mode: 'HTML', disable_web_page_preview: true }) }).catch(()=>{});
+                }
+            }
+        }
         return NextResponse.json({ success: true, total_matches: validMatches.length });
     } catch (e) {
         await supabase.from('cron_logs').delete().eq('run_date', lockKey);
