@@ -43,7 +43,7 @@ export default function MatchHeaderClient({ dbData }: any) {
       prevAwayScore.current = liveData?.away_score || 0;
   }, [liveData?.home_score, liveData?.away_score]);
 
-  if (hasPremiumWidget) return <ScoreAxisWidget matchId={dbData.widget_id} />;
+  if (hasPremiumWidget) return <ScoreAxisWidget matchId="{dbData.widget_id}"/>;
 
   const currentStatus = liveData?.status?.toUpperCase() || '';
   const isHT = ['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME'].includes(currentStatus);
@@ -68,22 +68,14 @@ export default function MatchHeaderClient({ dbData }: any) {
   const homeGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'home' || (e.player && e.player.toLowerCase().includes(homeTeamName.toLowerCase()))));
   const awayGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'away' || (e.player && e.player.toLowerCase().includes(awayTeamName.toLowerCase()))));
 
-  // 🟢 EXTRACT HT, PENS & AGGREGATE
-  const stats = liveData?.stats || {};
-  const homePens = stats.home_penalties;
-  const awayPens = stats.away_penalties;
-  const hasPens = homePens != null && awayPens != null;
-
-  const homeHT = stats.home_ht;
-  const awayHT = stats.away_ht;
-  const hasHT = homeHT != null && awayHT != null;
-
-  const homeAgg = stats.home_agg;
-  const awayAgg = stats.away_agg;
-  let aggregateText = stats.aggregate_text || stats.aggregate;
-  if (!aggregateText && homeAgg != null && awayAgg != null) {
-      aggregateText = `Agg: ${homeAgg}-${awayAgg}`;
-  }
+  const stats = liveData?.stats || { home: {}, away: {} };
+  const homePens = stats?.home_penalties;
+  const awayPens = stats?.away_penalties;
+  const hasPens = homePens !== null && homePens !== undefined;
+  const homeHT = stats?.home_ht;
+  const awayHT = stats?.away_ht;
+  const hasHT = homeHT !== null && homeHT !== undefined;
+  const aggregateText = stats?.aggregate;
 
   return (
     <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
@@ -95,7 +87,7 @@ export default function MatchHeaderClient({ dbData }: any) {
         <div className="relative z-10 px-2 py-2 md:py-3">
             <div className="flex justify-between items-start max-w-lg mx-auto">
                 <div className="flex flex-col items-center w-[30%]">
-                    <Link href={`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center group active:scale-95 transition-transform w-full">
+                    <Link href="{`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g," ''))}`} className="flex flex-col items-center group active:scale-95 transition-transform w-full">
                         <div className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
                             {dbData?.home_logo && <img src={dbData.home_logo} className="w-full h-full object-contain" alt="" />}
                         </div>
@@ -112,7 +104,7 @@ export default function MatchHeaderClient({ dbData }: any) {
                         <div className="mt-2 flex flex-col items-center gap-0.5 max-w-full px-1">
                             {formatGoals(homeGoals).map((txt, i) => (
                                 <span key={i} className="text-[6.5px] md:text-[7.5px] text-slate-300 font-bold leading-tight flex items-center gap-0.5 text-center drop-shadow-md break-words max-w-full">
-                                    <Zap size={6} className="text-yellow-400 fill-yellow-400 shrink-0"/> {txt}
+                                    <Zap size="{6}" className="text-yellow-400 fill-yellow-400 shrink-0"/> {txt}
                                 </span>
                             ))}
                         </div>
@@ -127,7 +119,7 @@ export default function MatchHeaderClient({ dbData }: any) {
                     )}
                     {!isLive && (
                          <span className={`text-[8px] md:text-[9px] font-bold px-2 py-0.5 rounded-sm mb-1 shadow-md ${isFinished ? 'bg-slate-800/80 backdrop-blur text-slate-300' : 'bg-white/20 backdrop-blur text-white'}`}>
-                            {isFinished ? 'FT' : <MatchTime date={dbData?.match_date} />}
+                            {isFinished ? 'FT' : <MatchTime date="{dbData?.match_date}"/>}
                          </span>
                     )}
 
@@ -141,8 +133,7 @@ export default function MatchHeaderClient({ dbData }: any) {
                                 <span className={`transition-all duration-300 ${awayFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{liveData?.away_score ?? 0}</span>
                             </div>
                             
-                            {/* 🟢 NEW: HT, PENALTY & AGGREGATE DISPLAY */}
-                            {hasHT && (isFinished || (isLive && currentStatus !== '1H')) && (
+                            {hasHT && (
                                 <span className="text-[9px] md:text-[10px] font-bold text-slate-400 drop-shadow-md mt-0.5">
                                     (HT: {homeHT}-{awayHT})
                                 </span>
@@ -162,7 +153,7 @@ export default function MatchHeaderClient({ dbData }: any) {
                 </div>
 
                 <div className="flex flex-col items-center w-[30%]">
-                    <Link href={`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center group active:scale-95 transition-transform w-full">
+                    <Link href="{`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g," ''))}`} className="flex flex-col items-center group active:scale-95 transition-transform w-full">
                         <div className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
                             {dbData?.away_logo && <img src={dbData.away_logo} className="w-full h-full object-contain" alt="" />}
                         </div>
@@ -179,7 +170,7 @@ export default function MatchHeaderClient({ dbData }: any) {
                         <div className="mt-2 flex flex-col items-center gap-0.5 max-w-full px-1">
                             {formatGoals(awayGoals).map((txt, i) => (
                                 <span key={i} className="text-[6.5px] md:text-[7.5px] text-slate-300 font-bold leading-tight flex items-center gap-0.5 text-center drop-shadow-md break-words max-w-full">
-                                    <Zap size={6} className="text-yellow-400 fill-yellow-400 shrink-0"/> {txt}
+                                    <Zap size="{6}" className="text-yellow-400 fill-yellow-400 shrink-0"/> {txt}
                                 </span>
                             ))}
                         </div>
@@ -190,10 +181,10 @@ export default function MatchHeaderClient({ dbData }: any) {
 
         <div className="relative z-10 w-full bg-black/40 backdrop-blur-sm border-t border-white/5 py-1.5 px-2 flex justify-between items-center drop-shadow-md">
             <div className="flex items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide text-[7px] md:text-[8px] font-bold text-slate-300 uppercase tracking-widest whitespace-nowrap">
-                {formattedDate && <span className="flex items-center gap-1"><Calendar size={9} className="text-blue-400"/> {formattedDate}</span>}
-                {dbData?.venue && <span className="flex items-center gap-1"><MapPin size={9} className="text-red-400"/> {dbData.venue}</span>}
-                {dbData?.stage && <span className="flex items-center gap-1"><Trophy size={9} className="text-yellow-500"/> {dbData.stage.replace(/_/g, ' ')}</span>}
-                {refName && <span className="flex items-center gap-1"><Flag size={9} className="text-slate-400"/> {refName}</span>}
+                {formattedDate && <span className="flex items-center gap-1"><Calendar size="{9}" className="text-blue-400"/> {formattedDate}</span>}
+                {dbData?.venue && <span className="flex items-center gap-1"><MapPin size="{9}" className="text-red-400"/> {dbData.venue}</span>}
+                {dbData?.stage && <span className="flex items-center gap-1"><Trophy size="{9}" className="text-yellow-500"/> {dbData.stage.replace(/_/g, ' ')}</span>}
+                {refName && <span className="flex items-center gap-1"><Flag size="{9}" className="text-slate-400"/> {refName}</span>}
             </div>
         </div>
     </div>

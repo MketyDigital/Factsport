@@ -75,19 +75,13 @@ export default function LiveScoreLabel({
   const isHT = HT_STATUSES.includes(cleanStatus);
   const isFinished = FINISHED_STATUSES.includes(cleanStatus);
 
-  // 🟢 EXTRACT HT, PENS & AGGREGATE
   const homePens = data.stats?.home_penalties;
   const awayPens = data.stats?.away_penalties;
   const hasPens = homePens !== null && homePens !== undefined;
-
   const homeHT = data.stats?.home_ht;
   const awayHT = data.stats?.away_ht;
   const hasHT = homeHT !== null && homeHT !== undefined;
-
-  let aggregateText = data.stats?.aggregate_text || data.stats?.aggregate;
-  if (!aggregateText && data.stats?.home_agg != null && data.stats?.away_agg != null) {
-      aggregateText = `Agg: ${data.stats.home_agg}-${data.stats.away_agg}`;
-  }
+  const aggregateText = data.stats?.aggregate;
 
   if (variant === 'badge') {
       if (isHT) return <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded shadow-sm tracking-widest border border-amber-600">HT</span>;
@@ -107,7 +101,6 @@ export default function LiveScoreLabel({
                   <div className="text-slate-300 font-black text-lg italic mb-1">VS</div>
                   {isHT && <span className="bg-amber-100 text-amber-700 text-[9px] px-2 py-0.5 rounded font-black border border-amber-200">HT</span>}
                   {isLiveNow && !isHT && data.clock && <span className="text-red-500 text-[10px] font-black animate-pulse bg-red-50 px-2 py-0.5 rounded">{data.clock}</span>}
-                  
                   {hasPens && <span className="text-[9px] font-black text-amber-500 mt-1">(Pens: {homePens}-{awayPens})</span>}
                   {hasHT && !isHT && (isLiveNow || isFinished) && <span className="text-[9px] text-slate-400 font-bold mt-1">(HT: {homeHT}-{awayHT})</span>}
               </div>

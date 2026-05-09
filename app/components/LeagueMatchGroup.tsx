@@ -70,7 +70,6 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
             let hasChanges = false;
             const newLiveMatches = liveMatches.map(m => {
                 const update = results.find(r => r && r.id === m.id);
-                // 🟢 Includes check for stats update (penalties/aggregate/HT)
                 if (update && (update.status !== m.status || update.home_score !== m.home_score || update.away_score !== m.away_score || update.displayClock !== m.displayClock || JSON.stringify(update.stats) !== JSON.stringify(m.stats))) {
                     hasChanges = true;
                     return { ...m, status: update.status, home_score: update.home_score, away_score: update.away_score, displayClock: update.displayClock, stats: update.stats };
@@ -112,8 +111,8 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
             <div className="bg-slate-50 border-b border-slate-200">
                 <div className="px-4 py-3 flex justify-between items-center">
                     <h2 className="font-black text-sm uppercase text-slate-800 tracking-wider truncate">{leagueName}</h2>
-                    <Link href={`/standings?league=${encodeURIComponent(leagueName.replace(' Matches', ''))}`} className="text-[10px] font-bold text-blue-600 flex items-center gap-1 hover:underline">
-                        Full Table <ChevronRight size={10} />
+                    <Link href="{`/standings?league=${encodeURIComponent(leagueName.replace('" Matches', ''))}`} className="text-[10px] font-bold text-blue-600 flex items-center gap-1 hover:underline">
+                        Full Table <ChevronRight size="{10}"/>
                     </Link>
                 </div>
                 
@@ -122,18 +121,18 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                         onClick={() => handleTabChange('fixtures')} 
                         className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'fixtures' ? 'bg-white shadow-sm text-blue-600 border border-slate-100' : 'text-slate-400 hover:bg-slate-100'}`}
                     >
-                        <Calendar size={12} /> Fixtures
+                        <Calendar size="{12}"/> Fixtures
                         <span className={`px-1.5 rounded-full text-[9px] ${activeTab === 'fixtures' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{fixtures.length}</span>
                     </button>
                     <button 
                         onClick={() => handleTabChange('results')} 
                         className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'results' ? 'bg-white shadow-sm text-blue-600 border border-slate-100' : 'text-slate-400 hover:bg-slate-100'}`}
                     >
-                        <CheckCircle size={12} /> Results
+                        <CheckCircle size="{12}"/> Results
                         <span className={`px-1.5 rounded-full text-[9px] ${activeTab === 'results' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{results.length}</span>
                     </button>
-                    <Link href={`/standings?league=${encodeURIComponent(leagueName.replace(' Matches', ''))}`} className="flex-1 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:bg-slate-100 flex items-center justify-center gap-2 transition-all">
-                        <BarChart2 size={12} /> Table
+                    <Link href="{`/standings?league=${encodeURIComponent(leagueName.replace('" Matches', ''))}`} className="flex-1 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:bg-slate-100 flex items-center justify-center gap-2 transition-all">
+                        <BarChart2 size="{12}"/> Table
                     </Link>
                 </div>
             </div>
@@ -141,7 +140,7 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
             <div className="divide-y divide-slate-50 min-h-[100px]">
                 {!hasData ? (
                     <div className="flex flex-col items-center justify-center py-8 text-slate-400">
-                        <Calendar size={24} className="mb-2 opacity-50"/>
+                        <Calendar size="{24}" className="mb-2 opacity-50"/>
                         <p className="text-xs font-medium">No {activeTab} available.</p>
                     </div>
                 ) : (
@@ -149,7 +148,7 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                         <div key={dateKey}>
                             <div className="bg-slate-100/80 backdrop-blur-sm px-4 py-1.5 border-b border-slate-50 sticky top-0 z-10">
                                 <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
-                                    <Clock size={10}/> {dateKey}
+                                    <Clock size="{10}"/> {dateKey}
                                 </span>
                             </div>
 
@@ -161,28 +160,22 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                 const stageText = match.match_group ? match.match_group.replace(/_/g, ' ') : (match.stage && match.stage !== 'REGULAR_SEASON' ? match.stage.replace(/_/g, ' ') : null);
                                 const isKnockout = match.stage && (match.stage.includes('FINAL') || match.stage.includes('KNOCKOUT'));
 
-                                // 🟢 EXTRACT HT, PENS & AGGREGATE
                                 const homePens = match.stats?.home_penalties;
                                 const awayPens = match.stats?.away_penalties;
                                 const hasPens = homePens !== null && homePens !== undefined;
-
                                 const homeHT = match.stats?.home_ht;
                                 const awayHT = match.stats?.away_ht;
                                 const hasHT = homeHT !== null && homeHT !== undefined;
-
-                                let aggregateText = match.stats?.aggregate_text || match.stats?.aggregate;
-                                if (!aggregateText && match.stats?.home_agg != null && match.stats?.away_agg != null) {
-                                    aggregateText = `Agg: ${match.stats.home_agg}-${match.stats.away_agg}`;
-                                }
+                                const aggregateText = match.stats?.aggregate;
 
                                 return (
                                 <div key={match.id} className={`block hover:bg-slate-50 transition p-4 ${isKnockout ? 'bg-amber-50/30' : ''}`}>
-                                    <Link href={`/match/${match.id}`} className="flex items-center justify-between mb-3">
+                                    <Link href="{`/match/${match.id}`}" className="flex items-center justify-between mb-3">
                                         
                                         <div className="flex-1 space-y-3">
                                             {stageText && (
                                                 <div className={`text-[8px] font-black uppercase tracking-wider mb-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${isKnockout ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-white shadow-sm' : 'text-blue-500 bg-blue-50'}`}>
-                                                    {isKnockout && <Trophy size={8} />} {stageText}
+                                                    {isKnockout && <Trophy size="{8}"/>} {stageText}
                                                 </div>
                                             )}
 
@@ -216,7 +209,6 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                                 )}
                                             </div>
 
-                                            {/* 🟢 NEW: Renders HT and Aggregate elegantly side-by-side below teams */}
                                             {(hasHT || aggregateText) && (
                                                 <div className="flex items-center gap-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-2 pt-1 border-t border-slate-100/50">
                                                     {hasHT && <span>HT: {homeHT}-{awayHT}</span>}
@@ -239,7 +231,7 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                             ) : (
                                                 <div className="flex flex-col items-center bg-slate-50 p-1.5 rounded border border-slate-100 shadow-sm">
                                                     <span className="text-slate-800 font-black text-xs">
-                                                        <MatchTime date={match.match_date} />
+                                                        <MatchTime date="{match.match_date}"/>
                                                     </span>
                                                 </div>
                                             )}
@@ -249,18 +241,18 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                     {!isFinished && (
                                         <div className="flex gap-2 mt-2 pt-3 border-t border-slate-50">
                                             {isScheduled && (
-                                                <Link href={`/match/${match.id}`} className="flex-1 bg-gradient-to-b from-white to-slate-50 border border-slate-200 text-slate-700 rounded-lg py-1.5 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 hover:border-slate-300 transition shadow-sm">
-                                                    <Zap size={10} className="text-blue-600 fill-blue-600"/> Predict
+                                                <Link href="{`/match/${match.id}`}" className="flex-1 bg-gradient-to-b from-white to-slate-50 border border-slate-200 text-slate-700 rounded-lg py-1.5 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 hover:border-slate-300 transition shadow-sm">
+                                                    <Zap size="{10}" className="text-blue-600 fill-blue-600"/> Predict
                                                 </Link>
                                             )}
                                             
                                             {match.booking_code ? (
                                                 <button className="flex-1 bg-[#0a1428] text-white rounded-lg py-1.5 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-md hover:bg-[#1a2b4c] transition">
-                                                    <Ticket size={10} className="text-yellow-400"/> Code: {match.booking_code}
+                                                    <Ticket size="{10}" className="text-yellow-400"/> Code: {match.booking_code}
                                                 </button>
                                             ) : (
                                                 <a href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} target="_blank" rel="noopener noreferrer" className="flex-1 bg-green-50 text-green-700 border border-green-200 rounded-lg py-1.5 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 hover:bg-green-100 transition shadow-sm">
-                                                    <ExternalLink size={10}/> Bet Now
+                                                    <ExternalLink size="{10}"/> Bet Now
                                                 </a>
                                             )}
                                         </div>
@@ -279,7 +271,7 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                         onClick={() => setVisibleCount(prev => prev + 10)}
                         className="w-full bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-slate-600 font-black text-[10px] uppercase tracking-widest py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
                     >
-                        <RefreshCcw size={14} className="text-blue-500" /> 
+                        <RefreshCcw size="{14}" className="text-blue-500"/> 
                         Load {Math.min(10, activeList.length - visibleCount)} More {activeTab === 'fixtures' ? 'Upcoming Matches' : 'Recent Results'}
                     </button>
                 </div>
