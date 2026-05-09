@@ -31,7 +31,6 @@ export default function LiveScoreLabel({
       isFetching.current = true;
 
       try {
-          // 🟢 USES THE GLOBAL DEDUPLICATOR
           const matchData = await fetchLiveMatchDeduplicated(espnId);
           
           if (matchData && !matchData.error) {
@@ -76,10 +75,19 @@ export default function LiveScoreLabel({
   const isHT = HT_STATUSES.includes(cleanStatus);
   const isFinished = FINISHED_STATUSES.includes(cleanStatus);
 
-  // 🟢 EXTRACT PENS
+  // 🟢 EXTRACT HT, PENS & AGGREGATE
   const homePens = data.stats?.home_penalties;
   const awayPens = data.stats?.away_penalties;
   const hasPens = homePens !== null && homePens !== undefined;
+
+  const homeHT = data.stats?.home_ht;
+  const awayHT = data.stats?.away_ht;
+  const hasHT = homeHT !== null && homeHT !== undefined;
+
+  let aggregateText = data.stats?.aggregate_text || data.stats?.aggregate;
+  if (!aggregateText && data.stats?.home_agg != null && data.stats?.away_agg != null) {
+      aggregateText = `Agg: ${data.stats.home_agg}-${data.stats.away_agg}`;
+  }
 
   if (variant === 'badge') {
       if (isHT) return <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded shadow-sm tracking-widest border border-amber-600">HT</span>;
@@ -99,7 +107,9 @@ export default function LiveScoreLabel({
                   <div className="text-slate-300 font-black text-lg italic mb-1">VS</div>
                   {isHT && <span className="bg-amber-100 text-amber-700 text-[9px] px-2 py-0.5 rounded font-black border border-amber-200">HT</span>}
                   {isLiveNow && !isHT && data.clock && <span className="text-red-500 text-[10px] font-black animate-pulse bg-red-50 px-2 py-0.5 rounded">{data.clock}</span>}
+                  
                   {hasPens && <span className="text-[9px] font-black text-amber-500 mt-1">(Pens: {homePens}-{awayPens})</span>}
+                  {hasHT && !isHT && (isLiveNow || isFinished) && <span className="text-[9px] text-slate-400 font-bold mt-1">(HT: {homeHT}-{awayHT})</span>}
               </div>
               <div className="text-center w-1/3">
                   <div className="text-3xl font-black text-slate-800 tracking-tighter">{data.away ?? 0}</div>
@@ -117,6 +127,7 @@ export default function LiveScoreLabel({
                 {data.home} - {data.away}
             </span>
             {hasPens && <span className="text-[9px] text-amber-500 font-black mt-0.5">(Pens: {homePens}-{awayPens})</span>}
+            {hasHT && <span className="text-[8px] text-slate-400 font-bold mt-0.5">(HT: {homeHT}-{awayHT})</span>}
             {data.clock && !isHT && <span className="text-[9px] text-red-500 font-bold mt-1">{data.clock}</span>}
         </div>
     );
@@ -126,6 +137,8 @@ export default function LiveScoreLabel({
       <div className="flex flex-col items-center">
           <span className="text-slate-700 font-black text-[11px] bg-slate-100 border border-slate-200 px-2 py-0.5 rounded shadow-sm">{data.home} - {data.away}</span>
           {hasPens && <span className="text-[8px] text-amber-600 font-bold mt-0.5">(Pens: {homePens}-{awayPens})</span>}
+          {hasHT && <span className="text-[8px] text-slate-400 font-bold mt-0.5">(HT: {homeHT}-{awayHT})</span>}
+          {aggregateText && <span className="text-[8px] text-blue-500 font-bold mt-0.5">{aggregateText}</span>}
       </div>
   );
   

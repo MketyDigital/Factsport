@@ -75,12 +75,10 @@ export async function GET(request: Request) {
                 const fdAwayScore = m.score?.fullTime?.away ?? 0;
                 let shouldUpdateMatch = false;
 
-                // 🟢 NEW SHIELD: Ensure standings update if the league is active today, 
-                // regardless of whether ESPN beat Football-Data to the 'FT' update!
-                const matchDateObj = new Date(m.utcDate);
-                const isToday = matchDateObj.toDateString() === today.toDateString();
-                
-                if (['LIVE', 'HT'].includes(fdStatusMapped) || isDbLive || (fdStatusMapped === 'FT' && isToday)) {
+                // 🟢 FIXED SHIELD: Broaden the trigger window. If a match happened in our 48-hour 
+                // fetch window and is finished or live, ALWAYS sync its league's standings.
+                // This permanently solves the issue where FD delays their standings update and we miss it.
+                if (['LIVE', 'HT', 'FT', 'FINISHED', 'AWARDED'].includes(fdStatusMapped) || isDbLive) {
                     leaguesNeedingStandingsUpdate.add(compCode);
                 }
 
@@ -132,7 +130,7 @@ export async function GET(request: Request) {
         for (const leagueId of Array.from(leaguesNeedingStandingsUpdate)) {
             if (leagueId === 'EC' || leagueId === 'WC') continue; 
 
-            // Prevent Football-Data rate limiting (Edge friendly)
+            // Prevent Football-Data rate limiting (Edge friendly - max 10 requests per minute)
             await new Promise(resolve => setTimeout(resolve, 1500)); 
 
             const standRes = await fetch(`https://api.football-data.org/v4/competitions/${leagueId}/standings`, { 

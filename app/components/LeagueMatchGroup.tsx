@@ -70,7 +70,7 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
             let hasChanges = false;
             const newLiveMatches = liveMatches.map(m => {
                 const update = results.find(r => r && r.id === m.id);
-                // 🟢 Includes check for stats update (penalties/aggregate)
+                // 🟢 Includes check for stats update (penalties/aggregate/HT)
                 if (update && (update.status !== m.status || update.home_score !== m.home_score || update.away_score !== m.away_score || update.displayClock !== m.displayClock || JSON.stringify(update.stats) !== JSON.stringify(m.stats))) {
                     hasChanges = true;
                     return { ...m, status: update.status, home_score: update.home_score, away_score: update.away_score, displayClock: update.displayClock, stats: update.stats };
@@ -161,11 +161,19 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                 const stageText = match.match_group ? match.match_group.replace(/_/g, ' ') : (match.stage && match.stage !== 'REGULAR_SEASON' ? match.stage.replace(/_/g, ' ') : null);
                                 const isKnockout = match.stage && (match.stage.includes('FINAL') || match.stage.includes('KNOCKOUT'));
 
-                                // 🟢 EXTRACT PENS & AGGREGATE
+                                // 🟢 EXTRACT HT, PENS & AGGREGATE
                                 const homePens = match.stats?.home_penalties;
                                 const awayPens = match.stats?.away_penalties;
                                 const hasPens = homePens !== null && homePens !== undefined;
-                                const aggregateText = match.stats?.aggregate;
+
+                                const homeHT = match.stats?.home_ht;
+                                const awayHT = match.stats?.away_ht;
+                                const hasHT = homeHT !== null && homeHT !== undefined;
+
+                                let aggregateText = match.stats?.aggregate_text || match.stats?.aggregate;
+                                if (!aggregateText && match.stats?.home_agg != null && match.stats?.away_agg != null) {
+                                    aggregateText = `Agg: ${match.stats.home_agg}-${match.stats.away_agg}`;
+                                }
 
                                 return (
                                 <div key={match.id} className={`block hover:bg-slate-50 transition p-4 ${isKnockout ? 'bg-amber-50/30' : ''}`}>
@@ -208,9 +216,12 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                                 )}
                                             </div>
 
-                                            {aggregateText && (
-                                                <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                                                    {aggregateText}
+                                            {/* 🟢 NEW: Renders HT and Aggregate elegantly side-by-side below teams */}
+                                            {(hasHT || aggregateText) && (
+                                                <div className="flex items-center gap-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-2 pt-1 border-t border-slate-100/50">
+                                                    {hasHT && <span>HT: {homeHT}-{awayHT}</span>}
+                                                    {hasHT && aggregateText && <span className="w-1 h-1 bg-slate-300 rounded-full"></span>}
+                                                    {aggregateText && <span className="text-blue-500">{aggregateText}</span>}
                                                 </div>
                                             )}
                                         </div>
