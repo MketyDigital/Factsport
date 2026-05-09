@@ -91,9 +91,9 @@ async function generateDailyPreview() {
         1. TIME AWARENESS: It is currently 2026. 
         2. ZERO HALLUCINATIONS: Do NOT invent or name any specific players or managers. Focus on the clubs, their current form, and the importance of the fixture.
         3. EMBEDDING MATCHES: When you finish analyzing a specific match, you MUST paste its "EXACT SHORTCODE TO USE" on a brand new line all by itself. DO NOT add punctuation, bolding, or extra words to the shortcode. Just the raw code.
-        4. Headline: Punchy and narrative-driven. Under 10 words. Do not use asterisks (*).
+        4. Headline: Create a professional, human-sounding football headline (style like Sky Sports or BBC Sport). Captivating but grounded. Under 10 words. Do NOT use #, * or any Markdown symbols.
         5. Tone: Insightful, opinionated, and highly engaging. 
-        6. Length: 400-600 words. Plain text only.
+        6. Length: 400-600 words. Plain text only. Absolutely NO Markdown symbols like #, ##, or ### for headers. Use simple capitalized text for headers.
         7. FACEBOOK SUMMARY: At the very end of your entire response, skip a line and write the exact text "FB_POST:" followed by a comprehensive Facebook post. You MUST mention EVERY specific match listed in the schedule above so fans know exactly what is playing today. Make it highly engaging. 
         8. NO EMOJIS: Do NOT use a single emoji anywhere in the article or the Facebook post. Keep it entirely text-based and professional.
     `;
