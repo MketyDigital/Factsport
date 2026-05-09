@@ -1,17 +1,14 @@
 import { createClient } from '@/app/lib/supabase/client';
 
 export const ESPN_LEAGUES: Record<string, string> = {
-  // Main Leagues
   'Premier League': 'eng.1', 'La Liga': 'esp.1', 'Bundesliga': 'ger.1',
   'Serie A': 'ita.1', 'Ligue 1': 'fra.1', 'Champions League': 'uefa.champions',
   'Euros': 'uefa.euro', 'World Cup': 'fifa.world',
   
-  // Major Cups
   'Europa League': 'uefa.europa', 'Europa Conference League': 'uefa.conference',
   'FA Cup': 'eng.fa', 'Carabao Cup': 'eng.league_cup', 'Copa del Rey': 'esp.copa_del_rey',
   'Coppa Italia': 'ita.copa_italia', 'Coupe de France': 'fra.coupe_de_france', 'DFB-Pokal': 'ger.dfb_pokal',
 
-  // 🌍 INTERNATIONAL BREAK ADDITIONS
   'International Friendlies': 'fifa.friendly',
   'UEFA Nations League': 'uefa.nations',
   'CONCACAF Nations League': 'concacaf.nations',
@@ -62,15 +59,6 @@ export async function fetchEspnDetails(gameId: string) {
     const homeTeamName = homeCompetitor.team.displayName;
     const awayTeamName = awayCompetitor.team.displayName;
 
-    // 🟢 EXTRACT HT, PENALTY & AGGREGATE DATA
-    const homePens = homeCompetitor?.shootoutScore;
-    const awayPens = awayCompetitor?.shootoutScore;
-    const homeAgg = homeCompetitor?.aggregateScore;
-    const awayAgg = awayCompetitor?.aggregateScore;
-    const aggSummary = data.header?.competitions?.[0]?.series?.summary || data.header?.series?.summary || null;
-    const homeHT = homeCompetitor?.linescores?.[0]?.value;
-    const awayHT = awayCompetitor?.linescores?.[0]?.value;
-
     const venue = data.gameInfo?.venue?.fullName || null;
     const referees = data.gameInfo?.officials?.map((o: any) => o.displayName || o.fullName) || [];
     
@@ -83,7 +71,15 @@ export async function fetchEspnDetails(gameId: string) {
         };
     }
 
+    const homePens = homeCompetitor?.shootoutScore;
+    const awayPens = awayCompetitor?.shootoutScore;
+    const aggSummary = data.header?.series?.summary || null;
+    const homeHT = homeCompetitor?.linescores?.[0]?.value;
+    const awayHT = awayCompetitor?.linescores?.[0]?.value;
+
     const boxscore = data.boxscore;
+    
+    // THIS PREVENTS THE CRASH: Strictly initializing home and away as objects
     const stats: any = { 
         home: {}, 
         away: {},
@@ -91,9 +87,6 @@ export async function fetchEspnDetails(gameId: string) {
         away_penalties: awayPens !== undefined ? parseInt(awayPens) : null,
         home_ht: homeHT !== undefined ? parseInt(homeHT) : null,
         away_ht: awayHT !== undefined ? parseInt(awayHT) : null,
-        home_agg: homeAgg !== undefined ? parseInt(homeAgg) : null,
-        away_agg: awayAgg !== undefined ? parseInt(awayAgg) : null,
-        aggregate_text: aggSummary,
         aggregate: aggSummary
     };
     
