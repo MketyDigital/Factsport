@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -211,7 +212,6 @@ async function runProSlipEngine() {
     const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
     const endOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59)).toISOString();
 
-    // THIS PREVENTS THE CRASH: Added neq FT and FINISHED to Free Tips so it doesn't grab a finished game!
     const { data: allAnalyzedToday } = await supabase.from('matches').select('*')
         .not('pro_analysis', 'is', null)
         .gte('match_date', startOfToday)

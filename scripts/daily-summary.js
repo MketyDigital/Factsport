@@ -80,7 +80,8 @@ async function generateDailySummaries() {
 
     let matchSummaries = "";
     for (const [leagueName, leagueMatches] of Object.entries(leagues)) {
-        matchSummaries += `\n### ${leagueName}:\n`;
+        // SURGERY: Removed ### Markdown from the league header here
+        matchSummaries += `\n${leagueName.toUpperCase()}:\n`;
         leagueMatches.forEach(m => {
             matchSummaries += `- ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} | EXACT SHORTCODE TO USE: [MATCH_WIDGET:${m.id}]\n`;
         });
@@ -89,7 +90,7 @@ async function generateDailySummaries() {
     const prompt = `
         You are a top-tier European football journalist writing for 'FactSport'.
         Write a deep, engaging "Daily Matchday Round-Up" article covering ALL the leagues and results listed below. 
-        Use clear headings to separate the analysis for each league/competition.
+        Use clear, simple capitalized text for league sections.
         
         TODAY'S EXACT DATE: ${exactDateString}
         
@@ -99,8 +100,8 @@ async function generateDailySummaries() {
         STRICT FACTUAL GUIDELINES:
         1. ZERO HALLUCINATIONS: Do NOT invent or name any specific goalscorers, players, or managers. Focus entirely on the team performance, the final scoreline, and the tactical battle.
         2. EMBEDDING MATCHES: When you finish discussing a match result, you MUST paste its "EXACT SHORTCODE TO USE" on a brand new line all by itself. DO NOT add punctuation, bolding, or extra words to the shortcode. Just the raw code.
-        3. Headline: Catchy and dramatic, covering the global day of football. Under 10 words. Do not use asterisks (*).
-        4. Length: 500-800 words. Plain text only.
+        3. Headline: Create a professional, human-sounding football headline (style like Sky Sports or BBC Sport). Captivating but grounded. Under 10 words. Do NOT use #, * or any Markdown symbols.
+        4. Length: 500-800 words. Plain text only. Absolutely NO Markdown symbols like #, ##, or ### for headers.
         5. FACEBOOK SUMMARY: At the very end, skip a line and write the exact text "FB_POST:" followed by a comprehensive Facebook post. You MUST mention ALL the major results and scorelines across every league provided. 
         6. NO EMOJIS: Do NOT use a single emoji anywhere in the article or the Facebook post. Keep it entirely text-based and professional.
     `;
