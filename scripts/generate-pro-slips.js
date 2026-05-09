@@ -176,7 +176,8 @@ async function runProSlipEngine() {
                 const prompt = `You are an elite football tactical analyst in 2026. Provide a highly accurate "Pro Betting Slip" for: ${match.home_team} vs ${match.away_team} (${match.league}). Data Context: ${textContext || "No historical form available. Base prediction on current tactical profiles."} Return ONLY a valid JSON object: {"primary": "Value bet", "odds": "1.60", "safe": "Safe bet", "safeOdds": "1.20", "rationale": "40-50 words."}`;
                 let text = await generateWithRetry(prompt);
                 if (!text) continue; 
-                text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+                text = text.replace(/```json/gi, '').replace(/
+```/g, '').trim();
                 const analysisData = JSON.parse(text);
                 const updatePayload = { pro_analysis: analysisData };
                 if (translatedH2H && translatedH2H.matches.length > 0) updatePayload.h2h = translatedH2H; 
@@ -217,8 +218,14 @@ async function runProSlipEngine() {
 
     if (allAnalyzedToday && allAnalyzedToday.length > 0) {
         if (featuredMatchId) {
-            const { data: forcedMatch } = await supabase.from('matches').select('*').eq('id', featuredMatchId).single();
-            if (forcedMatch && forcedMatch.pro_analysis) { freeTipMatch = forcedMatch; console.log(`   ⚡ Admin Override: ${freeTipMatch.home_team}`); }
+            // NEW LOGIC: Verify the featured match is actually scheduled for today
+            const forcedMatch = allAnalyzedToday.find(m => String(m.id) === String(featuredMatchId));
+            if (forcedMatch && forcedMatch.pro_analysis) { 
+                freeTipMatch = forcedMatch; 
+                console.log(`   ⚡ Admin Override: ${freeTipMatch.home_team}`); 
+            } else {
+                console.log(`   ⚠️ Admin match is not scheduled for today (or lacks analysis). Falling back to auto-selection.`);
+            }
         }
         if (!freeTipMatch) {
             const giants = ['Arsenal','Chelsea','Liverpool','Man City','Man United','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG', 'Inter', 'AC Milan', 'Atletico'];
@@ -277,8 +284,12 @@ async function runProSlipEngine() {
         }
 
         if (successfullyPosted) {
-            await supabase.from('site_settings').update({ social_config: { ...config, last_freetip_broadcast_date: todayDateString } }).eq('id', 1);
-            console.log(`   🔒 Saved broadcast date to prevent double-posting today.`);
+            // NEW LOGIC: Clear the featured match ID to reset for tomorrow
+            const updatedConfig = { ...config, last_freetip_broadcast_date: todayDateString };
+            delete updatedConfig.featured_match_id; 
+
+            await supabase.from('site_settings').update({ social_config: updatedConfig }).eq('id', 1);
+            console.log(`   🔒 Saved broadcast date & reset Admin Override for tomorrow.`);
         }
     } else { console.log(`   💤 No analyzed matches found for today. Skipping Free Tip broadcast.`); }
 
