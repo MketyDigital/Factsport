@@ -68,11 +68,22 @@ export default function MatchHeaderClient({ dbData }: any) {
   const homeGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'home' || (e.player && e.player.toLowerCase().includes(homeTeamName.toLowerCase()))));
   const awayGoals = events.filter((e: any) => e.type === 'goal' && (e.team === 'away' || (e.player && e.player.toLowerCase().includes(awayTeamName.toLowerCase()))));
 
-  // 🟢 EXTRACT PENS & AGGREGATE
-  const homePens = liveData?.stats?.home_penalties;
-  const awayPens = liveData?.stats?.away_penalties;
-  const hasPens = homePens !== null && homePens !== undefined;
-  const aggregateText = liveData?.stats?.aggregate;
+  // 🟢 EXTRACT HT, PENS & AGGREGATE
+  const stats = liveData?.stats || {};
+  const homePens = stats.home_penalties;
+  const awayPens = stats.away_penalties;
+  const hasPens = homePens != null && awayPens != null;
+
+  const homeHT = stats.home_ht;
+  const awayHT = stats.away_ht;
+  const hasHT = homeHT != null && awayHT != null;
+
+  const homeAgg = stats.home_agg;
+  const awayAgg = stats.away_agg;
+  let aggregateText = stats.aggregate_text || stats.aggregate;
+  if (!aggregateText && homeAgg != null && awayAgg != null) {
+      aggregateText = `Agg: ${homeAgg}-${awayAgg}`;
+  }
 
   return (
     <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
@@ -123,17 +134,22 @@ export default function MatchHeaderClient({ dbData }: any) {
                     {isUpcoming ? (
                          <div className="text-xl md:text-2xl font-black text-white/30 italic">VS</div>
                     ) : (
-                        <div className="flex flex-col items-center">
+                        <div className="flex flex-col items-center mt-1">
                             <div className="text-2xl md:text-3xl font-black tracking-tighter flex gap-1 items-center drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
                                 <span className={`transition-all duration-300 ${homeFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{liveData?.home_score ?? 0}</span>
                                 <span className="text-white/40 text-xl md:text-2xl pb-1">-</span>
                                 <span className={`transition-all duration-300 ${awayFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{liveData?.away_score ?? 0}</span>
                             </div>
                             
-                            {/* 🟢 NEW: PENALTY & AGGREGATE DISPLAY */}
+                            {/* 🟢 NEW: HT, PENALTY & AGGREGATE DISPLAY */}
+                            {hasHT && (isFinished || (isLive && currentStatus !== '1H')) && (
+                                <span className="text-[9px] md:text-[10px] font-bold text-slate-400 drop-shadow-md mt-0.5">
+                                    (HT: {homeHT}-{awayHT})
+                                </span>
+                            )}
                             {hasPens && (
                                 <span className="text-[10px] md:text-xs font-black text-amber-400 tracking-widest drop-shadow-md mt-0.5">
-                                    (PENS: {homePens}-{awayPens})
+                                    PENS: {homePens}-{awayPens}
                                 </span>
                             )}
                             {aggregateText && (

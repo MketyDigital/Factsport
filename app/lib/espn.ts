@@ -29,11 +29,9 @@ export const normalizeName = (name: string) => {
     .trim();
 };
 
-// 1. Fetch Scoreboard (Fast)
 export async function fetchEspnLive(leagueCode: string) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueCode}/scoreboard`;
   try {
-    // 🟢 THE FIX: Changed revalidate to 5 to protect API limits
     const res = await fetch(url, { next: { revalidate: 5 } });
     if (!res.ok) return [];
     
@@ -51,11 +49,9 @@ export async function fetchEspnLive(leagueCode: string) {
   } catch (err) { return []; }
 }
 
-// 2. Fetch Deep Details (Clean Facts Only - Triple Layer Engine + Rich Data)
 export async function fetchEspnDetails(gameId: string) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${gameId}`;
   try {
-    // 🟢 THE FIX: Changed revalidate to 5 to protect API limits
     const res = await fetch(url, { next: { revalidate: 5 } });
     if (!res.ok) return null;
     const data = await res.json();
@@ -66,12 +62,15 @@ export async function fetchEspnDetails(gameId: string) {
     const homeTeamName = homeCompetitor.team.displayName;
     const awayTeamName = awayCompetitor.team.displayName;
 
-    // 🟢 NEW: EXTRACT PENALTY & AGGREGATE DATA FOR SUPABASE STORAGE
+    // 🟢 EXTRACT HT, PENALTY & AGGREGATE DATA
     const homePens = homeCompetitor?.shootoutScore;
     const awayPens = awayCompetitor?.shootoutScore;
-    const aggSummary = data.header?.series?.summary || null;
+    const homeAgg = homeCompetitor?.aggregateScore;
+    const awayAgg = awayCompetitor?.aggregateScore;
+    const aggSummary = data.header?.competitions?.[0]?.series?.summary || data.header?.series?.summary || null;
+    const homeHT = homeCompetitor?.linescores?.[0]?.value;
+    const awayHT = awayCompetitor?.linescores?.[0]?.value;
 
-    // 🟢 1. EXTRACT VENUE & REFEREES & PREDICTOR
     const venue = data.gameInfo?.venue?.fullName || null;
     const referees = data.gameInfo?.officials?.map((o: any) => o.displayName || o.fullName) || [];
     
@@ -84,13 +83,17 @@ export async function fetchEspnDetails(gameId: string) {
         };
     }
 
-    // 🟢 2. PARSE STATS
     const boxscore = data.boxscore;
     const stats: any = { 
         home: {}, 
         away: {},
         home_penalties: homePens !== undefined ? parseInt(homePens) : null,
         away_penalties: awayPens !== undefined ? parseInt(awayPens) : null,
+        home_ht: homeHT !== undefined ? parseInt(homeHT) : null,
+        away_ht: awayHT !== undefined ? parseInt(awayHT) : null,
+        home_agg: homeAgg !== undefined ? parseInt(homeAgg) : null,
+        away_agg: awayAgg !== undefined ? parseInt(awayAgg) : null,
+        aggregate_text: aggSummary,
         aggregate: aggSummary
     };
     
@@ -102,8 +105,6 @@ export async function fetchEspnDetails(gameId: string) {
              if(s.name === 'foulsCommitted') stats[side].fouls = s.displayValue;
              if(s.name === 'wonCorners') stats[side].corners = s.displayValue;
              if(s.name === 'saves') stats[side].saves = s.displayValue;
-             
-             // The Shot Catcher
              if(s.name === 'shotsSummary' || s.name === 'totalShots') stats[side].shots = s.displayValue;
              if(s.name === 'shotsOnTarget') stats[side].shotsOnTarget = s.displayValue;
              if(s.name === 'shotsOffTarget') stats[side].shotsOffTarget = s.displayValue;
@@ -111,7 +112,6 @@ export async function fetchEspnDetails(gameId: string) {
        });
     }
 
-    // 🟢 3. PARSE LINEUPS & FORMATIONS
     const lineups: any = { home: [], away: [], formations: { home: null, away: null } };
     let rosters = boxscore?.rosters;
     if (!rosters && boxscore?.players) rosters = boxscore.players;
@@ -143,7 +143,6 @@ export async function fetchEspnDetails(gameId: string) {
         });
     }
 
-    // 🔥 C. BUILD THE ROSTER DICTIONARY
     const rosterDict: { name: string, side: string, teamName: string }[] = [];
     ['home', 'away'].forEach(side => {
         const teamName = side === 'home' ? homeTeamName : awayTeamName;
@@ -153,7 +152,6 @@ export async function fetchEspnDetails(gameId: string) {
     });
     rosterDict.sort((a, b) => b.name.length - a.name.length);
 
-    // 🟢 D. PARSE EVENTS (THE TRIPLE-LAYER SHREDDER)
     let events: any[] = [];
     if (data.commentary && data.commentary.length > 0) {
         const rawEvents = data.commentary;
@@ -169,107 +167,58 @@ export async function fetchEspnDetails(gameId: string) {
                 const time = c.time?.displayValue || "0'";
                 const metaType = c.play?.type?.text?.toLowerCase() || '';
 
-                let type = 'event';
-                let actionName = 'Event';
-                let player = '';
-                let matchedPlayerName = '';
-                let matchedTeamName = '';
-                let matchedSide = ''; // 🟢 ADDED TO TRACK HOME VS AWAY GOALS
+                let type = 'event'; let actionName = 'Event'; let player = ''; let matchedPlayerName = ''; let matchedTeamName = ''; let matchedSide = '';
 
-                // --- 1. THE TRIPLE-LOCK CLASSIFIER ---
                 if (lowerText.includes('var decision') || lowerText.includes('overturned') || lowerText.includes('disallowed') || lowerText.includes('no goal') || metaType.includes('var')) {
                     type = 'var_overturn'; actionName = 'VAR Decision';
                 } 
-                else if (lowerText.includes('penalty conceded')) {
-                    type = 'penalty_awarded'; actionName = 'Penalty Conceded'; 
-                } else if (lowerText.includes('penalty awarded')) {
-                    type = 'penalty_awarded'; actionName = 'Penalty Awarded';
-                } else if (lowerText.includes('penalty') && (lowerText.includes('check') || lowerText.includes('var'))) {
-                    type = 'var_overturn'; actionName = 'VAR Penalty Check'; 
-                } else if ((lowerText.includes('penalty') && (lowerText.includes('saved') || lowerText.includes('missed'))) || metaType === 'penalty missed' || metaType === 'penalty saved') {
-                    type = 'penalty_missed'; actionName = 'Penalty Missed';
-                } 
-                else if (lowerText.includes('attempt') || lowerText.includes('saved') || lowerText.includes('missed') || lowerText.includes('blocked') || lowerText.includes('post') || lowerText.includes('crossbar') || metaType.includes('shot') || metaType.includes('miss')) {
-                    type = 'attempt'; actionName = lowerText.includes('saved') ? 'Shot Saved' : 'Shot Missed';
-                } 
-                else if (metaType === 'goal' || lowerText.includes('goal!') || lowerText.includes('own goal by') || (lowerText.includes('goal') && /\d+/.test(lowerText))) {
-                    type = 'goal'; actionName = lowerText.includes('own goal') ? 'Own Goal' : 'Goal';
-                } else if (lowerText.includes('penalty') && lowerText.includes('scored')) {
-                    type = 'goal'; actionName = 'Penalty Goal';
-                } 
-                else if (lowerText.includes('card') || metaType.includes('card')) {
-                    type = lowerText.includes('red') ? 'red-card' : 'card';
-                    actionName = lowerText.includes('red') ? 'Red Card' : 'Yellow Card';
-                } else if (lowerText.includes('substitution') || metaType.includes('substitution')) {
-                    type = 'sub'; actionName = 'Substitution';
-                } else {
-                    type = 'attempt'; actionName = 'Match Update';
-                }
+                else if (lowerText.includes('penalty conceded')) { type = 'penalty_awarded'; actionName = 'Penalty Conceded'; } 
+                else if (lowerText.includes('penalty awarded')) { type = 'penalty_awarded'; actionName = 'Penalty Awarded'; } 
+                else if (lowerText.includes('penalty') && (lowerText.includes('check') || lowerText.includes('var'))) { type = 'var_overturn'; actionName = 'VAR Penalty Check'; } 
+                else if ((lowerText.includes('penalty') && (lowerText.includes('saved') || lowerText.includes('missed'))) || metaType === 'penalty missed' || metaType === 'penalty saved') { type = 'penalty_missed'; actionName = 'Penalty Missed'; } 
+                else if (lowerText.includes('attempt') || lowerText.includes('saved') || lowerText.includes('missed') || lowerText.includes('blocked') || lowerText.includes('post') || lowerText.includes('crossbar') || metaType.includes('shot') || metaType.includes('miss')) { type = 'attempt'; actionName = lowerText.includes('saved') ? 'Shot Saved' : 'Shot Missed'; } 
+                else if (metaType === 'goal' || lowerText.includes('goal!') || lowerText.includes('own goal by') || (lowerText.includes('goal') && /\d+/.test(lowerText))) { type = 'goal'; actionName = lowerText.includes('own goal') ? 'Own Goal' : 'Goal'; } 
+                else if (lowerText.includes('penalty') && lowerText.includes('scored')) { type = 'goal'; actionName = 'Penalty Goal'; } 
+                else if (lowerText.includes('card') || metaType.includes('card')) { type = lowerText.includes('red') ? 'red-card' : 'card'; actionName = lowerText.includes('red') ? 'Red Card' : 'Yellow Card'; } 
+                else if (lowerText.includes('substitution') || metaType.includes('substitution')) { type = 'sub'; actionName = 'Substitution'; } 
+                else { type = 'attempt'; actionName = 'Match Update'; }
 
-                // --- LAYER 1: THE HIDDEN METADATA ---
                 if (c.play?.participants?.length > 0) {
                     matchedPlayerName = c.play.participants[0]?.athlete?.displayName || '';
                     const teamMatch = rosterDict.find(r => r.name === matchedPlayerName);
-                    if (teamMatch) {
-                        matchedTeamName = teamMatch.teamName;
-                        matchedSide = teamMatch.side; // 🟢 EXTRACT SIDE
-                    }
-
+                    if (teamMatch) { matchedTeamName = teamMatch.teamName; matchedSide = teamMatch.side; }
                     if (type === 'sub' && c.play.participants.length > 1) {
                         const p1 = c.play.participants[0]?.athlete?.displayName;
                         const p2 = c.play.participants[1]?.athlete?.displayName;
-                        if (p1 && p2) {
-                            player = teamMatch ? `${p1} (In) / ${p2} (Out) (${teamMatch.teamName})` : `${p1} (In) / ${p2} (Out)`;
-                        }
+                        if (p1 && p2) player = teamMatch ? `${p1} (In) / ${p2} (Out) (${teamMatch.teamName})` : `${p1} (In) / ${p2} (Out)`;
                     }
                 }
 
-                // --- LAYER 2: THE ROSTER DICTIONARY & TEAM NAME INJECTOR ---
                 if (!player) {
                     if (type === 'sub') {
-                        const matched = rosterDict
-                            .filter(r => text.includes(r.name))
-                            .sort((a, b) => text.indexOf(a.name) - text.indexOf(b.name));
-                        
-                        if (matched.length >= 2) {
-                            player = `${matched[0].name} (In) / ${matched[1].name} (Out) (${matched[0].teamName})`;
-                            matchedSide = matched[0].side; // 🟢 EXTRACT SIDE
-                        } else if (matched.length === 1) {
-                            player = `${matched[0].name} (${matched[0].teamName})`;
-                            matchedSide = matched[0].side; // 🟢 EXTRACT SIDE
-                        }
+                        const matched = rosterDict.filter(r => text.includes(r.name)).sort((a, b) => text.indexOf(a.name) - text.indexOf(b.name));
+                        if (matched.length >= 2) { player = `${matched[0].name} (In) / ${matched[1].name} (Out) (${matched[0].teamName})`; matchedSide = matched[0].side; } 
+                        else if (matched.length === 1) { player = `${matched[0].name} (${matched[0].teamName})`; matchedSide = matched[0].side; }
                     } else {
                         if (!matchedPlayerName) {
                             const match = rosterDict.find(r => text.includes(r.name));
-                            if (match) {
-                                matchedPlayerName = match.name;
-                                matchedTeamName = match.teamName;
-                                matchedSide = match.side; // 🟢 EXTRACT SIDE
-                            }
+                            if (match) { matchedPlayerName = match.name; matchedTeamName = match.teamName; matchedSide = match.side; }
                         }
-
-                        if (matchedPlayerName) {
-                            player = matchedTeamName ? `${matchedPlayerName} (${matchedTeamName})` : matchedPlayerName;
-                        }
+                        if (matchedPlayerName) player = matchedTeamName ? `${matchedPlayerName} (${matchedTeamName})` : matchedPlayerName;
                     }
                 }
 
-                // --- ASSISTS FOR GOALS ---
                 if (type === 'goal' && lowerText.includes('assisted by')) {
                     const assistIndex = lowerText.indexOf('assisted by');
                     const assistText = text.substring(assistIndex);
-                    
                     const assistMatch = rosterDict.find(r => assistText.includes(r.name) && r.name !== matchedPlayerName);
-                    
-                    if (assistMatch) {
-                        player = `${player || 'Goal'} (Assist: ${assistMatch.name})`;
-                    } else {
+                    if (assistMatch) { player = `${player || 'Goal'} (Assist: ${assistMatch.name})`; } 
+                    else {
                         const regMatch = text.match(/Assisted by (.*?)(?: with|\.)/i);
                         if (regMatch) player = `${player || 'Goal'} (Assist: ${regMatch[1].trim()})`;
                     }
                 }
 
-                // --- LAYER 3: THE CLEAN SHIELD (Final Fallback) ---
                 if (!player || player.trim() === '' || player.length > 85 || player.toLowerCase().includes('unknown')) {
                     if (type === 'goal') player = 'Goal Confirmed';
                     else if (type === 'var_overturn') player = 'Goal Disallowed';
@@ -286,7 +235,7 @@ export async function fetchEspnDetails(gameId: string) {
                     time: time,
                     type: type,
                     text: actionName,
-                    team: matchedSide, // 🟢 NOW PASSING 'home' OR 'away'
+                    team: matchedSide, 
                     player: player
                 };
             });
