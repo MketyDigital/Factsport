@@ -176,8 +176,11 @@ async function runProSlipEngine() {
                 const prompt = `You are an elite football tactical analyst in 2026. Provide a highly accurate "Pro Betting Slip" for: ${match.home_team} vs ${match.away_team} (${match.league}). Data Context: ${textContext || "No historical form available. Base prediction on current tactical profiles."} Return ONLY a valid JSON object: {"primary": "Value bet", "odds": "1.60", "safe": "Safe bet", "safeOdds": "1.20", "rationale": "40-50 words."}`;
                 let text = await generateWithRetry(prompt);
                 if (!text) continue; 
+                
+                // --- THE FIX IS HERE ---
                 text = text.replace(/```json/gi, '').replace(/
 ```/g, '').trim();
+                
                 const analysisData = JSON.parse(text);
                 const updatePayload = { pro_analysis: analysisData };
                 if (translatedH2H && translatedH2H.matches.length > 0) updatePayload.h2h = translatedH2H; 
