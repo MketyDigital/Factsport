@@ -177,9 +177,8 @@ async function runProSlipEngine() {
                 let text = await generateWithRetry(prompt);
                 if (!text) continue; 
                 
-                // --- THE FIX IS HERE ---
-                text = text.replace(/```json/gi, '').replace(/
-```/g, '').trim();
+                // Copy-Paste Proof string replacement
+                text = text.replace(/```json/gi, '').replace(new RegExp('```', 'g'), '').trim();
                 
                 const analysisData = JSON.parse(text);
                 const updatePayload = { pro_analysis: analysisData };
@@ -221,7 +220,6 @@ async function runProSlipEngine() {
 
     if (allAnalyzedToday && allAnalyzedToday.length > 0) {
         if (featuredMatchId) {
-            // NEW LOGIC: Verify the featured match is actually scheduled for today
             const forcedMatch = allAnalyzedToday.find(m => String(m.id) === String(featuredMatchId));
             if (forcedMatch && forcedMatch.pro_analysis) { 
                 freeTipMatch = forcedMatch; 
@@ -248,7 +246,6 @@ async function runProSlipEngine() {
         const matchLink = `https://factsport.com/match/${freeTipMatch.id}`;
         const matchDateObj = formatDate(freeTipMatch.match_date); 
         
-        // 🟢 APPLY DASHBOARD TEMPLATES (With Fallbacks)
         const fb1Text = parseTemplate(templates.fb1 || `🎁 FREE BET OF THE DAY 🎁\n\n📅 Date: [DATE]\n⚽️ [HOME] vs [AWAY]\n🎯 Prediction: [PICK]\n🔥 Odds: [ODDS]\n\n👇 See full stats and place your bet!\n[LINK]`, freeTipMatch, freeTipMatch.pro_analysis, matchLink, matchDateObj);
         const fb2Text = parseTemplate(templates.fb2 || fb1Text, freeTipMatch, freeTipMatch.pro_analysis, matchLink, matchDateObj);
         
@@ -287,7 +284,6 @@ async function runProSlipEngine() {
         }
 
         if (successfullyPosted) {
-            // NEW LOGIC: Clear the featured match ID to reset for tomorrow
             const updatedConfig = { ...config, last_freetip_broadcast_date: todayDateString };
             delete updatedConfig.featured_match_id; 
 
