@@ -102,9 +102,26 @@ const getImageKitProxyUrl = (rawUrl: string) => {
     return `${endpoint}/tr:f-png/${encodeURIComponent(rawUrl)}`;
 };
 
+// 🟢 FIX 2: COMPRESS URL PAYLOAD FOR LINEUPS TO PREVENT MAKE.COM / BUFFER INVALID IMAGE ERROR
+const compressPlayerName = (player: string) => {
+    if (!player) return '';
+    const numMatch = player.match(/\b(\d{1,2})\b/);
+    const num = numMatch ? numMatch[0] : '';
+    const nameCleaned = player.replace(/\b\d{1,2}\b/g, '').replace(/[()]/g, '').trim();
+    const lastName = nameCleaned ? nameCleaned.split(' ').pop() : '';
+    return num ? `${num} ${lastName}` : lastName;
+};
+
 function parseTemplate(text: string, state: any, matchUrl: string, extra: any) {
     if (!text) return '';
-    return text
+
+    let processedText = text;
+    // 🟢 FIX 3: SMART CTA INJECTION! If they included [LINK] but forgot [CTA], inject the media CTA securely!
+    if (extra.activeCta && !processedText.includes('[CTA]') && !processedText.includes('[PRE_CTA]')) {
+        processedText = processedText.replace(/\[LINK\]/g, `${extra.activeCta}[LINK]`);
+    }
+
+    return processedText
         .replace(/\[HOME\]/g, state.home_team || '')
         .replace(/\[AWAY\]/g, state.away_team || '')
         .replace(/\[H_SCORE\]/g, state.home_score || 0)
@@ -189,7 +206,7 @@ export async function POST(request: Request) {
     let extraData: any = { ctaText, preMatchCta, hashtags };
     let ogImageUrl = null;
 
-    // 🟢 EVENT EVALUATION HIERARCHY (Original)
+    // 🟢 EVENT EVALUATION HIERARCHY
     if (!strictlyFinishedStatuses.includes(oldStatus) && strictlyFinishedStatuses.includes(newStatus)) {
         eventKey = 'fulltime';
         ogImageUrl = getMatchImageUrl('FULL TIME', newState, frontendUrl);
@@ -220,6 +237,8 @@ export async function POST(request: Request) {
     } 
     else if (!htStatuses.includes(oldStatus) && htStatuses.includes(newStatus)) {
         eventKey = 'halftime';
+        // 🟢 FIX 1: HT NOW GENERATES AN IMAGE URL!
+        ogImageUrl = getMatchImageUrl('HALF TIME', newState, frontendUrl);
     } 
     else if (htStatuses.includes(oldStatus) && (live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus))) {
         eventKey = 'kickoff';
@@ -230,12 +249,15 @@ export async function POST(request: Request) {
     } 
     else if (oldWasIncomplete && newIsComplete) {
         eventKey = 'lineups';
+        
+        // 🟢 APPLY FIX 2: Compress payload so Make/Buffer doesn't reject it for being too long!
         const lineupOg = { 
             type: 'pitch', label: 'STARTING XI', 
             home: newState.home_team, away: newState.away_team, 
             homeFormation: newState.lineups?.formations?.home || '4-3-3',
             awayFormation: newState.lineups?.formations?.away || '4-3-3',
-            homeXI: newValidH.slice(0, 11), awayXI: newValidA.slice(0, 11)
+            homeXI: newValidH.slice(0, 11).map(compressPlayerName), 
+            awayXI: newValidA.slice(0, 11).map(compressPlayerName)
         };
         ogImageUrl = `${frontendUrl}/api/og?data=${encodeBase64Safe(lineupOg)}`;
     }
@@ -244,6 +266,9 @@ export async function POST(request: Request) {
 
     const evtConfig = config.events[eventKey] || {};
     const tpl = config.templates?.[eventKey] || {};
+
+    // Determine which CTA to use based on the event triggering
+    extraData.activeCta = (eventKey === 'lineups' || eventKey === 'kickoff') ? preMatchCta : ctaText;
 
     const fb1Text = evtConfig.fb1 ? parseTemplate(tpl.fb1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]`, newState, matchUrl, extraData) : null;
     const fb2Text = evtConfig.fb2 ? parseTemplate(tpl.fb2 || fb1Text || '', newState, matchUrl, extraData) : null;
@@ -256,7 +281,7 @@ export async function POST(request: Request) {
     // 🟢 Apply ImageKit proxy only if an image exists
     const proxiedImage = ogImageUrl ? getImageKitProxyUrl(ogImageUrl) : null;
 
-    // 🟢 SAFELY CONSTRUCT PAYLOAD (Fixes Make.com null error)
+    // 🟢 SAFELY CONSTRUCT PAYLOAD
     const makePayload1: any = { fb2_text: fb1Text, x_text: make1Text };
     if (proxiedImage) makePayload1.x_image_url = proxiedImage;
 
