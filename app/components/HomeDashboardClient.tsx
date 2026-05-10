@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from "next/link";
 import { ArrowRight, TrendingUp, Calendar, Info, BarChart2 } from "lucide-react";
-import { createClient } from '@/app/lib/supabase/client'; // 🟢 NEW: Needed to check Admin Override
+import { createClient } from '@/app/lib/supabase/client'; 
 import HeroMatchCards from '@/app/components/HeroMatchCards'; 
 import CompactMatchRow from '@/app/components/CompactMatchRow';
 import BetOfTheDay from '@/app/components/BetOfTheDay'; 
@@ -19,11 +19,10 @@ export default function HomeDashboardClient({
 }) {
     const [localData, setLocalData] = useState<any>(null);
     const [leagueTab, setLeagueTab] = useState<'matches'|'table'>('matches');
-    const [featuredMatchId, setFeaturedMatchId] = useState<string | null>(null); // 🟢 NEW: Admin Override State
+    const [featuredMatchId, setFeaturedMatchId] = useState<string | null>(null);
 
     useEffect(() => { setLeagueTab('matches'); }, [selectedLeague]);
 
-    // 🟢 NEW: Fetch the Admin Override ID once when the page loads
     useEffect(() => {
         const fetchSettings = async () => {
             const supabase = createClient();
@@ -31,14 +30,13 @@ export default function HomeDashboardClient({
             if (data?.social_config?.featured_match_id) {
                 setFeaturedMatchId(data.social_config.featured_match_id);
             } else {
-                setFeaturedMatchId(''); // Explicitly empty so we know it loaded successfully
+                setFeaturedMatchId(''); 
             }
         };
         fetchSettings();
     }, []);
 
     useEffect(() => {
-        // Wait until we have checked the database for an Admin Override before rendering the matches
         if (featuredMatchId === null) return; 
 
         const now = new Date();
@@ -127,7 +125,6 @@ export default function HomeDashboardClient({
         if (computedHero.length === 0) computedHero = todayMedia.slice(0, 5); 
         computedHero = computedHero.slice(0, 5);
 
-
         // ---------------------------------------------------------------------
         // 🟢 THE STRICT SYNC FIX: BET OF THE DAY LOGIC
         // This math is now 100% identical to the Telegram Node.js background script
@@ -138,7 +135,6 @@ export default function HomeDashboardClient({
             return t >= startOfLocalDay && t <= endOfLocalDay;
         });
 
-        // 1. Only look at matches that actually have AI Analysis completed
         const analyzedMatches = allLocalTodayMatches.filter(m => {
             if (!m.pro_analysis) return false;
             if (typeof m.pro_analysis === 'object' && Object.keys(m.pro_analysis).length === 0) return false;
@@ -147,12 +143,10 @@ export default function HomeDashboardClient({
         });
 
         if (analyzedMatches.length > 0) {
-            // Tier 1 Check: Did the Admin explicitly choose a match in the dashboard?
             if (featuredMatchId) {
                 computedBetMatch = analyzedMatches.find(m => String(m.id) === String(featuredMatchId));
             }
 
-            // Tier 2 Fallback: Run the exact same Giants + Time math as the Telegram Bot
             if (!computedBetMatch) {
                 const giants = ['Arsenal','Chelsea','Liverpool','Man City','Man United','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG', 'Inter', 'AC Milan', 'Atletico'];
                 
@@ -165,12 +159,11 @@ export default function HomeDashboardClient({
                     const bAwayGiant = giants.some(t => b.away_team?.includes(t));
                     const bScore = (bHomeGiant ? 1 : 0) + (bAwayGiant ? 1 : 0);
 
-                    if (bScore !== aScore) return bScore - aScore; // Highest giant score first
+                    if (bScore !== aScore) return bScore - aScore; 
 
-                    // Tie-breaker: "Last match of the day" (Latest Kickoff Time)
                     const aTime = new Date(a.match_date).getTime();
                     const bTime = new Date(b.match_date).getTime();
-                    return bTime - aTime; // Latest time first
+                    return bTime - aTime; 
                 });
 
                 computedBetMatch = sortedSlips[0];
@@ -192,7 +185,7 @@ export default function HomeDashboardClient({
         });
 
         setLocalData({ heroMatches: computedHero, betMatch: computedBetMatch, groupedMatches: grouped, fallbackTriggered });
-    }, [globalMatches, featuredMatches, selectedLeague, featuredMatchId]); // 🟢 NEW: Re-runs when featuredMatchId is loaded
+    }, [globalMatches, featuredMatches, selectedLeague, featuredMatchId]); 
 
     if (!localData) return <div className="w-full h-96 animate-pulse bg-slate-200/50 rounded-2xl max-w-6xl mx-auto mt-8"></div>;
 

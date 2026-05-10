@@ -1,11 +1,15 @@
 'use client';
 
-import { X, Square, Maximize2 } from 'lucide-react';
+import { useState } from 'react';
+import { X, Square, Maximize2, Play } from 'lucide-react';
 import { useGlobalMedia } from '@/app/providers/GlobalMediaProvider'; 
 import Link from 'next/link';
 
 export default function StickyAffiliateBanner() {
     const { activeMatchId, mediaType: contextMediaType, videoUrl: rawVideoUrl, isPageActive, stopMedia } = useGlobalMedia();
+    
+    // 🟢 NEW: State to force the iframe to reload on user click
+    const [playTrigger, setPlayTrigger] = useState(0);
 
     // 🔥 THE GHOST PROTOCOL: Extract the hidden tag to accurately detect forced audio mode
     const isForcedAudio = rawVideoUrl?.includes('#is-audio-mode');
@@ -37,8 +41,9 @@ export default function StickyAffiliateBanner() {
             */}
             {showFloatingAudio && (
                 <div className="absolute top-[-9999px] left-[-9999px] w-[10px] h-[10px] opacity-[0.01] overflow-hidden pointer-events-none">
-                    {isRawMedia && <video src={videoUrl!} autoPlay playsInline controls={false} />}
-                    {isYouTube && <iframe src={getAutoPlayUrl(videoUrl!)} allow="autoplay; encrypted-media" title="Background Audio" />}
+                    {/* 🟢 NEW: Added key={playTrigger} to force remount on click, bypassing browser autoplay blocks */}
+                    {isRawMedia && <video key={playTrigger} src={videoUrl!} autoPlay playsInline controls={false} />}
+                    {isYouTube && <iframe key={playTrigger} src={getAutoPlayUrl(videoUrl!)} allow="autoplay; encrypted-media" title="Background Audio" />}
                 </div>
             )}
 
@@ -74,7 +79,7 @@ export default function StickyAffiliateBanner() {
 
             {/* 🟢 FLOATING AUDIO CONTROLS (Live Radio Only) */}
             {showFloatingAudio && (
-                <div className="bg-[#0a1428]/95 backdrop-blur-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.9)] rounded-full px-5 py-2.5 flex items-center justify-between gap-4 max-w-[220px] pointer-events-auto animate-in slide-in-from-bottom-10 mx-auto">
+                <div className="bg-[#0a1428]/95 backdrop-blur-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.9)] rounded-full px-5 py-2.5 flex items-center justify-between gap-4 max-w-[240px] pointer-events-auto animate-in slide-in-from-bottom-10 mx-auto">
                     <Link href={activeMatchId === 'global-goal-rush' ? '/live' : `/match/${activeMatchId}`} className="flex flex-col hover:opacity-70 transition-opacity">
                         <span className="text-[10px] text-red-500 font-black uppercase tracking-widest flex items-center gap-1.5 drop-shadow-md">
                             <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_red]"></span> LIVE RADIO
@@ -89,9 +94,23 @@ export default function StickyAffiliateBanner() {
                     
                     <div className="w-[1px] h-6 bg-white/10"></div>
 
-                    <button onClick={stopMedia} className="w-8 h-8 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm">
-                        <Square size={14} fill="currentColor" />
-                    </button>
+                    {/* 🟢 NEW: Added a Play button wrapper to hold both controls */}
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={() => setPlayTrigger(prev => prev + 1)} 
+                            className="w-8 h-8 bg-blue-500/20 text-blue-500 rounded-full flex items-center justify-center hover:bg-blue-500 hover:text-white transition-all shadow-sm"
+                            title="Play/Resume Audio"
+                        >
+                            <Play size={14} fill="currentColor" className="ml-0.5" />
+                        </button>
+                        <button 
+                            onClick={stopMedia} 
+                            className="w-8 h-8 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                            title="Stop Audio"
+                        >
+                            <Square size={14} fill="currentColor" />
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
