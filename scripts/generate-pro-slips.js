@@ -176,8 +176,8 @@ async function runProSlipEngine() {
                 let text = await generateWithRetry(prompt);
                 if (!text) continue; 
                 
-                text = text.replace(/```json/gi, '').replace(new RegExp('
-```', 'g'), '').trim();
+                // THIS IS THE FIX: Cleanly stripping markdown without line breaks
+                text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
                 
                 const analysisData = JSON.parse(text);
                 const updatePayload = { pro_analysis: analysisData };
