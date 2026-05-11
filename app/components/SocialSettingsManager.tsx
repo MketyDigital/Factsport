@@ -171,7 +171,7 @@ export default function SocialSettingsManager() {
 
     const liveEvents = ['goals', 'lineups', 'kickoff', 'fulltime', 'halftime', 'var_overturn', 'penalty_awarded'];
     const backgroundEvents = ['daily_preview', 'daily_summary', 'free_tips', 'vip_tips'];
-    const templatePlatforms = ['fb1', 'fb2', 'make1', 'make2', 'tg_general', 'tg_vip']; // Used only for editing templates (Buffer inherits fb/make text)
+    const templatePlatforms = ['fb1', 'fb2', 'make1', 'make2', 'tg_general', 'tg_vip'];
 
     return (
         <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mt-8 relative">
@@ -227,14 +227,11 @@ export default function SocialSettingsManager() {
 
             <div className="p-6 grid grid-cols-1 xl:grid-cols-12 gap-8">
                 
-                {/* LEFT COLUMN: EVENTS MATRIX (Takes up more space now for the extra columns) */}
                 <div className="xl:col-span-8 space-y-6">
-                    
                     <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 overflow-x-auto shadow-inner">
                         <h3 className="font-black text-slate-800 text-sm mb-4 flex items-center gap-2"><Globe size={16} className="text-blue-500"/> Advanced Routing Matrix</h3>
                         
                         <div className="space-y-3 min-w-[750px]">
-                            {/* THE HEADER ROW */}
                             <div className="flex items-center justify-between pb-2 border-b border-slate-300 px-2 bg-slate-100 rounded-t-lg pt-2">
                                 <div className="w-[18%] text-[9px] font-black text-slate-500 uppercase tracking-widest">Event Trigger</div>
                                 <div className="w-[7%] flex justify-center text-[9px] font-black text-purple-600 title='Buffer X Account 1'">B-X1</div>
@@ -291,7 +288,6 @@ export default function SocialSettingsManager() {
                         </div>
                     </div>
 
-                    {/* VIP TEAMS & LEAGUES */}
                     <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 flex gap-4">
                         <div className="flex-1">
                             <h3 className="font-black text-slate-800 text-[10px] uppercase mb-2">VIP Teams</h3>
@@ -304,16 +300,12 @@ export default function SocialSettingsManager() {
                             <div className="flex flex-wrap gap-1">{vipLeagues.map(l => <span key={l} className="bg-white border text-[9px] px-1.5 rounded">{l} <button onClick={()=>removeItem('league',l)} className="text-red-400">x</button></span>)}</div>
                         </div>
                     </div>
-
                 </div>
 
-                {/* RIGHT COLUMN: API KEYS & CREDENTIALS */}
                 <div className="xl:col-span-4 space-y-6">
                     <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
                         <div className="flex items-center gap-2 mb-4"><KeyRound size={16} className="text-red-500" /><h3 className="font-black text-slate-800 text-sm">Webhooks & API Keys</h3></div>
                         <div className="space-y-3">
-                            
-                            {/* NEW: EXPANDED BUFFER API SECTION */}
                             <div className="bg-white p-3 rounded-xl border border-slate-200">
                                 <h4 className="text-[10px] font-black text-purple-600 mb-2 uppercase tracking-widest"><Twitter size={12} className="inline mr-1"/> Buffer API (Direct)</h4>
                                 <input type="password" placeholder="Global Buffer Access Token" value={credentials.buffer_token} onChange={e => setCredentials({...credentials, buffer_token: e.target.value})} className="w-full mb-3 bg-purple-50 border border-purple-100 rounded p-1.5 text-xs outline-none" />

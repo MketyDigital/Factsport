@@ -2,7 +2,39 @@ export const runtime = 'edge';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-// 🟢 STRICT ACCURACY SHIELDS (Original)
+// 🟢 100% NO-FAIL BUFFER IMAGE PROXY
+// Downloads the dynamic Vercel image and saves it to Supabase as a static PNG.
+async function secureStaticImage(dynamicUrl: string, fileName: string, supabaseClient: any) {
+    if (!dynamicUrl) return "";
+    try {
+        const imgResponse = await fetch(dynamicUrl);
+        if (!imgResponse.ok) return dynamicUrl; 
+        
+        const arrayBuffer = await imgResponse.arrayBuffer();
+
+        // Uploads as pure static binary, upserting to overwrite and save space
+        const { error } = await supabaseClient.storage
+            .from('socials')
+            .upload(`${fileName}.png`, arrayBuffer, {
+                contentType: 'image/png',
+                upsert: true 
+            });
+
+        if (error) {
+            console.error("Supabase Storage Error:", error);
+            return dynamicUrl; 
+        }
+
+        const { data } = supabaseClient.storage.from('socials').getPublicUrl(`${fileName}.png`);
+        return data.publicUrl;
+
+    } catch (err) {
+        console.error("Image Proxy Failed:", err);
+        return dynamicUrl; 
+    }
+}
+
+// 🟢 STRICT ACCURACY SHIELDS
 const getValidGoals = (eventsArr: any[]) => {
     if (!Array.isArray(eventsArr)) return [];
     return eventsArr.filter((e: any) => {
@@ -29,7 +61,7 @@ const parseTime = (t: any) => {
     return (parseInt(parts[0]) || 0) * 100 + (parseInt(parts[1]) || 0); 
 };
 
-// 🟢 EXPANDED KNOWN TEAMS DICTIONARY (Original)
+// 🟢 EXPANDED KNOWN TEAMS DICTIONARY
 const KNOWN_TEAMS: Record<string, string> = {
     'manchester city': 'MCI', 'man city': 'MCI', 'm. city': 'MCI', 'manchester united': 'MUN', 'man united': 'MUN', 'man utd': 'MUN',
     'arsenal': 'ARS', 'arsenal fc': 'ARS', 'chelsea': 'CHE', 'chelsea fc': 'CHE', 'liverpool': 'LIV', 'liverpool fc': 'LIV',
@@ -95,14 +127,12 @@ const getMatchImageUrl = (label: string, state: any, baseUrl: string) => {
     return `${baseUrl}/api/og?data=${encodeBase64Safe(payload)}`;
 };
 
-// 🟢 ORIGINAL IMAGEKIT LOGIC RESTORED
 const getImageKitProxyUrl = (rawUrl: string) => {
     const endpoint = process.env.IMAGEKIT_URL_ENDPOINT?.replace(/\/+$/, '');
     if (!endpoint) return rawUrl;
     return `${endpoint}/tr:f-png/${encodeURIComponent(rawUrl)}`;
 };
 
-// 🟢 COMPRESS URL PAYLOAD FOR LINEUPS TO PREVENT MAKE.COM / BUFFER INVALID IMAGE ERROR
 const compressPlayerName = (player: string) => {
     if (!player) return '';
     const numMatch = player.match(/\b(\d{1,2})\b/);
@@ -173,7 +203,6 @@ export async function POST(request: Request) {
     const matchUrl = `${frontendUrl}/match/${newState.id}`; 
     const hashtags = getMatchHashtag(newState.home_team, newState.away_team, newState.league, newState.home_tla, newState.away_tla); 
     
-    // 🟢 SMART MEDIA CTA LOGIC
     let ctaText = "👇 Match Stats & Updates:\n";
     let preMatchCta = "👇 See the tactical setup & subs here!\n";
     if (newState.media_url || newState.stream_url) {
@@ -205,7 +234,6 @@ export async function POST(request: Request) {
     let extraData: any = { ctaText, preMatchCta, hashtags };
     let ogImageUrl = null;
 
-    // 🟢 EVENT EVALUATION HIERARCHY
     if (!strictlyFinishedStatuses.includes(oldStatus) && strictlyFinishedStatuses.includes(newStatus)) {
         eventKey = 'fulltime';
         ogImageUrl = getMatchImageUrl('FULL TIME', newState, frontendUrl);
@@ -247,7 +275,6 @@ export async function POST(request: Request) {
     } 
     else if (oldWasIncomplete && newIsComplete) {
         eventKey = 'lineups';
-        
         const lineupOg = { 
             type: 'pitch', label: 'STARTING XI', 
             home: newState.home_team, away: newState.away_team, 
@@ -263,7 +290,6 @@ export async function POST(request: Request) {
 
     const evtConfig = config.events[eventKey] || {};
     const tpl = config.templates?.[eventKey] || {};
-
     extraData.activeCta = (eventKey === 'lineups' || eventKey === 'kickoff') ? preMatchCta : ctaText;
 
     const fb1Text = evtConfig.fb1 || evtConfig.buf_fb1 ? parseTemplate(tpl.fb1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]`, newState, matchUrl, extraData) : null;
@@ -273,31 +299,18 @@ export async function POST(request: Request) {
     const tgMsg = evtConfig.tg_general ? parseTemplate(tpl.tg_general || `<b>[HOME] [H_SCORE] - [A_SCORE] [AWAY]</b>\n<a href="[LINK]">Match Center</a>`, newState, matchUrl, extraData) : null;
 
     const creds = config.credentials || {};
-    
-    // 🟢 Apply ImageKit proxy only if an image exists
     const proxiedImage = ogImageUrl ? getImageKitProxyUrl(ogImageUrl) : null;
 
-    // 🟢 SAFELY CONSTRUCT MAKE.COM / ACTIVEPIECES PAYLOAD
     const makePayload1: any = { fb2_text: fb1Text, x_text: make1Text };
     if (proxiedImage) makePayload1.x_image_url = proxiedImage;
 
     const makePayload2: any = { fb2_text: fb2Text, x_text: make2Text };
     if (proxiedImage) makePayload2.x_image_url = proxiedImage;
 
-    // 🟢 NEW ENGINE: Direct Buffer API with TinyURL Bypass
-    const postToBufferDirectly = async (text: string, imgUrl: string, profileId: string, token: string) => {
-        let safeImg = imgUrl ? imgUrl.trim() : "";
-        
-        if (safeImg && safeImg.length > 150) {
-            try {
-                const shortRes = await fetch('https://tinyurl.com/api-create.php?url=' + encodeURIComponent(safeImg));
-                if (shortRes.ok) safeImg = await shortRes.text();
-            } catch(e) { /* ignore shortener errors, fallback to long url */ }
-        }
-
+    const postToBufferDirectly = async (text: string, safeImgUrl: string, profileId: string, token: string) => {
         const payload = {
             query: `mutation($text: String!, $img: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow, assets: { images: [{ url: $img }] } }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }`,
-            variables: { text: text || "", img: safeImg }
+            variables: { text: text || "", img: safeImgUrl || "" }
         };
 
         const res = await fetch("https://api.buffer.com/1/graphql", {
@@ -311,25 +324,33 @@ export async function POST(request: Request) {
 
     try {
         const bufferToken = creds.buffer_token || process.env.BUFFER_ACCESS_TOKEN;
-
-        // 🚀 1. BUFFER DIRECT: X (Twitter) Account 1
-        if (evtConfig.buf_x1 && bufferToken && creds.buffer_x1_id) {
-            await postToBufferDirectly(make1Text!, proxiedImage!, creds.buffer_x1_id, bufferToken).catch(e => console.error("BUF X1 Error:", e));
+        
+        // 🚀 THE MAGIC: Convert the slow dynamic URL into a fast static URL for Buffer
+        let finalBufferImage = ogImageUrl;
+        if (ogImageUrl && (evtConfig.buf_x1 || evtConfig.buf_x2 || evtConfig.buf_fb1 || evtConfig.buf_fb2)) {
+            // Overwrites the same image per match to save 99% of storage space
+            const cacheName = `buffer_match_${newState.id}`; 
+            finalBufferImage = await secureStaticImage(ogImageUrl, cacheName, supabase);
         }
 
-        // 🚀 2. BUFFER DIRECT: X (Twitter) Account 2
+        // 🚀 1. BUFFER DIRECT: X (Twitter) 1
+        if (evtConfig.buf_x1 && bufferToken && creds.buffer_x1_id) {
+            await postToBufferDirectly(make1Text!, finalBufferImage!, creds.buffer_x1_id, bufferToken).catch(e => console.error("BUF X1 Error:", e));
+        }
+
+        // 🚀 2. BUFFER DIRECT: X (Twitter) 2
         if (evtConfig.buf_x2 && bufferToken && creds.buffer_x2_id) {
-            await postToBufferDirectly(make2Text || make1Text!, proxiedImage!, creds.buffer_x2_id, bufferToken).catch(e => console.error("BUF X2 Error:", e));
+            await postToBufferDirectly(make2Text || make1Text!, finalBufferImage!, creds.buffer_x2_id, bufferToken).catch(e => console.error("BUF X2 Error:", e));
         }
 
         // 🚀 3. BUFFER DIRECT: Facebook Page 1
         if (evtConfig.buf_fb1 && bufferToken && creds.buffer_fb1_id) {
-            await postToBufferDirectly(fb1Text!, proxiedImage!, creds.buffer_fb1_id, bufferToken).catch(e => console.error("BUF FB1 Error:", e));
+            await postToBufferDirectly(fb1Text!, finalBufferImage!, creds.buffer_fb1_id, bufferToken).catch(e => console.error("BUF FB1 Error:", e));
         }
 
         // 🚀 4. BUFFER DIRECT: Facebook Page 2
         if (evtConfig.buf_fb2 && bufferToken && creds.buffer_fb2_id) {
-            await postToBufferDirectly(fb2Text || fb1Text!, proxiedImage!, creds.buffer_fb2_id, bufferToken).catch(e => console.error("BUF FB2 Error:", e));
+            await postToBufferDirectly(fb2Text || fb1Text!, finalBufferImage!, creds.buffer_fb2_id, bufferToken).catch(e => console.error("BUF FB2 Error:", e));
         }
 
         // 🚀 5. NATIVE GRAPH API: Facebook Page 1
