@@ -2,19 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
-import { Save, Loader2, Trophy, Globe, Facebook, Twitter, X as CloseIcon, Plus, AlertCircle, KeyRound, Send, Target, Edit3 } from 'lucide-react';
+import { Save, Loader2, Trophy, Globe, Facebook, Twitter, X as CloseIcon, Plus, AlertCircle, KeyRound, Send, Target, Edit3, Layers } from 'lucide-react';
 
 const DEFAULT_EVENTS = {
-    goals: { fb1: true, fb2: false, make1: true, make2: false, label: "Goals & Shootouts" },
-    lineups: { fb1: true, fb2: false, make1: true, make2: false, label: "Starting XI Lineups" },
-    kickoff: { fb1: true, fb2: false, make1: true, make2: false, label: "Match Kick-Off" },
-    fulltime: { fb1: true, fb2: false, make1: true, make2: false, label: "Full Time Results" },
-    halftime: { fb1: true, fb2: false, make1: false, make2: false, label: "Half Time Scores" },
-    var_overturn: { fb1: true, fb2: false, make1: false, make2: false, label: "VAR Overturns" },
-    penalty_awarded: { fb1: true, fb2: false, make1: false, make2: false, label: "Penalty Awarded" },
-    daily_preview: { fb1: true, fb2: true, make1: true, make2: true, tg_general: true, label: "Morning Daily Preview" },
-    daily_summary: { fb1: true, fb2: true, make1: true, make2: true, tg_general: true, label: "Evening Matchday Summary" },
-    free_tips: { fb1: true, fb2: true, make1: true, make2: true, tg_general: true, label: "Free Bet of the Day" },
+    goals: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: true, make2: false, label: "Goals & Shootouts" },
+    lineups: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: true, make2: false, label: "Starting XI Lineups" },
+    kickoff: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: true, make2: false, label: "Match Kick-Off" },
+    fulltime: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: true, make2: false, label: "Full Time Results" },
+    halftime: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: false, make2: false, label: "Half Time Scores" },
+    var_overturn: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: false, make2: false, label: "VAR Overturns" },
+    penalty_awarded: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: false, make2: false, label: "Penalty Awarded" },
+    daily_preview: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: true, make1: true, make2: true, tg_general: true, label: "Morning Daily Preview" },
+    daily_summary: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: true, make1: true, make2: true, tg_general: true, label: "Evening Matchday Summary" },
+    free_tips: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: true, make1: true, make2: true, tg_general: true, label: "Free Bet of the Day" },
     vip_tips: { tg_vip: true, label: "Pro AI Analysis (VIP Only)" }
 };
 
@@ -66,7 +66,7 @@ export default function SocialSettingsManager() {
     const [events, setEvents] = useState<any>(DEFAULT_EVENTS);
     const [templates, setTemplates] = useState<any>(DEFAULT_TEMPLATES); 
     
-    const [credentials, setCredentials] = useState({ fb1_id: '', fb1_token: '', fb2_id: '', fb2_token: '', make_webhook_1: '', make_webhook_2: '', telegram_bot_token: '', betting_partner_link: '' });
+    const [credentials, setCredentials] = useState({ buffer_token: '', buffer_x1_id: '', buffer_x2_id: '', buffer_fb1_id: '', buffer_fb2_id: '', fb1_id: '', fb1_token: '', fb2_id: '', fb2_token: '', make_webhook_1: '', make_webhook_2: '', telegram_bot_token: '', betting_partner_link: '' });
     const [tgGeneralChannels, setTgGeneralChannels] = useState<{chatId: string, link: string, wants_preview: boolean, wants_summary: boolean, wants_freetips: boolean}[]>([]);
     const [tgVipChannels, setTgVipChannels] = useState<{chatId: string, link: string}[]>([]);
     
@@ -92,7 +92,10 @@ export default function SocialSettingsManager() {
             setTemplates({ ...DEFAULT_TEMPLATES, ...(settingsData.social_config.templates || {}) }); 
             
             const savedCreds = settingsData.social_config.credentials || {};
-            setCredentials({ fb1_id: savedCreds.fb1_id || '', fb1_token: savedCreds.fb1_token || '', fb2_id: savedCreds.fb2_id || '', fb2_token: savedCreds.fb2_token || '', make_webhook_1: savedCreds.make_webhook_1 || '', make_webhook_2: savedCreds.make_webhook_2 || '', telegram_bot_token: savedCreds.telegram_bot_token || '', betting_partner_link: savedCreds.betting_partner_link || '' });
+            setCredentials({ 
+                buffer_token: savedCreds.buffer_token || '', buffer_x1_id: savedCreds.buffer_x1_id || savedCreds.buffer_x_id || '', buffer_x2_id: savedCreds.buffer_x2_id || '', buffer_fb1_id: savedCreds.buffer_fb1_id || '', buffer_fb2_id: savedCreds.buffer_fb2_id || '', 
+                fb1_id: savedCreds.fb1_id || '', fb1_token: savedCreds.fb1_token || '', fb2_id: savedCreds.fb2_id || '', fb2_token: savedCreds.fb2_token || '', make_webhook_1: savedCreds.make_webhook_1 || '', make_webhook_2: savedCreds.make_webhook_2 || '', telegram_bot_token: savedCreds.telegram_bot_token || '', betting_partner_link: savedCreds.betting_partner_link || '' 
+            });
 
             const loadedGenChannels = (savedCreds.tg_general_channels || []).map((ch: any) => ({ ...ch, wants_preview: ch.wants_preview !== false, wants_summary: ch.wants_summary !== false, wants_freetips: ch.wants_freetips !== false }));
             setTgGeneralChannels(loadedGenChannels);
@@ -102,7 +105,7 @@ export default function SocialSettingsManager() {
             const mergedEvents: any = JSON.parse(JSON.stringify(DEFAULT_EVENTS)); 
             Object.keys(mergedEvents).forEach(key => {
                 if (savedEvents[key]) {
-                    ['fb1','fb2','make1','make2','tg_general','tg_vip'].forEach(plat => {
+                    ['buf_x1', 'buf_x2', 'buf_fb1', 'buf_fb2', 'fb1','fb2','make1','make2','tg_general','tg_vip'].forEach(plat => {
                         if (savedEvents[key][plat] !== undefined) mergedEvents[key][plat] = savedEvents[key][plat];
                     });
                 }
@@ -168,7 +171,7 @@ export default function SocialSettingsManager() {
 
     const liveEvents = ['goals', 'lineups', 'kickoff', 'fulltime', 'halftime', 'var_overturn', 'penalty_awarded'];
     const backgroundEvents = ['daily_preview', 'daily_summary', 'free_tips', 'vip_tips'];
-    const platforms = ['fb1', 'fb2', 'make1', 'make2', 'tg_general', 'tg_vip'];
+    const templatePlatforms = ['fb1', 'fb2', 'make1', 'make2', 'tg_general', 'tg_vip']; // Used only for editing templates (Buffer inherits fb/make text)
 
     return (
         <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mt-8 relative">
@@ -185,7 +188,7 @@ export default function SocialSettingsManager() {
                             <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[HOME]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[AWAY]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[H_SCORE]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[A_SCORE]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[TIME]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[LINK]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[SCORER]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[STATUS]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[CTA]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[PRE_CTA]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[HASHTAGS]</span>
                         </div>
                         <div className="p-4 overflow-y-auto space-y-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {platforms.map(plat => {
+                            {templatePlatforms.map(plat => {
                                 if (events[activeModalEvent][plat] === undefined) return null; 
                                 return (
                                     <div key={plat} className="flex flex-col">
@@ -209,9 +212,9 @@ export default function SocialSettingsManager() {
 
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-[#0a1428] text-white">
                 <div className="flex items-center gap-3">
-                    <div className="bg-blue-600/30 p-2 rounded-lg"><Globe size={20} className="text-blue-400" /></div>
+                    <div className="bg-blue-600/30 p-2 rounded-lg"><Layers size={20} className="text-blue-400" /></div>
                     <div>
-                        <h2 className="font-black text-lg tracking-tight">Social Media Command Center</h2>
+                        <h2 className="font-black text-lg tracking-tight">Social Media Matrix</h2>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Control Triggers, Routing & Credentials</p>
                     </div>
                 </div>
@@ -222,51 +225,47 @@ export default function SocialSettingsManager() {
 
             {statusMsg.text && ( <div className={`p-3 text-xs font-bold text-center flex items-center justify-center gap-2 ${statusMsg.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}><AlertCircle size={14} /> {statusMsg.text}</div> )}
 
-            <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="p-6 grid grid-cols-1 xl:grid-cols-12 gap-8">
                 
-                {/* LEFT COLUMN (VIP / Routing) */}
-                <div className="space-y-6">
-                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 flex gap-4">
-                        <div className="flex-1">
-                            <h3 className="font-black text-slate-800 text-[10px] uppercase mb-2">VIP Teams</h3>
-                            <div className="flex gap-1 mb-2"><input type="text" value={newTeam} onChange={e => setNewTeam(e.target.value)} onKeyDown={e => e.key === 'Enter' && addItem('team')} className="w-full border rounded px-2 py-1 text-xs" /><button onClick={() => addItem('team')} className="bg-slate-800 text-white px-2 rounded">+</button></div>
-                            <div className="flex flex-wrap gap-1">{vipTeams.map(t => <span key={t} className="bg-white border text-[9px] px-1.5 rounded">{t} <button onClick={()=>removeItem('team',t)} className="text-red-400">x</button></span>)}</div>
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="font-black text-slate-800 text-[10px] uppercase mb-2">VIP Leagues</h3>
-                            <div className="flex gap-1 mb-2"><input type="text" value={newLeague} onChange={e => setNewLeague(e.target.value)} onKeyDown={e => e.key === 'Enter' && addItem('league')} className="w-full border rounded px-2 py-1 text-xs" /><button onClick={() => addItem('league')} className="bg-slate-800 text-white px-2 rounded">+</button></div>
-                            <div className="flex flex-wrap gap-1">{vipLeagues.map(l => <span key={l} className="bg-white border text-[9px] px-1.5 rounded">{l} <button onClick={()=>removeItem('league',l)} className="text-red-400">x</button></span>)}</div>
-                        </div>
-                    </div>
-
-                    {/* EVENT MATRIX */}
-                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
-                        <h3 className="font-black text-slate-800 text-sm mb-4">Automation Routing & Templates</h3>
+                {/* LEFT COLUMN: EVENTS MATRIX (Takes up more space now for the extra columns) */}
+                <div className="xl:col-span-8 space-y-6">
+                    
+                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 overflow-x-auto shadow-inner">
+                        <h3 className="font-black text-slate-800 text-sm mb-4 flex items-center gap-2"><Globe size={16} className="text-blue-500"/> Advanced Routing Matrix</h3>
                         
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between pb-2 border-b border-slate-200 px-2">
-                                <div className="w-[25%] text-[9px] font-black text-slate-400 uppercase tracking-widest">Event</div>
-                                <div className="w-[10%] flex justify-center text-[9px] font-bold text-blue-600">FB 1</div>
-                                <div className="w-[10%] flex justify-center text-[9px] font-bold text-blue-400">FB 2</div>
-                                <div className="w-[10%] flex justify-center text-[9px] font-bold text-slate-800">Mk 1</div>
-                                <div className="w-[10%] flex justify-center text-[9px] font-bold text-slate-600">Mk 2</div>
-                                <div className="w-[10%] flex justify-center text-[9px] font-bold text-blue-400">TG G</div>
-                                <div className="w-[10%] flex justify-center text-[9px] font-bold text-yellow-600">TG V</div>
-                                <div className="w-[10%]"></div>
+                        <div className="space-y-3 min-w-[750px]">
+                            {/* THE HEADER ROW */}
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-300 px-2 bg-slate-100 rounded-t-lg pt-2">
+                                <div className="w-[18%] text-[9px] font-black text-slate-500 uppercase tracking-widest">Event Trigger</div>
+                                <div className="w-[7%] flex justify-center text-[9px] font-black text-purple-600 title='Buffer X Account 1'">B-X1</div>
+                                <div className="w-[7%] flex justify-center text-[9px] font-black text-purple-500 title='Buffer X Account 2'">B-X2</div>
+                                <div className="w-[7%] flex justify-center text-[9px] font-black text-indigo-600 title='Buffer FB Page 1'">B-FB1</div>
+                                <div className="w-[7%] flex justify-center text-[9px] font-black text-indigo-500 title='Buffer FB Page 2'">B-FB2</div>
+                                <div className="w-[7%] flex justify-center text-[9px] font-black text-blue-600 title='Direct Graph API FB 1'">D-FB1</div>
+                                <div className="w-[7%] flex justify-center text-[9px] font-black text-blue-400 title='Direct Graph API FB 2'">D-FB2</div>
+                                <div className="w-[7%] flex justify-center text-[9px] font-black text-slate-800 title='Make/Activepieces 1'">MK1</div>
+                                <div className="w-[7%] flex justify-center text-[9px] font-black text-slate-600 title='Make/Activepieces 2'">MK2</div>
+                                <div className="w-[7%] flex justify-center text-[9px] font-black text-blue-400 title='Telegram General'">TG-G</div>
+                                <div className="w-[7%] flex justify-center text-[9px] font-black text-yellow-600 title='Telegram VIP'">TG-V</div>
+                                <div className="w-[5%]"></div>
                             </div>
                             
                             <div className="pt-2 pb-1 text-[8px] uppercase tracking-widest font-black text-slate-400">Live Triggers</div>
                             {liveEvents.map((key) => {
                                 const config = events[key];
                                 return (
-                                <div key={key} className="flex items-center justify-between py-1.5 px-2 hover:bg-white rounded-lg transition-colors group border border-transparent hover:border-blue-100">
-                                    <div className="w-[25%] font-bold text-slate-700 text-[10px]">{config.label}</div>
-                                    <div className="w-[10%] flex justify-center"><button onClick={() => toggleEvent(key, 'fb1')} className={`w-6 h-3 rounded-full relative transition-colors ${config.fb1 ? 'bg-blue-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.fb1 ? 'left-3.5' : 'left-0.5'}`}></div></button></div>
-                                    <div className="w-[10%] flex justify-center"><button onClick={() => toggleEvent(key, 'fb2')} className={`w-6 h-3 rounded-full relative transition-colors ${config.fb2 ? 'bg-blue-400' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.fb2 ? 'left-3.5' : 'left-0.5'}`}></div></button></div>
-                                    <div className="w-[10%] flex justify-center"><button onClick={() => toggleEvent(key, 'make1')} className={`w-6 h-3 rounded-full relative transition-colors ${config.make1 ? 'bg-slate-800' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.make1 ? 'left-3.5' : 'left-0.5'}`}></div></button></div>
-                                    <div className="w-[10%] flex justify-center"><button onClick={() => toggleEvent(key, 'make2')} className={`w-6 h-3 rounded-full relative transition-colors ${config.make2 ? 'bg-slate-500' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.make2 ? 'left-3.5' : 'left-0.5'}`}></div></button></div>
-                                    <div className="w-[10%]"></div><div className="w-[10%]"></div>
-                                    <div className="w-[10%] flex justify-end"><button onClick={() => setActiveModalEvent(key)} className="text-slate-300 hover:text-blue-600 transition-colors bg-white shadow-sm border border-slate-200 p-1 rounded"><Edit3 size={12}/></button></div>
+                                <div key={key} className="flex items-center justify-between py-1.5 px-2 hover:bg-white rounded-lg transition-colors group border border-transparent hover:border-slate-200">
+                                    <div className="w-[18%] font-bold text-slate-700 text-[10px] truncate pr-2">{config.label}</div>
+                                    <div className="w-[7%] flex justify-center"><button onClick={() => toggleEvent(key, 'buf_x1')} className={`w-6 h-3 rounded-full relative transition-colors ${config.buf_x1 ? 'bg-purple-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.buf_x1 ? 'left-3.5' : 'left-0.5'}`}></div></button></div>
+                                    <div className="w-[7%] flex justify-center"><button onClick={() => toggleEvent(key, 'buf_x2')} className={`w-6 h-3 rounded-full relative transition-colors ${config.buf_x2 ? 'bg-purple-500' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.buf_x2 ? 'left-3.5' : 'left-0.5'}`}></div></button></div>
+                                    <div className="w-[7%] flex justify-center"><button onClick={() => toggleEvent(key, 'buf_fb1')} className={`w-6 h-3 rounded-full relative transition-colors ${config.buf_fb1 ? 'bg-indigo-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.buf_fb1 ? 'left-3.5' : 'left-0.5'}`}></div></button></div>
+                                    <div className="w-[7%] flex justify-center"><button onClick={() => toggleEvent(key, 'buf_fb2')} className={`w-6 h-3 rounded-full relative transition-colors ${config.buf_fb2 ? 'bg-indigo-500' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.buf_fb2 ? 'left-3.5' : 'left-0.5'}`}></div></button></div>
+                                    <div className="w-[7%] flex justify-center"><button onClick={() => toggleEvent(key, 'fb1')} className={`w-6 h-3 rounded-full relative transition-colors ${config.fb1 ? 'bg-blue-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.fb1 ? 'left-3.5' : 'left-0.5'}`}></div></button></div>
+                                    <div className="w-[7%] flex justify-center"><button onClick={() => toggleEvent(key, 'fb2')} className={`w-6 h-3 rounded-full relative transition-colors ${config.fb2 ? 'bg-blue-400' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.fb2 ? 'left-3.5' : 'left-0.5'}`}></div></button></div>
+                                    <div className="w-[7%] flex justify-center"><button onClick={() => toggleEvent(key, 'make1')} className={`w-6 h-3 rounded-full relative transition-colors ${config.make1 ? 'bg-slate-800' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.make1 ? 'left-3.5' : 'left-0.5'}`}></div></button></div>
+                                    <div className="w-[7%] flex justify-center"><button onClick={() => toggleEvent(key, 'make2')} className={`w-6 h-3 rounded-full relative transition-colors ${config.make2 ? 'bg-slate-500' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.make2 ? 'left-3.5' : 'left-0.5'}`}></div></button></div>
+                                    <div className="w-[7%]"></div><div className="w-[7%]"></div>
+                                    <div className="w-[5%] flex justify-end"><button onClick={() => setActiveModalEvent(key)} className="text-slate-300 hover:text-blue-600 transition-colors bg-white shadow-sm border border-slate-200 p-1 rounded"><Edit3 size={12}/></button></div>
                                 </div>
                             )})}
 
@@ -274,37 +273,70 @@ export default function SocialSettingsManager() {
                             {backgroundEvents.map((key) => {
                                 const config = events[key];
                                 return (
-                                <div key={key} className="flex items-center justify-between py-1.5 px-2 hover:bg-white rounded-lg transition-colors group border border-transparent hover:border-blue-100">
-                                    <div className="w-[25%] font-bold text-slate-700 text-[10px]">{config.label}</div>
-                                    <div className="w-[10%] flex justify-center">{config.fb1 !== undefined && <button onClick={() => toggleEvent(key, 'fb1')} className={`w-6 h-3 rounded-full relative transition-colors ${config.fb1 ? 'bg-blue-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.fb1 ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
-                                    <div className="w-[10%] flex justify-center">{config.fb2 !== undefined && <button onClick={() => toggleEvent(key, 'fb2')} className={`w-6 h-3 rounded-full relative transition-colors ${config.fb2 ? 'bg-blue-400' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.fb2 ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
-                                    <div className="w-[10%] flex justify-center">{config.make1 !== undefined && <button onClick={() => toggleEvent(key, 'make1')} className={`w-6 h-3 rounded-full relative transition-colors ${config.make1 ? 'bg-slate-800' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.make1 ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
-                                    <div className="w-[10%] flex justify-center">{config.make2 !== undefined && <button onClick={() => toggleEvent(key, 'make2')} className={`w-6 h-3 rounded-full relative transition-colors ${config.make2 ? 'bg-slate-500' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.make2 ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
-                                    <div className="w-[10%] flex justify-center">{config.tg_general !== undefined && <button onClick={() => toggleEvent(key, 'tg_general')} className={`w-6 h-3 rounded-full relative transition-colors ${config.tg_general ? 'bg-blue-400' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.tg_general ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
-                                    <div className="w-[10%] flex justify-center">{config.tg_vip !== undefined && <button onClick={() => toggleEvent(key, 'tg_vip')} className={`w-6 h-3 rounded-full relative transition-colors ${config.tg_vip ? 'bg-yellow-500' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.tg_vip ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
-                                    <div className="w-[10%] flex justify-end"><button onClick={() => setActiveModalEvent(key)} className="text-slate-300 hover:text-blue-600 transition-colors bg-white shadow-sm border border-slate-200 p-1 rounded"><Edit3 size={12}/></button></div>
+                                <div key={key} className="flex items-center justify-between py-1.5 px-2 hover:bg-white rounded-lg transition-colors group border border-transparent hover:border-slate-200">
+                                    <div className="w-[18%] font-bold text-slate-700 text-[10px] truncate pr-2">{config.label}</div>
+                                    <div className="w-[7%] flex justify-center">{config.buf_x1 !== undefined && <button onClick={() => toggleEvent(key, 'buf_x1')} className={`w-6 h-3 rounded-full relative transition-colors ${config.buf_x1 ? 'bg-purple-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.buf_x1 ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
+                                    <div className="w-[7%] flex justify-center">{config.buf_x2 !== undefined && <button onClick={() => toggleEvent(key, 'buf_x2')} className={`w-6 h-3 rounded-full relative transition-colors ${config.buf_x2 ? 'bg-purple-500' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.buf_x2 ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
+                                    <div className="w-[7%] flex justify-center">{config.buf_fb1 !== undefined && <button onClick={() => toggleEvent(key, 'buf_fb1')} className={`w-6 h-3 rounded-full relative transition-colors ${config.buf_fb1 ? 'bg-indigo-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.buf_fb1 ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
+                                    <div className="w-[7%] flex justify-center">{config.buf_fb2 !== undefined && <button onClick={() => toggleEvent(key, 'buf_fb2')} className={`w-6 h-3 rounded-full relative transition-colors ${config.buf_fb2 ? 'bg-indigo-500' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.buf_fb2 ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
+                                    <div className="w-[7%] flex justify-center">{config.fb1 !== undefined && <button onClick={() => toggleEvent(key, 'fb1')} className={`w-6 h-3 rounded-full relative transition-colors ${config.fb1 ? 'bg-blue-600' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.fb1 ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
+                                    <div className="w-[7%] flex justify-center">{config.fb2 !== undefined && <button onClick={() => toggleEvent(key, 'fb2')} className={`w-6 h-3 rounded-full relative transition-colors ${config.fb2 ? 'bg-blue-400' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.fb2 ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
+                                    <div className="w-[7%] flex justify-center">{config.make1 !== undefined && <button onClick={() => toggleEvent(key, 'make1')} className={`w-6 h-3 rounded-full relative transition-colors ${config.make1 ? 'bg-slate-800' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.make1 ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
+                                    <div className="w-[7%] flex justify-center">{config.make2 !== undefined && <button onClick={() => toggleEvent(key, 'make2')} className={`w-6 h-3 rounded-full relative transition-colors ${config.make2 ? 'bg-slate-500' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.make2 ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
+                                    <div className="w-[7%] flex justify-center">{config.tg_general !== undefined && <button onClick={() => toggleEvent(key, 'tg_general')} className={`w-6 h-3 rounded-full relative transition-colors ${config.tg_general ? 'bg-blue-400' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.tg_general ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
+                                    <div className="w-[7%] flex justify-center">{config.tg_vip !== undefined && <button onClick={() => toggleEvent(key, 'tg_vip')} className={`w-6 h-3 rounded-full relative transition-colors ${config.tg_vip ? 'bg-yellow-500' : 'bg-slate-200'}`}><div className={`absolute top-0.5 w-2 h-2 bg-white rounded-full transition-all ${config.tg_vip ? 'left-3.5' : 'left-0.5'}`}></div></button>}</div>
+                                    <div className="w-[5%] flex justify-end"><button onClick={() => setActiveModalEvent(key)} className="text-slate-300 hover:text-blue-600 transition-colors bg-white shadow-sm border border-slate-200 p-1 rounded"><Edit3 size={12}/></button></div>
                                 </div>
                             )})}
                         </div>
                     </div>
+
+                    {/* VIP TEAMS & LEAGUES */}
+                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 flex gap-4">
+                        <div className="flex-1">
+                            <h3 className="font-black text-slate-800 text-[10px] uppercase mb-2">VIP Teams</h3>
+                            <div className="flex gap-1 mb-2"><input type="text" value={newTeam} onChange={e => setNewTeam(e.target.value)} onKeyDown={e => e.key === 'Enter' && addItem('team')} className="w-full border rounded px-2 py-1 text-xs outline-none" /><button onClick={() => addItem('team')} className="bg-slate-800 text-white px-2 rounded">+</button></div>
+                            <div className="flex flex-wrap gap-1">{vipTeams.map(t => <span key={t} className="bg-white border text-[9px] px-1.5 rounded">{t} <button onClick={()=>removeItem('team',t)} className="text-red-400">x</button></span>)}</div>
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-black text-slate-800 text-[10px] uppercase mb-2">VIP Leagues</h3>
+                            <div className="flex gap-1 mb-2"><input type="text" value={newLeague} onChange={e => setNewLeague(e.target.value)} onKeyDown={e => e.key === 'Enter' && addItem('league')} className="w-full border rounded px-2 py-1 text-xs outline-none" /><button onClick={() => addItem('league')} className="bg-slate-800 text-white px-2 rounded">+</button></div>
+                            <div className="flex flex-wrap gap-1">{vipLeagues.map(l => <span key={l} className="bg-white border text-[9px] px-1.5 rounded">{l} <button onClick={()=>removeItem('league',l)} className="text-red-400">x</button></span>)}</div>
+                        </div>
+                    </div>
+
                 </div>
 
-                {/* RIGHT COLUMN (API & Telegram) */}
-                <div className="space-y-6">
+                {/* RIGHT COLUMN: API KEYS & CREDENTIALS */}
+                <div className="xl:col-span-4 space-y-6">
                     <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
                         <div className="flex items-center gap-2 mb-4"><KeyRound size={16} className="text-red-500" /><h3 className="font-black text-slate-800 text-sm">Webhooks & API Keys</h3></div>
                         <div className="space-y-3">
+                            
+                            {/* NEW: EXPANDED BUFFER API SECTION */}
                             <div className="bg-white p-3 rounded-xl border border-slate-200">
-                                <h4 className="text-[10px] font-black text-blue-600 mb-2 uppercase"><Facebook size={12} className="inline mr-1"/> FB Pages (Direct API)</h4>
+                                <h4 className="text-[10px] font-black text-purple-600 mb-2 uppercase tracking-widest"><Twitter size={12} className="inline mr-1"/> Buffer API (Direct)</h4>
+                                <input type="password" placeholder="Global Buffer Access Token" value={credentials.buffer_token} onChange={e => setCredentials({...credentials, buffer_token: e.target.value})} className="w-full mb-3 bg-purple-50 border border-purple-100 rounded p-1.5 text-xs outline-none" />
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input type="text" placeholder="X (Twitter) 1 ID" value={credentials.buffer_x1_id} onChange={e => setCredentials({...credentials, buffer_x1_id: e.target.value})} className="w-full bg-slate-50 border rounded p-1.5 text-xs outline-none" />
+                                    <input type="text" placeholder="X (Twitter) 2 ID" value={credentials.buffer_x2_id} onChange={e => setCredentials({...credentials, buffer_x2_id: e.target.value})} className="w-full bg-slate-50 border rounded p-1.5 text-xs outline-none" />
+                                    <input type="text" placeholder="FB Page 1 ID" value={credentials.buffer_fb1_id} onChange={e => setCredentials({...credentials, buffer_fb1_id: e.target.value})} className="w-full bg-slate-50 border rounded p-1.5 text-xs outline-none" />
+                                    <input type="text" placeholder="FB Page 2 ID" value={credentials.buffer_fb2_id} onChange={e => setCredentials({...credentials, buffer_fb2_id: e.target.value})} className="w-full bg-slate-50 border rounded p-1.5 text-xs outline-none" />
+                                </div>
+                            </div>
+
+                            <div className="bg-white p-3 rounded-xl border border-slate-200">
+                                <h4 className="text-[10px] font-black text-blue-600 mb-2 uppercase"><Facebook size={12} className="inline mr-1"/> Graph API (Direct FB)</h4>
                                 <input type="text" placeholder="Page 1 ID" value={credentials.fb1_id} onChange={e => setCredentials({...credentials, fb1_id: e.target.value})} className="w-full mb-1 bg-slate-50 border rounded p-1.5 text-xs outline-none" />
                                 <input type="password" placeholder="Page 1 Token" value={credentials.fb1_token} onChange={e => setCredentials({...credentials, fb1_token: e.target.value})} className="w-full mb-3 bg-slate-50 border rounded p-1.5 text-xs outline-none" />
                                 <input type="text" placeholder="Page 2 ID" value={credentials.fb2_id} onChange={e => setCredentials({...credentials, fb2_id: e.target.value})} className="w-full mb-1 bg-slate-50 border rounded p-1.5 text-xs outline-none" />
                                 <input type="password" placeholder="Page 2 Token" value={credentials.fb2_token} onChange={e => setCredentials({...credentials, fb2_token: e.target.value})} className="w-full bg-slate-50 border rounded p-1.5 text-xs outline-none" />
                             </div>
+                            
                             <div className="bg-white p-3 rounded-xl border border-slate-200">
-                                <h4 className="text-[10px] font-black text-slate-800 mb-2 uppercase"><Globe size={12} className="inline mr-1"/> Make / Activepieces Webhooks</h4>
-                                <input type="text" placeholder="Webhook URL 1" value={credentials.make_webhook_1} onChange={e => setCredentials({...credentials, make_webhook_1: e.target.value})} className="w-full mb-2 bg-slate-50 border rounded p-1.5 text-xs outline-none" />
-                                <input type="text" placeholder="Webhook URL 2" value={credentials.make_webhook_2} onChange={e => setCredentials({...credentials, make_webhook_2: e.target.value})} className="w-full bg-slate-50 border rounded p-1.5 text-xs outline-none" />
+                                <h4 className="text-[10px] font-black text-slate-800 mb-2 uppercase"><Globe size={12} className="inline mr-1"/> Automation Webhooks</h4>
+                                <input type="text" placeholder="Webhook URL 1 (Make / AP)" value={credentials.make_webhook_1} onChange={e => setCredentials({...credentials, make_webhook_1: e.target.value})} className="w-full mb-2 bg-slate-50 border rounded p-1.5 text-xs outline-none" />
+                                <input type="text" placeholder="Webhook URL 2 (Make / AP)" value={credentials.make_webhook_2} onChange={e => setCredentials({...credentials, make_webhook_2: e.target.value})} className="w-full bg-slate-50 border rounded p-1.5 text-xs outline-none" />
                             </div>
                         </div>
                     </div>
