@@ -2,7 +2,39 @@ export const runtime = 'edge';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-// 🟢 STRICT ACCURACY SHIELDS (Original)
+// 🟢 100% NO-FAIL BUFFER IMAGE PROXY
+// Downloads the dynamic Vercel image and saves it to Supabase as a static PNG.
+async function secureStaticImage(dynamicUrl: string, fileName: string, supabaseClient: any) {
+    if (!dynamicUrl) return "";
+    try {
+        const imgResponse = await fetch(dynamicUrl);
+        if (!imgResponse.ok) return dynamicUrl; 
+        
+        const arrayBuffer = await imgResponse.arrayBuffer();
+
+        // Uploads as pure static binary, upserting to overwrite and save space
+        const { error } = await supabaseClient.storage
+            .from('socials')
+            .upload(`${fileName}.png`, arrayBuffer, {
+                contentType: 'image/png',
+                upsert: true 
+            });
+
+        if (error) {
+            console.error("Supabase Storage Error:", error);
+            return dynamicUrl; 
+        }
+
+        const { data } = supabaseClient.storage.from('socials').getPublicUrl(`${fileName}.png`);
+        return data.publicUrl;
+
+    } catch (err) {
+        console.error("Image Proxy Failed:", err);
+        return dynamicUrl; 
+    }
+}
+
+// 🟢 STRICT ACCURACY SHIELDS
 const getValidGoals = (eventsArr: any[]) => {
     if (!Array.isArray(eventsArr)) return [];
     return eventsArr.filter((e: any) => {
@@ -29,7 +61,7 @@ const parseTime = (t: any) => {
     return (parseInt(parts[0]) || 0) * 100 + (parseInt(parts[1]) || 0); 
 };
 
-// 🟢 EXPANDED KNOWN TEAMS DICTIONARY (Original)
+// 🟢 EXPANDED KNOWN TEAMS DICTIONARY
 const KNOWN_TEAMS: Record<string, string> = {
     'manchester city': 'MCI', 'man city': 'MCI', 'm. city': 'MCI', 'manchester united': 'MUN', 'man united': 'MUN', 'man utd': 'MUN',
     'arsenal': 'ARS', 'arsenal fc': 'ARS', 'chelsea': 'CHE', 'chelsea fc': 'CHE', 'liverpool': 'LIV', 'liverpool fc': 'LIV',
@@ -95,14 +127,12 @@ const getMatchImageUrl = (label: string, state: any, baseUrl: string) => {
     return `${baseUrl}/api/og?data=${encodeBase64Safe(payload)}`;
 };
 
-// 🟢 ORIGINAL IMAGEKIT LOGIC RESTORED (Works specifically for Buffer)
 const getImageKitProxyUrl = (rawUrl: string) => {
     const endpoint = process.env.IMAGEKIT_URL_ENDPOINT?.replace(/\/+$/, '');
     if (!endpoint) return rawUrl;
     return `${endpoint}/tr:f-png/${encodeURIComponent(rawUrl)}`;
 };
 
-// 🟢 FIX 2: COMPRESS URL PAYLOAD FOR LINEUPS TO PREVENT MAKE.COM / BUFFER INVALID IMAGE ERROR
 const compressPlayerName = (player: string) => {
     if (!player) return '';
     const numMatch = player.match(/\b(\d{1,2})\b/);
@@ -116,7 +146,6 @@ function parseTemplate(text: string, state: any, matchUrl: string, extra: any) {
     if (!text) return '';
 
     let processedText = text;
-    // 🟢 FIX 3: SMART CTA INJECTION! If they included [LINK] but forgot [CTA], inject the media CTA securely!
     if (extra.activeCta && !processedText.includes('[CTA]') && !processedText.includes('[PRE_CTA]')) {
         processedText = processedText.replace(/\[LINK\]/g, `${extra.activeCta}[LINK]`);
     }
@@ -174,7 +203,6 @@ export async function POST(request: Request) {
     const matchUrl = `${frontendUrl}/match/${newState.id}`; 
     const hashtags = getMatchHashtag(newState.home_team, newState.away_team, newState.league, newState.home_tla, newState.away_tla); 
     
-    // 🟢 SMART MEDIA CTA LOGIC (Original)
     let ctaText = "👇 Match Stats & Updates:\n";
     let preMatchCta = "👇 See the tactical setup & subs here!\n";
     if (newState.media_url || newState.stream_url) {
@@ -206,7 +234,6 @@ export async function POST(request: Request) {
     let extraData: any = { ctaText, preMatchCta, hashtags };
     let ogImageUrl = null;
 
-    // 🟢 EVENT EVALUATION HIERARCHY
     if (!strictlyFinishedStatuses.includes(oldStatus) && strictlyFinishedStatuses.includes(newStatus)) {
         eventKey = 'fulltime';
         ogImageUrl = getMatchImageUrl('FULL TIME', newState, frontendUrl);
@@ -237,7 +264,6 @@ export async function POST(request: Request) {
     } 
     else if (!htStatuses.includes(oldStatus) && htStatuses.includes(newStatus)) {
         eventKey = 'halftime';
-        // 🟢 FIX 1: HT NOW GENERATES AN IMAGE URL!
         ogImageUrl = getMatchImageUrl('HALF TIME', newState, frontendUrl);
     } 
     else if (htStatuses.includes(oldStatus) && (live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus))) {
@@ -249,8 +275,6 @@ export async function POST(request: Request) {
     } 
     else if (oldWasIncomplete && newIsComplete) {
         eventKey = 'lineups';
-        
-        // 🟢 APPLY FIX 2: Compress payload so Make/Buffer doesn't reject it for being too long!
         const lineupOg = { 
             type: 'pitch', label: 'STARTING XI', 
             home: newState.home_team, away: newState.away_team, 
@@ -266,56 +290,117 @@ export async function POST(request: Request) {
 
     const evtConfig = config.events[eventKey] || {};
     const tpl = config.templates?.[eventKey] || {};
-
-    // Determine which CTA to use based on the event triggering
     extraData.activeCta = (eventKey === 'lineups' || eventKey === 'kickoff') ? preMatchCta : ctaText;
 
-    const fb1Text = evtConfig.fb1 ? parseTemplate(tpl.fb1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]`, newState, matchUrl, extraData) : null;
-    const fb2Text = evtConfig.fb2 ? parseTemplate(tpl.fb2 || fb1Text || '', newState, matchUrl, extraData) : null;
-    const make1Text = evtConfig.make1 ? parseTemplate(tpl.make1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]\n[HASHTAGS]`, newState, matchUrl, extraData) : null;
-    const make2Text = evtConfig.make2 ? parseTemplate(tpl.make2 || make1Text || '', newState, matchUrl, extraData) : null;
+    const fb1Text = evtConfig.fb1 || evtConfig.buf_fb1 ? parseTemplate(tpl.fb1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]`, newState, matchUrl, extraData) : null;
+    const fb2Text = evtConfig.fb2 || evtConfig.buf_fb2 ? parseTemplate(tpl.fb2 || fb1Text || '', newState, matchUrl, extraData) : null;
+    const make1Text = evtConfig.make1 || evtConfig.buf_x1 ? parseTemplate(tpl.make1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]\n[HASHTAGS]`, newState, matchUrl, extraData) : null;
+    const make2Text = evtConfig.make2 || evtConfig.buf_x2 ? parseTemplate(tpl.make2 || make1Text || '', newState, matchUrl, extraData) : null;
     const tgMsg = evtConfig.tg_general ? parseTemplate(tpl.tg_general || `<b>[HOME] [H_SCORE] - [A_SCORE] [AWAY]</b>\n<a href="[LINK]">Match Center</a>`, newState, matchUrl, extraData) : null;
 
     const creds = config.credentials || {};
-    
-    // 🟢 Apply ImageKit proxy only if an image exists
     const proxiedImage = ogImageUrl ? getImageKitProxyUrl(ogImageUrl) : null;
 
-    // 🟢 SAFELY CONSTRUCT PAYLOAD
     const makePayload1: any = { fb2_text: fb1Text, x_text: make1Text };
     if (proxiedImage) makePayload1.x_image_url = proxiedImage;
 
     const makePayload2: any = { fb2_text: fb2Text, x_text: make2Text };
     if (proxiedImage) makePayload2.x_image_url = proxiedImage;
 
+    const postToBufferDirectly = async (text: string, safeImgUrl: string, profileId: string, token: string) => {
+        const payload = {
+            query: `mutation($text: String!, $img: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow, assets: { images: [{ url: $img }] } }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }`,
+            variables: { text: text || "", img: safeImgUrl || "" }
+        };
+
+        const res = await fetch("https://api.buffer.com/1/graphql", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify(payload)
+        });
+
+        return await res.json();
+    };
+
     try {
-        if (evtConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
-            await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makePayload1) }).catch(()=>{});
+        const bufferToken = creds.buffer_token || process.env.BUFFER_ACCESS_TOKEN;
+        
+        // 🚀 THE MAGIC: Convert the slow dynamic URL into a fast static URL for Buffer
+        let finalBufferImage = ogImageUrl;
+        if (ogImageUrl && (evtConfig.buf_x1 || evtConfig.buf_x2 || evtConfig.buf_fb1 || evtConfig.buf_fb2)) {
+            // Overwrites the same image per match to save 99% of storage space
+            const cacheName = `buffer_match_${newState.id}`; 
+            finalBufferImage = await secureStaticImage(ogImageUrl, cacheName, supabase);
         }
-        if (evtConfig.make2 && creds.make_webhook_2) {
-            await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makePayload2) }).catch(()=>{});
+
+        // 🚀 1. BUFFER DIRECT: X (Twitter) 1
+        if (evtConfig.buf_x1 && bufferToken && creds.buffer_x1_id) {
+            await postToBufferDirectly(make1Text!, finalBufferImage!, creds.buffer_x1_id, bufferToken).catch(e => console.error("BUF X1 Error:", e));
         }
+
+        // 🚀 2. BUFFER DIRECT: X (Twitter) 2
+        if (evtConfig.buf_x2 && bufferToken && creds.buffer_x2_id) {
+            await postToBufferDirectly(make2Text || make1Text!, finalBufferImage!, creds.buffer_x2_id, bufferToken).catch(e => console.error("BUF X2 Error:", e));
+        }
+
+        // 🚀 3. BUFFER DIRECT: Facebook Page 1
+        if (evtConfig.buf_fb1 && bufferToken && creds.buffer_fb1_id) {
+            await postToBufferDirectly(fb1Text!, finalBufferImage!, creds.buffer_fb1_id, bufferToken).catch(e => console.error("BUF FB1 Error:", e));
+        }
+
+        // 🚀 4. BUFFER DIRECT: Facebook Page 2
+        if (evtConfig.buf_fb2 && bufferToken && creds.buffer_fb2_id) {
+            await postToBufferDirectly(fb2Text || fb1Text!, finalBufferImage!, creds.buffer_fb2_id, bufferToken).catch(e => console.error("BUF FB2 Error:", e));
+        }
+
+        // 🚀 5. NATIVE GRAPH API: Facebook Page 1
         if (evtConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
-            const pageId = creds.fb1_id || process.env.FB_PAGE_ID; const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
+            const pageId = creds.fb1_id || process.env.FB_PAGE_ID; 
+            const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
             const url = ogImageUrl ? `https://graph.facebook.com/v19.0/${pageId}/photos?url=${encodeURIComponent(ogImageUrl)}&message=${encodeURIComponent(fb1Text!)}&access_token=${token}` : `https://graph.facebook.com/v19.0/${pageId}/feed?message=${encodeURIComponent(fb1Text!)}&access_token=${token}`;
             await fetch(url, { method: 'POST' }).catch(()=>{});
         }
+
+        // 🚀 6. NATIVE GRAPH API: Facebook Page 2
         if (evtConfig.fb2 && creds.fb2_id && creds.fb2_token) {
             const url = ogImageUrl ? `https://graph.facebook.com/v19.0/${creds.fb2_id}/photos?url=${encodeURIComponent(ogImageUrl)}&message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}` : `https://graph.facebook.com/v19.0/${creds.fb2_id}/feed?message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}`;
             await fetch(url, { method: 'POST' }).catch(()=>{});
         }
+
+        // 🚀 7. MAKE / ACTIVEPIECES: Webhook 1
+        if (evtConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
+            await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(makePayload1) 
+            }).catch(()=>{});
+        }
+
+        // 🚀 8. MAKE / ACTIVEPIECES: Webhook 2
+        if (evtConfig.make2 && creds.make_webhook_2) {
+            await fetch(creds.make_webhook_2, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(makePayload2) 
+            }).catch(()=>{});
+        }
+
+        // 🚀 9. TELEGRAM DIRECT POSTS
         if (evtConfig.tg_general && creds.telegram_bot_token && creds.tg_general_channels) {
             for (const channel of creds.tg_general_channels) {
                 await fetch(`https://api.telegram.org/bot${creds.telegram_bot_token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: channel.chatId, text: tgMsg, parse_mode: 'HTML', disable_web_page_preview: false }) }).catch(()=>{});
             }
         }
 
+        // 🚀 10. FRONTEND INDEXING
         fetch(`${frontendUrl}/api/index-url`, {
             method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
             body: JSON.stringify({ url: matchUrl, type: 'URL_UPDATED' })
         }).catch(() => {});
 
-    } catch (err) { console.error("Critical error firing socials:", err); }
+    } catch (err) { 
+        console.error("Critical error firing socials:", err); 
+    }
 
     return NextResponse.json({ success: true, event: eventKey });
 }
