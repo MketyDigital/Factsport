@@ -2,8 +2,7 @@ export const runtime = 'edge';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-// 🟢 100% NO-FAIL BUFFER IMAGE PROXY
-// Downloads the dynamic Vercel image and saves it to Supabase as a static PNG.
+// 🟢 100% NO-FAIL BUFFER IMAGE PROXY (WITH CACHE BUSTER)
 async function secureStaticImage(dynamicUrl: string, fileName: string, supabaseClient: any) {
     if (!dynamicUrl) return "";
     try {
@@ -26,7 +25,9 @@ async function secureStaticImage(dynamicUrl: string, fileName: string, supabaseC
         }
 
         const { data } = supabaseClient.storage.from('socials').getPublicUrl(`${fileName}.png`);
-        return data.publicUrl;
+        
+        // 🔥 CACHE BUSTER: Forces Buffer & Twitter to ignore old cached images
+        return `${data.publicUrl}?v=${Date.now()}`;
 
     } catch (err) {
         console.error("Image Proxy Failed:", err);
@@ -325,35 +326,30 @@ export async function POST(request: Request) {
     try {
         const bufferToken = creds.buffer_token || process.env.BUFFER_ACCESS_TOKEN;
         
-        // 🚀 THE MAGIC: Convert the slow dynamic URL into a fast static URL for Buffer
+        // 🚀 CONVERT TO CACHE-BUSTED STATIC URL FOR BUFFER
         let finalBufferImage = ogImageUrl;
         if (ogImageUrl && (evtConfig.buf_x1 || evtConfig.buf_x2 || evtConfig.buf_fb1 || evtConfig.buf_fb2)) {
-            // Overwrites the same image per match to save 99% of storage space
             const cacheName = `buffer_match_${newState.id}`; 
             finalBufferImage = await secureStaticImage(ogImageUrl, cacheName, supabase);
         }
 
-        // 🚀 1. BUFFER DIRECT: X (Twitter) 1
+        // 🚀 ISOLATED BROADCASTING MATRIX
         if (evtConfig.buf_x1 && bufferToken && creds.buffer_x1_id) {
             await postToBufferDirectly(make1Text!, finalBufferImage!, creds.buffer_x1_id, bufferToken).catch(e => console.error("BUF X1 Error:", e));
         }
 
-        // 🚀 2. BUFFER DIRECT: X (Twitter) 2
         if (evtConfig.buf_x2 && bufferToken && creds.buffer_x2_id) {
             await postToBufferDirectly(make2Text || make1Text!, finalBufferImage!, creds.buffer_x2_id, bufferToken).catch(e => console.error("BUF X2 Error:", e));
         }
 
-        // 🚀 3. BUFFER DIRECT: Facebook Page 1
         if (evtConfig.buf_fb1 && bufferToken && creds.buffer_fb1_id) {
             await postToBufferDirectly(fb1Text!, finalBufferImage!, creds.buffer_fb1_id, bufferToken).catch(e => console.error("BUF FB1 Error:", e));
         }
 
-        // 🚀 4. BUFFER DIRECT: Facebook Page 2
         if (evtConfig.buf_fb2 && bufferToken && creds.buffer_fb2_id) {
             await postToBufferDirectly(fb2Text || fb1Text!, finalBufferImage!, creds.buffer_fb2_id, bufferToken).catch(e => console.error("BUF FB2 Error:", e));
         }
 
-        // 🚀 5. NATIVE GRAPH API: Facebook Page 1
         if (evtConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
             const pageId = creds.fb1_id || process.env.FB_PAGE_ID; 
             const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
@@ -361,38 +357,29 @@ export async function POST(request: Request) {
             await fetch(url, { method: 'POST' }).catch(()=>{});
         }
 
-        // 🚀 6. NATIVE GRAPH API: Facebook Page 2
         if (evtConfig.fb2 && creds.fb2_id && creds.fb2_token) {
             const url = ogImageUrl ? `https://graph.facebook.com/v19.0/${creds.fb2_id}/photos?url=${encodeURIComponent(ogImageUrl)}&message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}` : `https://graph.facebook.com/v19.0/${creds.fb2_id}/feed?message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}`;
             await fetch(url, { method: 'POST' }).catch(()=>{});
         }
 
-        // 🚀 7. MAKE / ACTIVEPIECES: Webhook 1
         if (evtConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
             await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify(makePayload1) 
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makePayload1) 
             }).catch(()=>{});
         }
 
-        // 🚀 8. MAKE / ACTIVEPIECES: Webhook 2
         if (evtConfig.make2 && creds.make_webhook_2) {
             await fetch(creds.make_webhook_2, { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify(makePayload2) 
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makePayload2) 
             }).catch(()=>{});
         }
 
-        // 🚀 9. TELEGRAM DIRECT POSTS
         if (evtConfig.tg_general && creds.telegram_bot_token && creds.tg_general_channels) {
             for (const channel of creds.tg_general_channels) {
                 await fetch(`https://api.telegram.org/bot${creds.telegram_bot_token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: channel.chatId, text: tgMsg, parse_mode: 'HTML', disable_web_page_preview: false }) }).catch(()=>{});
             }
         }
 
-        // 🚀 10. FRONTEND INDEXING
         fetch(`${frontendUrl}/api/index-url`, {
             method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
             body: JSON.stringify({ url: matchUrl, type: 'URL_UPDATED' })
