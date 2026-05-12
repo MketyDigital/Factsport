@@ -13,9 +13,33 @@ if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
+
+// 🟢 STRICT JSON MODE ENABLED
+const model = genAI.getGenerativeModel({ 
+    model: "gemini-2.5-flash",
+    generationConfig: { responseMimeType: "application/json" }
+}); 
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function postToBufferDirectly(text, safeImgUrl, profileId, token) {
+    if (!profileId || !token) return;
+    const hasImg = safeImgUrl && safeImgUrl.length > 5;
+    
+    const query = hasImg 
+        ? `mutation($text: String!, $img: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow, assets: { images: [{ url: $img }] } }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }`
+        : `mutation($text: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }`;
+    
+    const variables = hasImg ? { text: text || "", img: safeImgUrl } : { text: text || "" };
+
+    try {
+        const res = await fetch("https://api.buffer.com/1/graphql", {
+            method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ query, variables })
+        });
+        const data = await res.json();
+        if (data?.data?.createPost?.message) throw new Error(data.data.createPost.message);
+    } catch (e) { console.error(`Buffer Error for ${profileId}:`, e.message); }
+}
 
 const ESPN_LEAGUES = {
     'Premier League': 'eng.1', 'La Liga': 'esp.1', 'Bundesliga': 'ger.1', 'Serie A': 'ita.1', 'Ligue 1': 'fra.1', 
@@ -32,8 +56,7 @@ const getCanonicalName = (rawName) => {
 };
 
 const isStrongMatch = (dbName, espnName) => {
-    const s1 = getCanonicalName(dbName);
-    const s2 = getCanonicalName(espnName);
+    const s1 = getCanonicalName(dbName); const s2 = getCanonicalName(espnName);
     if (s1.length < 4 || s2.length < 4) return s1 === s2;
     return s1.includes(s2) || s2.includes(s1);
 };
@@ -41,13 +64,9 @@ const isStrongMatch = (dbName, espnName) => {
 function parseTemplate(templateText, match, analysis, link, dateStr) {
     if (!templateText) return null;
     let text = templateText;
-    if (match) {
-        text = text.replace(/\[HOME\]/g, match.home_team).replace(/\[AWAY\]/g, match.away_team);
-    }
+    if (match) text = text.replace(/\[HOME\]/g, match.home_team).replace(/\[AWAY\]/g, match.away_team);
     if (analysis) {
-        text = text.replace(/\[PICK\]/g, analysis.primary)
-                   .replace(/\[ODDS\]/g, analysis.odds)
-                   .replace(/\[RATIONALE\]/g, analysis.rationale);
+        text = text.replace(/\[PICK\]/g, analysis.primary).replace(/\[ODDS\]/g, analysis.odds).replace(/\[RATIONALE\]/g, analysis.rationale);
     }
     if (link) text = text.replace(/\[LINK\]/g, link);
     if (dateStr) text = text.replace(/\[DATE\]/g, dateStr);
@@ -100,8 +119,7 @@ async function fetchRichEspnContext(espnId, currentHomeTeam) {
         const res = await fetch(`https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${espnId}`);
         if (!res.ok) return { textContext: null, translatedH2H: null };
         const data = await res.json();
-        let textContext = "";
-        let translatedH2H = null;
+        let textContext = ""; let translatedH2H = null;
 
         if (data.form && data.form.length >= 2) {
             const t1 = data.form[0].events.map(e => e.teamResult).join('-');
@@ -109,11 +127,9 @@ async function fetchRichEspnContext(espnId, currentHomeTeam) {
             textContext += `\n[Recent Form] ${data.form[0].team.displayName}: ${t1} | ${data.form[1].team.displayName}: ${t2}`;
         }
         if (data.headToHead && data.headToHead.games && data.headToHead.games.length > 0) {
-            let hw = 0, aw = 0, d = 0, tg = 0;
-            let mapped = [];
+            let hw = 0, aw = 0, d = 0, tg = 0; let mapped = [];
             const h2hStr = data.headToHead.games.slice(0, 4).map(g => {
-                const hs = parseInt(g.homeTeam.score); const as = parseInt(g.awayTeam.score);
-                tg += (hs + as);
+                const hs = parseInt(g.homeTeam.score); const as = parseInt(g.awayTeam.score); tg += (hs + as);
                 const isHistHome = isStrongMatch(currentHomeTeam, g.homeTeam.displayName);
                 if (hs === as) d++; else if (hs > as) isHistHome ? hw++ : aw++; else isHistHome ? aw++ : hw++;
                 mapped.push({ utcDate: g.date, homeTeam: { name: g.homeTeam.displayName }, awayTeam: { name: g.awayTeam.displayName }, score: { fullTime: { home: hs, away: as } } });
@@ -129,7 +145,10 @@ async function fetchRichEspnContext(espnId, currentHomeTeam) {
 async function generateWithRetry(prompt, maxRetries = 3) {
     for (let i = 0; i < maxRetries; i++) {
         try {
-            const result = await model.generateContent(prompt);
+            const result = await model.generateContent({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                tools: [{ googleSearch: {} }] 
+            });
             return result.response.text().trim();
         } catch (error) {
             if (error.message.includes('PerDay') || error.message.includes('429')) {
@@ -155,6 +174,7 @@ async function runProSlipEngine() {
     const now = new Date();
     const todayDateString = now.toISOString().split('T')[0];
     const in24Hours = new Date(now.getTime() + (24 * 60 * 60 * 1000)).toISOString();
+    const currentMonthYear = now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
     const { data: allMatches, error } = await supabase.from('matches').select('*')
         .gte('match_date', now.toISOString()).lte('match_date', in24Hours)
@@ -172,11 +192,29 @@ async function runProSlipEngine() {
             try {
                 const espnId = match.espn_id || await getEspnIdForMatch(match.league, match.match_date, match.home_team, match.away_team);
                 const { textContext, translatedH2H } = await fetchRichEspnContext(espnId, match.home_team);
-                const prompt = `You are an elite football tactical analyst in 2026. Provide a highly accurate "Pro Betting Slip" for: ${match.home_team} vs ${match.away_team} (${match.league}). Data Context: ${textContext || "No historical form available. Base prediction on current tactical profiles."} Return ONLY a valid JSON object: {"primary": "Value bet", "odds": "1.60", "safe": "Safe bet", "safeOdds": "1.20", "rationale": "40-50 words."}`;
+                
+                const prompt = `
+                    You are an elite football tactical analyst in ${currentMonthYear}. 
+                    Provide a highly accurate "Pro Betting Slip" for: ${match.home_team} vs ${match.away_team} (${match.league}). 
+                    Data Context provided by our DB: ${textContext || "No historical form available in database."} 
+                    
+                    CRITICAL RULES: 
+                    1. TIER-1 SEARCH ONLY: Use your Google Search tool to look up the CURRENT ${currentMonthYear} league standings, recent match form, and major injury news. You MUST ONLY use trusted sources (BBC, Sky Sports, ESPN, The Athletic, official club sites). Disregard all fan blogs.
+                    2. ANTI-HALLUCINATION: If Tier-1 search fails or lacks info, base your rationale strictly on the teams' historical reputations and the current table math. DO NOT hallucinate past seasons' forms.
+                    
+                    You must return a raw JSON object matching exactly this schema:
+                    {
+                        "primary": "String (e.g., Over 2.5 Goals)", 
+                        "odds": "String (e.g., 1.60)", 
+                        "safe": "String (e.g., Home Win or Draw)", 
+                        "safeOdds": "String (e.g., 1.20)", 
+                        "rationale": "String (40-50 words of expert tactical rationale based on today's verified search results.)"
+                    }
+                `;
                 let text = await generateWithRetry(prompt);
                 if (!text) continue; 
                 
-                // THIS IS THE FIX: Cleanly stripping markdown without line breaks
+                // Fallback replace just in case strict JSON mode bleeds backticks
                 text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
                 
                 const analysisData = JSON.parse(text);
@@ -266,12 +304,20 @@ async function runProSlipEngine() {
             }
         }
 
+        const bufferToken = creds.buffer_token || process.env.BUFFER_ACCESS_TOKEN;
+
+        if (freeTipsConfig.buf_x1) { await postToBufferDirectly(make1Text, null, creds.buffer_x1_id, bufferToken); successfullyPosted = true; }
+        if (freeTipsConfig.buf_x2) { await postToBufferDirectly(make2Text, null, creds.buffer_x2_id, bufferToken); successfullyPosted = true; }
+        if (freeTipsConfig.buf_fb1) { await postToBufferDirectly(fb1Text, null, creds.buffer_fb1_id, bufferToken); successfullyPosted = true; }
+        if (freeTipsConfig.buf_fb2) { await postToBufferDirectly(fb2Text, null, creds.buffer_fb2_id, bufferToken); successfullyPosted = true; }
+
         if (freeTipsConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
-            await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb1Text, x_text: make1Text }) }).then(() => successfullyPosted = true).catch(()=>{});
+            await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb1Text, x_text: make1Text, x_image_url: null }) }).then(() => successfullyPosted = true).catch(()=>{});
         }
         if (freeTipsConfig.make2 && creds.make_webhook_2) {
-            await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb2Text, x_text: make2Text }) }).then(() => successfullyPosted = true).catch(()=>{});
+            await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb2Text, x_text: make2Text, x_image_url: null }) }).then(() => successfullyPosted = true).catch(()=>{});
         }
+
         if (freeTipsConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
             const pageId = creds.fb1_id || process.env.FB_PAGE_ID; const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
             await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed?message=${encodeURIComponent(fb1Text)}&access_token=${token}`, { method: 'POST' }).then(() => successfullyPosted = true).catch(()=>{});
