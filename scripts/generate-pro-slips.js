@@ -1,73 +1,154 @@
 // @ts-nocheck
 const { createClient } = require('@supabase/supabase-js');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const GEMINI_KEY = process.env.GEMINI_API_KEY; 
+const FD_API_KEY = process.env.FOOTBALL_DATA_API_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) { 
-    console.error("❌ Missing Keys"); 
+    console.error("❌ Missing Keys. Make sure SUPABASE, GEMINI, and FOOTBALL_DATA keys are set."); 
     process.exit(1); 
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 
-// 🟢 STRICT JSON MODE ENABLED
+// 🔥 STRICT JSON SCHEMA IMPLEMENTED
+const proSlipSchema = {
+    type: SchemaType.OBJECT,
+    properties: {
+        primary: { type: SchemaType.STRING, description: "e.g., Over 2.5 Goals" },
+        odds: { type: SchemaType.STRING, description: "e.g., 1.60" },
+        safe: { type: SchemaType.STRING, description: "e.g., Home Win or Draw" },
+        safeOdds: { type: SchemaType.STRING, description: "e.g., 1.20" },
+        rationale: { type: SchemaType.STRING, description: "40-50 words of expert tactical rationale." }
+    },
+    required: ["primary", "odds", "safe", "safeOdds", "rationale"]
+};
+
 const model = genAI.getGenerativeModel({ 
     model: "gemini-2.5-flash",
-    generationConfig: { responseMimeType: "application/json" }
+    generationConfig: { 
+        responseMimeType: "application/json",
+        responseSchema: proSlipSchema
+    }
 }); 
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function postToBufferDirectly(text, safeImgUrl, profileId, token) {
-    if (!profileId || !token) return;
-    const hasImg = safeImgUrl && safeImgUrl.length > 5;
-    
-    const query = hasImg 
-        ? `mutation($text: String!, $img: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow, assets: { images: [{ url: $img }] } }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }`
-        : `mutation($text: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }`;
-    
-    const variables = hasImg ? { text: text || "", img: safeImgUrl } : { text: text || "" };
-
-    try {
-        const res = await fetch("https://api.buffer.com/1/graphql", {
-            method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ query, variables })
-        });
-        const data = await res.json();
-        if (data?.data?.createPost?.message) throw new Error(data.data.createPost.message);
-    } catch (e) { console.error(`Buffer Error for ${profileId}:`, e.message); }
-}
-
-const ESPN_LEAGUES = {
-    'Premier League': 'eng.1', 'La Liga': 'esp.1', 'Bundesliga': 'ger.1', 'Serie A': 'ita.1', 'Ligue 1': 'fra.1', 
-    'Champions League': 'uefa.champions', 'Euros': 'uefa.euro', 'World Cup': 'fifa.world', 'Europa League': 'uefa.europa', 
-    'Europa Conference League': 'uefa.conference', 'FA Cup': 'eng.fa', 'Carabao Cup': 'eng.league_cup', 
-    'Copa del Rey': 'esp.copa_del_rey', 'Coppa Italia': 'ita.copa_italia', 'Coupe de France': 'fra.coupe_de_france', 'DFB-Pokal': 'ger.dfb_pokal'
-};
+// --- UNIFIED DATA FETCHING HELPERS ---
+const ESPN_LEAGUES = { 'Premier League': 'eng.1', 'La Liga': 'esp.1', 'Bundesliga': 'ger.1', 'Serie A': 'ita.1', 'Ligue 1': 'fra.1', 'Champions League': 'uefa.champions', 'Europa League': 'uefa.europa', 'FA Cup': 'eng.fa' };
+const FD_LEAGUES = { 'Premier League': 'PL', 'La Liga': 'PD', 'Bundesliga': 'BL1', 'Serie A': 'SA', 'Ligue 1': 'FL1', 'Champions League': 'CL' };
 
 const getCanonicalName = (rawName) => {
     if (!rawName) return "";
     return rawName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, '')
-        .replace(/\b(1|fc|cf|afc|sc|sv|rc|fk|vfl|fsv|tsg|ssc|bayer|rcd|ud|as|us|osc|cfa|aja|ca|bc|ac|sk|olympique|de)\b/g, '')
+        .replace(/\b(1|fc|cf|afc|sc|sv|rc|fk|vfl|fsv|tsg|ssc|bayer|rcd|ud|as|us|osc|cfa|aja|ca|bc|ac|sk|olympique|de|united|city|hotspur|albion|wanderers|villa)\b/g, '')
         .replace(/\s+/g, ' ').trim();
 };
 
-const isStrongMatch = (dbName, espnName) => {
-    const s1 = getCanonicalName(dbName); const s2 = getCanonicalName(espnName);
-    if (s1.length < 4 || s2.length < 4) return s1 === s2;
+const isStrongMatch = (dbName, apiName) => {
+    const s1 = getCanonicalName(dbName); const s2 = getCanonicalName(apiName);
+    if (s1.length < 3 || s2.length < 3) return s1 === s2;
     return s1.includes(s2) || s2.includes(s1);
 };
+
+// FULL TABLE MAPPER + CUP FORMAT IGNORER
+async function getLeagueStandings(leagueName) {
+    if (!FD_API_KEY || !FD_LEAGUES[leagueName]) return "Standings unavailable.";
+    const domesticLeagues = ['PL', 'PD', 'BL1', 'SA', 'FL1']; 
+    const mappedLeague = FD_LEAGUES[leagueName];
+
+    if (!domesticLeagues.includes(mappedLeague)) {
+        return "Tournament/Cup tie - League table not applicable. Focus strictly on knockout stakes, recent form, and H2H.";
+    }
+
+    try {
+        const res = await fetch(`https://api.football-data.org/v4/competitions/${mappedLeague}/standings`, { headers: { 'X-Auth-Token': FD_API_KEY } });
+        const data = await res.json();
+        if (data.standings && data.standings[0]) {
+            return `FULL LEAGUE TABLE: ` + data.standings[0].table.map(t => `${t.position}. ${t.team.shortName} (${t.points}pts)`).join(', ');
+        }
+    } catch (e) { console.error(`Error fetching table for ${leagueName}:`, e.message); } 
+    return "Standings unavailable.";
+}
+
+async function getMatchContext(leagueName, dateString, homeTeam, awayTeam) {
+    let contextStr = ""; let translatedH2H = null;
+    const espnCode = ESPN_LEAGUES[leagueName];
+    let espnSuccess = false;
+
+    if (espnCode) {
+        const matchDate = new Date(dateString);
+        const datesToTry = [ matchDate.toISOString().split('T')[0].replace(/-/g, ''), new Date(matchDate.getTime() + 86400000).toISOString().split('T')[0].replace(/-/g, ''), new Date(matchDate.getTime() - 86400000).toISOString().split('T')[0].replace(/-/g, '') ];
+        
+        for (const dp of datesToTry) {
+            try {
+                const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnCode}/scoreboard?dates=${dp}`);
+                if (!res.ok) continue;
+                const data = await res.json();
+                if (!data.events) continue;
+                
+                const event = data.events.find(e => {
+                    const h = e.competitions[0].competitors.find(c => c.homeAway === 'home').team.displayName;
+                    const a = e.competitions[0].competitors.find(c => c.homeAway === 'away').team.displayName;
+                    return isStrongMatch(homeTeam, h) && isStrongMatch(awayTeam, a);
+                });
+
+                if (event) {
+                    const sumRes = await fetch(`https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${event.id}`);
+                    const sData = await sumRes.json();
+                    
+                    if (sData.form && sData.form.length >= 2) {
+                        contextStr += `[FORM] ${sData.form[0].team.displayName}: ${sData.form[0].events.map(e=>e.teamResult).join('')} | ${sData.form[1].team.displayName}: ${sData.form[1].events.map(e=>e.teamResult).join('')} `;
+                    }
+                    if (sData.headToHead?.games?.length > 0) {
+                        let hw = 0, aw = 0, d = 0, tg = 0; let mapped = [];
+                        const h2hStr = sData.headToHead.games.slice(0, 4).map(g => {
+                            const hs = parseInt(g.homeTeam.score); const as = parseInt(g.awayTeam.score); tg += (hs + as);
+                            const isHistHome = isStrongMatch(homeTeam, g.homeTeam.displayName);
+                            if (hs === as) d++; else if (hs > as) isHistHome ? hw++ : aw++; else isHistHome ? aw++ : hw++;
+                            mapped.push({ utcDate: g.date, homeTeam: { name: g.homeTeam.displayName }, awayTeam: { name: g.awayTeam.displayName }, score: { fullTime: { home: hs, away: as } } });
+                            return `${g.homeTeam.abbrev} ${hs}-${as} ${g.awayTeam.abbrev}`;
+                        }).join(', ');
+                        contextStr += `| [H2H] ${h2hStr}`;
+                        translatedH2H = { aggregates: { numberOfMatches: sData.headToHead.games.length, totalGoals: tg, homeTeam: { wins: hw, draws: d, losses: aw }, awayTeam: { wins: aw, draws: d, losses: hw } }, matches: mapped };
+                    }
+                    espnSuccess = true; break;
+                }
+            } catch (e) {}
+        }
+    }
+
+    if (!espnSuccess && FD_API_KEY && FD_LEAGUES[leagueName]) {
+        try {
+            const res = await fetch(`https://api.football-data.org/v4/competitions/${FD_LEAGUES[leagueName]}/matches?status=FINISHED`, { headers: { 'X-Auth-Token': FD_API_KEY } });
+            const data = await res.json();
+            if (data.matches) {
+                const homeForm = data.matches.filter(m => isStrongMatch(m.homeTeam.name, homeTeam) || isStrongMatch(m.awayTeam.name, homeTeam)).slice(-3).map(m => `${m.homeTeam.shortName} ${m.score.fullTime.home}-${m.score.fullTime.away} ${m.awayTeam.shortName}`).join(', ');
+                contextStr = `[RECENT RESULTS FALLBACK] ${homeTeam}: ${homeForm || 'N/A'}`;
+            }
+        } catch(e) {}
+    }
+    return { textContext: contextStr || "[NO H2H/FORM FOUND]", translatedH2H };
+}
+// --- END HELPERS ---
+
+async function postToBufferDirectly(text, safeImgUrl, profileId, token) { 
+    if (!profileId || !token) return;
+    const hasImg = safeImgUrl && safeImgUrl.length > 5;
+    const query = hasImg ? `mutation($text: String!, $img: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow, assets: { images: [{ url: $img }] } }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }` : `mutation($text: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }`;
+    const variables = hasImg ? { text: text || "", img: safeImgUrl } : { text: text || "" };
+    try { await fetch("https://api.buffer.com/1/graphql", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ query, variables }) }); } catch (e) { console.error(`Buffer Error for ${profileId}:`, e.message); }
+}
 
 function parseTemplate(templateText, match, analysis, link, dateStr) {
     if (!templateText) return null;
     let text = templateText;
     if (match) text = text.replace(/\[HOME\]/g, match.home_team).replace(/\[AWAY\]/g, match.away_team);
-    if (analysis) {
-        text = text.replace(/\[PICK\]/g, analysis.primary).replace(/\[ODDS\]/g, analysis.odds).replace(/\[RATIONALE\]/g, analysis.rationale);
-    }
+    if (analysis) { text = text.replace(/\[PICK\]/g, analysis.primary).replace(/\[ODDS\]/g, analysis.odds).replace(/\[RATIONALE\]/g, analysis.rationale); }
     if (link) text = text.replace(/\[LINK\]/g, link);
     if (dateStr) text = text.replace(/\[DATE\]/g, dateStr);
     return text;
@@ -75,88 +156,12 @@ function parseTemplate(templateText, match, analysis, link, dateStr) {
 
 async function postToTelegram(botToken, chatId, text, parseMode = 'HTML') {
     if (!botToken || !chatId) return;
-    try {
-        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: parseMode, disable_web_page_preview: true })
-        });
-    } catch (e) { console.error("❌ Telegram Error:", e.message); }
+    try { await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: parseMode, disable_web_page_preview: true }) }); } catch (e) { console.error("❌ Telegram Error:", e.message); }
 }
 
 const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 };
-
-async function getEspnIdForMatch(leagueName, dateString, homeTeam, awayTeam) {
-    const espnCode = ESPN_LEAGUES[leagueName];
-    if (!espnCode) return null;
-    const matchDate = new Date(dateString);
-    const datesToTry = [
-        matchDate.toISOString().split('T')[0].replace(/-/g, ''), 
-        new Date(matchDate.getTime() + 86400000).toISOString().split('T')[0].replace(/-/g, ''), 
-        new Date(matchDate.getTime() - 86400000).toISOString().split('T')[0].replace(/-/g, '')  
-    ];
-    for (const dp of datesToTry) {
-        try {
-            const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnCode}/scoreboard?dates=${dp}`);
-            if (!res.ok) continue;
-            const data = await res.json();
-            if (!data.events) continue;
-            const matchedEvent = data.events.find(e => {
-                const h = e.competitions[0].competitors.find(c => c.homeAway === 'home').team.displayName;
-                const a = e.competitions[0].competitors.find(c => c.homeAway === 'away').team.displayName;
-                return isStrongMatch(homeTeam, h) || isStrongMatch(awayTeam, a);
-            });
-            if (matchedEvent) return matchedEvent.id;
-        } catch (e) { continue; }
-    }
-    return null;
-}
-
-async function fetchRichEspnContext(espnId, currentHomeTeam) {
-    if (!espnId) return { textContext: null, translatedH2H: null };
-    try {
-        const res = await fetch(`https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${espnId}`);
-        if (!res.ok) return { textContext: null, translatedH2H: null };
-        const data = await res.json();
-        let textContext = ""; let translatedH2H = null;
-
-        if (data.form && data.form.length >= 2) {
-            const t1 = data.form[0].events.map(e => e.teamResult).join('-');
-            const t2 = data.form[1].events.map(e => e.teamResult).join('-');
-            textContext += `\n[Recent Form] ${data.form[0].team.displayName}: ${t1} | ${data.form[1].team.displayName}: ${t2}`;
-        }
-        if (data.headToHead && data.headToHead.games && data.headToHead.games.length > 0) {
-            let hw = 0, aw = 0, d = 0, tg = 0; let mapped = [];
-            const h2hStr = data.headToHead.games.slice(0, 4).map(g => {
-                const hs = parseInt(g.homeTeam.score); const as = parseInt(g.awayTeam.score); tg += (hs + as);
-                const isHistHome = isStrongMatch(currentHomeTeam, g.homeTeam.displayName);
-                if (hs === as) d++; else if (hs > as) isHistHome ? hw++ : aw++; else isHistHome ? aw++ : hw++;
-                mapped.push({ utcDate: g.date, homeTeam: { name: g.homeTeam.displayName }, awayTeam: { name: g.awayTeam.displayName }, score: { fullTime: { home: hs, away: as } } });
-                return `${g.homeTeam.abbrev} ${hs}-${as} ${g.awayTeam.abbrev}`;
-            }).join(', ');
-            textContext += `\n[Last Meetings] ${h2hStr}`;
-            translatedH2H = { aggregates: { numberOfMatches: data.headToHead.games.length, totalGoals: tg, homeTeam: { wins: hw, draws: d, losses: aw }, awayTeam: { wins: aw, draws: d, losses: hw } }, matches: mapped };
-        }
-        return { textContext: textContext.trim() || null, translatedH2H };
-    } catch (e) { return { textContext: null, translatedH2H: null }; }
-}
-
-async function generateWithRetry(prompt, maxRetries = 3) {
-    for (let i = 0; i < maxRetries; i++) {
-        try {
-            const result = await model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                tools: [{ googleSearch: {} }] 
-            });
-            return result.response.text().trim();
-        } catch (error) {
-            if (error.message.includes('PerDay') || error.message.includes('429')) {
-                console.log(`   ⏳ Google AI is busy. Waiting 30s...`); await delay(30000); 
-            } else { throw error; }
-        }
-    }
-}
 
 async function runProSlipEngine() {
     console.log("🧠 Starting Automated AI Pro Slip Generation & Routing...");
@@ -190,36 +195,32 @@ async function runProSlipEngine() {
         for (const match of matchesNeedingAnalysis) {
             console.log(`\n⏳ Analyzing: ${match.home_team} vs ${match.away_team}...`);
             try {
-                const espnId = match.espn_id || await getEspnIdForMatch(match.league, match.match_date, match.home_team, match.away_team);
-                const { textContext, translatedH2H } = await fetchRichEspnContext(espnId, match.home_team);
+                const tableStr = await getLeagueStandings(match.league);
+                const { textContext, translatedH2H } = await getMatchContext(match.league, match.match_date, match.home_team, match.away_team);
                 
                 const prompt = `
-                    You are an elite football tactical analyst in ${currentMonthYear}. 
+                    You are a gritty, elite football tactical analyst in ${currentMonthYear}. 
                     Provide a highly accurate "Pro Betting Slip" for: ${match.home_team} vs ${match.away_team} (${match.league}). 
-                    Data Context provided by our DB: ${textContext || "No historical form available in database."} 
+                    
+                    FACTUAL CONTEXT (THIS IS YOUR ONLY SOURCE OF TRUTH):
+                    LEAGUE STANDING: ${tableStr}
+                    MATCH FORM & H2H: ${textContext}
                     
                     CRITICAL RULES: 
-                    1. TIER-1 SEARCH ONLY: Use your Google Search tool to look up the CURRENT ${currentMonthYear} league standings, recent match form, and major injury news. You MUST ONLY use trusted sources (BBC, Sky Sports, ESPN, The Athletic, official club sites). Disregard all fan blogs.
-                    2. ANTI-HALLUCINATION: If Tier-1 search fails or lacks info, base your rationale strictly on the teams' historical reputations and the current table math. DO NOT hallucinate past seasons' forms.
-                    
-                    You must return a raw JSON object matching exactly this schema:
-                    {
-                        "primary": "String (e.g., Over 2.5 Goals)", 
-                        "odds": "String (e.g., 1.60)", 
-                        "safe": "String (e.g., Home Win or Draw)", 
-                        "safeOdds": "String (e.g., 1.20)", 
-                        "rationale": "String (40-50 words of expert tactical rationale based on today's verified search results.)"
-                    }
+                    1. STRICT FACTS: Base your tactical rationale strictly on the Factual Context provided above. Do not invent past results.
+                    2. SEARCH FALLBACK: Use your Google Search tool ONLY to verify if a star player picked up an injury today.
+                    3. TONE: Be direct, expert, and authoritative. Speak from experience.
                 `;
-                let text = await generateWithRetry(prompt);
-                if (!text) continue; 
                 
-                // Fallback replace just in case strict JSON mode bleeds backticks
-                text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+                const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ googleSearch: {} }] });
+                const text = result.response.text();
+                
+                if (!text) continue; 
                 
                 const analysisData = JSON.parse(text);
                 const updatePayload = { pro_analysis: analysisData };
                 if (translatedH2H && translatedH2H.matches.length > 0) updatePayload.h2h = translatedH2H; 
+                
                 await supabase.from('matches').update(updatePayload).eq('id', match.id);
                 console.log(`   ✅ Saved Elite AI Analysis!`);
                 newlyGeneratedSlips.push({ match, analysis: analysisData });
@@ -265,8 +266,6 @@ async function runProSlipEngine() {
             if (forcedMatch && forcedMatch.pro_analysis) { 
                 freeTipMatch = forcedMatch; 
                 console.log(`   ⚡ Admin Override: ${freeTipMatch.home_team}`); 
-            } else {
-                console.log(`   ⚠️ Admin match is not scheduled for today (or lacks analysis). Falling back to auto-selection.`);
             }
         }
         if (!freeTipMatch) {
