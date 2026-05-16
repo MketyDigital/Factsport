@@ -28,6 +28,7 @@ const proSlipSchema = {
     required: ["primary", "odds", "safe", "safeOdds", "rationale"]
 };
 
+// 🟢 JSON MODE ENABLED (NO SEARCH TOOL ALLOWED HERE TO PREVENT 400 ERRORS)
 const model = genAI.getGenerativeModel({ 
     model: "gemini-2.5-flash",
     generationConfig: { 
@@ -136,203 +137,230 @@ async function getMatchContext(leagueName, dateString, homeTeam, awayTeam) {
 }
 // --- END HELPERS ---
 
-async function postToBufferDirectly(text, safeImgUrl, profileId, token) { 
-    if (!profileId || !token) return;
-    const hasImg = safeImgUrl && safeImgUrl.length > 5;
-    const query = hasImg ? `mutation($text: String!, $img: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow, assets: { images: [{ url: $img }] } }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }` : `mutation($text: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }`;
-    const variables = hasImg ? { text: text || "", img: safeImgUrl } : { text: text || "" };
-    try { await fetch("https://api.buffer.com/1/graphql", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ query, variables }) }); } catch (e) { console.error(`Buffer Error for ${profileId}:`, e.message); }
-}
-
-function parseTemplate(templateText, match, analysis, link, dateStr) {
-    if (!templateText) return null;
-    let text = templateText;
-    if (match) text = text.replace(/\[HOME\]/g, match.home_team).replace(/\[AWAY\]/g, match.away_team);
-    if (analysis) { text = text.replace(/\[PICK\]/g, analysis.primary).replace(/\[ODDS\]/g, analysis.odds).replace(/\[RATIONALE\]/g, analysis.rationale); }
-    if (link) text = text.replace(/\[LINK\]/g, link);
-    if (dateStr) text = text.replace(/\[DATE\]/g, dateStr);
-    return text;
-}
-
 async function postToTelegram(botToken, chatId, text, parseMode = 'HTML') {
     if (!botToken || !chatId) return;
-    try { await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: parseMode, disable_web_page_preview: true }) }); } catch (e) { console.error("❌ Telegram Error:", e.message); }
+    try {
+        const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+        await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: parseMode, disable_web_page_preview: true })
+        });
+    } catch (e) { console.error("❌ Telegram Post Error:", e.message); }
 }
 
-const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-};
+async function generateWithRetry(prompt, maxRetries = 3) {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            // 🔥 Removed tools parameter. Gemini handles pure JSON natively via schema.
+            const result = await model.generateContent(prompt);
+            return result.response.text().trim();
+        } catch (error) {
+            if (error.message.includes('PerDay')) {
+                console.log(`   🛑 Google AI Daily Quota Reached. Will resume tomorrow.`);
+                return null; 
+            } else if (error.message.includes('429') || error.message.includes('503')) {
+                if (i < maxRetries - 1) {
+                    console.log(`   ⏳ Google AI is busy. Waiting 30 seconds before retry ${i + 1}/${maxRetries}...`);
+                    await delay(30000); 
+                } else { throw error; }
+            } else { throw error; }
+        }
+    }
+}
 
 async function runProSlipEngine() {
-    console.log("🧠 Starting Automated AI Pro Slip Generation & Routing...");
+    console.log("🧠 Starting Automated AI Pro Slip Generation...");
 
+    // 🟢 FETCH SETTINGS & MULTI-CHANNELS
     const { data: settingsData } = await supabase.from('site_settings').select('social_config').single();
     const config = settingsData?.social_config || {};
     const creds = config.credentials || {};
     const eventsConfig = config.events || {};
-    const featuredMatchId = config.featured_match_id; 
+    const featuredMatchId = config.featured_match_id; // 🟢 Get Admin Override
+
     const tgGeneralChannels = creds.tg_general_channels || [];
     const tgVipChannels = creds.tg_vip_channels || [];
-    const freeTipsConfig = eventsConfig.free_tips || {};
-    const templates = config.templates?.free_tips || {};
 
     const now = new Date();
-    const todayDateString = now.toISOString().split('T')[0];
-    const in24Hours = new Date(now.getTime() + (24 * 60 * 60 * 1000)).toISOString();
+    const twoHoursAgo = new Date(now.getTime() - (2 * 60 * 60 * 1000)).toISOString();
+    const in48Hours = new Date(now.getTime() + (48 * 60 * 60 * 1000)).toISOString();
     const currentMonthYear = now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
-    const { data: allMatches, error } = await supabase.from('matches').select('*')
-        .gte('match_date', now.toISOString()).lte('match_date', in24Hours)
-        .neq('status', 'FT').neq('status', 'FINISHED');
-
-    if (error || !allMatches) return;
-
-    const matchesNeedingAnalysis = allMatches.filter(m => !m.pro_analysis || (typeof m.pro_analysis === 'object' && Object.keys(m.pro_analysis).length === 0) || (typeof m.pro_analysis === 'string' && m.pro_analysis.trim() === ''));
-    const newlyGeneratedSlips = [];
-
-    if (matchesNeedingAnalysis.length > 0) {
-        console.log(`🎯 Found ${matchesNeedingAnalysis.length} upcoming matches needing VIP analysis.`);
-        for (const match of matchesNeedingAnalysis) {
-            console.log(`\n⏳ Analyzing: ${match.home_team} vs ${match.away_team}...`);
-            try {
-                const tableStr = await getLeagueStandings(match.league);
-                const { textContext, translatedH2H } = await getMatchContext(match.league, match.match_date, match.home_team, match.away_team);
-                
-                const prompt = `
-                    You are a gritty, elite football tactical analyst in ${currentMonthYear}. 
-                    Provide a highly accurate "Pro Betting Slip" for: ${match.home_team} vs ${match.away_team} (${match.league}). 
-                    
-                    FACTUAL CONTEXT (THIS IS YOUR ONLY SOURCE OF TRUTH):
-                    LEAGUE STANDING: ${tableStr}
-                    MATCH FORM & H2H: ${textContext}
-                    
-                    CRITICAL RULES: 
-                    1. STRICT FACTS: Base your tactical rationale strictly on the Factual Context provided above. Do not invent past results.
-                    2. SEARCH FALLBACK: Use your Google Search tool ONLY to verify if a star player picked up an injury today.
-                    3. TONE: Be direct, expert, and authoritative. Speak from experience.
-                `;
-                
-                const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ googleSearch: {} }] });
-                const text = result.response.text();
-                
-                if (!text) continue; 
-                
-                const analysisData = JSON.parse(text);
-                const updatePayload = { pro_analysis: analysisData };
-                if (translatedH2H && translatedH2H.matches.length > 0) updatePayload.h2h = translatedH2H; 
-                
-                await supabase.from('matches').update(updatePayload).eq('id', match.id);
-                console.log(`   ✅ Saved Elite AI Analysis!`);
-                newlyGeneratedSlips.push({ match, analysis: analysisData });
-            } catch (err) { console.error(`   🔥 Error processing match:`, err.message); }
-            await delay(8000); 
-        }
-
-        if (newlyGeneratedSlips.length > 0 && eventsConfig.vip_tips?.tg_vip !== false && tgVipChannels.length > 0) {
-            console.log(`\n💎 Broadcasting NEW slips to VIP Channels...`);
-            for (const channel of tgVipChannels) {
-                for (const item of newlyGeneratedSlips) {
-                    const matchDateObj = formatDate(item.match.match_date); 
-                    const vipMsg = `💎 <b>VIP PRO ANALYSIS</b> 💎\n\n📅 <b>Date:</b> ${matchDateObj}\n⚽️ <b>${item.match.home_team} vs ${item.match.away_team}</b>\n🏆 ${item.match.league}\n\n🎯 <b>Main Value Pick:</b> ${item.analysis.primary} (${item.analysis.odds})\n🛡 <b>Safe Acca Pick:</b> ${item.analysis.safe} (${item.analysis.safeOdds})\n\n🧠 <b>Tactical Rationale:</b>\n<i>${item.analysis.rationale}</i>`;
-                    await postToTelegram(creds.telegram_bot_token, channel.chatId, vipMsg);
-                    await delay(1500); 
-                }
-            }
-        }
-    } else { console.log("💤 No new upcoming matches need VIP analysis right now."); }
-
-    console.log(`\n🎁 Evaluating Free Bet of the Day...`);
-
-    if (config.last_freetip_broadcast_date === todayDateString) {
-        console.log(`   ⏭️ Free Tip already broadcasted today. Skipping to prevent double-posting.`);
-        console.log("\n🏁 Automated AI Engine Complete!"); return; 
-    }
-    
-    const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
-    const endOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59)).toISOString();
-
-    const { data: allAnalyzedToday } = await supabase.from('matches').select('*')
-        .not('pro_analysis', 'is', null)
-        .gte('match_date', startOfToday)
-        .lte('match_date', endOfToday)
+    const { data: allMatches, error } = await supabase
+        .from('matches')
+        .select('*')
+        .gte('match_date', twoHoursAgo)
+        .lte('match_date', in48Hours)
         .neq('status', 'FT')
         .neq('status', 'FINISHED');
 
-    let freeTipMatch = null;
+    if (error || !allMatches) return;
 
-    if (allAnalyzedToday && allAnalyzedToday.length > 0) {
-        if (featuredMatchId) {
-            const forcedMatch = allAnalyzedToday.find(m => String(m.id) === String(featuredMatchId));
-            if (forcedMatch && forcedMatch.pro_analysis) { 
-                freeTipMatch = forcedMatch; 
-                console.log(`   ⚡ Admin Override: ${freeTipMatch.home_team}`); 
+    const matches = allMatches.filter(m => {
+        if (!m.pro_analysis) return true;
+        if (typeof m.pro_analysis === 'object' && Object.keys(m.pro_analysis).length === 0) return true;
+        if (typeof m.pro_analysis === 'string' && m.pro_analysis.trim() === '') return true;
+        return false; 
+    });
+
+    if (matches.length === 0) {
+        console.log("💤 No matches need AI analysis right now.");
+        return;
+    }
+
+    console.log(`🎯 Found ${matches.length} matches needing analysis.`);
+
+    const generatedSlips = [];
+
+    for (const match of matches) {
+        console.log(`\n⏳ Analyzing: ${match.home_team} vs ${match.away_team}...`);
+        
+        try {
+            const tableStr = await getLeagueStandings(match.league);
+            const { textContext, translatedH2H } = await getMatchContext(match.league, match.match_date, match.home_team, match.away_team);
+
+            let promptContext = textContext;
+            
+            if (promptContext && promptContext !== "[NO H2H/FORM FOUND]") {
+                console.log(`   📡 Successfully pulled Live Form & H2H!`);
+            } else if (match.h2h && match.h2h.aggregates) {
+                console.log(`   🗄️ API shallow. Falling back to Football-Data API H2H from DB!`);
+                const agg = match.h2h.aggregates;
+                promptContext = `[Historical H2H] Matches Played: ${agg.numberOfMatches}. ${match.home_team} Wins: ${agg.homeTeam?.wins || 0}. ${match.away_team} Wins: ${agg.awayTeam?.wins || 0}. Draws: ${agg.homeTeam?.draws || 0}. Total Goals: ${agg.totalGoals}.`;
+                
+                if (match.h2h.matches && match.h2h.matches.length > 0) {
+                    const recentStrs = match.h2h.matches.slice(0, 4).map(m => {
+                        const hs = m.score?.fullTime?.home ?? '?';
+                        const as = m.score?.fullTime?.away ?? '?';
+                        return `${m.homeTeam?.name || 'Home'} ${hs}-${as} ${m.awayTeam?.name || 'Away'}`;
+                    });
+                    promptContext += `\n[Recent Meetings] ${recentStrs.join(', ')}`;
+                }
+            } else {
+                promptContext = "No historical form or H2H data available. Base prediction purely on current season tactical profiles, manager tendencies, and general team reputation.";
+                console.log(`   ⚠️ No data found anywhere. Using pure AI tactical fallback.`);
+            }
+
+            const prompt = `
+                You are a gritty, elite football tactical analyst in ${currentMonthYear}. 
+                Provide a highly accurate "Pro Betting Slip" for: ${match.home_team} vs ${match.away_team} (${match.league}).
+                
+                🔥 PRISTINE DATA CONTEXT: 
+                LEAGUE STANDING: ${tableStr}
+                MATCH FORM & H2H: ${promptContext}
+
+                STRICT INSTRUCTIONS:
+                1. Base your betting rationale heavily on the Data Context provided above.
+                2. NO HALLUCINATIONS. Do not invent exact recent scorelines or player injuries.
+                3. TONE: Be direct, expert, and authoritative. Speak from experience.
+            `;
+
+            let text = await generateWithRetry(prompt);
+            
+            if (!text) break; 
+            
+            // Safety parsing in case markdown bleeds
+            text = text.replace(/```json/gi, '').replace(/
+```/g, '').trim();
+            const analysisData = JSON.parse(text);
+
+            const updatePayload = { pro_analysis: analysisData };
+            
+            if (translatedH2H && translatedH2H.matches && translatedH2H.matches.length > 0) {
+                updatePayload.h2h = translatedH2H; 
+            }
+
+            const { error: updateErr } = await supabase
+                .from('matches')
+                .update(updatePayload)
+                .eq('id', match.id);
+
+            if (updateErr) {
+                console.error(`   ❌ Failed to save to DB:`, updateErr.message);
+            } else {
+                console.log(`   ✅ Saved Elite AI Analysis!`);
+                generatedSlips.push({ match, analysis: analysisData });
+            }
+
+        } catch (err) {
+            console.error(`   🔥 Error processing match:`, err.message);
+        }
+        
+        await delay(8000); 
+    }
+    
+    // -------------------------------------------------------------
+    // 🚀 TELEGRAM & SOCIAL BROADCAST (Multi-Channel Routing)
+    // -------------------------------------------------------------
+    if (generatedSlips.length > 0 && creds.telegram_bot_token) {
+        console.log(`\n📢 Broadcasting to Telegram...`);
+
+        // 1. VIP CHANNELS (Post EVERY slip to ALL registered VIP channels)
+        if (eventsConfig.vip_tips?.tg_vip !== false && tgVipChannels.length > 0) {
+            for (const channel of tgVipChannels) {
+                for (const item of generatedSlips) {
+                    const vipMsg = `💎 <b>VIP PRO ANALYSIS</b> 💎\n\n⚽️ <b>${item.match.home_team} vs ${item.match.away_team}</b>\n🏆 ${item.match.league}\n\n🎯 <b>Main Value Pick:</b> ${item.analysis.primary} (${item.analysis.odds})\n🛡 <b>Safe Acca Pick:</b> ${item.analysis.safe} (${item.analysis.safeOdds})\n\n🧠 <b>Tactical Rationale:</b>\n<i>${item.analysis.rationale}</i>`;
+                    await postToTelegram(creds.telegram_bot_token, channel.chatId, vipMsg);
+                    await delay(1500); // Safe delay between messages
+                }
+                console.log(`   ✅ Sent ${generatedSlips.length} tickets to VIP Channel: ${channel.chatId}`);
             }
         }
-        if (!freeTipMatch) {
-            const giants = ['Arsenal','Chelsea','Liverpool','Man City','Man United','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG', 'Inter', 'AC Milan', 'Atletico'];
-            allAnalyzedToday.sort((a, b) => {
-                const aScore = (giants.some(t => a.home_team.includes(t)) ? 1 : 0) + (giants.some(t => a.away_team.includes(t)) ? 1 : 0);
-                const bScore = (giants.some(t => b.home_team.includes(t)) ? 1 : 0) + (giants.some(t => b.away_team.includes(t)) ? 1 : 0);
-                if (bScore !== aScore) return bScore - aScore; 
-                return new Date(b.match_date).getTime() - new Date(a.match_date).getTime(); 
+
+        // 2. FREE BET OF THE DAY (Strict Sync Logic)
+        if (generatedSlips.length > 0) {
+            
+            // 🟢 STRICT SORTING ALGORITHM: Admin Override -> Latest Kickoff Time
+            generatedSlips.sort((a, b) => {
+                // Tier 1: Did Admin manually select a featured match?
+                if (featuredMatchId) {
+                    if (a.match.id === featuredMatchId) return -1;
+                    if (b.match.id === featuredMatchId) return 1;
+                }
+
+                // Tier 2: The Most Important Rule (Last match scheduled for that day)
+                const aTime = new Date(a.match.match_date).getTime();
+                const bTime = new Date(b.match.match_date).getTime();
+                return bTime - aTime; // Highest time (latest kickoff) comes first
             });
-            freeTipMatch = allAnalyzedToday[0];
-            console.log(`   🧮 Math Selected: ${freeTipMatch.home_team}`);
+
+            const freeItem = generatedSlips[0]; 
+            const matchLink = `https://factsport.com/match/${freeItem.match.id}`;
+            
+            const isFbEnabled = eventsConfig.free_tips?.fb !== false;
+            const isXEnabled = eventsConfig.free_tips?.x !== false;
+            const isTgEnabled = eventsConfig.free_tips?.tg_general !== false;
+
+            // Send to ALL General Telegram Channels (Using their unique links!)
+            if (isTgEnabled && tgGeneralChannels.length > 0) {
+                for (const channel of tgGeneralChannels) {
+                    const linkToUse = channel.link || matchLink; 
+                    const freeTgMsg = `🎁 <b>FREE BET OF THE DAY</b> 🎁\n\n⚽️ <b>${freeItem.match.home_team} vs ${freeItem.match.away_team}</b>\n\n🎯 <b>Prediction:</b> ${freeItem.analysis.primary}\n🔥 <b>Odds:</b> ${freeItem.analysis.odds}\n\n🧠 <b>Why?:</b> <i>${freeItem.analysis.rationale}</i>\n\n👉 <a href="${linkToUse}">Bet on this match here!</a>\n\nWant more expert picks? Upgrade to VIP on <a href="https://factsport.com">FactSport</a>!`;
+                    
+                    await postToTelegram(creds.telegram_bot_token, channel.chatId, freeTgMsg);
+                    console.log(`   ✅ Sent Free Tip to General Channel: ${channel.chatId}`);
+                    await delay(1500);
+                }
+            }
+
+            // Send to X and Facebook via Make.com (SAFE ROUTING: ONLY USES MATCH LINK)
+            const makeUrl = creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL;
+            if (makeUrl && (isFbEnabled || isXEnabled)) {
+                await fetch(makeUrl, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        fb2_text: isFbEnabled ? `🎁 FREE BET OF THE DAY 🎁\n\n⚽️ ${freeItem.match.home_team} vs ${freeItem.match.away_team}\n🎯 Prediction: ${freeItem.analysis.primary}\n🔥 Odds: ${freeItem.analysis.odds}\n\n👇 See full stats and place your bet!\n${matchLink}` : null,
+                        x_text: isXEnabled ? `🎁 FREE BET OF THE DAY!\n\n⚽️ ${freeItem.match.home_team} vs ${freeItem.match.away_team}\n🎯 Pick: ${freeItem.analysis.primary} (${freeItem.analysis.odds})\n\n👇 Full stats:\n${matchLink}` : null, 
+                        x_image_url: null
+                    })
+                });
+                console.log(`   ✅ Fired Free Tip to X/FB Make.com Router.`);
+            }
         }
     }
 
-    if (freeTipMatch) {
-        let successfullyPosted = false;
-        const matchLink = `https://factsport.com/match/${freeTipMatch.id}`;
-        const matchDateObj = formatDate(freeTipMatch.match_date); 
-        
-        const fb1Text = parseTemplate(templates.fb1 || `🎁 FREE BET OF THE DAY 🎁\n\n📅 Date: [DATE]\n⚽️ [HOME] vs [AWAY]\n🎯 Prediction: [PICK]\n🔥 Odds: [ODDS]\n\n👇 See full stats and place your bet!\n[LINK]`, freeTipMatch, freeTipMatch.pro_analysis, matchLink, matchDateObj);
-        const fb2Text = parseTemplate(templates.fb2 || fb1Text, freeTipMatch, freeTipMatch.pro_analysis, matchLink, matchDateObj);
-        const make1Text = parseTemplate(templates.make1 || `🎁 FREE BET OF THE DAY!\n\n📅 [DATE]\n⚽️ [HOME] vs [AWAY]\n🎯 Pick: [PICK] ([ODDS])\n\n👇 Full stats:\n[LINK]`, freeTipMatch, freeTipMatch.pro_analysis, matchLink, matchDateObj);
-        const make2Text = parseTemplate(templates.make2 || make1Text, freeTipMatch, freeTipMatch.pro_analysis, matchLink, matchDateObj);
-
-        if (freeTipsConfig.tg_general && tgGeneralChannels.length > 0) {
-            for (const channel of tgGeneralChannels) {
-                if (channel.wants_freetips) {
-                    const linkToUse = channel.link || matchLink; 
-                    const rawTgMsg = templates.tg_general || `🎁 <b>FREE BET OF THE DAY</b> 🎁\n\n📅 <b>Date:</b> [DATE]\n⚽️ <b>[HOME] vs [AWAY]</b>\n\n🎯 <b>Prediction:</b> [PICK]\n🔥 <b>Odds:</b> [ODDS]\n\n🧠 <b>Why?:</b> <i>[RATIONALE]</i>\n\n👉 <a href="[LINK]">Bet on this match here!</a>`;
-                    const freeTgMsg = parseTemplate(rawTgMsg, freeTipMatch, freeTipMatch.pro_analysis, linkToUse, matchDateObj);
-                    await postToTelegram(creds.telegram_bot_token, channel.chatId, freeTgMsg);
-                    successfullyPosted = true; await delay(1500);
-                }
-            }
-        }
-
-        const bufferToken = creds.buffer_token || process.env.BUFFER_ACCESS_TOKEN;
-
-        if (freeTipsConfig.buf_x1) { await postToBufferDirectly(make1Text, null, creds.buffer_x1_id, bufferToken); successfullyPosted = true; }
-        if (freeTipsConfig.buf_x2) { await postToBufferDirectly(make2Text, null, creds.buffer_x2_id, bufferToken); successfullyPosted = true; }
-        if (freeTipsConfig.buf_fb1) { await postToBufferDirectly(fb1Text, null, creds.buffer_fb1_id, bufferToken); successfullyPosted = true; }
-        if (freeTipsConfig.buf_fb2) { await postToBufferDirectly(fb2Text, null, creds.buffer_fb2_id, bufferToken); successfullyPosted = true; }
-
-        if (freeTipsConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
-            await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb1Text, x_text: make1Text, x_image_url: null }) }).then(() => successfullyPosted = true).catch(()=>{});
-        }
-        if (freeTipsConfig.make2 && creds.make_webhook_2) {
-            await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb2Text, x_text: make2Text, x_image_url: null }) }).then(() => successfullyPosted = true).catch(()=>{});
-        }
-
-        if (freeTipsConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
-            const pageId = creds.fb1_id || process.env.FB_PAGE_ID; const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
-            await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed?message=${encodeURIComponent(fb1Text)}&access_token=${token}`, { method: 'POST' }).then(() => successfullyPosted = true).catch(()=>{});
-        }
-        if (freeTipsConfig.fb2 && creds.fb2_id && creds.fb2_token) {
-            await fetch(`https://graph.facebook.com/v19.0/${creds.fb2_id}/feed?message=${encodeURIComponent(fb2Text)}&access_token=${creds.fb2_token}`, { method: 'POST' }).then(() => successfullyPosted = true).catch(()=>{});
-        }
-
-        if (successfullyPosted) {
-            const updatedConfig = { ...config, last_freetip_broadcast_date: todayDateString };
-            delete updatedConfig.featured_match_id; 
-            await supabase.from('site_settings').update({ social_config: updatedConfig }).eq('id', 1);
-            console.log(`   🔒 Saved broadcast date & reset Admin Override for tomorrow.`);
-        }
-    } else { console.log(`   💤 No analyzed matches found for today. Skipping Free Tip broadcast.`); }
-
-    console.log("\n🏁 Automated AI Engine Complete!");
+    console.log("\n🏁 Automated AI Pro Slip Generation Complete!");
 }
+
 runProSlipEngine();
