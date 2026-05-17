@@ -296,11 +296,18 @@ export async function POST(request: Request) {
     const tpl = config.templates?.[eventKey] || {};
     extraData.activeCta = (eventKey === 'lineups' || eventKey === 'kickoff') ? preMatchCta : ctaText;
 
-    const fb1Text = evtConfig.fb1 || evtConfig.buf_fb1 ? parseTemplate(tpl.fb1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]`, newState, matchUrl, extraData) : null;
-    const fb2Text = evtConfig.fb2 || evtConfig.buf_fb2 ? parseTemplate(tpl.fb2 || fb1Text || '', newState, matchUrl, extraData) : null;
-    const make1Text = evtConfig.make1 || evtConfig.buf_x1 ? parseTemplate(tpl.make1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]\n[HASHTAGS]`, newState, matchUrl, extraData) : null;
-    const make2Text = evtConfig.make2 || evtConfig.buf_x2 ? parseTemplate(tpl.make2 || make1Text || '', newState, matchUrl, extraData) : null;
+    // 1. Standard Fallback Templates (Make & Direct Graph)
+    const fb1Text = evtConfig.fb1 ? parseTemplate(tpl.fb1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]`, newState, matchUrl, extraData) : null;
+    const fb2Text = evtConfig.fb2 ? parseTemplate(tpl.fb2 || fb1Text || '', newState, matchUrl, extraData) : null;
+    const make1Text = evtConfig.make1 ? parseTemplate(tpl.make1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]\n[HASHTAGS]`, newState, matchUrl, extraData) : null;
+    const make2Text = evtConfig.make2 ? parseTemplate(tpl.make2 || make1Text || '', newState, matchUrl, extraData) : null;
     const tgMsg = evtConfig.tg_general ? parseTemplate(tpl.tg_general || `<b>[HOME] [H_SCORE] - [A_SCORE] [AWAY]</b>\n<a href="[LINK]">Match Center</a>`, newState, matchUrl, extraData) : null;
+
+    // 2. 🟢 NEW: Dedicated Buffer Templates (With intelligent fallbacks if left blank)
+    const bufX1Text = evtConfig.buf_x1 ? parseTemplate(tpl.buf_x1 || tpl.make1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]\n[HASHTAGS]`, newState, matchUrl, extraData) : null;
+    const bufX2Text = evtConfig.buf_x2 ? parseTemplate(tpl.buf_x2 || tpl.make2 || bufX1Text || '', newState, matchUrl, extraData) : null;
+    const bufFb1Text = evtConfig.buf_fb1 ? parseTemplate(tpl.buf_fb1 || tpl.fb1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]`, newState, matchUrl, extraData) : null;
+    const bufFb2Text = evtConfig.buf_fb2 ? parseTemplate(tpl.buf_fb2 || tpl.fb2 || bufFb1Text || '', newState, matchUrl, extraData) : null;
 
     const creds = config.credentials || {};
     const proxiedImage = ogImageUrl ? getImageKitProxyUrl(ogImageUrl) : null;
@@ -356,19 +363,19 @@ export async function POST(request: Request) {
 
         // 🚀 ISOLATED BROADCASTING MATRIX
         if (evtConfig.buf_x1 && bufferToken && creds.buffer_x1_id) {
-            await postToBufferDirectly(make1Text!, finalBufferImage!, creds.buffer_x1_id, bufferToken).catch(e => console.error("BUF X1 Error:", e));
+            await postToBufferDirectly(bufX1Text!, finalBufferImage!, creds.buffer_x1_id, bufferToken).catch(e => console.error("BUF X1 Error:", e));
         }
 
         if (evtConfig.buf_x2 && bufferToken && creds.buffer_x2_id) {
-            await postToBufferDirectly(make2Text || make1Text!, finalBufferImage!, creds.buffer_x2_id, bufferToken).catch(e => console.error("BUF X2 Error:", e));
+            await postToBufferDirectly(bufX2Text!, finalBufferImage!, creds.buffer_x2_id, bufferToken).catch(e => console.error("BUF X2 Error:", e));
         }
 
         if (evtConfig.buf_fb1 && bufferToken && creds.buffer_fb1_id) {
-            await postToBufferDirectly(fb1Text!, finalBufferImage!, creds.buffer_fb1_id, bufferToken).catch(e => console.error("BUF FB1 Error:", e));
+            await postToBufferDirectly(bufFb1Text!, finalBufferImage!, creds.buffer_fb1_id, bufferToken).catch(e => console.error("BUF FB1 Error:", e));
         }
 
         if (evtConfig.buf_fb2 && bufferToken && creds.buffer_fb2_id) {
-            await postToBufferDirectly(fb2Text || fb1Text!, finalBufferImage!, creds.buffer_fb2_id, bufferToken).catch(e => console.error("BUF FB2 Error:", e));
+            await postToBufferDirectly(bufFb2Text!, finalBufferImage!, creds.buffer_fb2_id, bufferToken).catch(e => console.error("BUF FB2 Error:", e));
         }
 
         if (evtConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
