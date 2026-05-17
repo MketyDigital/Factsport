@@ -243,8 +243,7 @@ async function runProSlipEngine() {
                 if (!text) continue; 
                 
                 // Safety cleanup in case markdown backticks bleed through
-                text = text.replace(/```json/gi, '').replace(/
-```/g, '').trim();
+                text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
                 const analysisData = JSON.parse(text);
                 
                 const updatePayload = { pro_analysis: analysisData };
