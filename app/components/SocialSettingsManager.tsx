@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/app/lib/supabase/client';
-import { Save, Loader2, Trophy, Globe, Facebook, Twitter, X as CloseIcon, Plus, AlertCircle, KeyRound, Send, Target, Edit3, Layers } from 'lucide-react';
+import { Save, Loader2, Globe, Facebook, Twitter, X as CloseIcon, AlertCircle, KeyRound, Send, Target, Edit3, Layers } from 'lucide-react';
 
 const DEFAULT_EVENTS = {
     goals: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: true, make2: false, label: "Goals & Shootouts" },
@@ -18,38 +18,55 @@ const DEFAULT_EVENTS = {
     vip_tips: { tg_vip: true, label: "Pro AI Analysis (VIP Only)" }
 };
 
+// 🟢 EXPANDED: Now includes explicit Buffer Direct defaults so text boxes aren't empty
 const DEFAULT_TEMPLATES: Record<string, Record<string, string>> = {
     goals: {
+        buf_fb1: "🚨 GOAL ALERT!\n\n[HOME] [H_SCORE] - [A_SCORE] [AWAY][STATUS]\n[SCORER]\n[CTA][LINK]",
+        buf_x1: "🚨 GOAL ALERT!\n\n[HOME] [H_SCORE] - [A_SCORE] [AWAY][STATUS]\n[SCORER]\n[CTA][LINK]\n\n[HASHTAGS]",
         fb1: "🚨 GOAL ALERT!\n\n[HOME] [H_SCORE] - [A_SCORE] [AWAY][STATUS]\n[SCORER]\n[CTA][LINK]",
         make1: "🚨 GOAL ALERT!\n\n[HOME] [H_SCORE] - [A_SCORE] [AWAY][STATUS]\n[SCORER]\n[CTA][LINK]\n\n[HASHTAGS]",
         tg_general: "🚨 <b>GOAL ALERT!</b>\n\n⚽️ <b>[HOME] [H_SCORE] - [A_SCORE] [AWAY]</b>[STATUS]\n[SCORER]\n\n[CTA]<a href=\"[LINK]\">Match Center</a>"
     },
     lineups: {
+        buf_fb1: "📋 STARTING XI ANNOUNCED!\n\n[HOME] vs [AWAY]\n\n[PRE_CTA][LINK]",
+        buf_x1: "🚨 STARTING XI: [HOME] vs [AWAY]!\n\n[PRE_CTA][LINK]\n\n[HASHTAGS]",
         fb1: "📋 STARTING XI ANNOUNCED!\n\n[HOME] vs [AWAY]\n\n[PRE_CTA][LINK]",
         make1: "🚨 STARTING XI: [HOME] vs [AWAY]!\n\n[PRE_CTA][LINK]\n\n[HASHTAGS]",
         tg_general: "📋 <b>STARTING XI ANNOUNCED!</b>\n\n⚔️ <b>[HOME] vs [AWAY]</b>\n\n[PRE_CTA]<a href=\"[LINK]\">View Lineups & Tactics</a>"
     },
     kickoff: {
+        buf_fb1: "⏱️ KICK-OFF!\n\nWe are officially underway: [HOME] vs [AWAY].\n\n[CTA][LINK]",
+        buf_x1: "⏱️ KICK-OFF!\n\nWe are officially underway.\n\n[CTA][LINK]\n\n[HASHTAGS]",
         fb1: "⏱️ KICK-OFF!\n\nWe are officially underway: [HOME] vs [AWAY].\n\n[CTA][LINK]",
         make1: "⏱️ KICK-OFF!\n\nWe are officially underway.\n\n[CTA][LINK]\n\n[HASHTAGS]",
     },
     fulltime: {
+        buf_fb1: "⏹️ FULL TIME!\n\n[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n\n👇 Final Match Stats & Ratings:\n[LINK]",
+        buf_x1: "⏹️ FULL TIME.\n\n[HOME] [H_SCORE] - [A_SCORE] [AWAY].\n\n👇 Final Stats:\n[LINK]\n\n[HASHTAGS]",
         fb1: "⏹️ FULL TIME!\n\n[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n\n👇 Final Match Stats & Ratings:\n[LINK]",
         make1: "⏹️ FULL TIME.\n\n[HOME] [H_SCORE] - [A_SCORE] [AWAY].\n\n👇 Final Stats:\n[LINK]\n\n[HASHTAGS]",
     },
     halftime: {
+        buf_fb1: "⏸️ HALF TIME.\n\nHow do you rate the first half performance?\n\n[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n\n[CTA][LINK]",
+        buf_x1: "⏸️ HALF TIME.\n\n[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n\n[CTA][LINK]\n\n[HASHTAGS]",
         fb1: "⏸️ HALF TIME.\n\nHow do you rate the first half performance?\n\n[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n\n[CTA][LINK]",
         make1: "⏸️ HALF TIME.\n\n[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n\n[CTA][LINK]\n\n[HASHTAGS]",
     },
     var_overturn: {
+        buf_fb1: "❌ VAR DECISION: OVERTURNED - Previous G/Event has been canceled.\n\nThe score returns to:\n⚽ [HOME] [H_SCORE] - [A_SCORE] [AWAY]\n\n[CTA][LINK]",
+        buf_x1: "❌ VAR DECISION: OVERTURNED - Previous G/Event canceled.\n\n⚽ [HOME] [H_SCORE] - [A_SCORE] [AWAY]\n\n[CTA][LINK]\n\n[HASHTAGS]",
         fb1: "❌ VAR DECISION: OVERTURNED - Previous G/Event has been canceled.\n\nThe score returns to:\n⚽ [HOME] [H_SCORE] - [A_SCORE] [AWAY]\n\n[CTA][LINK]",
         make1: "❌ VAR DECISION: OVERTURNED - Previous G/Event canceled.\n\n⚽ [HOME] [H_SCORE] - [A_SCORE] [AWAY]\n\n[CTA][LINK]\n\n[HASHTAGS]",
     },
     penalty_awarded: {
+        buf_fb1: "⚠️ PENALTY AWARDED - (Confirmed by Referee/VAR) [TIME]\n\nMassive moment in the match! Will they convert it?\n\n[CTA][LINK]",
+        buf_x1: "⚠️ PENALTY AWARDED - [TIME]\n\nMassive moment in the match! Will they convert it?\n\n[CTA][LINK]\n\n[HASHTAGS]",
         fb1: "⚠️ PENALTY AWARDED - (Confirmed by Referee/VAR) [TIME]\n\nMassive moment in the match! Will they convert it?\n\n[CTA][LINK]",
         make1: "⚠️ PENALTY AWARDED - [TIME]\n\nMassive moment in the match! Will they convert it?\n\n[CTA][LINK]\n\n[HASHTAGS]",
     },
     free_tips: {
+        buf_fb1: "🎁 FREE BET OF THE DAY 🎁\n\n📅 Date: [DATE]\n⚽️ [HOME] vs [AWAY]\n🎯 Prediction: [PICK]\n🔥 Odds: [ODDS]\n\n👇 See full stats and place your bet!\n[LINK]",
+        buf_x1: "🎁 FREE BET OF THE DAY!\n\n📅 [DATE]\n⚽️ [HOME] vs [AWAY]\n🎯 Pick: [PICK] ([ODDS])\n\n👇 Full stats:\n[LINK]",
         fb1: "🎁 FREE BET OF THE DAY 🎁\n\n📅 Date: [DATE]\n⚽️ [HOME] vs [AWAY]\n🎯 Prediction: [PICK]\n🔥 Odds: [ODDS]\n\n👇 See full stats and place your bet!\n[LINK]",
         make1: "🎁 FREE BET OF THE DAY!\n\n📅 [DATE]\n⚽️ [HOME] vs [AWAY]\n🎯 Pick: [PICK] ([ODDS])\n\n👇 Full stats:\n[LINK]",
         tg_general: "🎁 <b>FREE BET OF THE DAY</b> 🎁\n\n📅 <b>Date:</b> [DATE]\n⚽️ <b>[HOME] vs [AWAY]</b>\n\n🎯 <b>Prediction:</b> [PICK]\n🔥 <b>Odds:</b> [ODDS]\n\n🧠 <b>Why?:</b> <i>[RATIONALE]</i>\n\n👉 <a href=\"[LINK]\">Bet on this match here!</a>"
@@ -171,14 +188,16 @@ export default function SocialSettingsManager() {
 
     const liveEvents = ['goals', 'lineups', 'kickoff', 'fulltime', 'halftime', 'var_overturn', 'penalty_awarded'];
     const backgroundEvents = ['daily_preview', 'daily_summary', 'free_tips', 'vip_tips'];
-    const templatePlatforms = ['fb1', 'fb2', 'make1', 'make2', 'tg_general', 'tg_vip'];
+    
+    // 🟢 EXPANDED: Template platforms array now fully unlocks Buffer Direct text boxes
+    const templatePlatforms = ['buf_x1', 'buf_x2', 'buf_fb1', 'buf_fb2', 'fb1', 'fb2', 'make1', 'make2', 'tg_general', 'tg_vip'];
 
     return (
         <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mt-8 relative">
             
             {activeModalEvent && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-6">
-                    <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl flex flex-col max-h-full overflow-hidden">
+                    <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col max-h-full overflow-hidden">
                         <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                             <h3 className="font-black text-slate-800 text-lg flex items-center gap-2"><Edit3 size={18} className="text-blue-600"/> Edit Templates: <span className="text-blue-600">{events[activeModalEvent].label}</span></h3>
                             <button onClick={() => setActiveModalEvent(null)} className="text-slate-400 hover:text-red-500 bg-white border border-slate-200 p-1.5 rounded-lg"><CloseIcon size={20}/></button>
@@ -187,7 +206,7 @@ export default function SocialSettingsManager() {
                             <span className="font-black">Supported Variables:</span><br/>
                             <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[HOME]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[AWAY]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[H_SCORE]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[A_SCORE]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[TIME]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[LINK]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[SCORER]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[STATUS]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[CTA]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[PRE_CTA]</span> <span className="font-mono bg-white px-1 py-0.5 rounded border border-blue-200">[HASHTAGS]</span>
                         </div>
-                        <div className="p-4 overflow-y-auto space-y-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 overflow-y-auto space-y-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {templatePlatforms.map(plat => {
                                 if (events[activeModalEvent][plat] === undefined) return null; 
                                 return (
@@ -196,7 +215,7 @@ export default function SocialSettingsManager() {
                                         <textarea 
                                             value={templates[activeModalEvent]?.[plat] !== undefined ? templates[activeModalEvent][plat] : (DEFAULT_TEMPLATES[activeModalEvent]?.[plat] || '')} 
                                             onChange={(e) => handleTemplateChange(activeModalEvent, plat, e.target.value)}
-                                            placeholder={`Type custom text...`}
+                                            placeholder={`Type custom text for ${plat}...`}
                                             className="w-full h-28 p-3 text-xs border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 bg-slate-50"
                                         />
                                     </div>
