@@ -28,6 +28,7 @@ const proSlipSchema = {
     required: ["primary", "odds", "safe", "safeOdds", "rationale"]
 };
 
+// 🟢 JSON MODE ENABLED (NO SEARCH TOOL ALLOWED HERE TO PREVENT 400 ERRORS)
 const model = genAI.getGenerativeModel({ 
     model: "gemini-2.5-flash",
     generationConfig: { 
@@ -163,6 +164,31 @@ const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 };
 
+// 🔥 FIXED: This retry function will now correctly catch 429 errors and pause the script safely.
+async function generateWithRetry(prompt, maxRetries = 3) {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            // No search tool used here, strict JSON mode handles it perfectly.
+            const result = await model.generateContent(prompt);
+            return result.response.text().trim();
+        } catch (error) {
+            if (error.message.includes('PerDay') || error.message.includes('Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20')) {
+                console.log(`   🛑 Google AI Daily Quota Reached (Free Tier). Will resume tomorrow.`);
+                return null; 
+            } else if (error.message.includes('429') || error.message.includes('503')) {
+                if (i < maxRetries - 1) {
+                    console.log(`   ⏳ Google AI Speed Limit Hit. Waiting 30 seconds before retry ${i + 1}/${maxRetries}...`);
+                    await delay(30000); 
+                } else {
+                    throw error; 
+                }
+            } else {
+                throw error; 
+            }
+        }
+    }
+}
+
 async function runProSlipEngine() {
     console.log("🧠 Starting Automated AI Pro Slip Generation & Routing...");
 
@@ -208,24 +234,31 @@ async function runProSlipEngine() {
                     
                     CRITICAL RULES: 
                     1. STRICT FACTS: Base your tactical rationale strictly on the Factual Context provided above. Do not invent past results.
-                    2. SEARCH FALLBACK: Use your Google Search tool ONLY to verify if a star player picked up an injury today.
-                    3. TONE: Be direct, expert, and authoritative. Speak from experience.
+                    2. TONE: Be direct, expert, and authoritative. Speak from experience.
                 `;
                 
-                const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ googleSearch: {} }] });
-                const text = result.response.text();
+                // 🔥 FIXED: We now use generateWithRetry so it pauses when Google hits rate limits
+                let text = await generateWithRetry(prompt);
                 
                 if (!text) continue; 
                 
+                // Safety cleanup in case markdown backticks bleed through
+                text = text.replace(/```json/gi, '').replace(/
+```/g, '').trim();
                 const analysisData = JSON.parse(text);
+                
                 const updatePayload = { pro_analysis: analysisData };
-                if (translatedH2H && translatedH2H.matches.length > 0) updatePayload.h2h = translatedH2H; 
+                if (translatedH2H && translatedH2H.matches && translatedH2H.matches.length > 0) {
+                    updatePayload.h2h = translatedH2H; 
+                }
                 
                 await supabase.from('matches').update(updatePayload).eq('id', match.id);
                 console.log(`   ✅ Saved Elite AI Analysis!`);
                 newlyGeneratedSlips.push({ match, analysis: analysisData });
             } catch (err) { console.error(`   🔥 Error processing match:`, err.message); }
-            await delay(8000); 
+            
+            // 🔥 FIXED: Increased delay to 15 seconds to safely stay under the 5 requests-per-minute Free Tier limit
+            await delay(15000); 
         }
 
         if (newlyGeneratedSlips.length > 0 && eventsConfig.vip_tips?.tg_vip !== false && tgVipChannels.length > 0) {
