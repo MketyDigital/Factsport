@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
         const jsonStr = decodeBase64Safe(dataParam);
         const parsedData = JSON.parse(jsonStr);
 
-        // 🟢 1. PITCH LINEUP TEMPLATE (Brutally Explicit CSS for Satori)
+        // 🟢 1. PITCH LINEUP TEMPLATE
         if (parsedData.type === 'pitch') {
             const homeRows = parseFormationRows(parsedData.homeXI || [], parsedData.homeFormation);
             const awayRows = parseFormationRows(parsedData.awayXI || [], parsedData.awayFormation);
@@ -99,9 +99,8 @@ export async function GET(req: NextRequest) {
                                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between', width: '100%' }}>
                                     {renderHomeRows.map((row, i) => (
                                         <div key={i} style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-around', width: '100%' }}>
-                                            {row.map((player: string, j: number) => {
-                                                // Extract Number & Name
-                                                const playerStr = player ? player.trim() : '';
+                                            {(row || []).map((player: string, j: number) => {
+                                                const playerStr = player ? String(player).trim() : '';
                                                 const numberMatch = playerStr.match(/\b(\d{1,2})\b/);
                                                 const playerNumber = numberMatch ? numberMatch[0] : '';
                                                 const nameCleaned = playerStr.replace(/\b\d{1,2}\b/g, '').replace(/[()]/g, '').trim();
@@ -116,13 +115,13 @@ export async function GET(req: NextRequest) {
                                                                 <PlayerIcon />
                                                             )}
                                                         </div>
-                                                        {lastName && (
+                                                        {lastName ? (
                                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 6, backgroundColor: '#00000099', paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6, borderRadius: 4 }}>
                                                                 <div style={{ display: 'flex', fontSize: 13, fontWeight: 800, color: 'white' }}>
                                                                     {cleanText(lastName)}
                                                                 </div>
                                                             </div>
-                                                        )}
+                                                        ) : null}
                                                     </div>
                                                 );
                                             })}
@@ -147,9 +146,8 @@ export async function GET(req: NextRequest) {
                                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between', width: '100%' }}>
                                     {renderAwayRows.map((row, i) => (
                                         <div key={i} style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-around', width: '100%' }}>
-                                            {row.map((player: string, j: number) => {
-                                                // Extract Number & Name
-                                                const playerStr = player ? player.trim() : '';
+                                            {(row || []).map((player: string, j: number) => {
+                                                const playerStr = player ? String(player).trim() : '';
                                                 const numberMatch = playerStr.match(/\b(\d{1,2})\b/);
                                                 const playerNumber = numberMatch ? numberMatch[0] : '';
                                                 const nameCleaned = playerStr.replace(/\b\d{1,2}\b/g, '').replace(/[()]/g, '').trim();
@@ -164,13 +162,13 @@ export async function GET(req: NextRequest) {
                                                                 <PlayerIcon />
                                                             )}
                                                         </div>
-                                                        {lastName && (
+                                                        {lastName ? (
                                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 6, backgroundColor: '#00000099', paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6, borderRadius: 4 }}>
                                                                 <div style={{ display: 'flex', fontSize: 13, fontWeight: 800, color: 'white' }}>
                                                                     {cleanText(lastName)}
                                                                 </div>
                                                             </div>
-                                                        )}
+                                                        ) : null}
                                                     </div>
                                                 );
                                             })}
@@ -186,46 +184,7 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        // 🟢 2. VERSUS TEMPLATE
-        if (parsedData.type === 'versus') {
-            const isGoal = (parsedData.label || '').includes('GOAL');
-            return new ImageResponse(
-                (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 1200, height: 630, backgroundColor: '#0a1428', color: 'white', fontFamily: 'sans-serif' }}>
-                        <img src="https://factsport.com/logo.png" style={{ display: 'flex', width: 60, height: 60, position: 'absolute', top: 40, left: 40 }} />
-                        <div style={{ display: 'flex', fontSize: 32, color: isGoal ? '#ef4444' : '#facc15', fontWeight: 900, letterSpacing: '4px', marginBottom: 40 }}>
-                            {cleanText(parsedData.label)}
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', width: '90%', justifyContent: 'space-between' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '35%' }}>
-                                {parsedData.homeLogo ? (
-                                    <img src={parsedData.homeLogo} style={{ display: 'flex', width: 180, height: 180, objectFit: 'contain', marginBottom: 20 }} />
-                                ) : (
-                                    <div style={{ display: 'flex', width: 180, height: 180, backgroundColor: '#1e293b', borderRadius: 90, marginBottom: 20 }}></div>
-                                )}
-                                <div style={{ display: 'flex', fontSize: 42, fontWeight: 900, textAlign: 'center' }}>{cleanText(parsedData.home)}</div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e293b', paddingTop: 20, paddingBottom: 20, paddingLeft: 40, paddingRight: 40, borderRadius: 20, borderWidth: 2, borderStyle: 'solid', borderColor: '#334155' }}>
-                                <div style={{ display: 'flex', fontSize: 110, fontWeight: 900, color: '#4ade80' }}>{parsedData.hScore}</div>
-                                <div style={{ display: 'flex', fontSize: 60, color: '#64748b', marginLeft: 30, marginRight: 30 }}>-</div>
-                                <div style={{ display: 'flex', fontSize: 110, fontWeight: 900, color: '#4ade80' }}>{parsedData.aScore}</div>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '35%' }}>
-                                {parsedData.awayLogo ? (
-                                    <img src={parsedData.awayLogo} style={{ display: 'flex', width: 180, height: 180, objectFit: 'contain', marginBottom: 20 }} />
-                                ) : (
-                                    <div style={{ display: 'flex', width: 180, height: 180, backgroundColor: '#1e293b', borderRadius: 90, marginBottom: 20 }}></div>
-                                )}
-                                <div style={{ display: 'flex', fontSize: 42, fontWeight: 900, textAlign: 'center' }}>{cleanText(parsedData.away)}</div>
-                            </div>
-                        </div>
-                    </div>
-                ),
-                { width: 1200, height: 630 }
-            );
-        }
-
-        // 🟢 3. SCHEDULE/RESULTS GRID TEMPLATE
+        // 3. SCHEDULE/RESULTS GRID TEMPLATE
         return new ImageResponse(
             (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 1200, height: 630, backgroundColor: '#0a1428', color: 'white', fontFamily: 'sans-serif', paddingTop: 40, paddingBottom: 40, paddingLeft: 40, paddingRight: 40 }}>

@@ -219,12 +219,14 @@ export async function POST(request: Request) {
     const oldPenaltiesList = getPenaltyEvents(oldState.match_events || []);
     const newPenaltiesList = getPenaltyEvents(newState.match_events || []);
 
-    const getValidNames = (arr: any[]) => (Array.isArray(arr) ? arr : []).map(p => p?.name || (typeof p === 'string' ? p : null)).filter(Boolean);
+    // 🟢 EXTRACT NAMES DEEP PATH CHECK
+    const getValidNames = (arr: any[]) => (Array.isArray(arr) ? arr : []).map(p => p?.name || p?.player?.name || p?.playerName || (typeof p === 'string' ? p : null)).filter(Boolean);
     const oldValidH = getValidNames(oldState.lineups?.home); const oldValidA = getValidNames(oldState.lineups?.away);
     const newValidH = getValidNames(newState.lineups?.home); const newValidA = getValidNames(newState.lineups?.away);
     
-    const oldWasIncomplete = oldValidH.length < 11 || oldValidA.length < 11;
-    const newIsComplete = newValidH.length >= 11 && newValidA.length >= 11;
+    // 🛡️ MEASURE 1: Strict absolute 11-man validation gatekeeper for both squads
+    const oldHasFullLineups = oldValidH.length === 11 && oldValidA.length === 11;
+    const newHasFullLineups = newValidH.length === 11 && newValidA.length === 11;
 
     const preStatuses = ['PRE_MATCH', 'SCHEDULED', 'PRE', 'NS', 'UPCOMING', 'TBD'];
     const live1HStatuses = ['IN_PLAY', 'LIVE', '1H', 'FIRST_HALF', 'FIRST HALF'];
@@ -274,7 +276,8 @@ export async function POST(request: Request) {
         eventKey = 'kickoff';
         ogImageUrl = getMatchImageUrl('KICK-OFF', newState, frontendUrl);
     } 
-    else if (oldWasIncomplete && newIsComplete) {
+    // 🛡️ MEASURE 2: Only trigger if the old dataset was structurally unannounced, and the new pulse has all 22 starters
+    else if (!oldHasFullLineups && newHasFullLineups) { 
         eventKey = 'lineups';
         const lineupOg = { 
             type: 'pitch', label: 'STARTING XI', 
@@ -308,15 +311,33 @@ export async function POST(request: Request) {
     const makePayload2: any = { fb2_text: fb2Text, x_text: make2Text };
     if (proxiedImage) makePayload2.x_image_url = proxiedImage;
 
+    // 🟢 DYNAMIC GRAPHQL MUTATION COMPLIANT MATRIX WITH 2026 INPUT PATTERNS
     const postToBufferDirectly = async (text: string, safeImgUrl: string, profileId: string, token: string) => {
         const payload = {
-            query: `mutation($text: String!, $img: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow, assets: { images: [{ url: $img }] } }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }`,
-            variables: { text: text || "", img: safeImgUrl || "" }
+            query: "mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }",
+            variables: {
+                input: {
+                    text: text || "",
+                    channelId: profileId,
+                    schedulingType: "automatic",
+                    mode: "shareNow",
+                    assets: [
+                        {
+                            image: {
+                                url: safeImgUrl || ""
+                            }
+                        }
+                    ]
+                }
+            }
         };
 
         const res = await fetch("https://api.buffer.com/1/graphql", {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            headers: { 
+                "Content-Type": "application/json", 
+                "Authorization": `Bearer ${token}` 
+            },
             body: JSON.stringify(payload)
         });
 
