@@ -34,6 +34,9 @@ const model = genAI.getGenerativeModel({
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// 🟢 HTML SANITIZER: Prevents Telegram from crashing if the AI uses < or > symbols
+const escapeHTML = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 const ESPN_LEAGUES = { 'Premier League': 'eng.1', 'La Liga': 'esp.1', 'Bundesliga': 'ger.1', 'Serie A': 'ita.1', 'Ligue 1': 'fra.1', 'Champions League': 'uefa.champions', 'Europa League': 'uefa.europa', 'FA Cup': 'eng.fa' };
 const FD_LEAGUES = { 'Premier League': 'PL', 'La Liga': 'PD', 'Bundesliga': 'BL1', 'Serie A': 'SA', 'Ligue 1': 'FL1', 'Champions League': 'CL' };
 
@@ -50,14 +53,12 @@ const isStrongMatch = (dbName, apiName) => {
     return s1.includes(s2) || s2.includes(s1);
 };
 
-// 🟢 1. IN-MEMORY CACHE: Prevents duplicate API hits within the same run
 const standingsCache = {};
 
 async function getLeagueStandings(leagueName) {
     const mappedLeague = FD_LEAGUES[leagueName];
     if (!mappedLeague) return "Standings unavailable.";
     
-    // Check Cache First
     if (standingsCache[mappedLeague]) return standingsCache[mappedLeague];
 
     const domesticLeagues = ['PL', 'PD', 'BL1', 'SA', 'FL1']; 
@@ -65,12 +66,12 @@ async function getLeagueStandings(leagueName) {
 
     try {
         if (FD_API_KEY) {
-            const liveRes = await fetch(`[https://api.football-data.org/v4/competitions/$](https://api.football-data.org/v4/competitions/$){mappedLeague}/standings`, { headers: { 'X-Auth-Token': FD_API_KEY } });
+            const liveRes = await fetch(`https://api.football-data.org/v4/competitions/${mappedLeague}/standings`, { headers: { 'X-Auth-Token': FD_API_KEY } });
             if (liveRes.ok) {
                 const data = await liveRes.json();
                 if (data.standings && data.standings[0]) {
                     const resultStr = `FULL LEAGUE TABLE: ` + data.standings[0].table.map(t => `${t.position}. ${t.team.shortName} (${t.points}pts)`).join(', ');
-                    standingsCache[mappedLeague] = resultStr; // Save to memory
+                    standingsCache[mappedLeague] = resultStr; 
                     return resultStr;
                 }
             }
@@ -81,10 +82,10 @@ async function getLeagueStandings(leagueName) {
         const { data: dbStandings, error } = await supabase.from('standings').select('position, team_short_name, team_name, points').eq('league_code', mappedLeague).order('position', { ascending: true });
         if (!error && dbStandings && dbStandings.length > 0) {
             const resultStr = `FULL LEAGUE TABLE: ` + dbStandings.map(t => `${t.position}. ${t.team_short_name || t.team_name} (${t.points}pts)`).join(', ');
-            standingsCache[mappedLeague] = resultStr; // Save to memory
+            standingsCache[mappedLeague] = resultStr; 
             return resultStr;
         }
-    } catch (e) { console.error(`Error fetching table for ${leagueName} from Supabase:`, e.message); } 
+    } catch (e) {} 
     
     return "Standings unavailable.";
 }
@@ -100,7 +101,7 @@ async function getMatchContext(leagueName, dateString, homeTeam, awayTeam) {
         
         for (const dp of datesToTry) {
             try {
-                const res = await fetch(`[https://site.api.espn.com/apis/site/v2/sports/soccer/$](https://site.api.espn.com/apis/site/v2/sports/soccer/$){espnCode}/scoreboard?dates=${dp}`);
+                const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnCode}/scoreboard?dates=${dp}`);
                 if (!res.ok) continue;
                 const data = await res.json();
                 if (!data.events) continue;
@@ -112,7 +113,7 @@ async function getMatchContext(leagueName, dateString, homeTeam, awayTeam) {
                 });
 
                 if (event) {
-                    const sumRes = await fetch(`[https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=$](https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=$){event.id}`);
+                    const sumRes = await fetch(`https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${event.id}`);
                     const sData = await sumRes.json();
                     
                     if (sData.form && sData.form.length >= 2) {
@@ -138,7 +139,7 @@ async function getMatchContext(leagueName, dateString, homeTeam, awayTeam) {
 
     if (!espnSuccess && FD_API_KEY && FD_LEAGUES[leagueName]) {
         try {
-            const res = await fetch(`[https://api.football-data.org/v4/competitions/$](https://api.football-data.org/v4/competitions/$){FD_LEAGUES[leagueName]}/matches?status=FINISHED`, { headers: { 'X-Auth-Token': FD_API_KEY } });
+            const res = await fetch(`https://api.football-data.org/v4/competitions/${FD_LEAGUES[leagueName]}/matches?status=FINISHED`, { headers: { 'X-Auth-Token': FD_API_KEY } });
             const data = await res.json();
             if (data.matches) {
                 const homeForm = data.matches.filter(m => isStrongMatch(m.homeTeam.name, homeTeam) || isStrongMatch(m.awayTeam.name, homeTeam)).slice(-3).map(m => `${m.homeTeam.shortName} ${m.score.fullTime.home}-${m.score.fullTime.away} ${m.awayTeam.shortName}`).join(', ');
@@ -149,12 +150,25 @@ async function getMatchContext(leagueName, dateString, homeTeam, awayTeam) {
     return { textContext: contextStr || "[NO H2H/FORM FOUND]", translatedH2H };
 }
 
+// 🟢 LOUD API: Tracks true success and logs actual errors
 async function postToBufferDirectly(text, safeImgUrl, profileId, token) { 
-    if (!profileId || !token) return;
+    if (!profileId || !token) return false;
     const hasImg = safeImgUrl && safeImgUrl.length > 5;
     const query = hasImg ? `mutation($text: String!, $img: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow, assets: { images: [{ url: $img }] } }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }` : `mutation($text: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }`;
     const variables = hasImg ? { text: text || "", img: safeImgUrl } : { text: text || "" };
-    try { await fetch("[https://api.buffer.com/1/graphql](https://api.buffer.com/1/graphql)", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ query, variables }) }); } catch (e) { console.error(`Buffer Error for ${profileId}:`, e.message); }
+    
+    try { 
+        const res = await fetch("https://api.buffer.com/1/graphql", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ query, variables }) }); 
+        const data = await res.json();
+        if (data?.data?.createPost?.message) {
+            console.error(`❌ Buffer Error for ${profileId}:`, data.data.createPost.message);
+            return false;
+        }
+        return true;
+    } catch (e) { 
+        console.error(`❌ Buffer Network Error for ${profileId}:`, e.message); 
+        return false;
+    }
 }
 
 function parseTemplate(templateText, match, analysis, link, dateStr) {
@@ -167,9 +181,24 @@ function parseTemplate(templateText, match, analysis, link, dateStr) {
     return text;
 }
 
+// 🟢 LOUD API: Tracks true success and logs actual Telegram parsing crashes
 async function postToTelegram(botToken, chatId, text, parseMode = 'HTML') {
-    if (!botToken || !chatId) return;
-    try { await fetch(`[https://api.telegram.org/bot$](https://api.telegram.org/bot$){botToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: parseMode, disable_web_page_preview: true }) }); } catch (e) {}
+    if (!botToken || !chatId) {
+        console.error("❌ Telegram skipped: Missing botToken or chatId");
+        return false;
+    }
+    try { 
+        const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: parseMode, disable_web_page_preview: true }) }); 
+        if (!res.ok) {
+            const errData = await res.json();
+            console.error(`❌ Telegram API Error for ${chatId}:`, JSON.stringify(errData));
+            return false;
+        }
+        return true;
+    } catch (e) { 
+        console.error("❌ Telegram Network Error:", e.message); 
+        return false;
+    }
 }
 
 const formatDate = (dateString) => {
@@ -183,7 +212,7 @@ async function generateWithRetry(prompt, maxRetries = 3) {
             return result.response.text().trim();
         } catch (error) {
             if (error.message.includes('PerDay') || error.message.includes('Quota exceeded')) {
-                console.log(`   🛑 Google AI Daily Quota Reached. Will resume tomorrow.`);
+                console.log(`   🛑 Google AI Daily Quota Reached.`);
                 return null; 
             } else if (error.message.includes('429') || error.message.includes('503')) {
                 if (i < maxRetries - 1) {
@@ -220,10 +249,8 @@ async function runProSlipEngine() {
 
     let matchesNeedingAnalysis = allMatches.filter(m => !m.pro_analysis || (typeof m.pro_analysis === 'object' && Object.keys(m.pro_analysis).length === 0) || (typeof m.pro_analysis === 'string' && m.pro_analysis.trim() === ''));
     
-    // 🟢 MICRO-BATCHING: Process a maximum of 5 matches per run to save GitHub Action minutes
     const MAX_MATCHES_PER_RUN = 5;
     if (matchesNeedingAnalysis.length > MAX_MATCHES_PER_RUN) {
-        console.log(`⚠️ High volume detected: ${matchesNeedingAnalysis.length} matches need analysis. Processing batch of ${MAX_MATCHES_PER_RUN} to respect quotas.`);
         matchesNeedingAnalysis = matchesNeedingAnalysis.slice(0, MAX_MATCHES_PER_RUN);
     }
 
@@ -253,7 +280,6 @@ async function runProSlipEngine() {
                 let text = await generateWithRetry(prompt);
                 if (!text) continue; 
                 
-                // 🟢 FIXED: Backticks are now safely escaped so VS Code's parser doesn't break
                 text = text.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
                 const analysisData = JSON.parse(text);
                 
@@ -267,7 +293,7 @@ async function runProSlipEngine() {
                 newlyGeneratedSlips.push({ match, analysis: analysisData });
             } catch (err) { console.error(`   🔥 Error processing match:`, err.message); }
             
-            await delay(12000); // Wait 12 seconds between Gemini calls
+            await delay(12000); 
         }
 
         if (newlyGeneratedSlips.length > 0 && eventsConfig.vip_tips?.tg_vip !== false && tgVipChannels.length > 0) {
@@ -275,13 +301,19 @@ async function runProSlipEngine() {
             for (const channel of tgVipChannels) {
                 for (const item of newlyGeneratedSlips) {
                     const matchDateObj = formatDate(item.match.match_date); 
-                    const vipMsg = `💎 <b>VIP PRO ANALYSIS</b> 💎\n\n📅 <b>Date:</b> ${matchDateObj}\n⚽️ <b>${item.match.home_team} vs ${item.match.away_team}</b>\n🏆 ${item.match.league}\n\n🎯 <b>Main Value Pick:</b> ${item.analysis.primary} (${item.analysis.odds})\n🛡 <b>Safe Acca Pick:</b> ${item.analysis.safe} (${item.analysis.safeOdds})\n\n🧠 <b>Tactical Rationale:</b>\n<i>${item.analysis.rationale}</i>`;
+                    // 🟢 SANITIZED FOR TELEGRAM HTML PARSER
+                    const safeRationale = escapeHTML(item.analysis.rationale);
+                    const safePrimary = escapeHTML(item.analysis.primary);
+                    const safeAcca = escapeHTML(item.analysis.safe);
+                    
+                    const vipMsg = `💎 <b>VIP PRO ANALYSIS</b> 💎\n\n📅 <b>Date:</b> ${matchDateObj}\n⚽️ <b>${item.match.home_team} vs ${item.match.away_team}</b>\n🏆 ${item.match.league}\n\n🎯 <b>Main Value Pick:</b> ${safePrimary} (${item.analysis.odds})\n🛡 <b>Safe Acca Pick:</b> ${safeAcca} (${item.analysis.safeOdds})\n\n🧠 <b>Tactical Rationale:</b>\n<i>${safeRationale}</i>`;
+                    
                     await postToTelegram(creds.telegram_bot_token, channel.chatId, vipMsg);
                     await delay(1000); 
                 }
             }
         }
-    } else { console.log("💤 No new matches need VIP analysis in this batch."); }
+    }
 
     console.log(`\n🎁 Evaluating Free Bet of the Day...`);
 
@@ -294,7 +326,7 @@ async function runProSlipEngine() {
     const hasPosted = alreadyPostedToday?.some(m => m.pro_analysis && m.pro_analysis.was_freetip_date === todayDateString);
 
     if (hasPosted) {
-        console.log(`   ⏭️ Free Tip already broadcasted today. Skipping to prevent double-posting.`);
+        console.log(`   ⏭️ Free Tip already broadcasted today. Skipping.`);
         console.log("\n🏁 Automated AI Engine Complete!"); return; 
     }
     
@@ -330,8 +362,15 @@ async function runProSlipEngine() {
 
     if (freeTipMatch) {
         let successfullyPosted = false;
-        const matchLink = `[https://factsport.com/match/$](https://factsport.com/match/$){freeTipMatch.id}`;
+        const matchLink = `https://factsport.com/match/${freeTipMatch.id}`;
         const matchDateObj = formatDate(freeTipMatch.match_date); 
+        
+        // 🟢 SANITIZE FREE TIP TEXT SO TELEGRAM DOESN'T CRASH
+        const safeAnalysis = {
+            ...freeTipMatch.pro_analysis,
+            primary: escapeHTML(freeTipMatch.pro_analysis.primary),
+            rationale: escapeHTML(freeTipMatch.pro_analysis.rationale)
+        };
         
         const fb1Text = parseTemplate(templates.fb1 || `🎁 FREE BET OF THE DAY 🎁\n\n📅 Date: [DATE]\n⚽️ [HOME] vs [AWAY]\n🎯 Prediction: [PICK]\n🔥 Odds: [ODDS]\n\n👇 See full stats and place your bet!\n[LINK]`, freeTipMatch, freeTipMatch.pro_analysis, matchLink, matchDateObj);
         const fb2Text = parseTemplate(templates.fb2 || fb1Text, freeTipMatch, freeTipMatch.pro_analysis, matchLink, matchDateObj);
@@ -343,35 +382,50 @@ async function runProSlipEngine() {
                 if (channel.wants_freetips) {
                     const linkToUse = channel.link || matchLink; 
                     const rawTgMsg = templates.tg_general || `🎁 <b>FREE BET OF THE DAY</b> 🎁\n\n📅 <b>Date:</b> [DATE]\n⚽️ <b>[HOME] vs [AWAY]</b>\n\n🎯 <b>Prediction:</b> [PICK]\n🔥 <b>Odds:</b> [ODDS]\n\n🧠 <b>Why?:</b> <i>[RATIONALE]</i>\n\n👉 <a href="[LINK]">Bet on this match here!</a>`;
-                    const freeTgMsg = parseTemplate(rawTgMsg, freeTipMatch, freeTipMatch.pro_analysis, linkToUse, matchDateObj);
-                    await postToTelegram(creds.telegram_bot_token, channel.chatId, freeTgMsg);
-                    successfullyPosted = true; await delay(1000);
+                    const freeTgMsg = parseTemplate(rawTgMsg, freeTipMatch, safeAnalysis, linkToUse, matchDateObj);
+                    
+                    const tgSuccess = await postToTelegram(creds.telegram_bot_token, channel.chatId, freeTgMsg);
+                    if (tgSuccess) successfullyPosted = true;
+                    await delay(1000);
                 }
             }
         }
 
         const bufferToken = creds.buffer_token || process.env.BUFFER_ACCESS_TOKEN;
 
-        if (eventsConfig.free_tips?.buf_x1) { await postToBufferDirectly(make1Text, null, creds.buffer_x1_id, bufferToken); successfullyPosted = true; }
-        if (eventsConfig.free_tips?.buf_x2) { await postToBufferDirectly(make2Text, null, creds.buffer_x2_id, bufferToken); successfullyPosted = true; }
-        if (eventsConfig.free_tips?.buf_fb1) { await postToBufferDirectly(fb1Text, null, creds.buffer_fb1_id, bufferToken); successfullyPosted = true; }
-        if (eventsConfig.free_tips?.buf_fb2) { await postToBufferDirectly(fb2Text, null, creds.buffer_fb2_id, bufferToken); successfullyPosted = true; }
+        if (eventsConfig.free_tips?.buf_x1) { const ok = await postToBufferDirectly(make1Text, null, creds.buffer_x1_id, bufferToken); if (ok) successfullyPosted = true; }
+        if (eventsConfig.free_tips?.buf_x2) { const ok = await postToBufferDirectly(make2Text, null, creds.buffer_x2_id, bufferToken); if (ok) successfullyPosted = true; }
+        if (eventsConfig.free_tips?.buf_fb1) { const ok = await postToBufferDirectly(fb1Text, null, creds.buffer_fb1_id, bufferToken); if (ok) successfullyPosted = true; }
+        if (eventsConfig.free_tips?.buf_fb2) { const ok = await postToBufferDirectly(fb2Text, null, creds.buffer_fb2_id, bufferToken); if (ok) successfullyPosted = true; }
 
+        // 🟢 LOUD API: Tracks Webhook Success
         if (eventsConfig.free_tips?.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
-            await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb1Text, x_text: make1Text, x_image_url: null }) }).then(() => successfullyPosted = true).catch(()=>{});
-        }
-        if (eventsConfig.free_tips?.make2 && creds.make_webhook_2) {
-            await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb2Text, x_text: make2Text, x_image_url: null }) }).then(() => successfullyPosted = true).catch(()=>{});
+            try {
+                const res = await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb1Text, x_text: make1Text, x_image_url: null }) });
+                if (res.ok) { successfullyPosted = true; console.log("✅ Webhook 1 Success"); } 
+                else console.error("❌ Webhook 1 Failed:", await res.text());
+            } catch(e) { console.error("❌ Webhook 1 Network Error:", e.message); }
         }
 
+        if (eventsConfig.free_tips?.make2 && creds.make_webhook_2) {
+            try {
+                const res = await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb2Text, x_text: make2Text, x_image_url: null }) });
+                if (res.ok) { successfullyPosted = true; console.log("✅ Webhook 2 Success"); } 
+                else console.error("❌ Webhook 2 Failed:", await res.text());
+            } catch(e) { console.error("❌ Webhook 2 Network Error:", e.message); }
+        }
+
+        // 🟢 LOUD API: Tracks FB Graph Success
         if (eventsConfig.free_tips?.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
             const pageId = creds.fb1_id || process.env.FB_PAGE_ID; const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
-            await fetch(`[https://graph.facebook.com/v19.0/$](https://graph.facebook.com/v19.0/$){pageId}/feed?message=${encodeURIComponent(fb1Text)}&access_token=${token}`, { method: 'POST' }).then(() => successfullyPosted = true).catch(()=>{});
-        }
-        if (eventsConfig.free_tips?.fb2 && creds.fb2_id && creds.fb2_token) {
-            await fetch(`[https://graph.facebook.com/v19.0/$](https://graph.facebook.com/v19.0/$){creds.fb2_id}/feed?message=${encodeURIComponent(fb2Text)}&access_token=${creds.fb2_token}`, { method: 'POST' }).then(() => successfullyPosted = true).catch(()=>{});
+            try {
+                const res = await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed?message=${encodeURIComponent(fb1Text)}&access_token=${token}`, { method: 'POST' });
+                if (res.ok) { successfullyPosted = true; console.log("✅ FB1 Graph Success"); } 
+                else console.error("❌ FB1 Graph Failed:", await res.text());
+            } catch(e) { console.error("❌ FB1 Graph Network Error:", e.message); }
         }
 
+        // 🟢 STRICT DB LOCK: Only locks if one of the APIs above successfully returned a 200 OK status
         if (successfullyPosted) {
             freeTipMatch.pro_analysis.was_freetip_date = todayDateString;
             await supabase.from('matches').update({ pro_analysis: freeTipMatch.pro_analysis }).eq('id', freeTipMatch.id);
@@ -382,6 +436,8 @@ async function runProSlipEngine() {
                 await supabase.from('site_settings').update({ social_config: updatedConfig }).eq('id', 1);
             }
             console.log(`   🔒 Logged Free Tip in DB & reset Admin Override.`);
+        } else {
+            console.log(`   ⚠️ ALL social endpoints failed. Database lock bypassed. Will retry next run.`);
         }
     }
 
