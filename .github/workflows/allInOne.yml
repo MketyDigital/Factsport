@@ -11,7 +11,19 @@ on:
     # 🌙 Daily Matchday Round-Up: Runs exactly at 22:40 UTC every day
     - cron: '40 22 * * *'
 
-  workflow_dispatch: # 🟢 Keeps manual run buttons unlocked for all tasks
+  workflow_dispatch:
+    # 🟢 UPGRADE: Adds a dropdown menu in the GitHub UI for manual runs!
+    inputs:
+      script_to_run:
+        description: 'Which script do you want to manually trigger?'
+        required: true
+        default: 'pro-slips'
+        type: choice
+        options:
+          - pro-slips
+          - morning-preview
+          - evening-summary
+          - run-all-safely
 
 jobs:
   execute-matrix:
@@ -26,16 +38,14 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      # Install only required dependencies once for speed optimization
       - name: Install System Dependencies
         run: npm install @supabase/supabase-js @google/generative-ai
 
-      # 🟢 TASK 1: Pro AI Analysis Engine (Runs on the 2 AM - 12 PM hourly cron cycles)
-      # Handled by your optimized script with local cache + micro-batching shields
+      # 🟢 TASK 1: Pro AI Analysis Engine
       - name: Run AI Pro Slip Engine
-        if: |
+        if: >
           github.event.schedule == '0 2-12 * * *' || 
-          github.event_name == 'workflow_dispatch'
+          (github.event_name == 'workflow_dispatch' && (inputs.script_to_run == 'pro-slips' || inputs.script_to_run == 'run-all-safely'))
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -43,11 +53,11 @@ jobs:
           FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
         run: node scripts/generate-pro-slips.js
 
-      # ☀️ TASK 2: Daily Morning Preview (Runs on the 8 AM UTC cron cycle)
+      # ☀️ TASK 2: Daily Morning Preview
       - name: Run Daily Morning Preview
-        if: |
+        if: >
           github.event.schedule == '0 8 * * *' || 
-          github.event_name == 'workflow_dispatch'
+          (github.event_name == 'workflow_dispatch' && (inputs.script_to_run == 'morning-preview' || inputs.script_to_run == 'run-all-safely'))
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -57,11 +67,11 @@ jobs:
           CRON_KEY: ${{ secrets.CRON_KEY }}
         run: node scripts/daily-preview.js
 
-      # 🌙 TASK 3: Daily Matchday Round-Up (Runs on the 10:40 PM UTC cron cycle)
+      # 🌙 TASK 3: Daily Matchday Round-Up
       - name: Run Daily Matchday Round-Up
-        if: |
+        if: >
           github.event.schedule == '40 22 * * *' || 
-          github.event_name == 'workflow_dispatch'
+          (github.event_name == 'workflow_dispatch' && (inputs.script_to_run == 'evening-summary' || inputs.script_to_run == 'run-all-safely'))
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
