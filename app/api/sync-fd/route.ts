@@ -38,7 +38,6 @@ export async function GET(request: Request) {
         let logs: string[] = [];
         const leaguesNeedingStandingsUpdate = new Set<string>();
 
-        // 1. FETCH API (1 Subrequest)
         const res = await fetch(`https://api.football-data.org/v4/matches?dateFrom=${fromStr}&dateTo=${toStr}`, { 
             headers: { 'X-Auth-Token': API_KEY } 
         });
@@ -51,7 +50,6 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: "No matches found in range." });
         }
 
-        // 🟢 2. BULK FETCH DB: Grabs all match statuses in ONE single request (Saves 40+ subrequests)
         const apiIds = fdMatches.map((m: any) => m.id);
         const { data: dbMatches, error: dbError } = await supabase
             .from('matches')
@@ -61,7 +59,7 @@ export async function GET(request: Request) {
         if (dbError) throw new Error(`Supabase Error: ${dbError.message}`);
 
         const dbMap = new Map(dbMatches?.map(m => [m.api_id, m]) || []);
-        const matchUpdates: Promise<any>[] = []; // Bundles update queries
+        const matchUpdates: any[] = []; 
 
         for (const m of fdMatches) {
             const compCode = m.competition?.code;
@@ -78,7 +76,6 @@ export async function GET(request: Request) {
                 fdStatusMapped = m.status;
             }
             
-            // Pull from our bulk dictionary instead of hitting the database again
             const dbMatch = dbMap.get(m.id);
             if (!dbMatch) continue;
 
@@ -114,21 +111,19 @@ export async function GET(request: Request) {
             }
 
             if (shouldUpdateMatch) {
-                // Queue the update promise
                 matchUpdates.push(
                     supabase.from('matches').update({ 
                         home_score: fdHomeScore, 
                         away_score: fdAwayScore, 
                         status: fdStatusMapped, 
                         updated_at: new Date().toISOString() 
-                    }).eq('api_id', m.id)
+                    }).eq('api_id', m.id).then()
                 );
                 matchesFinalized++; 
                 logs.push(`Cron Sync: ${m.id} (${compCode}) -> ${fdStatusMapped} ${fdHomeScore}-${fdAwayScore}`);
             }
         }
 
-        // 🟢 Execute queued match updates in parallel
         if (matchUpdates.length > 0) {
             await Promise.all(matchUpdates);
         }
@@ -138,11 +133,9 @@ export async function GET(request: Request) {
             logs.push("Admin forced a full standings sync.");
         }
 
-        // 🟢 3. BULK STANDINGS SYNC (Safe & Parallel)
         const targetStandingsLeagues = Array.from(leaguesNeedingStandingsUpdate).filter(l => l !== 'EC' && l !== 'WC');
 
         if (targetStandingsLeagues.length > 0) {
-            // Fetch all required league tables in parallel (Removes need for setTimeout)
             const standingsFetches = targetStandingsLeagues.map(leagueId => 
                 fetch(`https://api.football-data.org/v4/competitions/${leagueId}/standings`, { 
                     headers: { 'X-Auth-Token': API_KEY } 
@@ -174,17 +167,13 @@ export async function GET(request: Request) {
                         updated_at: new Date().toISOString()
                     }));
                     
-                    // Bundle all arrays into one massive insert payload
                     allStandingsToInsert = allStandingsToInsert.concat(mappedTable);
                     logs.push(`Standings Prepared: ${leagueId}`);
                 }
             });
 
             if (allStandingsToInsert.length > 0) {
-                // 🟢 ONE single bulk delete for all target leagues (Saves 5 subrequests)
                 await supabase.from('standings').delete().in('league_code', targetStandingsLeagues);
-                
-                // 🟢 ONE single bulk insert for all 100+ teams (Saves 5 subrequests)
                 const { error: stdErr } = await supabase.from('standings').insert(allStandingsToInsert);
                 
                 if (!stdErr) {

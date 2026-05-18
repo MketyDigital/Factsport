@@ -2,16 +2,26 @@ export const runtime = 'edge';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-// 🟢 100% NO-FAIL BUFFER IMAGE PROXY (WITH CACHE BUSTER)
-async function secureStaticImage(dynamicUrl: string, fileName: string, supabaseClient: any) {
-    if (!dynamicUrl) return "";
+const SAFETY_MAP: Record<string, any> = {
+    goals: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: true, make2: false },
+    lineups: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: true, make2: false },
+    kickoff: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: true, make2: false },
+    fulltime: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: true, make2: false },
+    halftime: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: false, make2: false },
+    var_overturn: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: false, make2: false },
+    penalty_awarded: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: false, make2: false }
+};
+
+// 🟢 BULLETPROOF INTERNAL FETCHER
+async function secureStaticImage(internalFetchUrl: string, publicFallbackUrl: string, fileName: string, supabaseClient: any) {
+    if (!internalFetchUrl) return "";
     try {
-        const imgResponse = await fetch(dynamicUrl);
-        if (!imgResponse.ok) return dynamicUrl; 
+        // Fetches from inside the Vercel network to bypass Cloudflare Blocks
+        const imgResponse = await fetch(internalFetchUrl, { headers: { 'Accept': 'image/png' } });
+        if (!imgResponse.ok) return publicFallbackUrl; 
         
         const arrayBuffer = await imgResponse.arrayBuffer();
 
-        // Uploads as pure static binary, upserting to overwrite and save space
         const { error } = await supabaseClient.storage
             .from('socials')
             .upload(`${fileName}.png`, arrayBuffer, {
@@ -21,21 +31,18 @@ async function secureStaticImage(dynamicUrl: string, fileName: string, supabaseC
 
         if (error) {
             console.error("Supabase Storage Error:", error);
-            return dynamicUrl; 
+            return publicFallbackUrl; 
         }
 
         const { data } = supabaseClient.storage.from('socials').getPublicUrl(`${fileName}.png`);
-        
-        // 🔥 CACHE BUSTER: Forces Buffer & Twitter to ignore old cached images
         return `${data.publicUrl}?v=${Date.now()}`;
 
     } catch (err) {
         console.error("Image Proxy Failed:", err);
-        return dynamicUrl; 
+        return publicFallbackUrl; 
     }
 }
 
-// 🟢 STRICT ACCURACY SHIELDS
 const getValidGoals = (eventsArr: any[]) => {
     if (!Array.isArray(eventsArr)) return [];
     return eventsArr.filter((e: any) => {
@@ -62,7 +69,6 @@ const parseTime = (t: any) => {
     return (parseInt(parts[0]) || 0) * 100 + (parseInt(parts[1]) || 0); 
 };
 
-// 🟢 EXPANDED KNOWN TEAMS DICTIONARY
 const KNOWN_TEAMS: Record<string, string> = {
     'manchester city': 'MCI', 'man city': 'MCI', 'm. city': 'MCI', 'manchester united': 'MUN', 'man united': 'MUN', 'man utd': 'MUN',
     'arsenal': 'ARS', 'arsenal fc': 'ARS', 'chelsea': 'CHE', 'chelsea fc': 'CHE', 'liverpool': 'LIV', 'liverpool fc': 'LIV',
@@ -97,22 +103,20 @@ const KNOWN_TEAMS: Record<string, string> = {
     'egypt': 'EGY', 'ghana': 'GHA', 'ivory coast': 'CIV', 'cote d\'ivoire': 'CIV', 'japan': 'JPN', 'south korea': 'KOR', 'korea republic': 'KOR'
 };
 
+const getTla = (name: string, fallbackTla?: string) => {
+    if (!name) return 'TM';
+    const normalized = name.replace(/['"]/g, '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    if (KNOWN_TEAMS[normalized]) return KNOWN_TEAMS[normalized];
+    if (fallbackTla) return fallbackTla.toUpperCase();
+    return name.replace(/ fc| cf| united| city/ig, '').replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase();
+};
+
 const getLeagueHashtags = (leagueName: string) => {
     const map: Record<string, string> = {
         'Premier League': '#PremierLeague #EPL', 'La Liga': '#LaLiga', 'Bundesliga': '#Bundesliga', 'Serie A': '#SerieA',
         'Ligue 1': '#Ligue1', 'Champions League': '#UCL #ChampionsLeague', 'Europa League': '#UEL', 'World Cup': '#WorldCup #FIFAWorldCup', 'Euros': '#Euro2024 #UEFA'
     };
     return map[leagueName] || `#${String(leagueName).replace(/[^a-zA-Z0-9]/g, '')}`;
-};
-
-const getMatchHashtag = (home: string, away: string, league: string, homeTla?: string, awayTla?: string) => {
-    const getTla = (name: string, fallbackTla?: string) => {
-        const normalized = name.replace(/['"]/g, '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-        if (KNOWN_TEAMS[normalized]) return KNOWN_TEAMS[normalized];
-        if (fallbackTla) return fallbackTla.toUpperCase();
-        return name.replace(/ fc| cf| united| city/ig, '').replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase();
-    };
-    return `#${getTla(home, homeTla)}${getTla(away, awayTla)} ${getLeagueHashtags(league)} #Football #LiveScores`;
 };
 
 function encodeBase64Safe(obj: any) {
@@ -122,17 +126,6 @@ function encodeBase64Safe(obj: any) {
     for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
-
-const getMatchImageUrl = (label: string, state: any, baseUrl: string) => {
-    const payload = { type: 'versus', label: label, home: state.home_team, away: state.away_team, hScore: state.home_score, aScore: state.away_score, homeLogo: state.home_logo, awayLogo: state.away_logo };
-    return `${baseUrl}/api/og?data=${encodeBase64Safe(payload)}`;
-};
-
-const getImageKitProxyUrl = (rawUrl: string) => {
-    const endpoint = process.env.IMAGEKIT_URL_ENDPOINT?.replace(/\/+$/, '');
-    if (!endpoint) return rawUrl;
-    return `${endpoint}/tr:f-png/${encodeURIComponent(rawUrl)}`;
-};
 
 const compressPlayerName = (player: string) => {
     if (!player) return '';
@@ -201,8 +194,10 @@ export async function POST(request: Request) {
     }
 
     const frontendUrl = 'https://factsport.com'; 
+    const internalOrigin = new URL(request.url).origin; // 🟢 FIX 1: Extracts internal deployment origin to bypass Bot Protection
+    
     const matchUrl = `${frontendUrl}/match/${newState.id}`; 
-    const hashtags = getMatchHashtag(newState.home_team, newState.away_team, newState.league, newState.home_tla, newState.away_tla); 
+    const hashtags = `#${getTla(newState.home_team, newState.home_tla)}${getTla(newState.away_team, newState.away_tla)} ${getLeagueHashtags(newState.league)} #Football`; 
     
     let ctaText = "👇 Match Stats & Updates:\n";
     let preMatchCta = "👇 See the tactical setup & subs here!\n";
@@ -219,12 +214,10 @@ export async function POST(request: Request) {
     const oldPenaltiesList = getPenaltyEvents(oldState.match_events || []);
     const newPenaltiesList = getPenaltyEvents(newState.match_events || []);
 
-    // 🟢 EXTRACT NAMES DEEP PATH CHECK
     const getValidNames = (arr: any[]) => (Array.isArray(arr) ? arr : []).map(p => p?.name || p?.player?.name || p?.playerName || (typeof p === 'string' ? p : null)).filter(Boolean);
     const oldValidH = getValidNames(oldState.lineups?.home); const oldValidA = getValidNames(oldState.lineups?.away);
     const newValidH = getValidNames(newState.lineups?.home); const newValidA = getValidNames(newState.lineups?.away);
     
-    // 🛡️ MEASURE 1: Strict absolute 11-man validation gatekeeper for both squads
     const oldHasFullLineups = oldValidH.length === 11 && oldValidA.length === 11;
     const newHasFullLineups = newValidH.length === 11 && newValidA.length === 11;
 
@@ -235,11 +228,11 @@ export async function POST(request: Request) {
 
     let eventKey = null;
     let extraData: any = { ctaText, preMatchCta, hashtags };
-    let ogImageUrl = null;
+    let ogPayload = null;
 
     if (!strictlyFinishedStatuses.includes(oldStatus) && strictlyFinishedStatuses.includes(newStatus)) {
         eventKey = 'fulltime';
-        ogImageUrl = getMatchImageUrl('FULL TIME', newState, frontendUrl);
+        ogPayload = { type: 'versus', label: 'FULL TIME', home: newState.home_team, away: newState.away_team, hScore: newState.home_score, aScore: newState.away_score, homeLogo: newState.home_logo, awayLogo: newState.away_logo, homeTla: getTla(newState.home_team, newState.home_tla), awayTla: getTla(newState.away_team, newState.away_tla) };
     } 
     else if (newTotal < oldTotal) {
         eventKey = 'var_overturn';
@@ -257,8 +250,7 @@ export async function POST(request: Request) {
         } 
         if (!extraData.scorer) extraData.scorer = `\n⚽ GOAL - Confirmed! Tap the link below for full details!\n`;
 
-        if (['PEN', 'PEN_SHOOT_OUT'].includes(newStatus)) ogImageUrl = getMatchImageUrl('PENALTY SCORED', newState, frontendUrl);
-        else ogImageUrl = getMatchImageUrl('GOAL ALERT!', newState, frontendUrl); 
+        ogPayload = { type: 'versus', label: ['PEN', 'PEN_SHOOT_OUT'].includes(newStatus) ? 'PENALTY SCORED' : 'GOAL ALERT!', home: newState.home_team, away: newState.away_team, hScore: newState.home_score, aScore: newState.away_score, homeLogo: newState.home_logo, awayLogo: newState.away_logo, homeTla: getTla(newState.home_team, newState.home_tla), awayTla: getTla(newState.away_team, newState.away_tla) };
     } 
     else if (newTotal === oldTotal && newPenaltiesList.length > oldPenaltiesList.length) {
         eventKey = 'penalty_awarded';
@@ -267,19 +259,18 @@ export async function POST(request: Request) {
     } 
     else if (!htStatuses.includes(oldStatus) && htStatuses.includes(newStatus)) {
         eventKey = 'halftime';
-        ogImageUrl = getMatchImageUrl('HALF TIME', newState, frontendUrl);
+        ogPayload = { type: 'versus', label: 'HALF TIME', home: newState.home_team, away: newState.away_team, hScore: newState.home_score, aScore: newState.away_score, homeLogo: newState.home_logo, awayLogo: newState.away_logo, homeTla: getTla(newState.home_team, newState.home_tla), awayTla: getTla(newState.away_team, newState.away_tla) };
     } 
     else if (htStatuses.includes(oldStatus) && (live1HStatuses.includes(newStatus) || live2HStatuses.includes(newStatus))) {
         eventKey = 'kickoff';
     } 
     else if (preStatuses.includes(oldStatus) && live1HStatuses.includes(newStatus)) {
         eventKey = 'kickoff';
-        ogImageUrl = getMatchImageUrl('KICK-OFF', newState, frontendUrl);
+        ogPayload = { type: 'versus', label: 'KICK-OFF', home: newState.home_team, away: newState.away_team, hScore: newState.home_score, aScore: newState.away_score, homeLogo: newState.home_logo, awayLogo: newState.away_logo, homeTla: getTla(newState.home_team, newState.home_tla), awayTla: getTla(newState.away_team, newState.away_tla) };
     } 
-    // 🛡️ MEASURE 2: Only trigger if the old dataset was structurally unannounced, and the new pulse has all 22 starters
     else if (!oldHasFullLineups && newHasFullLineups) { 
         eventKey = 'lineups';
-        const lineupOg = { 
+        ogPayload = { 
             type: 'pitch', label: 'STARTING XI', 
             home: newState.home_team, away: newState.away_team, 
             homeFormation: newState.lineups?.formations?.home || '4-3-3',
@@ -287,135 +278,87 @@ export async function POST(request: Request) {
             homeXI: newValidH.slice(0, 11).map(compressPlayerName), 
             awayXI: newValidA.slice(0, 11).map(compressPlayerName)
         };
-        ogImageUrl = `${frontendUrl}/api/og?data=${encodeBase64Safe(lineupOg)}`;
     }
 
     if (!eventKey) return NextResponse.json({ message: "No relevant trigger." });
 
-    const evtConfig = config.events[eventKey] || {};
+    const baseSafetyConfig = SAFETY_MAP[eventKey] || {};
+    const dbEventConfig = config.events[eventKey] || {};
+    const evtConfig = { ...baseSafetyConfig, ...dbEventConfig };
+
     const tpl = config.templates?.[eventKey] || {};
     extraData.activeCta = (eventKey === 'lineups' || eventKey === 'kickoff') ? preMatchCta : ctaText;
 
-    // 1. Standard Fallback Templates (Make & Direct Graph)
     const fb1Text = evtConfig.fb1 ? parseTemplate(tpl.fb1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]`, newState, matchUrl, extraData) : null;
     const fb2Text = evtConfig.fb2 ? parseTemplate(tpl.fb2 || fb1Text || '', newState, matchUrl, extraData) : null;
     const make1Text = evtConfig.make1 ? parseTemplate(tpl.make1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]\n[HASHTAGS]`, newState, matchUrl, extraData) : null;
     const make2Text = evtConfig.make2 ? parseTemplate(tpl.make2 || make1Text || '', newState, matchUrl, extraData) : null;
     const tgMsg = evtConfig.tg_general ? parseTemplate(tpl.tg_general || `<b>[HOME] [H_SCORE] - [A_SCORE] [AWAY]</b>\n<a href="[LINK]">Match Center</a>`, newState, matchUrl, extraData) : null;
 
-    // 2. 🟢 NEW: Dedicated Buffer Templates (With intelligent fallbacks if left blank)
     const bufX1Text = evtConfig.buf_x1 ? parseTemplate(tpl.buf_x1 || tpl.make1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]\n[HASHTAGS]`, newState, matchUrl, extraData) : null;
     const bufX2Text = evtConfig.buf_x2 ? parseTemplate(tpl.buf_x2 || tpl.make2 || bufX1Text || '', newState, matchUrl, extraData) : null;
     const bufFb1Text = evtConfig.buf_fb1 ? parseTemplate(tpl.buf_fb1 || tpl.fb1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]`, newState, matchUrl, extraData) : null;
     const bufFb2Text = evtConfig.buf_fb2 ? parseTemplate(tpl.buf_fb2 || tpl.fb2 || bufFb1Text || '', newState, matchUrl, extraData) : null;
 
     const creds = config.credentials || {};
-    const proxiedImage = ogImageUrl ? getImageKitProxyUrl(ogImageUrl) : null;
-
-    const makePayload1: any = { fb2_text: fb1Text, x_text: make1Text };
-    if (proxiedImage) makePayload1.x_image_url = proxiedImage;
-
-    const makePayload2: any = { fb2_text: fb2Text, x_text: make2Text };
-    if (proxiedImage) makePayload2.x_image_url = proxiedImage;
-
-    // 🟢 DYNAMIC GRAPHQL MUTATION COMPLIANT MATRIX WITH 2026 INPUT PATTERNS
-    const postToBufferDirectly = async (text: string, safeImgUrl: string, profileId: string, token: string) => {
-        const payload = {
-            query: "mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }",
-            variables: {
-                input: {
-                    text: text || "",
-                    channelId: profileId,
-                    schedulingType: "automatic",
-                    mode: "shareNow",
-                    assets: [
-                        {
-                            image: {
-                                url: safeImgUrl || ""
-                            }
-                        }
-                    ]
-                }
-            }
-        };
-
-        const res = await fetch("https://api.buffer.com/1/graphql", {
-            method: "POST",
-            headers: { 
-                "Content-Type": "application/json", 
-                "Authorization": `Bearer ${token}` 
-            },
-            body: JSON.stringify(payload)
-        });
-
-        return await res.json();
-    };
 
     try {
         const bufferToken = creds.buffer_token || process.env.BUFFER_ACCESS_TOKEN;
         
-        // 🚀 CONVERT TO CACHE-BUSTED STATIC URL FOR BUFFER
-        let finalBufferImage = ogImageUrl;
-        if (ogImageUrl && (evtConfig.buf_x1 || evtConfig.buf_x2 || evtConfig.buf_fb1 || evtConfig.buf_fb2)) {
-            const cacheName = `buffer_match_${newState.id}`; 
-            finalBufferImage = await secureStaticImage(ogImageUrl, cacheName, supabase);
+        let finalStaticImage = null;
+        if (ogPayload) { 
+            const payloadEncoded = encodeBase64Safe(ogPayload);
+            const internalFetchUrl = `${internalOrigin}/api/og?data=${payloadEncoded}`;
+            const publicFallbackUrl = `${frontendUrl}/api/og?data=${payloadEncoded}`;
+            
+            // 🟢 Generates a micro-dynamic name so Supabase NEVER locks or caches the file
+            const timestampKey = `match_${newState.id}_evt_${eventKey}_ts_${Date.now()}`; 
+            
+            // Bypasses Cloudflare block by requesting from the internal Vercel Origin
+            finalStaticImage = await secureStaticImage(internalFetchUrl, publicFallbackUrl, timestampKey, supabase);
         }
 
-        // 🚀 ISOLATED BROADCASTING MATRIX
-        if (evtConfig.buf_x1 && bufferToken && creds.buffer_x1_id) {
-            await postToBufferDirectly(bufX1Text!, finalBufferImage!, creds.buffer_x1_id, bufferToken).catch(e => console.error("BUF X1 Error:", e));
-        }
+        const makePayload1: any = { fb2_text: fb1Text, x_text: make1Text, buf_x_text: bufX1Text, buf_fb_text: bufFb1Text };
+        if (finalStaticImage) makePayload1.x_image_url = finalStaticImage;
 
-        if (evtConfig.buf_x2 && bufferToken && creds.buffer_x2_id) {
-            await postToBufferDirectly(bufX2Text!, finalBufferImage!, creds.buffer_x2_id, bufferToken).catch(e => console.error("BUF X2 Error:", e));
-        }
+        const makePayload2: any = { fb2_text: fb2Text, x_text: make2Text, buf_x_text: bufX2Text, buf_fb_text: bufFb2Text };
+        if (finalStaticImage) makePayload2.x_image_url = finalStaticImage;
 
-        if (evtConfig.buf_fb1 && bufferToken && creds.buffer_fb1_id) {
-            await postToBufferDirectly(bufFb1Text!, finalBufferImage!, creds.buffer_fb1_id, bufferToken).catch(e => console.error("BUF FB1 Error:", e));
-        }
+        const postToBufferDirectly = async (text: string, safeImgUrl: string, profileId: string, token: string) => {
+            const payload = {
+                query: "mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }",
+                variables: { input: { text: text || "", channelId: profileId, schedulingType: "automatic", mode: "shareNow", assets: [ { image: { url: safeImgUrl || "" } } ] } }
+            };
+            const res = await fetch("https://api.buffer.com/1/graphql", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify(payload) });
+            return await res.json();
+        };
 
-        if (evtConfig.buf_fb2 && bufferToken && creds.buffer_fb2_id) {
-            await postToBufferDirectly(bufFb2Text!, finalBufferImage!, creds.buffer_fb2_id, bufferToken).catch(e => console.error("BUF FB2 Error:", e));
-        }
+        if (evtConfig.buf_x1 && bufferToken && creds.buffer_x1_id) { await postToBufferDirectly(bufX1Text!, finalStaticImage!, creds.buffer_x1_id, bufferToken).catch(e => console.error("BUF X1 Error:", e)); }
+        if (evtConfig.buf_x2 && bufferToken && creds.buffer_x2_id) { await postToBufferDirectly(bufX2Text!, finalStaticImage!, creds.buffer_x2_id, bufferToken).catch(e => console.error("BUF X2 Error:", e)); }
+        if (evtConfig.buf_fb1 && bufferToken && creds.buffer_fb1_id) { await postToBufferDirectly(bufFb1Text!, finalStaticImage!, creds.buffer_fb1_id, bufferToken).catch(e => console.error("BUF FB1 Error:", e)); }
+        if (evtConfig.buf_fb2 && bufferToken && creds.buffer_fb2_id) { await postToBufferDirectly(bufFb2Text!, finalStaticImage!, creds.buffer_fb2_id, bufferToken).catch(e => console.error("BUF FB2 Error:", e)); }
 
         if (evtConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
-            const pageId = creds.fb1_id || process.env.FB_PAGE_ID; 
-            const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
-            const url = ogImageUrl ? `https://graph.facebook.com/v19.0/${pageId}/photos?url=${encodeURIComponent(ogImageUrl)}&message=${encodeURIComponent(fb1Text!)}&access_token=${token}` : `https://graph.facebook.com/v19.0/${pageId}/feed?message=${encodeURIComponent(fb1Text!)}&access_token=${token}`;
+            const pageId = creds.fb1_id || process.env.FB_PAGE_ID; const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
+            const url = finalStaticImage ? `https://graph.facebook.com/v19.0/${pageId}/photos?url=${encodeURIComponent(finalStaticImage)}&message=${encodeURIComponent(fb1Text!)}&access_token=${token}` : `https://graph.facebook.com/v19.0/${pageId}/feed?message=${encodeURIComponent(fb1Text!)}&access_token=${token}`;
             await fetch(url, { method: 'POST' }).catch(()=>{});
         }
 
         if (evtConfig.fb2 && creds.fb2_id && creds.fb2_token) {
-            const url = ogImageUrl ? `https://graph.facebook.com/v19.0/${creds.fb2_id}/photos?url=${encodeURIComponent(ogImageUrl)}&message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}` : `https://graph.facebook.com/v19.0/${creds.fb2_id}/feed?message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}`;
+            const url = finalStaticImage ? `https://graph.facebook.com/v19.0/${creds.fb2_id}/photos?url=${encodeURIComponent(finalStaticImage)}&message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}` : `https://graph.facebook.com/v19.0/${creds.fb2_id}/feed?message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}`;
             await fetch(url, { method: 'POST' }).catch(()=>{});
         }
 
-        if (evtConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
-            await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { 
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makePayload1) 
-            }).catch(()=>{});
-        }
-
-        if (evtConfig.make2 && creds.make_webhook_2) {
-            await fetch(creds.make_webhook_2, { 
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makePayload2) 
-            }).catch(()=>{});
-        }
+        if (evtConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) { await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makePayload1) }).catch(()=>{}); }
+        if (evtConfig.make2 && creds.make_webhook_2) { await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makePayload2) }).catch(()=>{}); }
 
         if (evtConfig.tg_general && creds.telegram_bot_token && creds.tg_general_channels) {
-            for (const channel of creds.tg_general_channels) {
-                await fetch(`https://api.telegram.org/bot${creds.telegram_bot_token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: channel.chatId, text: tgMsg, parse_mode: 'HTML', disable_web_page_preview: false }) }).catch(()=>{});
-            }
+            for (const channel of creds.tg_general_channels) { await fetch(`https://api.telegram.org/bot${creds.telegram_bot_token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: channel.chatId, text: tgMsg, parse_mode: 'HTML', disable_web_page_preview: false }) }).catch(()=>{}); }
         }
 
-        fetch(`${frontendUrl}/api/index-url`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
-            body: JSON.stringify({ url: matchUrl, type: 'URL_UPDATED' })
-        }).catch(() => {});
+        fetch(`${frontendUrl}/api/index-url`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` }, body: JSON.stringify({ url: matchUrl, type: 'URL_UPDATED' }) }).catch(() => {});
 
-    } catch (err) { 
-        console.error("Critical error firing socials:", err); 
-    }
+    } catch (err) { console.error("Critical error firing socials:", err); }
 
     return NextResponse.json({ success: true, event: eventKey });
 }
