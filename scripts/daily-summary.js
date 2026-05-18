@@ -21,11 +21,7 @@ async function postToBufferDirectly(text, safeImgUrl, profileId, token) {
     const hasImg = safeImgUrl && safeImgUrl.length > 5;
     const query = hasImg ? `mutation($text: String!, $img: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow, assets: { images: [{ url: $img }] } }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }` : `mutation($text: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }`;
     const variables = hasImg ? { text: text || "", img: safeImgUrl } : { text: text || "" };
-    try {
-        const res = await fetch("https://api.buffer.com/1/graphql", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ query, variables }) });
-        const data = await res.json();
-        if (data?.data?.createPost?.message) throw new Error(data.data.createPost.message);
-    } catch (e) { console.error(`Buffer Error for ${profileId}:`, e.message); }
+    try { await fetch("https://api.buffer.com/1/graphql", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ query, variables }) }); } catch (e) {}
 }
 
 async function postToTelegram(botToken, chatId, text, parseMode = 'HTML') { 
@@ -85,7 +81,7 @@ async function generateDailySummaries() {
 
         STRICT FACTUAL & TONAL GUIDELINES:
         1. LIVE SEARCH MANDATORY: Use Google Search to look up actual goalscorers and major context from these specific matches today. 
-        2. ANTI-HALLUCINATION: If search returns no recent news for a game, simply analyze the raw scoreline provided above. Do not guess who scored. Do not invent details.
+        2. ANTI-HALLUCINATION & FAIL-SAFE: If search returns no recent news for a game, simply analyze the raw scoreline confidently. NEVER complain to the reader about missing data. Do not use phrases like "Due to lack of information" or "With no available data". Write smoothly based on team reputations and the final score.
         3. HUMAN HEADLINE RULES: Create a 100% realistic, gritty journalistic headline under 10 words. NO colons. NO puns. NO markdown. Write exactly like a veteran editor. 
            - BAD: "Matchday Roundup: Madrid Stumbles as Bayern Secures Victory"
            - GOOD: "Late heartbreak for Madrid as Bayern seize group control"
@@ -144,7 +140,7 @@ async function generateDailySummaries() {
                 if (channel.wants_summary !== false) { 
                     const tgMessage = `🌙 <b>MATCHDAY ROUND-UP</b>\n\n<b>${headline}</b>\n\n${generatedFbText}\n\n👇 <b>Full stats and analysis here:</b>\n${articleUrl} 🏆`;
                     await postToTelegram(creds.telegram_bot_token, channel.chatId, tgMessage);
-                    await delay(1500); 
+                    await delay(1000); 
                 }
             }
         }
