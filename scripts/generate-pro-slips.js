@@ -15,7 +15,6 @@ if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) {
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 
-// 🔥 STRICT JSON SCHEMA IMPLEMENTED
 const proSlipSchema = {
     type: SchemaType.OBJECT,
     properties: {
@@ -28,18 +27,13 @@ const proSlipSchema = {
     required: ["primary", "odds", "safe", "safeOdds", "rationale"]
 };
 
-// 🟢 JSON MODE ENABLED (NO SEARCH TOOL ALLOWED HERE TO PREVENT 400 ERRORS)
 const model = genAI.getGenerativeModel({ 
     model: "gemini-2.5-flash",
-    generationConfig: { 
-        responseMimeType: "application/json",
-        responseSchema: proSlipSchema
-    }
+    generationConfig: { responseMimeType: "application/json", responseSchema: proSlipSchema }
 }); 
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// --- UNIFIED DATA FETCHING HELPERS ---
 const ESPN_LEAGUES = { 'Premier League': 'eng.1', 'La Liga': 'esp.1', 'Bundesliga': 'ger.1', 'Serie A': 'ita.1', 'Ligue 1': 'fra.1', 'Champions League': 'uefa.champions', 'Europa League': 'uefa.europa', 'FA Cup': 'eng.fa' };
 const FD_LEAGUES = { 'Premier League': 'PL', 'La Liga': 'PD', 'Bundesliga': 'BL1', 'Serie A': 'SA', 'Ligue 1': 'FL1', 'Champions League': 'CL' };
 
@@ -56,23 +50,42 @@ const isStrongMatch = (dbName, apiName) => {
     return s1.includes(s2) || s2.includes(s1);
 };
 
-// FULL TABLE MAPPER + CUP FORMAT IGNORER
-async function getLeagueStandings(leagueName) {
-    if (!FD_API_KEY || !FD_LEAGUES[leagueName]) return "Standings unavailable.";
-    const domesticLeagues = ['PL', 'PD', 'BL1', 'SA', 'FL1']; 
-    const mappedLeague = FD_LEAGUES[leagueName];
+// 🟢 1. IN-MEMORY CACHE: Prevents duplicate API hits within the same run
+const standingsCache = {};
 
-    if (!domesticLeagues.includes(mappedLeague)) {
-        return "Tournament/Cup tie - League table not applicable. Focus strictly on knockout stakes, recent form, and H2H.";
-    }
+async function getLeagueStandings(leagueName) {
+    const mappedLeague = FD_LEAGUES[leagueName];
+    if (!mappedLeague) return "Standings unavailable.";
+    
+    // Check Cache First
+    if (standingsCache[mappedLeague]) return standingsCache[mappedLeague];
+
+    const domesticLeagues = ['PL', 'PD', 'BL1', 'SA', 'FL1']; 
+    if (!domesticLeagues.includes(mappedLeague)) return "Tournament/Cup tie - League table not applicable. Focus strictly on knockout stakes, recent form, and H2H.";
 
     try {
-        const res = await fetch(`https://api.football-data.org/v4/competitions/${mappedLeague}/standings`, { headers: { 'X-Auth-Token': FD_API_KEY } });
-        const data = await res.json();
-        if (data.standings && data.standings[0]) {
-            return `FULL LEAGUE TABLE: ` + data.standings[0].table.map(t => `${t.position}. ${t.team.shortName} (${t.points}pts)`).join(', ');
+        if (FD_API_KEY) {
+            const liveRes = await fetch(`[https://api.football-data.org/v4/competitions/$](https://api.football-data.org/v4/competitions/$){mappedLeague}/standings`, { headers: { 'X-Auth-Token': FD_API_KEY } });
+            if (liveRes.ok) {
+                const data = await liveRes.json();
+                if (data.standings && data.standings[0]) {
+                    const resultStr = `FULL LEAGUE TABLE: ` + data.standings[0].table.map(t => `${t.position}. ${t.team.shortName} (${t.points}pts)`).join(', ');
+                    standingsCache[mappedLeague] = resultStr; // Save to memory
+                    return resultStr;
+                }
+            }
         }
-    } catch (e) { console.error(`Error fetching table for ${leagueName}:`, e.message); } 
+    } catch (e) { console.log(`⚠️ Live API failed for ${leagueName}, falling back to DB cache...`); }
+
+    try {
+        const { data: dbStandings, error } = await supabase.from('standings').select('position, team_short_name, team_name, points').eq('league_code', mappedLeague).order('position', { ascending: true });
+        if (!error && dbStandings && dbStandings.length > 0) {
+            const resultStr = `FULL LEAGUE TABLE: ` + dbStandings.map(t => `${t.position}. ${t.team_short_name || t.team_name} (${t.points}pts)`).join(', ');
+            standingsCache[mappedLeague] = resultStr; // Save to memory
+            return resultStr;
+        }
+    } catch (e) { console.error(`Error fetching table for ${leagueName} from Supabase:`, e.message); } 
+    
     return "Standings unavailable.";
 }
 
@@ -87,7 +100,7 @@ async function getMatchContext(leagueName, dateString, homeTeam, awayTeam) {
         
         for (const dp of datesToTry) {
             try {
-                const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnCode}/scoreboard?dates=${dp}`);
+                const res = await fetch(`[https://site.api.espn.com/apis/site/v2/sports/soccer/$](https://site.api.espn.com/apis/site/v2/sports/soccer/$){espnCode}/scoreboard?dates=${dp}`);
                 if (!res.ok) continue;
                 const data = await res.json();
                 if (!data.events) continue;
@@ -99,7 +112,7 @@ async function getMatchContext(leagueName, dateString, homeTeam, awayTeam) {
                 });
 
                 if (event) {
-                    const sumRes = await fetch(`https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${event.id}`);
+                    const sumRes = await fetch(`[https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=$](https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=$){event.id}`);
                     const sData = await sumRes.json();
                     
                     if (sData.form && sData.form.length >= 2) {
@@ -125,7 +138,7 @@ async function getMatchContext(leagueName, dateString, homeTeam, awayTeam) {
 
     if (!espnSuccess && FD_API_KEY && FD_LEAGUES[leagueName]) {
         try {
-            const res = await fetch(`https://api.football-data.org/v4/competitions/${FD_LEAGUES[leagueName]}/matches?status=FINISHED`, { headers: { 'X-Auth-Token': FD_API_KEY } });
+            const res = await fetch(`[https://api.football-data.org/v4/competitions/$](https://api.football-data.org/v4/competitions/$){FD_LEAGUES[leagueName]}/matches?status=FINISHED`, { headers: { 'X-Auth-Token': FD_API_KEY } });
             const data = await res.json();
             if (data.matches) {
                 const homeForm = data.matches.filter(m => isStrongMatch(m.homeTeam.name, homeTeam) || isStrongMatch(m.awayTeam.name, homeTeam)).slice(-3).map(m => `${m.homeTeam.shortName} ${m.score.fullTime.home}-${m.score.fullTime.away} ${m.awayTeam.shortName}`).join(', ');
@@ -135,14 +148,13 @@ async function getMatchContext(leagueName, dateString, homeTeam, awayTeam) {
     }
     return { textContext: contextStr || "[NO H2H/FORM FOUND]", translatedH2H };
 }
-// --- END HELPERS ---
 
 async function postToBufferDirectly(text, safeImgUrl, profileId, token) { 
     if (!profileId || !token) return;
     const hasImg = safeImgUrl && safeImgUrl.length > 5;
     const query = hasImg ? `mutation($text: String!, $img: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow, assets: { images: [{ url: $img }] } }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }` : `mutation($text: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }`;
     const variables = hasImg ? { text: text || "", img: safeImgUrl } : { text: text || "" };
-    try { await fetch("https://api.buffer.com/1/graphql", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ query, variables }) }); } catch (e) { console.error(`Buffer Error for ${profileId}:`, e.message); }
+    try { await fetch("[https://api.buffer.com/1/graphql](https://api.buffer.com/1/graphql)", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ query, variables }) }); } catch (e) { console.error(`Buffer Error for ${profileId}:`, e.message); }
 }
 
 function parseTemplate(templateText, match, analysis, link, dateStr) {
@@ -157,40 +169,34 @@ function parseTemplate(templateText, match, analysis, link, dateStr) {
 
 async function postToTelegram(botToken, chatId, text, parseMode = 'HTML') {
     if (!botToken || !chatId) return;
-    try { await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: parseMode, disable_web_page_preview: true }) }); } catch (e) { console.error("❌ Telegram Error:", e.message); }
+    try { await fetch(`[https://api.telegram.org/bot$](https://api.telegram.org/bot$){botToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: text, parse_mode: parseMode, disable_web_page_preview: true }) }); } catch (e) {}
 }
 
 const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 };
 
-// 🔥 FIXED: This retry function will now correctly catch 429 errors and pause the script safely.
 async function generateWithRetry(prompt, maxRetries = 3) {
     for (let i = 0; i < maxRetries; i++) {
         try {
-            // No search tool used here, strict JSON mode handles it perfectly.
             const result = await model.generateContent(prompt);
             return result.response.text().trim();
         } catch (error) {
-            if (error.message.includes('PerDay') || error.message.includes('Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20')) {
-                console.log(`   🛑 Google AI Daily Quota Reached (Free Tier). Will resume tomorrow.`);
+            if (error.message.includes('PerDay') || error.message.includes('Quota exceeded')) {
+                console.log(`   🛑 Google AI Daily Quota Reached. Will resume tomorrow.`);
                 return null; 
             } else if (error.message.includes('429') || error.message.includes('503')) {
                 if (i < maxRetries - 1) {
-                    console.log(`   ⏳ Google AI Speed Limit Hit. Waiting 30 seconds before retry ${i + 1}/${maxRetries}...`);
+                    console.log(`   ⏳ Google AI Speed Limit Hit. Waiting 30s...`);
                     await delay(30000); 
-                } else {
-                    throw error; 
-                }
-            } else {
-                throw error; 
-            }
+                } else { throw error; }
+            } else { throw error; }
         }
     }
 }
 
 async function runProSlipEngine() {
-    console.log("🧠 Starting Automated AI Pro Slip Generation & Routing...");
+    console.log("🧠 Starting Automated AI Pro Slip Engine...");
 
     const { data: settingsData } = await supabase.from('site_settings').select('social_config').single();
     const config = settingsData?.social_config || {};
@@ -199,7 +205,6 @@ async function runProSlipEngine() {
     const featuredMatchId = config.featured_match_id; 
     const tgGeneralChannels = creds.tg_general_channels || [];
     const tgVipChannels = creds.tg_vip_channels || [];
-    const freeTipsConfig = eventsConfig.free_tips || {};
     const templates = config.templates?.free_tips || {};
 
     const now = new Date();
@@ -213,11 +218,19 @@ async function runProSlipEngine() {
 
     if (error || !allMatches) return;
 
-    const matchesNeedingAnalysis = allMatches.filter(m => !m.pro_analysis || (typeof m.pro_analysis === 'object' && Object.keys(m.pro_analysis).length === 0) || (typeof m.pro_analysis === 'string' && m.pro_analysis.trim() === ''));
+    let matchesNeedingAnalysis = allMatches.filter(m => !m.pro_analysis || (typeof m.pro_analysis === 'object' && Object.keys(m.pro_analysis).length === 0) || (typeof m.pro_analysis === 'string' && m.pro_analysis.trim() === ''));
+    
+    // 🟢 MICRO-BATCHING: Process a maximum of 5 matches per run to save GitHub Action minutes
+    const MAX_MATCHES_PER_RUN = 5;
+    if (matchesNeedingAnalysis.length > MAX_MATCHES_PER_RUN) {
+        console.log(`⚠️ High volume detected: ${matchesNeedingAnalysis.length} matches need analysis. Processing batch of ${MAX_MATCHES_PER_RUN} to respect quotas.`);
+        matchesNeedingAnalysis = matchesNeedingAnalysis.slice(0, MAX_MATCHES_PER_RUN);
+    }
+
     const newlyGeneratedSlips = [];
 
     if (matchesNeedingAnalysis.length > 0) {
-        console.log(`🎯 Found ${matchesNeedingAnalysis.length} upcoming matches needing VIP analysis.`);
+        console.log(`🎯 Analyzing ${matchesNeedingAnalysis.length} upcoming matches...`);
         for (const match of matchesNeedingAnalysis) {
             console.log(`\n⏳ Analyzing: ${match.home_team} vs ${match.away_team}...`);
             try {
@@ -228,22 +241,20 @@ async function runProSlipEngine() {
                     You are a gritty, elite football tactical analyst in ${currentMonthYear}. 
                     Provide a highly accurate "Pro Betting Slip" for: ${match.home_team} vs ${match.away_team} (${match.league}). 
                     
-                    FACTUAL CONTEXT (THIS IS YOUR ONLY SOURCE OF TRUTH):
+                    FACTUAL CONTEXT:
                     LEAGUE STANDING: ${tableStr}
                     MATCH FORM & H2H: ${textContext}
                     
                     CRITICAL RULES: 
-                    1. STRICT FACTS: Base your tactical rationale strictly on the Factual Context provided above. Do not invent past results.
-                    2. TONE: Be direct, expert, and authoritative. Speak from experience.
+                    1. TONE: Be direct, expert, and authoritative. Speak from experience.
+                    2. THE "NO DATA" FAIL-SAFE: NEVER complain to the reader about missing data. NEVER use phrases like "With no available data", "Information is scarce", or "Tactical analysis is impossible." If the Factual Context above is sparse or missing, seamlessly rely on your vast internal expert knowledge of these clubs' historical playstyles, pedigree, and league tendencies to formulate a confident rationale.
                 `;
                 
-                // 🔥 FIXED: We now use generateWithRetry so it pauses when Google hits rate limits
                 let text = await generateWithRetry(prompt);
-                
                 if (!text) continue; 
                 
-                // Safety cleanup in case markdown backticks bleed through
-                text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+                // 🟢 FIXED: Backticks are now safely escaped so VS Code's parser doesn't break
+                text = text.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
                 const analysisData = JSON.parse(text);
                 
                 const updatePayload = { pro_analysis: analysisData };
@@ -256,8 +267,7 @@ async function runProSlipEngine() {
                 newlyGeneratedSlips.push({ match, analysis: analysisData });
             } catch (err) { console.error(`   🔥 Error processing match:`, err.message); }
             
-            // 🔥 FIXED: Increased delay to 15 seconds to safely stay under the 5 requests-per-minute Free Tier limit
-            await delay(15000); 
+            await delay(12000); // Wait 12 seconds between Gemini calls
         }
 
         if (newlyGeneratedSlips.length > 0 && eventsConfig.vip_tips?.tg_vip !== false && tgVipChannels.length > 0) {
@@ -267,22 +277,27 @@ async function runProSlipEngine() {
                     const matchDateObj = formatDate(item.match.match_date); 
                     const vipMsg = `💎 <b>VIP PRO ANALYSIS</b> 💎\n\n📅 <b>Date:</b> ${matchDateObj}\n⚽️ <b>${item.match.home_team} vs ${item.match.away_team}</b>\n🏆 ${item.match.league}\n\n🎯 <b>Main Value Pick:</b> ${item.analysis.primary} (${item.analysis.odds})\n🛡 <b>Safe Acca Pick:</b> ${item.analysis.safe} (${item.analysis.safeOdds})\n\n🧠 <b>Tactical Rationale:</b>\n<i>${item.analysis.rationale}</i>`;
                     await postToTelegram(creds.telegram_bot_token, channel.chatId, vipMsg);
-                    await delay(1500); 
+                    await delay(1000); 
                 }
             }
         }
-    } else { console.log("💤 No new upcoming matches need VIP analysis right now."); }
+    } else { console.log("💤 No new matches need VIP analysis in this batch."); }
 
     console.log(`\n🎁 Evaluating Free Bet of the Day...`);
 
-    if (config.last_freetip_broadcast_date === todayDateString) {
+    const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
+    const endOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59)).toISOString();
+
+    const { data: alreadyPostedToday } = await supabase.from('matches').select('id, pro_analysis')
+        .gte('match_date', startOfToday).lte('match_date', endOfToday);
+        
+    const hasPosted = alreadyPostedToday?.some(m => m.pro_analysis && m.pro_analysis.was_freetip_date === todayDateString);
+
+    if (hasPosted) {
         console.log(`   ⏭️ Free Tip already broadcasted today. Skipping to prevent double-posting.`);
         console.log("\n🏁 Automated AI Engine Complete!"); return; 
     }
     
-    const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
-    const endOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59)).toISOString();
-
     const { data: allAnalyzedToday } = await supabase.from('matches').select('*')
         .not('pro_analysis', 'is', null)
         .gte('match_date', startOfToday)
@@ -315,7 +330,7 @@ async function runProSlipEngine() {
 
     if (freeTipMatch) {
         let successfullyPosted = false;
-        const matchLink = `https://factsport.com/match/${freeTipMatch.id}`;
+        const matchLink = `[https://factsport.com/match/$](https://factsport.com/match/$){freeTipMatch.id}`;
         const matchDateObj = formatDate(freeTipMatch.match_date); 
         
         const fb1Text = parseTemplate(templates.fb1 || `🎁 FREE BET OF THE DAY 🎁\n\n📅 Date: [DATE]\n⚽️ [HOME] vs [AWAY]\n🎯 Prediction: [PICK]\n🔥 Odds: [ODDS]\n\n👇 See full stats and place your bet!\n[LINK]`, freeTipMatch, freeTipMatch.pro_analysis, matchLink, matchDateObj);
@@ -323,48 +338,53 @@ async function runProSlipEngine() {
         const make1Text = parseTemplate(templates.make1 || `🎁 FREE BET OF THE DAY!\n\n📅 [DATE]\n⚽️ [HOME] vs [AWAY]\n🎯 Pick: [PICK] ([ODDS])\n\n👇 Full stats:\n[LINK]`, freeTipMatch, freeTipMatch.pro_analysis, matchLink, matchDateObj);
         const make2Text = parseTemplate(templates.make2 || make1Text, freeTipMatch, freeTipMatch.pro_analysis, matchLink, matchDateObj);
 
-        if (freeTipsConfig.tg_general && tgGeneralChannels.length > 0) {
+        if (eventsConfig.free_tips?.tg_general && tgGeneralChannels.length > 0) {
             for (const channel of tgGeneralChannels) {
                 if (channel.wants_freetips) {
                     const linkToUse = channel.link || matchLink; 
                     const rawTgMsg = templates.tg_general || `🎁 <b>FREE BET OF THE DAY</b> 🎁\n\n📅 <b>Date:</b> [DATE]\n⚽️ <b>[HOME] vs [AWAY]</b>\n\n🎯 <b>Prediction:</b> [PICK]\n🔥 <b>Odds:</b> [ODDS]\n\n🧠 <b>Why?:</b> <i>[RATIONALE]</i>\n\n👉 <a href="[LINK]">Bet on this match here!</a>`;
                     const freeTgMsg = parseTemplate(rawTgMsg, freeTipMatch, freeTipMatch.pro_analysis, linkToUse, matchDateObj);
                     await postToTelegram(creds.telegram_bot_token, channel.chatId, freeTgMsg);
-                    successfullyPosted = true; await delay(1500);
+                    successfullyPosted = true; await delay(1000);
                 }
             }
         }
 
         const bufferToken = creds.buffer_token || process.env.BUFFER_ACCESS_TOKEN;
 
-        if (freeTipsConfig.buf_x1) { await postToBufferDirectly(make1Text, null, creds.buffer_x1_id, bufferToken); successfullyPosted = true; }
-        if (freeTipsConfig.buf_x2) { await postToBufferDirectly(make2Text, null, creds.buffer_x2_id, bufferToken); successfullyPosted = true; }
-        if (freeTipsConfig.buf_fb1) { await postToBufferDirectly(fb1Text, null, creds.buffer_fb1_id, bufferToken); successfullyPosted = true; }
-        if (freeTipsConfig.buf_fb2) { await postToBufferDirectly(fb2Text, null, creds.buffer_fb2_id, bufferToken); successfullyPosted = true; }
+        if (eventsConfig.free_tips?.buf_x1) { await postToBufferDirectly(make1Text, null, creds.buffer_x1_id, bufferToken); successfullyPosted = true; }
+        if (eventsConfig.free_tips?.buf_x2) { await postToBufferDirectly(make2Text, null, creds.buffer_x2_id, bufferToken); successfullyPosted = true; }
+        if (eventsConfig.free_tips?.buf_fb1) { await postToBufferDirectly(fb1Text, null, creds.buffer_fb1_id, bufferToken); successfullyPosted = true; }
+        if (eventsConfig.free_tips?.buf_fb2) { await postToBufferDirectly(fb2Text, null, creds.buffer_fb2_id, bufferToken); successfullyPosted = true; }
 
-        if (freeTipsConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
+        if (eventsConfig.free_tips?.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
             await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb1Text, x_text: make1Text, x_image_url: null }) }).then(() => successfullyPosted = true).catch(()=>{});
         }
-        if (freeTipsConfig.make2 && creds.make_webhook_2) {
+        if (eventsConfig.free_tips?.make2 && creds.make_webhook_2) {
             await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb2Text, x_text: make2Text, x_image_url: null }) }).then(() => successfullyPosted = true).catch(()=>{});
         }
 
-        if (freeTipsConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
+        if (eventsConfig.free_tips?.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
             const pageId = creds.fb1_id || process.env.FB_PAGE_ID; const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
-            await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed?message=${encodeURIComponent(fb1Text)}&access_token=${token}`, { method: 'POST' }).then(() => successfullyPosted = true).catch(()=>{});
+            await fetch(`[https://graph.facebook.com/v19.0/$](https://graph.facebook.com/v19.0/$){pageId}/feed?message=${encodeURIComponent(fb1Text)}&access_token=${token}`, { method: 'POST' }).then(() => successfullyPosted = true).catch(()=>{});
         }
-        if (freeTipsConfig.fb2 && creds.fb2_id && creds.fb2_token) {
-            await fetch(`https://graph.facebook.com/v19.0/${creds.fb2_id}/feed?message=${encodeURIComponent(fb2Text)}&access_token=${creds.fb2_token}`, { method: 'POST' }).then(() => successfullyPosted = true).catch(()=>{});
+        if (eventsConfig.free_tips?.fb2 && creds.fb2_id && creds.fb2_token) {
+            await fetch(`[https://graph.facebook.com/v19.0/$](https://graph.facebook.com/v19.0/$){creds.fb2_id}/feed?message=${encodeURIComponent(fb2Text)}&access_token=${creds.fb2_token}`, { method: 'POST' }).then(() => successfullyPosted = true).catch(()=>{});
         }
 
         if (successfullyPosted) {
-            const updatedConfig = { ...config, last_freetip_broadcast_date: todayDateString };
-            delete updatedConfig.featured_match_id; 
-            await supabase.from('site_settings').update({ social_config: updatedConfig }).eq('id', 1);
-            console.log(`   🔒 Saved broadcast date & reset Admin Override for tomorrow.`);
+            freeTipMatch.pro_analysis.was_freetip_date = todayDateString;
+            await supabase.from('matches').update({ pro_analysis: freeTipMatch.pro_analysis }).eq('id', freeTipMatch.id);
+            
+            if (featuredMatchId) {
+                const updatedConfig = { ...config };
+                delete updatedConfig.featured_match_id; 
+                await supabase.from('site_settings').update({ social_config: updatedConfig }).eq('id', 1);
+            }
+            console.log(`   🔒 Logged Free Tip in DB & reset Admin Override.`);
         }
-    } else { console.log(`   💤 No analyzed matches found for today. Skipping Free Tip broadcast.`); }
+    }
 
-    console.log("\n🏁 Automated AI Engine Complete!");
+    console.log("\n🏁 Engine Complete!");
 }
 runProSlipEngine();
