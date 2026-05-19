@@ -38,103 +38,115 @@ export async function GET(request: Request) {
         let logs: string[] = [];
         const leaguesNeedingStandingsUpdate = new Set<string>();
 
+        // 🟢 1. FETCH UPCOMING MATCHES
         const res = await fetch(`https://api.football-data.org/v4/matches?dateFrom=${fromStr}&dateTo=${toStr}`, { 
             headers: { 'X-Auth-Token': API_KEY } 
         });
 
-        if (!res.ok) throw new Error(`Football-Data API Error: ${res.status}`);
-        const data = await res.json();
-        const fdMatches = data.matches || [];
+        if (res.ok) {
+            const data = await res.json();
+            const fdMatches = data.matches || [];
 
-        if (fdMatches.length === 0) {
-            return NextResponse.json({ message: "No matches found in range." });
+            if (fdMatches.length > 0) {
+                const apiIds = fdMatches.map((m: any) => m.id);
+                const { data: dbMatches } = await supabase
+                    .from('matches')
+                    .select('id, api_id, status, home_score, away_score, espn_id')
+                    .in('api_id', apiIds);
+
+                const dbMap = new Map(dbMatches?.map(m => [m.api_id, m]) || []);
+                const matchUpdates: any[] = []; 
+
+                for (const m of fdMatches) {
+                    const compCode = m.competition?.code;
+                    if (!TARGET_LEAGUES.includes(compCode)) continue;
+                    
+                    let fdStatusMapped = 'SCHEDULED';
+                    if (['FINISHED', 'AWARDED'].includes(m.status)) {
+                        fdStatusMapped = 'FT';
+                    } else if (['IN_PLAY', 'PAUSED'].includes(m.status)) {
+                        fdStatusMapped = m.status === 'PAUSED' ? 'HT' : 'LIVE';
+                    } else if (['POSTPONED', 'CANCELLED', 'SUSPENDED'].includes(m.status)) {
+                        fdStatusMapped = 'POSTPONED';
+                    } else {
+                        fdStatusMapped = m.status;
+                    }
+                    
+                    const dbMatch = dbMap.get(m.id);
+                    if (!dbMatch) continue;
+
+                    const isDbLive = ['LIVE', 'HT', '1H', '2H', 'ET', 'P'].includes(dbMatch.status);
+                    const hasEspnId = !!dbMatch.espn_id;
+                    
+                    const fdHomeScore = m.score?.fullTime?.home ?? 0;
+                    const fdAwayScore = m.score?.fullTime?.away ?? 0;
+                    let shouldUpdateMatch = false;
+
+                    if (['LIVE', 'HT', 'FT', 'FINISHED', 'AWARDED'].includes(fdStatusMapped) || isDbLive) {
+                        leaguesNeedingStandingsUpdate.add(compCode);
+                    }
+
+                    if (fdStatusMapped === 'FT') {
+                        if (dbMatch.status !== 'FT' || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
+                            shouldUpdateMatch = true;
+                            leaguesNeedingStandingsUpdate.add(compCode); 
+                        }
+                    } 
+                    else if (hasEspnId && (fdStatusMapped === 'LIVE' || fdStatusMapped === 'HT' || isDbLive)) {
+                        continue; 
+                    } 
+                    else if (!hasEspnId && ['LIVE', 'HT'].includes(fdStatusMapped)) {
+                        if (dbMatch.status !== fdStatusMapped || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
+                            shouldUpdateMatch = true;
+                        }
+                    }
+                    else if (['POSTPONED', 'SCHEDULED'].includes(fdStatusMapped)) {
+                        if (dbMatch.status !== fdStatusMapped && !isDbLive) {
+                            shouldUpdateMatch = true;
+                        }
+                    }
+
+                    if (shouldUpdateMatch) {
+                        matchUpdates.push(
+                            supabase.from('matches').update({ 
+                                home_score: fdHomeScore, 
+                                away_score: fdAwayScore, 
+                                status: fdStatusMapped, 
+                                updated_at: new Date().toISOString() 
+                            }).eq('api_id', m.id).then()
+                        );
+                        matchesFinalized++; 
+                        logs.push(`Cron Sync: ${m.id} (${compCode}) -> ${fdStatusMapped} ${fdHomeScore}-${fdAwayScore}`);
+                    }
+                }
+
+                if (matchUpdates.length > 0) await Promise.all(matchUpdates);
+            }
         }
 
-        const apiIds = fdMatches.map((m: any) => m.id);
-        const { data: dbMatches, error: dbError } = await supabase
-            .from('matches')
-            .select('id, api_id, status, home_score, away_score, espn_id')
-            .in('api_id', apiIds);
-
-        if (dbError) throw new Error(`Supabase Error: ${dbError.message}`);
-
-        const dbMap = new Map(dbMatches?.map(m => [m.api_id, m]) || []);
-        const matchUpdates: any[] = []; 
-
-        for (const m of fdMatches) {
-            const compCode = m.competition?.code;
-            if (!TARGET_LEAGUES.includes(compCode)) continue;
-            
-            let fdStatusMapped = 'SCHEDULED';
-            if (['FINISHED', 'AWARDED'].includes(m.status)) {
-                fdStatusMapped = 'FT';
-            } else if (['IN_PLAY', 'PAUSED'].includes(m.status)) {
-                fdStatusMapped = m.status === 'PAUSED' ? 'HT' : 'LIVE';
-            } else if (['POSTPONED', 'CANCELLED', 'SUSPENDED'].includes(m.status)) {
-                fdStatusMapped = 'POSTPONED';
-            } else {
-                fdStatusMapped = m.status;
+        // 🟢 2. AUTOMATIC SELF-HEALING LAYER (Checks for completely empty tables in DB)
+        const { data: existingStandings } = await supabase.from('standings').select('league_code');
+        const presentLeagues = new Set(existingStandings?.map(s => s.league_code) || []);
+        
+        TARGET_LEAGUES.forEach(league => {
+            if (!presentLeagues.has(league) && league !== 'EC' && league !== 'WC') {
+                leaguesNeedingStandingsUpdate.add(league);
+                logs.push(`🛡️ Self-Healing Triggered: ${league} table was missing from database!`);
             }
-            
-            const dbMatch = dbMap.get(m.id);
-            if (!dbMatch) continue;
+        });
 
-            const isDbLive = ['LIVE', 'HT', '1H', '2H', 'ET', 'P'].includes(dbMatch.status);
-            const hasEspnId = !!dbMatch.espn_id;
-            
-            const fdHomeScore = m.score?.fullTime?.home ?? 0;
-            const fdAwayScore = m.score?.fullTime?.away ?? 0;
-            let shouldUpdateMatch = false;
-
-            if (['LIVE', 'HT', 'FT', 'FINISHED', 'AWARDED'].includes(fdStatusMapped) || isDbLive) {
-                leaguesNeedingStandingsUpdate.add(compCode);
-            }
-
-            if (fdStatusMapped === 'FT') {
-                if (dbMatch.status !== 'FT' || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
-                    shouldUpdateMatch = true;
-                    leaguesNeedingStandingsUpdate.add(compCode); 
-                }
-            } 
-            else if (hasEspnId && (fdStatusMapped === 'LIVE' || fdStatusMapped === 'HT' || isDbLive)) {
-                continue; 
-            } 
-            else if (!hasEspnId && ['LIVE', 'HT'].includes(fdStatusMapped)) {
-                if (dbMatch.status !== fdStatusMapped || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
-                    shouldUpdateMatch = true;
-                }
-            }
-            else if (['POSTPONED', 'SCHEDULED'].includes(fdStatusMapped)) {
-                if (dbMatch.status !== fdStatusMapped && !isDbLive) {
-                    shouldUpdateMatch = true;
-                }
-            }
-
-            if (shouldUpdateMatch) {
-                matchUpdates.push(
-                    supabase.from('matches').update({ 
-                        home_score: fdHomeScore, 
-                        away_score: fdAwayScore, 
-                        status: fdStatusMapped, 
-                        updated_at: new Date().toISOString() 
-                    }).eq('api_id', m.id).then()
-                );
-                matchesFinalized++; 
-                logs.push(`Cron Sync: ${m.id} (${compCode}) -> ${fdStatusMapped} ${fdHomeScore}-${fdAwayScore}`);
-            }
-        }
-
-        if (matchUpdates.length > 0) {
-            await Promise.all(matchUpdates);
-        }
-
-        if (forceSync) {
+        // 🟢 3. BACKGROUND CLOCK TRIGGER (Runs full audit of ALL leagues every 30 minutes)
+        const currentMinutes = today.getUTCMinutes();
+        const isHalfHourInterval = currentMinutes >= 0 && currentMinutes < 5 || currentMinutes >= 30 && currentMinutes < 35;
+        
+        if (isHalfHourInterval || forceSync) {
             TARGET_LEAGUES.forEach(league => leaguesNeedingStandingsUpdate.add(league));
-            logs.push("Admin forced a full standings sync.");
+            logs.push(`⏱️ Background Clock Audit: Syncing all leagues to keep data 100% fresh.`);
         }
 
         const targetStandingsLeagues = Array.from(leaguesNeedingStandingsUpdate).filter(l => l !== 'EC' && l !== 'WC');
 
+        // 🟢 4. EXECUTE BATCH DOWNLOADS
         if (targetStandingsLeagues.length > 0) {
             const standingsFetches = targetStandingsLeagues.map(leagueId => 
                 fetch(`https://api.football-data.org/v4/competitions/${leagueId}/standings`, { 
@@ -144,6 +156,7 @@ export async function GET(request: Request) {
 
             const standingsResults = await Promise.all(standingsFetches);
             let allStandingsToInsert: any[] = [];
+            const successfulLeagues: string[] = [];
 
             standingsResults.forEach((standData, index) => {
                 if (!standData) return;
@@ -168,12 +181,14 @@ export async function GET(request: Request) {
                     }));
                     
                     allStandingsToInsert = allStandingsToInsert.concat(mappedTable);
+                    successfulLeagues.push(leagueId);
                     logs.push(`Standings Prepared: ${leagueId}`);
                 }
             });
 
-            if (allStandingsToInsert.length > 0) {
-                await supabase.from('standings').delete().in('league_code', targetStandingsLeagues);
+            if (allStandingsToInsert.length > 0 && successfulLeagues.length > 0) {
+                // Wipe and replace ONLY the channels that returned successful data streams
+                await supabase.from('standings').delete().in('league_code', successfulLeagues);
                 const { error: stdErr } = await supabase.from('standings').insert(allStandingsToInsert);
                 
                 if (!stdErr) {
