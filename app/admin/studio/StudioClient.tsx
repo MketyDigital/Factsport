@@ -2,12 +2,10 @@
 
 import { useState } from 'react';
 import { Radio, Tv, Mic, Save, Loader2, CheckCircle2, AlertCircle, Power } from 'lucide-react';
-import { updateStudioSettings } from './actions'; // 🟢 Imports our new secure Server Action
+import { updateStudioSettings } from './actions'; 
 
 export default function StudioClient({ initialData }: { initialData: any }) {
-    const router = useRouter(); 
-
-    // Form State
+    // Form State (Notice the router is completely gone!)
     const [isSaving, setIsSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
     const [title, setTitle] = useState(initialData?.title || '');
@@ -20,22 +18,18 @@ export default function StudioClient({ initialData }: { initialData: any }) {
         setIsSaving(true);
         setMessage(null);
 
-        // 🟢 FIX: Removed the 'updated_at' field to perfectly match your DB schema
-        const { error } = await supabase
-            .from('global_studio')
-            .upsert({
-                id: 1, 
-                title: title,
-                audio_url: audioUrl || null,
-                video_url: videoUrl || null,
-                is_active: isActive
-            });
+        // 🟢 Passes the data to the secure server environment
+        const result = await updateStudioSettings({
+            title,
+            audioUrl,
+            videoUrl,
+            isActive
+        });
 
         if (result.error) {
             setMessage({ type: 'error', text: `Failed to save: ${result.error}` });
         } else {
             setMessage({ type: 'success', text: 'Studio broadcast settings updated successfully!' });
-            router.refresh(); 
             setTimeout(() => setMessage(null), 4000);
         }
         
