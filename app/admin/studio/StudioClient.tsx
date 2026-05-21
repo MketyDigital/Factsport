@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { Radio, Tv, Mic, Save, Loader2, CheckCircle2, AlertCircle, Power } from 'lucide-react';
 
@@ -10,6 +11,8 @@ const supabase = createClient(
 );
 
 export default function StudioClient({ initialData }: { initialData: any }) {
+    const router = useRouter(); // 🟢 Required to wipe the local cache on save
+
     // Form State
     const [isSaving, setIsSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -23,20 +26,24 @@ export default function StudioClient({ initialData }: { initialData: any }) {
         setIsSaving(true);
         setMessage(null);
 
+        // 🟢 FIX 2: Uses UPSERT instead of UPDATE. 
+        // If row 1 doesn't exist, this forces Supabase to create it so it never fails silently.
         const { error } = await supabase
             .from('global_studio')
-            .update({
+            .upsert({
+                id: 1, 
                 title: title,
                 audio_url: audioUrl || null,
                 video_url: videoUrl || null,
-                is_active: isActive
-            })
-            .eq('id', 1);
+                is_active: isActive,
+                updated_at: new Date().toISOString()
+            });
 
         if (error) {
             setMessage({ type: 'error', text: `Failed to save: ${error.message}` });
         } else {
             setMessage({ type: 'success', text: 'Studio broadcast settings updated successfully!' });
+            router.refresh(); // 🟢 FIX 3: Instantly refreshes Next.js so you see the changes
             setTimeout(() => setMessage(null), 4000);
         }
         setIsSaving(false);
