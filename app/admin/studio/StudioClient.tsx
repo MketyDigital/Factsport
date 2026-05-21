@@ -11,7 +11,7 @@ const supabase = createClient(
 );
 
 export default function StudioClient({ initialData }: { initialData: any }) {
-    const router = useRouter(); // 🟢 Required to wipe the local cache on save
+    const router = useRouter(); 
 
     // Form State
     const [isSaving, setIsSaving] = useState(false);
@@ -26,8 +26,7 @@ export default function StudioClient({ initialData }: { initialData: any }) {
         setIsSaving(true);
         setMessage(null);
 
-        // 🟢 FIX 2: Uses UPSERT instead of UPDATE. 
-        // If row 1 doesn't exist, this forces Supabase to create it so it never fails silently.
+        // 🟢 FIX: Removed the 'updated_at' field to perfectly match your DB schema
         const { error } = await supabase
             .from('global_studio')
             .upsert({
@@ -35,15 +34,14 @@ export default function StudioClient({ initialData }: { initialData: any }) {
                 title: title,
                 audio_url: audioUrl || null,
                 video_url: videoUrl || null,
-                is_active: isActive,
-                updated_at: new Date().toISOString()
+                is_active: isActive
             });
 
         if (error) {
             setMessage({ type: 'error', text: `Failed to save: ${error.message}` });
         } else {
             setMessage({ type: 'success', text: 'Studio broadcast settings updated successfully!' });
-            router.refresh(); // 🟢 FIX 3: Instantly refreshes Next.js so you see the changes
+            router.refresh(); 
             setTimeout(() => setMessage(null), 4000);
         }
         setIsSaving(false);
