@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-export const revalidate = 0; // Never cache the admin page!
+export const dynamic = 'force-dynamic'; // 🟢 Modern Next.js cache killer
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/app/lib/supabase/server';
@@ -27,7 +27,7 @@ export default async function AdminStudioPage() {
         .from('global_studio')
         .select('*')
         .eq('id', 1)
-        .single();
+        .maybeSingle(); // 🟢 FIX 1: Prevents the page from crashing if the database is empty
 
     if (error) {
         console.error("Failed to fetch studio settings:", error);

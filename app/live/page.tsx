@@ -87,7 +87,7 @@ export default async function LiveMediaPage() {
             </div>
         )}
 
-        {/* 🟢 DELEGATE FILTERING AND RENDERING TO THE CLIENT */}
+        {/* DELEGATE FILTERING AND RENDERING TO THE CLIENT */}
         <LiveMediaClient matches={matches || []} />
 
       </div>
