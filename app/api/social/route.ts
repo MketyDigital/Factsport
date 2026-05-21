@@ -12,15 +12,20 @@ const SAFETY_MAP: Record<string, any> = {
     penalty_awarded: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: false, make2: false }
 };
 
-// 🟢 BULLETPROOF INTERNAL FETCHER
 async function secureStaticImage(internalFetchUrl: string, publicFallbackUrl: string, fileName: string, supabaseClient: any) {
     if (!internalFetchUrl) return "";
     try {
-        // Fetches from inside the Vercel network to bypass Cloudflare Blocks
         const imgResponse = await fetch(internalFetchUrl, { headers: { 'Accept': 'image/png' } });
-        if (!imgResponse.ok) return publicFallbackUrl; 
+        let arrayBuffer;
         
-        const arrayBuffer = await imgResponse.arrayBuffer();
+        if (imgResponse.ok) {
+            arrayBuffer = await imgResponse.arrayBuffer();
+        } else {
+            console.log("⚠️ Internal OG render blocked, breaking out to public bridge...");
+            const fallbackRes = await fetch(publicFallbackUrl);
+            if (!fallbackRes.ok) return "";
+            arrayBuffer = await fallbackRes.arrayBuffer();
+        }
 
         const { error } = await supabaseClient.storage
             .from('socials')
@@ -36,7 +41,6 @@ async function secureStaticImage(internalFetchUrl: string, publicFallbackUrl: st
 
         const { data } = supabaseClient.storage.from('socials').getPublicUrl(`${fileName}.png`);
         return `${data.publicUrl}?v=${Date.now()}`;
-
     } catch (err) {
         console.error("Image Proxy Failed:", err);
         return publicFallbackUrl; 
@@ -91,16 +95,12 @@ const KNOWN_TEAMS: Record<string, string> = {
     'borussia monchengladbach': 'BMG', 'gladbach': 'BMG', 'mgladbach': 'BMG', 'mönchengladbach': 'BMG', 'vfb stuttgart': 'VFB', 'stuttgart': 'VFB',
     'wolfsburg': 'WOB', 'vfl wolfsburg': 'WOB', 'sc freiburg': 'SCF', 'freiburg': 'SCF', 'union berlin': 'FCU', 'fc union berlin': 'FCU',
     'paris saint germain': 'PSG', 'psg': 'PSG', 'paris sg': 'PSG', 'paris saint-germain': 'PSG', 'olympique de marseille': 'MAR', 'marseille': 'MAR', 'om': 'MAR',
-    'olympique lyonnais': 'LYO', 'lyon': 'LYO', 'ol': 'LYO', 'as monaco': 'ASM', 'monaco': 'ASM', 'lille osc': 'LOSC', 'lille': 'LOSC',
+    'olympique lyon': 'LYO', 'lyon': 'LYO', 'ol': 'LYO', 'as monaco': 'ASM', 'monaco': 'ASM', 'lille osc': 'LOSC', 'lille': 'LOSC',
     'rc lens': 'RCL', 'lens': 'RCL', 'ogc nice': 'OGCN', 'nice': 'OGCN', 'ajax': 'AJA', 'afc ajax': 'AJA', 'psv eindhoven': 'PSV', 'psv': 'PSV',
     'feyenoord': 'FEY', 'sporting cp': 'SCP', 'sporting': 'SCP', 'sporting lisbon': 'SCP', 'sl benfica': 'SLB', 'benfica': 'SLB',
     'fc porto': 'FCP', 'porto': 'FCP', 'celtic': 'CEL', 'celtic fc': 'CEL', 'rangers': 'RAN', 'rangers fc': 'RAN', 'galatasaray': 'GAL', 'galatasaray sk': 'GAL',
     'fenerbahce': 'FEN', 'fenerbahçe': 'FEN', 'besiktas': 'BES', 'beşiktaş': 'BES', 'club brugge': 'BRU', 'boca juniors': 'BOC', 'river plate': 'RIV',
-    'flamengo': 'FLA', 'palmeiras': 'PAL', 'al nassr': 'ALN', 'al hilal': 'ALH', 'inter miami': 'MIA',
-    'argentina': 'ARG', 'brazil': 'BRA', 'brasil': 'BRA', 'france': 'FRA', 'england': 'ENG', 'spain': 'ESP', 'españa': 'ESP', 'germany': 'GER', 'deutschland': 'GER',
-    'italy': 'ITA', 'italia': 'ITA', 'portugal': 'POR', 'netherlands': 'NED', 'holland': 'NED', 'belgium': 'BEL', 'croatia': 'CRO', 'uruguay': 'URU', 'colombia': 'COL',
-    'united states': 'USA', 'usa': 'USA', 'usmnt': 'USA', 'mexico': 'MEX', 'nigeria': 'NGA', 'super eagles': 'NGA', 'senegal': 'SEN', 'morocco': 'MAR',
-    'egypt': 'EGY', 'ghana': 'GHA', 'ivory coast': 'CIV', 'cote d\'ivoire': 'CIV', 'japan': 'JPN', 'south korea': 'KOR', 'korea republic': 'KOR'
+    'flamengo': 'FLA', 'palmeiras': 'PAL', 'al nassr': 'ALN', 'al hilal': 'ALH', 'inter miami': 'MIA'
 };
 
 const getTla = (name: string, fallbackTla?: string) => {
@@ -114,7 +114,7 @@ const getTla = (name: string, fallbackTla?: string) => {
 const getLeagueHashtags = (leagueName: string) => {
     const map: Record<string, string> = {
         'Premier League': '#PremierLeague #EPL', 'La Liga': '#LaLiga', 'Bundesliga': '#Bundesliga', 'Serie A': '#SerieA',
-        'Ligue 1': '#Ligue1', 'Champions League': '#UCL #ChampionsLeague', 'Europa League': '#UEL', 'World Cup': '#WorldCup #FIFAWorldCup', 'Euros': '#Euro2024 #UEFA'
+        'Ligue 1': '#Ligue1', 'Champions League': '#UCL #ChampionsLeague', 'Europa League': '#UEL'
     };
     return map[leagueName] || `#${String(leagueName).replace(/[^a-zA-Z0-9]/g, '')}`;
 };
@@ -138,10 +138,16 @@ const compressPlayerName = (player: string) => {
 
 function parseTemplate(text: string, state: any, matchUrl: string, extra: any) {
     if (!text) return '';
-
     let processedText = text;
-    if (extra.activeCta && !processedText.includes('[CTA]') && !processedText.includes('[PRE_CTA]')) {
-        processedText = processedText.replace(/\[LINK\]/g, `${extra.activeCta}[LINK]`);
+
+    if (extra.activeCta) {
+        if (processedText.includes('[PRE_CTA]')) {
+            processedText = processedText.replace(/\[PRE_CTA\]/g, extra.activeCta);
+        } else if (processedText.includes('[CTA]')) {
+            processedText = processedText.replace(/\[CTA\]/g, extra.activeCta);
+        } else if (!processedText.includes('[LINK]')) {
+            processedText = processedText + `\n\n${extra.activeCta}`;
+        }
     }
 
     return processedText
@@ -153,8 +159,6 @@ function parseTemplate(text: string, state: any, matchUrl: string, extra: any) {
         .replace(/\[TIME\]/g, extra.time || '')
         .replace(/\[SCORER\]/g, extra.scorer || '')
         .replace(/\[STATUS\]/g, extra.statusText || '')
-        .replace(/\[CTA\]/g, extra.ctaText || '')
-        .replace(/\[PRE_CTA\]/g, extra.preMatchCta || '')
         .replace(/\[HASHTAGS\]/g, extra.hashtags || '');
 }
 
@@ -171,13 +175,13 @@ export async function POST(request: Request) {
     const oldStatus = String(oldState.status).toUpperCase();
     const newStatus = String(newState.status).toUpperCase();
     const strictlyFinishedStatuses = ['FT', 'FINISHED', 'ABD', 'AET', 'AWARDED'];
+    
     if (strictlyFinishedStatuses.includes(oldStatus) && strictlyFinishedStatuses.includes(newStatus)) {
         return NextResponse.json({ message: "Match already finished. Ignoring late correction." });
     }
 
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     const { data: settingsData } = await supabase.from('site_settings').select('social_config').single();
-    
     const config = settingsData?.social_config || { credentials: {}, vip_teams: [], vip_leagues: [], events: {}, templates: {} };
 
     const isVipTeam = (config.vip_teams || []).includes(newState.home_team) || (config.vip_teams || []).includes(newState.away_team);
@@ -194,17 +198,23 @@ export async function POST(request: Request) {
     }
 
     const frontendUrl = 'https://factsport.com'; 
-    const internalOrigin = new URL(request.url).origin; // 🟢 FIX 1: Extracts internal deployment origin to bypass Bot Protection
-    
+    const internalOrigin = new URL(request.url).origin; 
     const matchUrl = `${frontendUrl}/match/${newState.id}`; 
     const hashtags = `#${getTla(newState.home_team, newState.home_tla)}${getTla(newState.away_team, newState.away_tla)} ${getLeagueHashtags(newState.league)} #Football`; 
     
     let ctaText = "👇 Match Stats & Updates:\n";
-    let preMatchCta = "👇 See the tactical setup & subs here!\n";
+    let preMatchCta = "👇 See tactical setup & subs:\n";
+    
     if (newState.media_url || newState.stream_url) {
-        const isAudio = newState.media_mode === 'audio' || String(newState.media_url).includes('audio') || String(newState.media_url).includes('radio');
-        if (isAudio) { ctaText = "🎧 Listen to Live Commentary:\n👇\n"; preMatchCta = "🎧 Live radio coverage begins at kick-off!\n👇\n"; } 
-        else { ctaText = "📺 Watch Live Match Stream:\n👇\n"; preMatchCta = "📺 Live stream begins at kick-off!\n👇\n"; }
+        const streamTarget = newState.stream_url || newState.media_url;
+        const isAudio = newState.media_mode === 'audio' || String(streamTarget).includes('audio') || String(streamTarget).includes('radio');
+        if (isAudio) {
+            ctaText = `🎧 Listen to Live Audio Commentary:\n👉 ${streamTarget}\n\n👇 Match Stats:\n`;
+            preMatchCta = `🎧 Live radio coverage begins at kick-off:\n👉 ${streamTarget}\n\n👇 Team Lineups:\n`;
+        } else {
+            ctaText = `📺 Watch Live Match Stream:\n👉 ${streamTarget}\n\n👇 Live Stats:\n`;
+            preMatchCta = `📺 Live video stream begins at kick-off:\n👉 ${streamTarget}\n\n👇 Team Formations:\n`;
+        }
     }
 
     const oldTotal = (oldState.home_score || 0) + (oldState.away_score || 0);
@@ -248,7 +258,7 @@ export async function POST(request: Request) {
             const time = latest.time || latest.minute ? `${latest.time || latest.minute}' ` : '';
             extraData.scorer = `\n⚽ GOAL - ${player} (${time.trim()})\n`;
         } 
-        if (!extraData.scorer) extraData.scorer = `\n⚽ GOAL - Confirmed! Tap the link below for full details!\n`;
+        if (!extraData.scorer) extraData.scorer = `\n⚽ GOAL - Confirmed!\n`;
 
         ogPayload = { type: 'versus', label: ['PEN', 'PEN_SHOOT_OUT'].includes(newStatus) ? 'PENALTY SCORED' : 'GOAL ALERT!', home: newState.home_team, away: newState.away_team, hScore: newState.home_score, aScore: newState.away_score, homeLogo: newState.home_logo, awayLogo: newState.away_logo, homeTla: getTla(newState.home_team, newState.home_tla), awayTla: getTla(newState.away_team, newState.away_tla) };
     } 
@@ -310,11 +320,8 @@ export async function POST(request: Request) {
             const payloadEncoded = encodeBase64Safe(ogPayload);
             const internalFetchUrl = `${internalOrigin}/api/og?data=${payloadEncoded}`;
             const publicFallbackUrl = `${frontendUrl}/api/og?data=${payloadEncoded}`;
-            
-            // 🟢 Generates a micro-dynamic name so Supabase NEVER locks or caches the file
             const timestampKey = `match_${newState.id}_evt_${eventKey}_ts_${Date.now()}`; 
             
-            // Bypasses Cloudflare block by requesting from the internal Vercel Origin
             finalStaticImage = await secureStaticImage(internalFetchUrl, publicFallbackUrl, timestampKey, supabase);
         }
 
@@ -327,7 +334,7 @@ export async function POST(request: Request) {
         const postToBufferDirectly = async (text: string, safeImgUrl: string, profileId: string, token: string) => {
             const payload = {
                 query: "mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }",
-                variables: { input: { text: text || "", channelId: profileId, schedulingType: "automatic", mode: "shareNow", assets: [ { image: { url: safeImgUrl || "" } } ] } }
+                variables: { input: { text: text || "", channelId: profileId, schedulingType: "automatic", mode: "shareNow", assets: safeImgUrl && safeImgUrl.length > 5 ? [ { image: { url: safeImgUrl } } ] : [] } }
             };
             const res = await fetch("https://api.buffer.com/1/graphql", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify(payload) });
             return await res.json();

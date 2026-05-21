@@ -57,8 +57,6 @@ async function runLiveUpdate(request: Request) {
                          
                          payload.status = newStatus;
                          
-                         // 🛡️ THE SMART LOCK: ESPN can't touch goals if FD marked it FT. 
-                         // But if FD doesn't track this cup, ESPN can update it forever!
                          const isTrackedByFD = !!dbMatch.api_id;
                          if (!terminalStatuses.includes(dbMatch.status) || !isTrackedByFD) {
                              payload.home_score = espnGame.home_score;
@@ -68,13 +66,37 @@ async function runLiveUpdate(request: Request) {
                      }
 
                      if (richData) {
-                         payload.match_events = richData.events; payload.stats = richData.stats; payload.lineups = richData.lineups;
+                         payload.match_events = richData.events; 
+                         payload.stats = richData.stats; 
+                         payload.lineups = richData.lineups;
+                         
                          if (richData.venue) payload.venue = richData.venue;
+                         if (richData.stage) payload.stage = richData.stage;
+                         if (richData.match_group) payload.match_group = richData.match_group;
+                         
                          if (richData.referees && richData.referees.length > 0) payload.referees = richData.referees;
                          if (richData.predictor) payload.predictor = richData.predictor;
                      }
 
                      await supabase.from('matches').update(payload).eq('id', dbMatch.id);
+                     
+                     // 🟢 THE INTERNAL DISPATCH TRIGGER
+                     // Instantly forwards any critical status changes to the socials engine. No Webhook needed.
+                     const statusChangedToFT = newStatus === 'FT' && dbMatch.status !== 'FT';
+                     const scoresChanged = payload.home_score !== dbMatch.home_score || payload.away_score !== dbMatch.away_score;
+                     const lineupsAnnounced = dbMatch.status === 'SCHEDULED' && newStatus === 'LIVE';
+
+                     if (statusChangedToFT || scoresChanged || lineupsAnnounced) {
+                         const internalOrigin = new URL(request.url).origin;
+                         const targetRecord = { ...dbMatch, ...payload };
+                         
+                         fetch(`${internalOrigin}/api/socials`, {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
+                             body: JSON.stringify({ record: targetRecord, old_record: dbMatch })
+                         }).catch(e => console.error(" Late FT Broadcast Intercept Failed:", e.message));
+                     }
+
                      return true;
                  })();
                  syncTasks.push(updateTask); updates++; logs.push(`⚡ ESPN Synced: ${dbMatch.home_team}`);
@@ -86,5 +108,6 @@ async function runLiveUpdate(request: Request) {
 
   } catch (error: any) { return NextResponse.json({ error: error.message }, { status: 500 }); }
 }
+
 export async function GET(request: Request) { return runLiveUpdate(request); }
 export async function POST(request: Request) { return runLiveUpdate(request); }

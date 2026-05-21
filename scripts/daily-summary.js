@@ -12,16 +12,40 @@ if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+// Powered via 2.5-flash for strict context token processing speeds
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function postToBufferDirectly(text, safeImgUrl, profileId, token) { 
     if (!profileId || !token) return;
-    const hasImg = safeImgUrl && safeImgUrl.length > 5;
-    const query = hasImg ? `mutation($text: String!, $img: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow, assets: { images: [{ url: $img }] } }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }` : `mutation($text: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }`;
-    const variables = hasImg ? { text: text || "", img: safeImgUrl } : { text: text || "" };
-    try { await fetch("https://api.buffer.com/1/graphql", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ query, variables }) }); } catch (e) {}
+    
+    // Exact 2026 production compliant graph payload
+    const payload = {
+        query: "mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }",
+        variables: {
+            input: {
+                text: text || "",
+                channelId: profileId,
+                schedulingType: "automatic",
+                mode: "shareNow",
+                assets: safeImgUrl && safeImgUrl.length > 5 ? [ { image: { url: safeImgUrl } } ] : []
+            }
+        }
+    };
+
+    try { 
+        await fetch("https://api.buffer.com/1/graphql", { 
+            method: "POST", 
+            headers: { 
+                "Content-Type": "application/json", 
+                "Authorization": `Bearer ${token}` 
+            }, 
+            body: JSON.stringify(payload) 
+        }); 
+    } catch (e) {
+        console.error("Buffer Direct Post Failed:", e.message);
+    }
 }
 
 async function postToTelegram(botToken, chatId, text, parseMode = 'HTML') { 
@@ -30,7 +54,7 @@ async function postToTelegram(botToken, chatId, text, parseMode = 'HTML') {
 }
 
 async function generateDailySummaries() {
-    console.log("🌙 Starting Daily Matchday Analysis...");
+    console.log("🌙 Starting Hardcoded Daily Matchday Analysis...");
 
     const { data: settingsData } = await supabase.from('site_settings').select('social_config').single();
     const config = settingsData?.social_config || {};
@@ -48,13 +72,13 @@ async function generateDailySummaries() {
     const currentMonthYear = now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
     const dateSlug = now.toISOString().split('T')[0];
 
-    const { data: matches } = await supabase.from('matches').select('*').in('status', ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED']).gte('match_date', startOfDay).lte('match_date', endOfDay);
+    const { data: matches } = await supabase.from('matches').select('*').in('status', ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD']).gte('match_date', startOfDay).lte('match_date', endOfDay);
 
-    if (!matches || matches.length === 0) { console.log("   💤 No finished matches found for this date."); return; }
+    if (!matches || matches.length === 0) { console.log(" 💤 No finished matches found for this date."); return; }
 
     const reportSlug = `matchday-roundup-${dateSlug}`;
     const { data: existing } = await supabase.from('news').select('id').eq('slug', reportSlug).single();
-    if (existing) { console.log(`   ⏩ Daily Round-Up already published for ${dateSlug}.`); return; }
+    if (existing) { console.log(` ⏩ Daily Round-Up already published for ${dateSlug}.`); return; }
 
     const leagues = {};
     matches.forEach(m => {
@@ -62,48 +86,63 @@ async function generateDailySummaries() {
         leagues[m.league].push(m);
     });
 
-    let matchSummaries = "";
+    let factualDataPayload = "";
     for (const [leagueName, leagueMatches] of Object.entries(leagues)) {
-        matchSummaries += `\n${leagueName.toUpperCase()}:\n`;
+        factualDataPayload += `\nCOMPETITION: ${leagueName.toUpperCase()}\n`;
+        
         leagueMatches.forEach(m => {
-            matchSummaries += `- ${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team} | EXACT SHORTCODE TO USE: [MATCH_WIDGET:${m.id}]\n`;
+            // Determine match format details cleanly
+            const isCupTie = ['Champions League', 'Europa League', 'FA Cup', 'World Cup', 'Euros'].includes(m.league);
+            const venueProfile = isCupTie ? `Tournament Venue Setting (Check if neutral final/knockout)` : `Domestic League Home Ground`;
+            
+            // Format score logs safely including any penalty scores explicitly
+            let scoreLine = `${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team}`;
+            if (m.status === 'PEN' && m.stats?.home_penalties !== null) {
+                scoreLine += ` (${m.stats.home_penalties}-${m.stats.away_penalties} on penalties)`;
+            }
+
+            // Extract explicit true event logs directly from the database schema
+            const trueEvents = Array.isArray(m.match_events) 
+                ? m.match_events.filter(e => e.type === 'goal' || e.type === 'red-card').map(e => `[${e.time}] ${e.text}: ${e.player}`).join('; ')
+                : "No major event details logged.";
+
+            factualDataPayload += `MATCH ID: ${m.id}\n- Core Score: ${scoreLine}\n- Ground Setting: ${venueProfile}\n- Logged Key Events: ${trueEvents}\n- EXACT SHORTCODE TO USE: [MATCH_WIDGET:${m.id}]\n\n`;
         });
     }
 
     const prompt = `
         You are a gritty, veteran European football pundit writing for 'FactSport'.
-        Write a direct, engaging "Daily Matchday Round-Up" article covering ALL the specific final scores listed below. 
+        Write a direct, professional, completely factual "Daily Matchday Round-Up" article.
         
         TODAY'S EXACT DATE: ${exactDateString} (Current reality is ${currentMonthYear}).
         
-        RESULTS TO DISCUSS (DO NOT ALTER THESE SCORES):
-        ${matchSummaries}
+        CRITICAL DATA ENVELOPE (THIS IS YOUR ONLY SOURCE OF TRUTH. SEARCHING IS DISABLED):
+        ${factualDataPayload}
 
-        STRICT FACTUAL & TONAL GUIDELINES:
-        1. LIVE SEARCH MANDATORY: Use Google Search to look up actual goalscorers and major context from these specific matches today. 
-        2. ANTI-HALLUCINATION & FAIL-SAFE: If search returns no recent news for a game, simply analyze the raw scoreline confidently. NEVER complain to the reader about missing data. Do not use phrases like "Due to lack of information" or "With no available data". Write smoothly based on team reputations and the final score.
-        3. HUMAN HEADLINE RULES: Create a 100% realistic, gritty journalistic headline under 10 words. NO colons. NO puns. NO markdown. Write exactly like a veteran editor. 
-           - BAD: "Matchday Roundup: Madrid Stumbles as Bayern Secures Victory"
-           - GOOD: "Late heartbreak for Madrid as Bayern seize group control"
-        4. TONE CHECK: Write directly to the reader. Be opinionated but completely accurate. Do NOT use repetitive AI filler words like "Furthermore", "Delve into", "Tapestry", or "In conclusion". 
+        STRICT RULES TO PREVENT ALL HALLUCINATIONS:
+        1. ZERO GUESSING ALLOWED: Write *only* about the matches, scores, scorers, and times provided above. If an event or goalscorer is not explicitly listed in the data payload, do not invent one. Focus your commentary entirely on the tactical impact of the final result.
+        2. TOURNAMENT AND VENUE CONTEXT: Pay attention to the competition. If it is a Cup tie or Tournament (like World Cup or Champions League), frame the analysis around progression, knockout stakes, or lifting the trophy. If it is a league match, focus on standings and points.
+        3. HUMAN HEADLINE RULES: Create a 100% realistic, gritty journalistic headline under 10 words. NO colons. NO puns. NO markdown symbols. Write exactly like a veteran editor. 
+        4. ANTI-AI FILLER: Avoid repetitive filler like "Furthermore", "Delve into", "Tapestry", or "In conclusion". Write punchy, human-like news.
         5. EMBEDDING MATCHES: When you finish discussing a match result, paste its "EXACT SHORTCODE TO USE" on a brand new line all by itself.
-        6. LENGTH: 500-800 words. Plain text only. 
-        7. FB_POST: At the very end, skip a line and write "FB_POST:" followed by a Facebook post mentioning ALL major results. No emojis.
+        6. LENGTH: 400-700 words. Plain text markdown format. 
+        7. FB_POST: At the very end, skip a line and write "FB_POST:" followed by a professional Facebook summary tracking major scores. No emojis.
     `;
 
     try {
-        const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ googleSearch: {} }] });
+        // 🟢 SEARCH TOOL IS ABSOLUTELY DISABLED HERE TO FORCE THE ANTI-HALLUCINATION GATE
+        const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
         const text = (await result.response).text();
 
         const splitText = text.split('FB_POST:');
         const articleContent = splitText[0].trim();
-        const generatedFbText = splitText.length > 1 ? splitText[1].trim() : "🏁 FULL TIME! Absolute drama on the pitch today. 🤯 Tap the link for our complete Round-Up! 👇";
+        const generatedFbText = splitText.length > 1 ? splitText[1].trim() : "🏁 FULL TIME! Absolute drama on the pitch today. Tap the link for our complete Round-Up! 👇";
 
         const lines = articleContent.split('\n').filter(line => line.trim() !== '');
         const headline = lines[0].replace(/^#+\s*/, '').replace(/[\*"]/g, ''); 
         const body = lines.slice(1).join('\n').trim();
 
-        const giants = ['Arsenal','Chelsea','Liverpool','Man City','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG'];
+        const giants = ['Arsenal','Chelsea','Liverpool','Man City','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG', 'Aston Villa'];
         let featureMatch = matches.find(g => giants.some(t => g.home_team.includes(t) || g.away_team.includes(t))) || matches[0];
 
         const { error } = await supabase.from('news').insert([{
@@ -112,9 +151,9 @@ async function generateDailySummaries() {
             is_breaking: false, is_headline: false  
         }]);
 
-        if (error) { console.error(`   ❌ Supabase DB Error:`, error.message); return; }
+        if (error) { console.error(` ❌ Supabase DB Error:`, error.message); return; }
         
-        console.log(`   ✅ Published: ${headline}`);
+        console.log(` ✅ Published Summary: ${headline}`);
         const articleUrl = `https://factsport.com/news/${reportSlug}`;
 
         try { fetch('https://factsport.com/api/index-url', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` }, body: JSON.stringify({ url: articleUrl, type: 'URL_UPDATED' }) }).catch(()=>{}); } catch (e) {}
@@ -144,7 +183,7 @@ async function generateDailySummaries() {
                 }
             }
         }
-    } catch (e) { console.error(`   🔥 Gemini Error: ${e.message}`); }
+    } catch (e) { console.error(` 🔥 Gemini Error: ${e.message}`); }
 }
 
 generateDailySummaries();

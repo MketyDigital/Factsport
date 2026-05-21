@@ -7,7 +7,7 @@ const GEMINI_KEY = process.env.GEMINI_NEWS_KEY;
 const FD_API_KEY = process.env.FOOTBALL_DATA_API_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) { 
-    console.error("❌ Missing Keys. Make sure SUPABASE, GEMINI, and FOOTBALL_DATA keys are set."); 
+    console.error("❌ Missing Keys."); 
     process.exit(1); 
 }
 
@@ -17,7 +17,7 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const ESPN_LEAGUES = { 'Premier League': 'eng.1', 'La Liga': 'esp.1', 'Bundesliga': 'ger.1', 'Serie A': 'ita.1', 'Ligue 1': 'fra.1', 'Champions League': 'uefa.champions', 'Europa League': 'uefa.europa', 'FA Cup': 'eng.fa' };
+const ESPN_LEAGUES = { 'Premier League': 'eng.1', 'La Liga': 'esp.1', 'Bundesliga': 'ger.1', 'Serie A': 'ita.1', 'Ligue 1': 'fra.1', 'Champions League': 'uefa.champions', 'Europa League': 'uefa.europa', 'FA Cup': 'eng.fa', 'World Cup': 'fifa.world', 'Euros': 'uefa.euro' };
 const FD_LEAGUES = { 'Premier League': 'PL', 'La Liga': 'PD', 'Bundesliga': 'BL1', 'Serie A': 'SA', 'Ligue 1': 'FL1', 'Champions League': 'CL' };
 
 const getCanonicalName = (rawName) => {
@@ -33,17 +33,16 @@ const isStrongMatch = (dbName, apiName) => {
     return s1.includes(s2) || s2.includes(s1);
 };
 
-// 🟢 HYBRID STANDINGS CACHE
 const standingsCache = {};
 
 async function getLeagueStandings(leagueName) {
     const mappedLeague = FD_LEAGUES[leagueName];
-    if (!mappedLeague) return "Standings unavailable.";
+    if (!mappedLeague) return "TOURNAMENT PROFILE: Cup/Knockout system active. Standings table not applicable. Focus context entirely on single-elimination stakes.";
     
     if (standingsCache[mappedLeague]) return standingsCache[mappedLeague];
 
     const domesticLeagues = ['PL', 'PD', 'BL1', 'SA', 'FL1']; 
-    if (!domesticLeagues.includes(mappedLeague)) return "Tournament/Cup tie - League table not applicable. Focus strictly on knockout stakes, recent form, and H2H.";
+    if (!domesticLeagues.includes(mappedLeague)) return "TOURNAMENT PROFILE: Cup/Knockout format tie. Standings mapping omitted.";
 
     try {
         if (FD_API_KEY) {
@@ -57,7 +56,7 @@ async function getLeagueStandings(leagueName) {
                 }
             }
         }
-    } catch (e) { console.log(`⚠️ Live API failed for ${leagueName}, falling back to DB cache...`); }
+    } catch (e) {}
 
     try {
         const { data: dbStandings, error } = await supabase.from('standings').select('position, team_short_name, team_name, points').eq('league_code', mappedLeague).order('position', { ascending: true });
@@ -68,7 +67,7 @@ async function getLeagueStandings(leagueName) {
         }
     } catch (e) {} 
     
-    return "Standings unavailable.";
+    return "Standings current slate configuration unavailable.";
 }
 
 async function getMatchContext(leagueName, dateString, homeTeam, awayTeam) {
@@ -101,7 +100,7 @@ async function getMatchContext(leagueName, dateString, homeTeam, awayTeam) {
                         contextStr += `[FORM] ${sData.form[0].team.displayName}: ${sData.form[0].events.map(e=>e.teamResult).join('')} | ${sData.form[1].team.displayName}: ${sData.form[1].events.map(e=>e.teamResult).join('')} `;
                     }
                     if (sData.headToHead?.games?.length > 0) {
-                        contextStr += `| [H2H] ${sData.headToHead.games.slice(0, 3).map(g => `${g.homeTeam.abbrev} ${g.homeTeam.score}-${g.awayTeam.score} ${g.awayTeam.abbrev}`).join(', ')}`;
+                        contextStr += `| [H2H HISTORY] ${sData.headToHead.games.slice(0, 3).map(g => `${g.homeTeam.abbrev} ${g.homeTeam.score}-${g.awayTeam.score} ${g.awayTeam.abbrev}`).join(', ')}`;
                     }
                     espnSuccess = true; break;
                 }
@@ -115,19 +114,20 @@ async function getMatchContext(leagueName, dateString, homeTeam, awayTeam) {
             const data = await res.json();
             if (data.matches) {
                 const homeForm = data.matches.filter(m => isStrongMatch(m.homeTeam.name, homeTeam) || isStrongMatch(m.awayTeam.name, homeTeam)).slice(-3).map(m => `${m.homeTeam.shortName} ${m.score.fullTime.home}-${m.score.fullTime.away} ${m.awayTeam.shortName}`).join(', ');
-                contextStr = `[RECENT RESULTS FALLBACK] ${homeTeam}: ${homeForm || 'N/A'}`;
+                contextStr = `[RECENT TIES FALLBACK DATA] ${homeTeam}: ${homeForm || 'N/A'}`;
             }
         } catch(e) {}
     }
-    return contextStr || "[NO H2H/FORM FOUND - Base analysis on general team strength]";
+    return contextStr || "[NO FORM STRINGS ATTACHED - Contextualize purely on general historical pedigree]";
 }
 
 async function postToBufferDirectly(text, safeImgUrl, profileId, token) { 
     if (!profileId || !token) return;
-    const hasImg = safeImgUrl && safeImgUrl.length > 5;
-    const query = hasImg ? `mutation($text: String!, $img: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow, assets: { images: [{ url: $img }] } }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }` : `mutation($text: String!) { createPost(input: { text: $text, channelId: "${profileId}", schedulingType: automatic, mode: shareNow }) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }`;
-    const variables = hasImg ? { text: text || "", img: safeImgUrl } : { text: text || "" };
-    try { await fetch("https://api.buffer.com/1/graphql", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ query, variables }) }); } catch (e) {}
+    const payload = {
+        query: "mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }",
+        variables: { input: { text: text || "", channelId: profileId, schedulingType: "automatic", mode: "shareNow", assets: safeImgUrl && safeImgUrl.length > 5 ? [ { image: { url: safeImgUrl } } ] : [] } }
+    };
+    try { await fetch("https://api.buffer.com/1/graphql", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify(payload) }); } catch (e) {}
 }
 
 async function postToTelegram(botToken, chatId, text, parseMode = 'HTML') { 
@@ -136,7 +136,7 @@ async function postToTelegram(botToken, chatId, text, parseMode = 'HTML') {
 }
 
 async function generateDailyPreview() {
-    console.log("☀️ Starting Daily Preview...");
+    console.log("☀️ Starting Sealed Daily Preview Engine...");
 
     const { data: settingsData } = await supabase.from('site_settings').select('social_config').single();
     const config = settingsData?.social_config || {};
@@ -154,11 +154,11 @@ async function generateDailyPreview() {
 
     const { data: matches } = await supabase.from('matches').select('*').neq('status', 'FT').gte('match_date', startOfDay).lte('match_date', endOfDay);
 
-    if (!matches || matches.length === 0) { console.log("   💤 No matches scheduled today."); return; }
+    if (!matches || matches.length === 0) { console.log(" 💤 No matches scheduled today."); return; }
 
     const reportSlug = `daily-briefing-${dateSlug}`;
     const { data: existing } = await supabase.from('news').select('id').eq('slug', reportSlug).single();
-    if (existing) { console.log("   ⏩ Preview already published."); return; }
+    if (existing) { console.log(" ⏩ Preview already published."); return; }
 
     const leagues = {};
     matches.forEach(m => {
@@ -169,12 +169,19 @@ async function generateDailyPreview() {
     let briefingData = "";
     for (const [league, games] of Object.entries(leagues)) {
         const tableStr = await getLeagueStandings(league);
-        briefingData += `\n${league.toUpperCase()} CONTEXT:\n${tableStr}\n\nFIXTURES TODAY:\n`;
+        briefingData += `\nCOMPETITION: ${league.toUpperCase()}\n${tableStr}\n\nFIXTURES SCHEDULED:\n`;
         
         for (const g of games) {
             const time = new Date(g.match_date).toLocaleTimeString('en-GB', {timeZone: 'UTC', hour: '2-digit', minute:'2-digit'});
             const h2hStr = await getMatchContext(g.league, g.match_date, g.home_team, g.away_team);
-            briefingData += `- ${g.home_team} vs ${g.away_team} at ${time} GMT.\n  STATS CHEAT SHEET: ${h2hStr}\n  EXACT SHORTCODE TO USE: [MATCH_WIDGET:${g.id}]\n\n`;
+            
+            // Explicit tracking for dynamic broadcasting metrics
+            let liveCoverageString = "Match Center Tracking Available.";
+            if (g.stream_url || g.media_url) {
+                liveCoverageString = g.media_mode === 'audio' ? `Live Commentary Audio Active` : `Live Stream Broadcast Active`;
+            }
+
+            briefingData += `- ${g.home_team} vs ${g.away_team} at ${time} UTC.\n  BROADCAST METRIC: ${liveCoverageString}\n  STATS CHEAT SHEET: ${h2hStr}\n  EXACT SHORTCODE TO USE: [MATCH_WIDGET:${g.id}]\n\n`;
         }
     }
 
@@ -185,23 +192,22 @@ async function generateDailyPreview() {
         
         TODAY'S EXACT DATE: ${exactDateString} (Current reality is ${currentMonthYear}).
         
-        FACTUAL CONTEXT (THIS IS YOUR ONLY SOURCE OF TRUTH):
+        FACTUAL CONTEXT (THIS IS YOUR ONLY SOURCE OF TRUTH. SEARCHING IS DISABLED):
         ${briefingData}
 
-        STRICT RULES:
-        1. USE THE CHEAT SHEET: You MUST base your analysis of each team's form, motivation, and standing purely on the "CONTEXT" and "STATS CHEAT SHEET" provided above. Do not invent past results. 
-        2. TONE & FAIL-SAFE: Punchy, direct, and authoritative. NEVER apologize for lack of data. NEVER say "Information is limited." If the cheat sheet is sparse, lean entirely on your expert knowledge of these clubs' historical pedigree and general playstyles.
-        3. NO BANNED WORDS: Never use "Moreover", "Furthermore", "Delve into", "Tapestry", or "A thrilling encounter".
-        4. HUMAN HEADLINE: Create a 100% realistic, gritty journalistic headline under 10 words. NO colons. NO puns. NO markdown symbols. Do not use generic words like "Showdown" or "Clash". 
-           - BAD: "A Thrilling Encounter: Arsenal Face Chelsea in London Derby"
-           - GOOD: "Arsenal face ultimate title test as Chelsea visit Emirates"
-        5. SEARCH TOOL FALLBACK: Only use Google Search if you need to check for a major, breaking injury that happened TODAY.
+        STRICT PROMPT CAGE TO PREVENT HALLUCINATIONS:
+        1. NO IMAGINED RESULTS: You MUST base your analysis of form, metrics, and motivation purely on the factual data block provided above. Do not invent scores or guess player lists.
+        2. COMPLEMENTARY MEDIA INJECTION: If a fixture has a "BROADCAST METRIC" listing live audio or video streams, prominently state in that match section that fans can access live streams/commentary explicitly inside the FactSport Match Center.
+        3. TOURNAMENT TYPE MODELING: Differentiate your narrative style dynamically. If the competition data block notes a Cup/Knockout tie (such as Champions League knockout stages, Cups, World Cup or Euro formats), ignore point margins and focus entirely on high-stakes, single-elimination context.
+        4. BANNED WORDS: Never use "Moreover", "Furthermore", "Delve into", "Tapestry", or "A thrilling encounter".
+        5. HUMAN HEADLINE: Create a 100% realistic, gritty journalistic headline under 10 words. NO colons. NO puns. NO markdown.
         6. EMBEDDING MATCHES: After you finish analyzing a match, paste its "EXACT SHORTCODE TO USE" on a brand new line all by itself.
-        7. FB_POST: At the very end, skip a line and write "FB_POST:" followed by a Facebook summary of today's slate.
+        7. FB_POST: At the very end, skip a line and write "FB_POST:" followed by a professional Facebook summary.
     `;
 
     try {
-        const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ googleSearch: {} }] });
+        // 🟢 SEARCH ENGINE REMOVED TO PREVENT HALLUCINATORY DATA INTERPRETATIONS
+        const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
         const text = (await result.response).text();
 
         const splitText = text.split('FB_POST:');
@@ -212,7 +218,7 @@ async function generateDailyPreview() {
         const headline = lines[0].replace(/^#+\s*/, '').replace(/[\*"]/g, ''); 
         const body = lines.slice(1).join('\n').trim();
 
-        const giants = ['Arsenal','Chelsea','Liverpool','Man City','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG'];
+        const giants = ['Arsenal','Chelsea','Liverpool','Man City','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG', 'Aston Villa'];
         let featureMatch = matches.find(g => giants.some(t => g.home_team.includes(t) || g.away_team.includes(t))) || matches[0];
 
         const { error } = await supabase.from('news').insert([{
@@ -221,9 +227,9 @@ async function generateDailyPreview() {
             is_breaking: false, is_headline: false  
         }]);
 
-        if (error) { console.error(`   ❌ Supabase DB Error:`, error.message); return; }
+        if (error) { console.error(` ❌ Supabase DB Error:`, error.message); return; }
         
-        console.log(`   ✅ Published Preview: ${headline}`);
+        console.log(` ✅ Published Preview: ${headline}`);
         const articleUrl = `https://factsport.com/news/${reportSlug}`;
 
         try { fetch('https://factsport.com/api/index-url', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` }, body: JSON.stringify({ url: articleUrl, type: 'URL_UPDATED' }) }).catch(()=>{}); } catch (e) {}
@@ -253,7 +259,7 @@ async function generateDailyPreview() {
                 }
             }
         }
-    } catch (e) { console.error(`   🔥 Gemini Error: ${e.message}`); }
+    } catch (e) { console.error(` 🔥 Gemini Error: ${e.message}`); }
 }
 
 generateDailyPreview();
