@@ -1,14 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
 import { Radio, Tv, Mic, Save, Loader2, CheckCircle2, AlertCircle, Power } from 'lucide-react';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!, 
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { updateStudioSettings } from './actions'; // 🟢 Imports our new secure Server Action
 
 export default function StudioClient({ initialData }: { initialData: any }) {
     const router = useRouter(); 
@@ -37,13 +31,14 @@ export default function StudioClient({ initialData }: { initialData: any }) {
                 is_active: isActive
             });
 
-        if (error) {
-            setMessage({ type: 'error', text: `Failed to save: ${error.message}` });
+        if (result.error) {
+            setMessage({ type: 'error', text: `Failed to save: ${result.error}` });
         } else {
             setMessage({ type: 'success', text: 'Studio broadcast settings updated successfully!' });
             router.refresh(); 
             setTimeout(() => setMessage(null), 4000);
         }
+        
         setIsSaving(false);
     };
 
