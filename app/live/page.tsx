@@ -1,5 +1,6 @@
 export const runtime = 'edge';
-export const revalidate = 3; // 🟢 THE SHIELD: Caches for 15s. Max 4 DB calls per minute regardless of traffic!
+export const dynamic = 'force-dynamic'; 
+export const fetchCache = 'force-no-store'; 
 
 import { createClient } from '@supabase/supabase-js'; 
 import Link from 'next/link';
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
 export default async function LiveMediaPage() {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-  // 🟢 The Time Bounding Box: Kills "ghost" matches from days ago.
+  // 🟢 FIX 1: The Time Bounding Box. Kills "ghost" matches from days ago.
   const now = Date.now();
   const lookBack = new Date(now - (24 * 60 * 60 * 1000)).toISOString(); // 24 hours ago
   const lookForward = new Date(now + (48 * 60 * 60 * 1000)).toISOString(); // 48 hours ahead
@@ -32,7 +33,7 @@ export default async function LiveMediaPage() {
     .lt('match_date', lookForward)
     .order('match_date', { ascending: true });
 
-  // Fetch Studio Data 
+  // 🟢 FIX 2: Fetches fresh Studio Data (Protected by force-dynamic)
   const { data: studioData } = await supabase.from('global_studio').select('*').eq('id', 1).single();
 
   // Loose boolean check just in case DB returns a string
