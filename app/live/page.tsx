@@ -1,5 +1,6 @@
 export const runtime = 'edge';
-export const revalidate = 3; 
+export const dynamic = 'force-dynamic'; 
+export const fetchCache = 'force-no-store'; 
 
 import { createClient } from '@supabase/supabase-js'; 
 import Link from 'next/link';
@@ -8,8 +9,6 @@ import { ChevronLeft, Radio, MessageCircle } from 'lucide-react';
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import FactSportMediaRoom from '@/app/components/FactSportMediaRoom'; 
 import FanZoneChat from '@/app/components/FanZoneChat'; 
-
-// 🟢 NEW: Imports the Timezone-Aware Client
 import LiveMediaClient from '@/app/components/LiveMediaClient'; 
 
 export const metadata: Metadata = {
@@ -20,16 +19,25 @@ export const metadata: Metadata = {
 export default async function LiveMediaPage() {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-  // Fetch ALL active/upcoming matches to let the client filter strictly by local timezone
+  // 🟢 FIX 1: The Time Bounding Box. Kills "ghost" matches from days ago.
+  const now = Date.now();
+  const lookBack = new Date(now - (24 * 60 * 60 * 1000)).toISOString(); // 24 hours ago
+  const lookForward = new Date(now + (48 * 60 * 60 * 1000)).toISOString(); // 48 hours ahead
+
+  // Fetch ALL active/upcoming matches within the strict time window
   const { data: matches } = await supabase
     .from('matches')
     .select('*')
     .not('status', 'in', '("FT","FINISHED","AET","PEN","AWARDED","ABD")')
+    .gt('match_date', lookBack)
+    .lt('match_date', lookForward)
     .order('match_date', { ascending: true });
 
+  // 🟢 FIX 2: Fetches fresh Studio Data (Protected by force-dynamic)
   const { data: studioData } = await supabase.from('global_studio').select('*').eq('id', 1).single();
 
-  const isStudioActive = studioData?.is_active;
+  // Loose boolean check just in case DB returns a string
+  const isStudioActive = studioData?.is_active === true || studioData?.is_active === 'true';
   const globalMediaUrl = studioData?.video_url || studioData?.audio_url || null;
   const studioTitle = studioData?.title || "Goal Rush Studio";
 
