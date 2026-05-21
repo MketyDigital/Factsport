@@ -28,7 +28,6 @@ export const normalizeName = (name: string) => {
 };
 
 export async function fetchEspnLive(leagueCode: string) {
-  // 🔥 THE FIX: Cache-busting timestamp forces Next.js to pull fresh data every time
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueCode}/scoreboard?_=${Date.now()}`;
   try {
     const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
@@ -56,14 +55,12 @@ export async function fetchEspnLive(leagueCode: string) {
 }
 
 export async function fetchEspnDetails(gameId: string) {
-  // 🔥 THE FIX: Cache-busting timestamp
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${gameId}&_=${Date.now()}`;
   try {
     const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
     if (!res.ok) return null;
     const data = await res.json();
 
-    // 🛡️ THE FIX: Safe exit if ESPN returns a broken payload
     if (!data || !data.header) return null;
 
     const comps = data.header.competitions?.[0];
@@ -72,6 +69,18 @@ export async function fetchEspnDetails(gameId: string) {
     const homeId = String(homeCompetitor?.team?.id || '');
     const homeTeamName = homeCompetitor?.team?.displayName || '';
     const awayTeamName = awayCompetitor?.team?.displayName || '';
+
+    // 🟢 DEEP ESPN METADATA AUDIT: Extract specific stage names and groups
+    let stageName = comps?.type?.abbreviation || comps?.type?.text || data.header.season?.type?.text || null;
+    let groupName = null;
+    
+    if (comps?.notes && Array.isArray(comps.notes)) {
+        const groupNote = comps.notes.find((n: any) => n.headline?.includes('Group'));
+        if (groupNote) {
+            groupName = groupNote.headline;
+            stageName = 'Group Stage';
+        }
+    }
 
     const venue = data.gameInfo?.venue?.fullName || null;
     const referees = data.gameInfo?.officials?.map((o: any) => o.displayName || o.fullName) || [];
@@ -259,7 +268,9 @@ export async function fetchEspnDetails(gameId: string) {
         lineups, 
         venue,        
         referees,     
-        predictor     
+        predictor,
+        stage: stageName,     // 🟢 NEW: EXPLICITLY RETURN STAGE
+        match_group: groupName // 🟢 NEW: EXPLICITLY RETURN GROUP
     };
 
   } catch (err) { 

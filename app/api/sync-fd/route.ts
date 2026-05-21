@@ -38,7 +38,6 @@ export async function GET(request: Request) {
         let logs: string[] = [];
         const leaguesNeedingStandingsUpdate = new Set<string>();
 
-        // 🟢 1. FETCH UPCOMING MATCHES
         const res = await fetch(`https://api.football-data.org/v4/matches?dateFrom=${fromStr}&dateTo=${toStr}`, { 
             headers: { 'X-Auth-Token': API_KEY } 
         });
@@ -51,7 +50,7 @@ export async function GET(request: Request) {
                 const apiIds = fdMatches.map((m: any) => m.id);
                 const { data: dbMatches } = await supabase
                     .from('matches')
-                    .select('id, api_id, status, home_score, away_score, espn_id')
+                    .select('*') // Grabs the full structural row footprint for social forwarding
                     .in('api_id', apiIds);
 
                 const dbMap = new Map(dbMatches?.map(m => [m.api_id, m]) || []);
@@ -90,6 +89,16 @@ export async function GET(request: Request) {
                         if (dbMatch.status !== 'FT' || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
                             shouldUpdateMatch = true;
                             leaguesNeedingStandingsUpdate.add(compCode); 
+                            
+                            // 🟢 FIX 2: TRIGGER FALLBACK SOCIAL DELIVERY FOR LATE RESULTS
+                            const internalOrigin = new URL(request.url).origin;
+                            const targetRecord = { ...dbMatch, home_score: fdHomeScore, away_score: fdAwayScore, status: 'FT' };
+                            
+                            fetch(`${internalOrigin}/api/socials`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
+                                body: JSON.stringify({ record: targetRecord, old_record: dbMatch })
+                            }).catch(e => console.error(" Late FT Broadcast Intercept Failed:", e.message));
                         }
                     } 
                     else if (hasEspnId && (fdStatusMapped === 'LIVE' || fdStatusMapped === 'HT' || isDbLive)) {
@@ -124,29 +133,26 @@ export async function GET(request: Request) {
             }
         }
 
-        // 🟢 2. AUTOMATIC SELF-HEALING LAYER (Checks for completely empty tables in DB)
         const { data: existingStandings } = await supabase.from('standings').select('league_code');
         const presentLeagues = new Set(existingStandings?.map(s => s.league_code) || []);
         
         TARGET_LEAGUES.forEach(league => {
             if (!presentLeagues.has(league) && league !== 'EC' && league !== 'WC') {
                 leaguesNeedingStandingsUpdate.add(league);
-                logs.push(`🛡️ Self-Healing Triggered: ${league} table was missing from database!`);
+                logs.push(`🛡️ Self-Healing Triggered: ${league} table fetched.`);
             }
         });
 
-        // 🟢 3. BACKGROUND CLOCK TRIGGER (Runs full audit of ALL leagues every 30 minutes)
         const currentMinutes = today.getUTCMinutes();
-        const isHalfHourInterval = currentMinutes >= 0 && currentMinutes < 5 || currentMinutes >= 30 && currentMinutes < 35;
+        const isHalfHourInterval = (currentMinutes >= 0 && currentMinutes < 5) || (currentMinutes >= 30 && currentMinutes < 35);
         
         if (isHalfHourInterval || forceSync) {
             TARGET_LEAGUES.forEach(league => leaguesNeedingStandingsUpdate.add(league));
-            logs.push(`⏱️ Background Clock Audit: Syncing all leagues to keep data 100% fresh.`);
+            logs.push(`⏱️ Background Clock Audit: Syncing tables.`);
         }
 
         const targetStandingsLeagues = Array.from(leaguesNeedingStandingsUpdate).filter(l => l !== 'EC' && l !== 'WC');
 
-        // 🟢 4. EXECUTE BATCH DOWNLOADS
         if (targetStandingsLeagues.length > 0) {
             const standingsFetches = targetStandingsLeagues.map(leagueId => 
                 fetch(`https://api.football-data.org/v4/competitions/${leagueId}/standings`, { 
@@ -187,7 +193,6 @@ export async function GET(request: Request) {
             });
 
             if (allStandingsToInsert.length > 0 && successfulLeagues.length > 0) {
-                // Wipe and replace ONLY the channels that returned successful data streams
                 await supabase.from('standings').delete().in('league_code', successfulLeagues);
                 const { error: stdErr } = await supabase.from('standings').insert(allStandingsToInsert);
                 
