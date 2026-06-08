@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -200,13 +201,12 @@ async function generateDailyPreview() {
         2. COMPLEMENTARY MEDIA INJECTION: If a fixture has a "BROADCAST METRIC" listing live audio or video streams, prominently state in that match section that fans can access live streams/commentary explicitly inside the FactSport Match Center.
         3. TOURNAMENT TYPE MODELING: Differentiate your narrative style dynamically. If the competition data block notes a Cup/Knockout tie (such as Champions League knockout stages, Cups, World Cup or Euro formats), ignore point margins and focus entirely on high-stakes, single-elimination context.
         4. BANNED WORDS: Never use "Moreover", "Furthermore", "Delve into", "Tapestry", or "A thrilling encounter".
-        5. HUMAN HEADLINE: Create a 100% realistic, gritty journalistic headline under 10 words. NO colons. NO puns. NO markdown.
+        5. HUMAN HEADLINE: Create a 100% human-like, realistic, gritty journalistic headline under 10 words. Think like a top editor. NO colons. NO puns. NO markdown. Treat this seriously.
         6. EMBEDDING MATCHES: After you finish analyzing a match, paste its "EXACT SHORTCODE TO USE" on a brand new line all by itself.
         7. FB_POST: At the very end, skip a line and write "FB_POST:" followed by a professional Facebook summary.
     `;
 
     try {
-        // 🟢 SEARCH ENGINE REMOVED TO PREVENT HALLUCINATORY DATA INTERPRETATIONS
         const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
         const text = (await result.response).text();
 
@@ -247,8 +247,8 @@ async function generateDailyPreview() {
         if (previewConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) { await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fbText, x_text: xText, x_image_url: null }) }).catch(()=>{}); }
         if (previewConfig.make2 && creds.make_webhook_2) { await fetch(creds.make_webhook_2, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fbText, x_text: xText, x_image_url: null }) }).catch(()=>{}); }
         
-        if (previewConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) { const pageId = creds.fb1_id || process.env.FB_PAGE_ID; const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN; await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed?message=${encodeURIComponent(fbText)}&access_token=${token}`, { method: 'POST' }).catch(()=>{}); }
-        if (previewConfig.fb2 && creds.fb2_id && creds.fb2_token) { await fetch(`https://graph.facebook.com/v19.0/${creds.fb2_id}/feed?message=${encodeURIComponent(fbText)}&access_token=${creds.fb2_token}`, { method: 'POST' }).catch(()=>{}); }
+        if (previewConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) { const pageId = creds.fb1_id || process.env.FB_PAGE_ID; const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN; await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed?message=${encodeURIComponent(fbText)}&access_token=${token}`, { method: 'POST' }).then(async r => { if(!r.ok) console.error("FB1 Error:", await r.text()); }).catch(()=>{}); }
+        if (previewConfig.fb2 && creds.fb2_id && creds.fb2_token) { await fetch(`https://graph.facebook.com/v19.0/${creds.fb2_id}/feed?message=${encodeURIComponent(fbText)}&access_token=${creds.fb2_token}`, { method: 'POST' }).then(async r => { if(!r.ok) console.error("FB2 Error:", await r.text()); }).catch(()=>{}); }
 
         if (previewConfig.tg_general && creds.telegram_bot_token && tgGeneralChannels.length > 0) {
             for (const channel of tgGeneralChannels) {

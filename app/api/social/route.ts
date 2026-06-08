@@ -73,7 +73,9 @@ const parseTime = (t: any) => {
     return (parseInt(parts[0]) || 0) * 100 + (parseInt(parts[1]) || 0); 
 };
 
+// Expanded KNOWN_TEAMS list with national teams and precise mapping
 const KNOWN_TEAMS: Record<string, string> = {
+    // English Premier League
     'manchester city': 'MCI', 'man city': 'MCI', 'm. city': 'MCI', 'manchester united': 'MUN', 'man united': 'MUN', 'man utd': 'MUN',
     'arsenal': 'ARS', 'arsenal fc': 'ARS', 'chelsea': 'CHE', 'chelsea fc': 'CHE', 'liverpool': 'LIV', 'liverpool fc': 'LIV',
     'tottenham hotspur': 'TOT', 'tottenham': 'TOT', 'spurs': 'TOT', 'newcastle united': 'NEW', 'newcastle': 'NEW', 'newcastle utd': 'NEW',
@@ -81,26 +83,52 @@ const KNOWN_TEAMS: Record<string, string> = {
     'wolverhampton wanderers': 'WOL', 'wolverhampton': 'WOL', 'wolves': 'WOL', 'nottingham forest': 'NFO', 'nottm forest': 'NFO', 'nottingham': 'NFO',
     'leicester city': 'LEI', 'leicester': 'LEI', 'everton': 'EVE', 'everton fc': 'EVE', 'crystal palace': 'CRY', 'palace': 'CRY',
     'brentford': 'BRE', 'brentford fc': 'BRE', 'fulham': 'FUL', 'fulham fc': 'FUL', 'afc bournemouth': 'BOU', 'bournemouth': 'BOU',
-    'southampton': 'SOU', 'saints': 'SOU', 'ipswich town': 'IPS', 'ipswich': 'IPS', 'real madrid': 'RMA', 'madrid': 'RMA',
+    'southampton': 'SOU', 'saints': 'SOU', 'ipswich town': 'IPS', 'ipswich': 'IPS', 
+    // La Liga
+    'real madrid': 'RMA', 'madrid': 'RMA',
     'barcelona': 'BAR', 'barca': 'BAR', 'fc barcelona': 'BAR', 'atletico madrid': 'ATM', 'atlético': 'ATM', 'atletico': 'ATM', 'atlético de madrid': 'ATM',
     'athletic club': 'ATH', 'athletic bilbao': 'ATH', 'athletic': 'ATH', 'real sociedad': 'RSO', 'sociedad': 'RSO', 'real betis': 'BET', 'betis': 'BET',
     'sevilla': 'SEV', 'sevilla fc': 'SEV', 'valencia': 'VAL', 'valencia cf': 'VAL', 'villarreal': 'VIL', 'villarreal cf': 'VIL',
     'celta vigo': 'CEL', 'celta': 'CEL', 'celta de vigo': 'CEL', 'girona': 'GIR', 'girona fc': 'GIR', 'osasuna': 'OSA', 'ca osasuna': 'OSA',
-    'mallorca': 'MLL', 'rcd mallorca': 'MLL', 'juventus': 'JUV', 'juve': 'JUV', 'ac milan': 'MIL', 'milan': 'MIL',
+    'mallorca': 'MLL', 'rcd mallorca': 'MLL', 
+    // Serie A
+    'juventus': 'JUV', 'juve': 'JUV', 'ac milan': 'MIL', 'milan': 'MIL',
     'inter milan': 'INT', 'inter': 'INT', 'internazionale': 'INT', 'ssc napoli': 'NAP', 'napoli': 'NAP', 'as roma': 'ROM', 'roma': 'ROM',
     'ss lazio': 'LAZ', 'lazio': 'LAZ', 'atalanta': 'ATA', 'atalanta bc': 'ATA', 'fiorentina': 'FIO', 'acf fiorentina': 'FIO',
-    'bologna': 'BOL', 'bologna fc': 'BOL', 'torino': 'TOR', 'torino fc': 'TOR', 'bayern munich': 'BAY', 'bayern': 'BAY', 'fc bayern': 'BAY', 'bayern münchen': 'BAY',
+    'bologna': 'BOL', 'bologna fc': 'BOL', 'torino': 'TOR', 'torino fc': 'TOR', 
+    // Bundesliga
+    'bayern munich': 'BAY', 'bayern': 'BAY', 'fc bayern': 'BAY', 'bayern münchen': 'BAY',
     'borussia dortmund': 'BVB', 'dortmund': 'BVB', 'bayer 04 leverkusen': 'B04', 'leverkusen': 'B04', 'bayer leverkusen': 'B04',
     'rb leipzig': 'RBL', 'leipzig': 'RBL', 'eintracht frankfurt': 'SGE', 'frankfurt': 'SGE', 'eintracht': 'SGE',
     'borussia monchengladbach': 'BMG', 'gladbach': 'BMG', 'mgladbach': 'BMG', 'mönchengladbach': 'BMG', 'vfb stuttgart': 'VFB', 'stuttgart': 'VFB',
     'wolfsburg': 'WOB', 'vfl wolfsburg': 'WOB', 'sc freiburg': 'SCF', 'freiburg': 'SCF', 'union berlin': 'FCU', 'fc union berlin': 'FCU',
+    // Ligue 1
     'paris saint germain': 'PSG', 'psg': 'PSG', 'paris sg': 'PSG', 'paris saint-germain': 'PSG', 'olympique de marseille': 'MAR', 'marseille': 'MAR', 'om': 'MAR',
     'olympique lyon': 'LYO', 'lyon': 'LYO', 'ol': 'LYO', 'as monaco': 'ASM', 'monaco': 'ASM', 'lille osc': 'LOSC', 'lille': 'LOSC',
-    'rc lens': 'RCL', 'lens': 'RCL', 'ogc nice': 'OGCN', 'nice': 'OGCN', 'ajax': 'AJA', 'afc ajax': 'AJA', 'psv eindhoven': 'PSV', 'psv': 'PSV',
+    'rc lens': 'RCL', 'lens': 'RCL', 'ogc nice': 'OGCN', 'nice': 'OGCN', 
+    // More European
+    'ajax': 'AJA', 'afc ajax': 'AJA', 'psv eindhoven': 'PSV', 'psv': 'PSV',
     'feyenoord': 'FEY', 'sporting cp': 'SCP', 'sporting': 'SCP', 'sporting lisbon': 'SCP', 'sl benfica': 'SLB', 'benfica': 'SLB',
     'fc porto': 'FCP', 'porto': 'FCP', 'celtic': 'CEL', 'celtic fc': 'CEL', 'rangers': 'RAN', 'rangers fc': 'RAN', 'galatasaray': 'GAL', 'galatasaray sk': 'GAL',
-    'fenerbahce': 'FEN', 'fenerbahçe': 'FEN', 'besiktas': 'BES', 'beşiktaş': 'BES', 'club brugge': 'BRU', 'boca juniors': 'BOC', 'river plate': 'RIV',
-    'flamengo': 'FLA', 'palmeiras': 'PAL', 'al nassr': 'ALN', 'al hilal': 'ALH', 'inter miami': 'MIA'
+    'fenerbahce': 'FEN', 'fenerbahçe': 'FEN', 'besiktas': 'BES', 'beşiktaş': 'BES', 'club brugge': 'BRU', 
+    // South America / Misc
+    'boca juniors': 'BOC', 'river plate': 'RIV', 'flamengo': 'FLA', 'palmeiras': 'PAL', 'al nassr': 'ALN', 'al hilal': 'ALH', 'inter miami': 'MIA',
+    
+    // NATIONAL TEAMS
+    'argentina': 'ARG', 'brazil': 'BRA', 'france': 'FRA', 'england': 'ENG', 'spain': 'ESP', 
+    'italy': 'ITA', 'germany': 'GER', 'portugal': 'POR', 'netherlands': 'NED', 'holland': 'NED',
+    'belgium': 'BEL', 'croatia': 'CRO', 'uruguay': 'URU', 'colombia': 'COL', 'usa': 'USA', 
+    'united states': 'USA', 'mexico': 'MEX', 'senegal': 'SEN', 'morocco': 'MAR', 'japan': 'JPN', 
+    'south korea': 'KOR', 'switzerland': 'SUI', 'denmark': 'DEN', 'sweden': 'SWE', 'poland': 'POL',
+    'wales': 'WAL', 'scotland': 'SCO', 'ireland': 'IRL', 'republic of ireland': 'IRL',
+    'norway': 'NOR', 'austria': 'AUT', 'hungary': 'HUN', 'serbia': 'SRB', 'turkey': 'TUR',
+    'ukraine': 'UKR', 'czech republic': 'CZE', 'czechia': 'CZE', 'greece': 'GRE', 'romania': 'ROU',
+    'chile': 'CHI', 'peru': 'PER', 'ecuador': 'ECU', 'paraguay': 'PAR', 'venezuela': 'VEN',
+    'bolivia': 'BOL', 'canada': 'CAN', 'costa rica': 'CRC', 'panama': 'PAN', 'jamaica': 'JAM',
+    'nigeria': 'NGA', 'egypt': 'EGY', 'cameroon': 'CMR', 'ghana': 'GHA', 'ivory coast': 'CIV', 
+    'cote d\'ivoire': 'CIV', 'algeria': 'ALG', 'tunisia': 'TUN', 'mali': 'MLI',
+    'iran': 'IRN', 'australia': 'AUS', 'saudi arabia': 'KSA', 'qatar': 'QAT', 'uzbekistan': 'UZB',
+    'new zealand': 'NZL'
 };
 
 const getTla = (name: string, fallbackTla?: string) => {
@@ -114,7 +142,8 @@ const getTla = (name: string, fallbackTla?: string) => {
 const getLeagueHashtags = (leagueName: string) => {
     const map: Record<string, string> = {
         'Premier League': '#PremierLeague #EPL', 'La Liga': '#LaLiga', 'Bundesliga': '#Bundesliga', 'Serie A': '#SerieA',
-        'Ligue 1': '#Ligue1', 'Champions League': '#UCL #ChampionsLeague', 'Europa League': '#UEL'
+        'Ligue 1': '#Ligue1', 'Champions League': '#UCL #ChampionsLeague', 'Europa League': '#UEL',
+        'World Cup': '#WorldCup #FIFAWorldCup', 'Euros': '#Euro', 'Copa America': '#CopaAmerica'
     };
     return map[leagueName] || `#${String(leagueName).replace(/[^a-zA-Z0-9]/g, '')}`;
 };
@@ -200,7 +229,7 @@ export async function POST(request: Request) {
     const frontendUrl = 'https://factsport.com'; 
     const internalOrigin = new URL(request.url).origin; 
     const matchUrl = `${frontendUrl}/match/${newState.id}`; 
-    const hashtags = `#${getTla(newState.home_team, newState.home_tla)}${getTla(newState.away_team, newState.away_tla)} ${getLeagueHashtags(newState.league)} #Football`; 
+    const hashtags = `#${getTla(newState.home_team, newState.home_tla)} #${getTla(newState.away_team, newState.away_tla)} ${getLeagueHashtags(newState.league)} #Football`; 
     
     let ctaText = "👇 Match Stats & Updates:\n";
     let preMatchCta = "👇 See tactical setup & subs:\n";
@@ -228,8 +257,8 @@ export async function POST(request: Request) {
     const oldValidH = getValidNames(oldState.lineups?.home); const oldValidA = getValidNames(oldState.lineups?.away);
     const newValidH = getValidNames(newState.lineups?.home); const newValidA = getValidNames(newState.lineups?.away);
     
-    const oldHasFullLineups = oldValidH.length === 11 && oldValidA.length === 11;
-    const newHasFullLineups = newValidH.length === 11 && newValidA.length === 11;
+    const oldHasFullLineups = oldValidH.length >= 11 && oldValidA.length >= 11;
+    const newHasFullLineups = newValidH.length >= 11 && newValidA.length >= 11;
 
     const preStatuses = ['PRE_MATCH', 'SCHEDULED', 'PRE', 'NS', 'UPCOMING', 'TBD'];
     const live1HStatuses = ['IN_PLAY', 'LIVE', '1H', 'FIRST_HALF', 'FIRST HALF'];
@@ -348,12 +377,12 @@ export async function POST(request: Request) {
         if (evtConfig.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
             const pageId = creds.fb1_id || process.env.FB_PAGE_ID; const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
             const url = finalStaticImage ? `https://graph.facebook.com/v19.0/${pageId}/photos?url=${encodeURIComponent(finalStaticImage)}&message=${encodeURIComponent(fb1Text!)}&access_token=${token}` : `https://graph.facebook.com/v19.0/${pageId}/feed?message=${encodeURIComponent(fb1Text!)}&access_token=${token}`;
-            await fetch(url, { method: 'POST' }).catch(()=>{});
+            await fetch(url, { method: 'POST' }).then(async r => { if(!r.ok) console.error("FB1 Error:", await r.text()); }).catch(()=>{});
         }
 
         if (evtConfig.fb2 && creds.fb2_id && creds.fb2_token) {
             const url = finalStaticImage ? `https://graph.facebook.com/v19.0/${creds.fb2_id}/photos?url=${encodeURIComponent(finalStaticImage)}&message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}` : `https://graph.facebook.com/v19.0/${creds.fb2_id}/feed?message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}`;
-            await fetch(url, { method: 'POST' }).catch(()=>{});
+            await fetch(url, { method: 'POST' }).then(async r => { if(!r.ok) console.error("FB2 Error:", await r.text()); }).catch(()=>{});
         }
 
         if (evtConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) { await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makePayload1) }).catch(()=>{}); }
