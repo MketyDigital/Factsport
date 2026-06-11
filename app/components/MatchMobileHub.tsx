@@ -48,7 +48,9 @@ const getMatchContextText = (data: any) => {
 };
 
 export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
-  const [activeTab, setActiveTab] = useState<'chat' | 'stats' | 'pro' | 'table'>('chat');
+  // *** KEY CHANGE HERE ***
+  // Changed initial state from 'chat' to 'stats'
+  const [activeTab, setActiveTab] = useState<'chat' | 'stats' | 'pro' | 'table'>('stats');
   const liveData = useMatchLive();
 
   const currentStatus = (liveData?.status || '').toUpperCase();
@@ -59,6 +61,10 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
   const isUniversallyFinished = isFinished || minutesToKick < -240;
 
   useEffect(() => {
+    // This logic should still ensure that if the match is finished,
+    // and a tab that shouldn't be visible is active, it switches.
+    // The initial default is now 'stats', so this primarily handles
+    // cases where 'pro' or 'table' was somehow already set.
     if (isUniversallyFinished && (activeTab === 'table' || activeTab === 'pro')) {
       setActiveTab('stats');
     }
@@ -67,7 +73,7 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
-      const y = element.getBoundingClientRect().top + window.scrollY - 60;
+      const y = element.getBoundingClientRect().top + window.scrollY - 60; // Adjust scroll position to account for sticky header
       window.scrollTo({ top: y, behavior: 'smooth' });
     }
   };
@@ -92,25 +98,31 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
       )}
 
       <div className="flex overflow-x-auto scrollbar-hide border-b border-slate-200 bg-white sticky top-0 z-40 shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
+        {/* Chat Tab Button */}
         <button onClick={() => setActiveTab('chat')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'chat' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
           <MessageCircle size={14} className={activeTab === 'chat' ? 'fill-blue-100' : ''}/> Live Chat
         </button>
+        
+        {/* Stats Tab Button (Always active, default) */}
         <button onClick={() => setActiveTab('stats')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'stats' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
           <BarChart2 size={14} /> Stats & XI
         </button>
 
+        {/* Table Tab Button (Conditional) */}
         {!isUniversallyFinished && (
           <button onClick={() => setActiveTab('table')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'table' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
             <Table size={14} /> Table
           </button>
         )}
 
+        {/* Pro Slip Tab Button (Conditional) */}
         {!isUniversallyFinished && (
           <button onClick={() => setActiveTab('pro')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'pro' ? 'text-yellow-600 border-b-2 border-yellow-500 bg-yellow-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
             <BrainCircuit size={14} className={activeTab === 'pro' ? 'text-yellow-500' : ''}/> Pro Slip
           </button>
         )}
 
+        {/* Predict Button (Scrolls to section) */}
         {!isUniversallyFinished && (
           <button onClick={() => scrollToSection('predictions')} className="flex-1 py-3 px-4 min-w-max text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 flex items-center justify-center gap-1.5 border-l border-slate-100">
             <Zap size={12} /> Predict
@@ -123,6 +135,7 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
           <AdsterraStandardBanner />
         </div>
 
+        {/* Conditional Rendering of content based on activeTab */}
         {activeTab === 'chat' && (
           <div className="p-2 md:p-4 bg-white flex flex-col h-full">
             <MOTMVoteWidget matchId={matchId} lineups={liveData?.lineups} />
