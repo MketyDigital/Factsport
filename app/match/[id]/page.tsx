@@ -110,7 +110,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   const matchDateMs = new Date(dbData.match_date).getTime();
   const minutesToKick = (matchDateMs - Date.now()) / 60000;
   
-  const isUniversallyFinished = isFinished || minutesToKick < -240;
+  const isUniversallyFinished = isFinished || minutesToKick < -900;
 
   const activeVideoUrl = sanitizeUrl(isUniversallyFinished ? dbData.video_url : dbData.livestream_url);
   const activeAudioUrl = sanitizeUrl(isUniversallyFinished ? null : dbData.audio_url);
@@ -121,7 +121,7 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
   } else if (isLive) {
       isServerLocked = false;
   } else {
-      if (minutesToKick <= 5 && minutesToKick > -240) {
+      if (minutesToKick <= 15 && minutesToKick > -900) {
           isServerLocked = false; 
       }
   }
