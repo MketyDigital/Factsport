@@ -1,879 +1,1562 @@
+// app/api/social/route.ts
+
+// @ts-nocheck
 export const runtime = 'edge';
-import { ImageResponse } from 'next/og';
-import { NextRequest } from 'next/server';
 
-const normalizeFormation = (formationStr: string) => {
-  if (!formationStr) return '4-3-3';
+import { createClient } from '@supabase/supabase-js';
+import { NextResponse } from 'next/server';
 
-  const counts = String(formationStr)
-    .split('-')
-    .map((n) => parseInt(n, 10) || 0);
+const SAFETY_MAP: Record<string, any> = {
+  goals: {
+    buf_x1: false,
+    buf_x2: false,
+    buf_fb1: false,
+    buf_fb2: false,
+    fb1: true,
+    fb2: false,
+    make1: true,
+    make2: false,
+    tg_general: false
+  },
 
-  const total = counts.reduce((sum, n) => sum + n, 0);
+  // LINEUPS:
+  // Only X/Make, X/Buffer, and FB1 direct are allowed.
+  // Everything else is forced off below for lineups too.
+  lineups: {
+    buf_x1: true,
+    buf_x2: false,
+    buf_fb1: false,
+    buf_fb2: false,
+    fb1: true,
+    fb2: false,
+    make1: true,
+    make2: false,
+    tg_general: false
+  },
 
-  if (total === 10) return counts;
+  kickoff: {
+    buf_x1: false,
+    buf_x2: false,
+    buf_fb1: false,
+    buf_fb2: false,
+    fb1: true,
+    fb2: false,
+    make1: true,
+    make2: false,
+    tg_general: false
+  },
 
-  if (total > 10) {
-    const normalized = [...counts];
-    normalized[normalized.length - 1] = Math.max(
-      0,
-      normalized[normalized.length - 1] - (total - 10)
-    );
-    return normalized;
+  fulltime: {
+    buf_x1: false,
+    buf_x2: false,
+    buf_fb1: false,
+    buf_fb2: false,
+    fb1: true,
+    fb2: false,
+    make1: true,
+    make2: false,
+    tg_general: false
+  },
+
+  halftime: {
+    buf_x1: false,
+    buf_x2: false,
+    buf_fb1: false,
+    buf_fb2: false,
+    fb1: true,
+    fb2: false,
+    make1: false,
+    make2: false,
+    tg_general: false
+  },
+
+  var_overturn: {
+    buf_x1: false,
+    buf_x2: false,
+    buf_fb1: false,
+    buf_fb2: false,
+    fb1: true,
+    fb2: false,
+    make1: false,
+    make2: false,
+    tg_general: false
+  },
+
+  penalty_awarded: {
+    buf_x1: false,
+    buf_x2: false,
+    buf_fb1: false,
+    buf_fb2: false,
+    fb1: true,
+    fb2: false,
+    make1: false,
+    make2: false,
+    tg_general: false
   }
-
-  return '4-3-3';
 };
 
-const padPlayers = (players: string[], count: number, fallbackPrefix: string) => {
-  const safePlayers = Array.isArray(players)
-    ? players.filter(Boolean).map(String)
-    : [];
+const TERMINAL_STATUSES = new Set([
+  'FT',
+  'FINISHED',
+  'ABD',
+  'AET',
+  'AWARDED',
+  'PEN'
+]);
 
-  while (safePlayers.length < count) {
-    const index = safePlayers.length + 1;
-    safePlayers.push(`${fallbackPrefix} ${index}`);
-  }
+const LIVE_STATUSES = new Set([
+  'IN_PLAY',
+  'LIVE',
+  '1H',
+  'FIRST_HALF',
+  'FIRST HALF',
+  '2H',
+  'SECOND_HALF',
+  'SECOND HALF'
+]);
 
-  return safePlayers.slice(0, count);
+const HT_STATUSES = new Set([
+  'HT',
+  'HALFTIME',
+  'HALF TIME',
+  'HALF-TIME',
+  'PAUSED'
+]);
+
+const PRE_STATUSES = new Set([
+  'PRE_MATCH',
+  'SCHEDULED',
+  'PRE',
+  'NS',
+  'UPCOMING',
+  'TBD'
+]);
+
+const EVENT_FRESHNESS_MS = 20 * 60 * 1000;
+
+const KNOWN_TEAMS: Record<string, string> = {
+  'manchester city': 'MCI',
+  'man city': 'MCI',
+  'manchester united': 'MUN',
+  'man united': 'MUN',
+  'man utd': 'MUN',
+  arsenal: 'ARS',
+  chelsea: 'CHE',
+  liverpool: 'LIV',
+  'tottenham hotspur': 'TOT',
+  tottenham: 'TOT',
+  spurs: 'TOT',
+  'newcastle united': 'NEW',
+  newcastle: 'NEW',
+  'aston villa': 'AVL',
+  villa: 'AVL',
+  'west ham united': 'WHU',
+  'west ham': 'WHU',
+  brighton: 'BHA',
+  'brighton & hove albion': 'BHA',
+  'wolverhampton wanderers': 'WOL',
+  wolves: 'WOL',
+  'nottingham forest': 'NFO',
+  'nottm forest': 'NFO',
+  'leicester city': 'LEI',
+  everton: 'EVE',
+  'crystal palace': 'CRY',
+  brentford: 'BRE',
+  fulham: 'FUL',
+  bournemouth: 'BOU',
+  'afc bournemouth': 'BOU',
+  southampton: 'SOU',
+  'ipswich town': 'IPS',
+  'real madrid': 'RMA',
+  madrid: 'RMA',
+  barcelona: 'BAR',
+  barca: 'BAR',
+  'atletico madrid': 'ATM',
+  'athletic club': 'ATH',
+  'real sociedad': 'RSO',
+  'real betis': 'BET',
+  sevilla: 'SEV',
+  valencia: 'VAL',
+  villarreal: 'VIL',
+  'celta vigo': 'CEL',
+  girona: 'GIR',
+  osasuna: 'OSA',
+  mallorca: 'MLL',
+  juventus: 'JUV',
+  juve: 'JUV',
+  'ac milan': 'MIL',
+  milan: 'MIL',
+  'inter milan': 'INT',
+  inter: 'INT',
+  'ssc napoli': 'NAP',
+  napoli: 'NAP',
+  'as roma': 'ROM',
+  roma: 'ROM',
+  'ss lazio': 'LAZ',
+  lazio: 'LAZ',
+  atalanta: 'ATA',
+  fiorentina: 'FIO',
+  bologna: 'BOL',
+  torino: 'TOR',
+  'bayern munich': 'BAY',
+  bayern: 'BAY',
+  'borussia dortmund': 'BVB',
+  dortmund: 'BVB',
+  'bayer leverkusen': 'B04',
+  leverkusen: 'B04',
+  'rb leipzig': 'RBL',
+  leipzig: 'RBL',
+  'eintracht frankfurt': 'SGE',
+  frankfurt: 'SGE',
+  'borussia monchengladbach': 'BMG',
+  gladbach: 'BMG',
+  'vfb stuttgart': 'VFB',
+  stuttgart: 'VFB',
+  wolfsburg: 'WOB',
+  'sc freiburg': 'SCF',
+  freiburg: 'SCF',
+  'fc union berlin': 'FCU',
+  'union berlin': 'FCU',
+  'paris saint germain': 'PSG',
+  psg: 'PSG',
+  'olympique de marseille': 'MAR',
+  marseille: 'MAR',
+  om: 'MAR',
+  'olympique lyon': 'LYO',
+  lyon: 'LYO',
+  ol: 'LYO',
+  'as monaco': 'ASM',
+  monaco: 'ASM',
+  'lille osc': 'LOSC',
+  lille: 'LOSC',
+  'rc lens': 'RCL',
+  lens: 'RCL',
+  'ogc nice': 'OGCN',
+  nice: 'OGCN',
+  ajax: 'AJA',
+  'psv eindhoven': 'PSV',
+  psv: 'PSV',
+  feyenoord: 'FEY',
+  'sporting cp': 'SCP',
+  sporting: 'SCP',
+  'sl benfica': 'SLB',
+  benfica: 'SLB',
+  'fc porto': 'FCP',
+  porto: 'FCP',
+  celtic: 'CEL',
+  rangers: 'RAN',
+  galatasaray: 'GAL',
+  fenerbahce: 'FEN',
+  fenerbahçe: 'FEN',
+  besiktas: 'BES',
+  beşiktaş: 'BES',
+  'club brugge': 'BRU',
+  'boca juniors': 'BOC',
+  'river plate': 'RIV',
+  flamengo: 'FLA',
+  palmeiras: 'PAL',
+  'al nassr': 'ALN',
+  'al hilal': 'ALH',
+  'inter miami': 'MIA',
+
+  argentina: 'ARG',
+  brazil: 'BRA',
+  brasil: 'BRA',
+  france: 'FRA',
+  england: 'ENG',
+  spain: 'ESP',
+  italy: 'ITA',
+  germany: 'GER',
+  deutschland: 'GER',
+  portugal: 'POR',
+  netherlands: 'NED',
+  holland: 'NED',
+  belgium: 'BEL',
+  croatia: 'CRO',
+  uruguay: 'URU',
+  colombia: 'COL',
+  usa: 'USA',
+  'united states': 'USA',
+  usmnt: 'USA',
+  uswnt: 'USA',
+  mexico: 'MEX',
+  senegal: 'SEN',
+  morocco: 'MAR',
+  japan: 'JPN',
+  'south korea': 'KOR',
+  'korea republic': 'KOR',
+  korea: 'KOR',
+  switzerland: 'SUI',
+  denmark: 'DEN',
+  sweden: 'SWE',
+  poland: 'POL',
+  wales: 'WAL',
+  scotland: 'SCO',
+  ireland: 'IRL',
+  'republic of ireland': 'IRL',
+  norway: 'NOR',
+  austria: 'AUT',
+  hungary: 'HUN',
+  serbia: 'SRB',
+  turkey: 'TUR',
+  ukraine: 'UKR',
+  'czech republic': 'CZE',
+  czechia: 'CZE',
+  greece: 'GRE',
+  romania: 'ROU',
+  chile: 'CHI',
+  peru: 'PER',
+  ecuador: 'ECU',
+  paraguay: 'PAR',
+  venezuela: 'VEN',
+  bolivia: 'BOL',
+  canada: 'CAN',
+  'costa rica': 'CRC',
+  panama: 'PAN',
+  jamaica: 'JAM',
+  nigeria: 'NGA',
+  egypt: 'EGY',
+  cameroon: 'CMR',
+  ghana: 'GHA',
+  'ivory coast': 'CIV',
+  "cote d'ivoire": 'CIV',
+  "côte d'ivoire": 'CIV',
+  algeria: 'ALG',
+  tunisia: 'TUN',
+  mali: 'MLI',
+  iran: 'IRN',
+  iraq: 'IRQ',
+  australia: 'AUS',
+  'saudi arabia': 'KSA',
+  qatar: 'QAT',
+  uzbekistan: 'UZB',
+  oman: 'OMA',
+  jordan: 'JOR',
+  bahrain: 'BHR',
+  kyrgyzstan: 'KGZ',
+  indonesia: 'IDN',
+  malaysia: 'MYS',
+  thailand: 'THA',
+  vietnam: 'VNM',
+  'united arab emirates': 'UAE',
+  uae: 'UAE',
+  'south africa': 'RSA',
+  'cape verde': 'CPV',
+  'cabo verde': 'CPV',
+  'dr congo': 'COD',
+  'congo dr': 'COD',
+  'bosnia and herzegovina': 'BIH',
+  bosnia: 'BIH',
+  slovakia: 'SVK',
+  slovenia: 'SVN',
+  albania: 'ALB',
+  georgia: 'GEO',
+  'new zealand': 'NZL'
 };
 
-const parseFormationRows = (
-  players: string[],
-  formationStr: string,
-  fallbackPrefix: string
-) => {
-  const counts = normalizeFormation(formationStr);
-  const safePlayers = padPlayers(players, 11, fallbackPrefix);
-  const rows: string[][] = [];
+const getTla = (name: string, fallbackTla?: string) => {
+  if (!name) return 'TM';
 
-  rows.push([safePlayers[0] || `${fallbackPrefix} 1`]);
-
-  let curr = 1;
-
-  counts.forEach((count) => {
-    if (count > 0) {
-      const rowPlayers = safePlayers.slice(curr, curr + count);
-
-      while (rowPlayers.length < count) {
-        rowPlayers.push(`${fallbackPrefix} ${curr + rowPlayers.length}`);
-      }
-
-      rows.push(rowPlayers);
-      curr += count;
-    }
-  });
-
-  return rows;
-};
-
-function decodeBase64Safe(safeBase64: string) {
-  try {
-    let base64 = safeBase64.replace(/-/g, '+').replace(/_/g, '/');
-
-    while (base64.length % 4) {
-      base64 += '=';
-    }
-
-    const binaryStr = atob(base64);
-    const bytes = new Uint8Array(binaryStr.length);
-
-    for (let i = 0; i < binaryStr.length; i++) {
-      bytes[i] = binaryStr.charCodeAt(i);
-    }
-
-    return new TextDecoder('utf-8').decode(bytes);
-  } catch (e) {
-    return '{}';
-  }
-}
-
-function cleanText(str: string) {
-  if (!str) return '';
-
-  return str
+  const normalized = name
+    .replace(/['"]/g, '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+  if (KNOWN_TEAMS[normalized]) return KNOWN_TEAMS[normalized];
+
+  if (fallbackTla) return fallbackTla.toUpperCase();
+
+  return name
+    .replace(/ fc| cf| united| city/ig, '')
+    .replace(/[^a-zA-Z]/g, '')
+    .substring(0, 3)
     .toUpperCase();
-}
+};
 
-function shortTeamName(name: string, fallback: string) {
-  const clean = cleanText(name);
+const getLeagueHashtags = (leagueName: string) => {
+  const map: Record<string, string> = {
+    'Premier League': '#PremierLeague #EPL',
+    'La Liga': '#LaLiga',
+    Bundesliga: '#Bundesliga',
+    'Serie A': '#SerieA',
+    'Ligue 1': '#Ligue1',
+    'Champions League': '#UCL #ChampionsLeague',
+    'Europa League': '#UEL #EuropaLeague',
+    'Europa Conference League': '#UECL #ConferenceLeague',
+    'FA Cup': '#FACup',
+    'Carabao Cup': '#CarabaoCup #EFLCup',
+    'Copa del Rey': '#CopaDelRey',
+    'Coppa Italia': '#CoppaItalia',
+    'Coupe de France': '#CoupeDeFrance',
+    'DFB-Pokal': '#DFBPokal',
+    'World Cup': '#WorldCup #FIFAWorldCup',
+    Euros: '#EURO2024 #Euro',
+    'Copa America': '#CopaAmerica',
+    AFCON: '#AFCON',
+    'UEFA Nations League': '#NationsLeague',
+    'CONCACAF Nations League': '#ConcacafNationsLeague'
+  };
 
-  if (!clean) return fallback;
+  return (
+    map[leagueName] ||
+    `#${String(leagueName).replace(/[^a-zA-Z0-9]/g, '')}`
+  );
+};
 
-  const words = clean.split(/\s+/).filter(Boolean);
+function encodeBase64Safe(obj: any) {
+  const str = JSON.stringify(obj);
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
 
-  if (words.length >= 2) {
-    return `${words[0].slice(0, 12)} ${words[words.length - 1].slice(0, 12)}`;
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
   }
 
-  return clean.slice(0, 18);
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
-function cleanPlayerName(player: string) {
-  const playerStr = player ? String(player).trim() : '';
-  const numberMatch = playerStr.match(/\b(\d{1,2})\b/);
-  const playerNumber = numberMatch ? numberMatch[0] : '';
-  const nameCleaned = playerStr
+const compressPlayerName = (player: string) => {
+  if (!player) return '';
+
+  const numMatch = player.match(/\b(\d{1,2})\b/);
+  const num = numMatch ? numMatch[0] : '';
+
+  const nameCleaned = player
     .replace(/\b\d{1,2}\b/g, '')
     .replace(/[()]/g, '')
     .trim();
 
   const lastName = nameCleaned ? nameCleaned.split(' ').pop() : '';
 
-  return {
-    number: playerNumber,
-    name: lastName ? lastName.slice(0, 10) : 'PLAYER'
-  };
+  return num ? `${num} ${lastName}` : lastName;
+};
+
+function parseTemplate(
+  text: string,
+  state: any,
+  matchUrl: string,
+  extra: any
+) {
+  if (!text) return '';
+
+  let processedText = text;
+
+  if (extra.activeCta) {
+    if (processedText.includes('[PRE_CTA]')) {
+      processedText = processedText.replace(/\[PRE_CTA\]/g, extra.activeCta);
+    } else if (processedText.includes('[CTA]')) {
+      processedText = processedText.replace(/\[CTA\]/g, extra.activeCta);
+    } else if (!processedText.includes('[LINK]')) {
+      processedText = processedText + `\n\n${extra.activeCta}`;
+    }
+  }
+
+  return processedText
+    .replace(/\[HOME\]/g, state.home_team || '')
+    .replace(/\[AWAY\]/g, state.away_team || '')
+    .replace(/\[H_SCORE\]/g, state.home_score || 0)
+    .replace(/\[A_SCORE\]/g, state.away_score || 0)
+    .replace(/\[LINK\]/g, matchUrl)
+    .replace(/\[TIME\]/g, extra.time || '')
+    .replace(/\[SCORER\]/g, extra.scorer || '')
+    .replace(/\[STATUS\]/g, extra.statusText || '')
+    .replace(/\[HASHTAGS\]/g, extra.hashtags || '')
+    .replace(/\[STAKES\]/g, extra.stakes || '')
+    .replace(/\[ROUND\]/g, extra.round || '')
+    .replace(/\[GROUP\]/g, extra.group || '');
 }
 
-const PlayerIcon = () => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="white"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-    <circle cx="12" cy="7" r="4"></circle>
-  </svg>
-);
+const secureStaticImage = async (
+  internalFetchUrl: string,
+  publicFallbackUrl: string,
+  fileName: string,
+  supabaseClient: any
+) => {
+  if (!internalFetchUrl) return '';
 
-export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const dataParam = searchParams.get('data');
+    const imgResponse = await fetch(internalFetchUrl, {
+      headers: { Accept: 'image/png' }
+    });
 
-    if (!dataParam) {
-      return new Response('Missing data', { status: 400 });
+    let arrayBuffer;
+
+    if (imgResponse.ok) {
+      arrayBuffer = await imgResponse.arrayBuffer();
+    } else {
+      const fallbackRes = await fetch(publicFallbackUrl);
+
+      if (!fallbackRes.ok) return '';
+
+      arrayBuffer = await fallbackRes.arrayBuffer();
     }
 
-    const jsonStr = decodeBase64Safe(dataParam);
-    const parsedData = JSON.parse(jsonStr);
+    const { error } = await supabaseClient.storage
+      .from('socials')
+      .upload(`${fileName}.png`, arrayBuffer, {
+        contentType: 'image/png',
+        upsert: true
+      });
 
-    // 📋 TEMPLATE 1: PITCH LINEUP INTERFACE
-    if (parsedData.type === 'pitch') {
-      const home = shortTeamName(parsedData.home, 'HOME');
-      const away = shortTeamName(parsedData.away, 'AWAY');
-      const homeFormation = parsedData.homeFormation || '4-3-3';
-      const awayFormation = parsedData.awayFormation || '4-3-3';
+    if (error) return publicFallbackUrl;
 
-      const homeRows = parseFormationRows(
-        parsedData.homeXI || [],
-        homeFormation,
-        home
-      );
+    const { data } = supabaseClient.storage
+      .from('socials')
+      .getPublicUrl(`${fileName}.png`);
 
-      const awayRows = parseFormationRows(
-        parsedData.awayXI || [],
-        awayFormation,
-        away
-      );
-
-      const renderHomeRows = [...homeRows].reverse();
-      const renderAwayRows = [...awayRows].reverse();
-
-      return new ImageResponse(
-        (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              width: 1200,
-              height: 630,
-              backgroundColor: '#0a1428',
-              color: 'white',
-              fontFamily: 'Arial, sans-serif'
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                width: 1200,
-                height: 105,
-                backgroundColor: '#0f1c3a',
-                borderBottomWidth: 2,
-                borderBottomStyle: 'solid',
-                borderBottomColor: '#1e293b',
-                paddingLeft: 42,
-                paddingRight: 42
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center'
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    fontSize: 20,
-                    color: '#facc15',
-                    fontWeight: 900,
-                    letterSpacing: '2px'
-                  }}
-                >
-                  {cleanText(parsedData.label || 'STARTING XI')}
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    fontSize: 34,
-                    fontWeight: 900,
-                    marginTop: 4
-                  }}
-                >
-                  <div style={{ display: 'flex', color: 'white' }}>{home}</div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      color: '#64748b',
-                      marginLeft: 14,
-                      marginRight: 14
-                    }}
-                  >
-                    VS
-                  </div>
-                  <div style={{ display: 'flex', color: 'white' }}>{away}</div>
-                </div>
-              </div>
-
-              <img
-                src="https://factsport.com/logo.png"
-                style={{ display: 'flex', width: 44, height: 44 }}
-              />
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'row',
-                width: 1200,
-                height: 525,
-                paddingTop: 22,
-                paddingBottom: 22,
-                paddingLeft: 22,
-                paddingRight: 22,
-                justifyContent: 'space-between',
-                gap: 20
-              }}
-            >
-              {/* HOME TEAM */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  width: 560,
-                  height: 485,
-                  backgroundColor: '#2E8B57',
-                  borderRadius: 18,
-                  borderWidth: 4,
-                  borderStyle: 'solid',
-                  borderColor: '#ffffff33',
-                  paddingTop: 16,
-                  paddingBottom: 16
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'row',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    height: 42,
-                    marginBottom: 10
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      fontSize: 20,
-                      fontWeight: 900,
-                      color: 'white'
-                    }}
-                  >
-                    {home}
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      fontSize: 16,
-                      color: '#bfdbfe',
-                      marginLeft: 8
-                    }}
-                  >
-                    ({homeFormation})
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    height: 425,
-                    justifyContent: 'space-between',
-                    width: 550
-                  }}
-                >
-                  {renderHomeRows.map((row, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'row',
-                        justifyContent: 'space-around',
-                        width: 550
-                      }}
-                    >
-                      {(row || []).map((player: string, j: number) => {
-                        const { number, name } = cleanPlayerName(player);
-
-                        return (
-                          <div
-                            key={j}
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              width: 104
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: 36,
-                                height: 36,
-                                borderRadius: 18,
-                                backgroundColor: '#2563eb',
-                                borderWidth: 3,
-                                borderStyle: 'solid',
-                                borderColor: '#ffffff'
-                              }}
-                            >
-                              {number ? (
-                                <span
-                                  style={{
-                                    fontSize: 14,
-                                    fontWeight: 900,
-                                    color: 'white',
-                                    marginTop: 2
-                                  }}
-                                >
-                                  {number}
-                                </span>
-                              ) : (
-                                <PlayerIcon />
-                              )}
-                            </div>
-
-                            <div
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                marginTop: 6,
-                                backgroundColor: '#00000099',
-                                paddingTop: 3,
-                                paddingBottom: 3,
-                                paddingLeft: 7,
-                                paddingRight: 7,
-                                borderRadius: 5
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  fontSize: 13,
-                                  fontWeight: 800,
-                                  color: 'white'
-                                }}
-                              >
-                                {name}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* AWAY TEAM */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  width: 560,
-                  height: 485,
-                  backgroundColor: '#2E8B57',
-                  borderRadius: 18,
-                  borderWidth: 4,
-                  borderStyle: 'solid',
-                  borderColor: '#ffffff33',
-                  paddingTop: 16,
-                  paddingBottom: 16
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'row',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    height: 42,
-                    marginBottom: 10
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      fontSize: 20,
-                      fontWeight: 900,
-                      color: 'white'
-                    }}
-                  >
-                    {away}
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      fontSize: 16,
-                      color: '#fecaca',
-                      marginLeft: 8
-                    }}
-                  >
-                    ({awayFormation})
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    height: 425,
-                    justifyContent: 'space-between',
-                    width: 550
-                  }}
-                >
-                  {renderAwayRows.map((row, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'row',
-                        justifyContent: 'space-around',
-                        width: 550
-                      }}
-                    >
-                      {(row || []).map((player: string, j: number) => {
-                        const { number, name } = cleanPlayerName(player);
-
-                        return (
-                          <div
-                            key={j}
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              width: 104
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: 36,
-                                height: 36,
-                                borderRadius: 18,
-                                backgroundColor: '#dc2626',
-                                borderWidth: 3,
-                                borderStyle: 'solid',
-                                borderColor: '#ffffff'
-                              }}
-                            >
-                              {number ? (
-                                <span
-                                  style={{
-                                    fontSize: 14,
-                                    fontWeight: 900,
-                                    color: 'white',
-                                    marginTop: 2
-                                  }}
-                                >
-                                  {number}
-                                </span>
-                              ) : (
-                                <PlayerIcon />
-                              )}
-                            </div>
-
-                            <div
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                marginTop: 6,
-                                backgroundColor: '#00000099',
-                                paddingTop: 3,
-                                paddingBottom: 3,
-                                paddingLeft: 7,
-                                paddingRight: 7,
-                                borderRadius: 5
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  fontSize: 13,
-                                  fontWeight: 800,
-                                  color: 'white'
-                                }}
-                              >
-                                {name}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        ),
-        { width: 1200, height: 630 }
-      );
-    }
-
-    // ⚔️ TEMPLATE 2: ELITE VERSUS INTERFACE
-    if (parsedData.type === 'versus') {
-      const hScore =
-        parsedData.hScore !== null && parsedData.hScore !== undefined
-          ? String(parsedData.hScore)
-          : '';
-
-      const aScore =
-        parsedData.aScore !== null && parsedData.aScore !== undefined
-          ? String(parsedData.aScore)
-          : '';
-
-      const hasScore = hScore !== '' && aScore !== '';
-
-      return new ImageResponse(
-        (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              width: 1200,
-              height: 630,
-              backgroundColor: '#0a1428',
-              color: 'white',
-              fontFamily: 'Arial, sans-serif'
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                width: 1200,
-                height: 110,
-                backgroundColor: '#0f1c3a',
-                borderBottomWidth: 3,
-                borderBottomStyle: 'solid',
-                borderBottomColor: '#1e293b',
-                paddingLeft: 50,
-                paddingRight: 50
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  fontSize: 34,
-                  color: '#facc15',
-                  fontWeight: 900,
-                  letterSpacing: '4px'
-                }}
-              >
-                {cleanText(parsedData.label || 'MATCH UPDATE')}
-              </div>
-
-              <img
-                src="https://factsport.com/logo.png"
-                style={{ display: 'flex', width: 50, height: 50 }}
-              />
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'row',
-                width: 1200,
-                height: 520,
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingLeft: 80,
-                paddingRight: 80
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  width: 350,
-                  justifyContent: 'center'
-                }}
-              >
-                {parsedData.homeLogo ? (
-                  <img
-                    src={parsedData.homeLogo}
-                    style={{
-                      display: 'flex',
-                      width: 190,
-                      height: 190,
-                      objectFit: 'contain'
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      display: 'flex',
-                      width: 190,
-                      height: 190,
-                      backgroundColor: '#1e293b',
-                      borderRadius: 95,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 4,
-                      borderStyle: 'solid',
-                      borderColor: '#334155'
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        fontSize: 60,
-                        fontWeight: 900,
-                        color: '#cbd5e1',
-                        letterSpacing: '2px'
-                      }}
-                    >
-                      {parsedData.homeTla || 'HOM'}
-                    </div>
-                  </div>
-                )}
-
-                <div
-                  style={{
-                    display: 'flex',
-                    fontSize: 44,
-                    fontWeight: 900,
-                    marginTop: 25,
-                    color: '#ffffff',
-                    textAlign: 'center'
-                  }}
-                >
-                  {cleanText(parsedData.home || 'HOME')}
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  width: 300,
-                  justifyContent: 'center'
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    backgroundColor: '#0f1c3a',
-                    paddingTop: 18,
-                    paddingBottom: 18,
-                    paddingLeft: 45,
-                    paddingRight: 45,
-                    borderRadius: 24,
-                    borderWidth: 4,
-                    borderStyle: 'solid',
-                    borderColor: '#2563eb',
-                    fontSize: 72,
-                    fontWeight: 900,
-                    color: hasScore ? '#4ade80' : '#94a3b8',
-                    letterSpacing: '2px',
-                    boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)'
-                  }}
-                >
-                  {hasScore ? `${hScore}-${aScore}` : 'VS'}
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  width: 350,
-                  justifyContent: 'center'
-                }}
-              >
-                {parsedData.awayLogo ? (
-                  <img
-                    src={parsedData.awayLogo}
-                    style={{
-                      display: 'flex',
-                      width: 190,
-                      height: 190,
-                      objectFit: 'contain'
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      display: 'flex',
-                      width: 190,
-                      height: 190,
-                      backgroundColor: '#1e293b',
-                      borderRadius: 95,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 4,
-                      borderStyle: 'solid',
-                      borderColor: '#334155'
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        fontSize: 60,
-                        fontWeight: 900,
-                        color: '#cbd5e1',
-                        letterSpacing: '2px'
-                      }}
-                    >
-                      {parsedData.awayTla || 'AWY'}
-                    </div>
-                  </div>
-                )}
-
-                <div
-                  style={{
-                    display: 'flex',
-                    fontSize: 44,
-                    fontWeight: 900,
-                    marginTop: 25,
-                    color: '#ffffff',
-                    textAlign: 'center'
-                  }}
-                >
-                  {cleanText(parsedData.away || 'AWAY')}
-                </div>
-              </div>
-            </div>
-          </div>
-        ),
-        { width: 1200, height: 630 }
-      );
-    }
-
-    // ⏱️ TEMPLATE 3: RELIABLE FALLBACK
-    return new ImageResponse(
-      (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 1200,
-            height: 630,
-            backgroundColor: '#0a1428',
-            color: 'white',
-            fontFamily: 'Arial, sans-serif'
-          }}
-        >
-          <img
-            src="https://factsport.com/logo.png"
-            style={{ display: 'flex', height: 80, marginBottom: 24 }}
-          />
-
-          <div
-            style={{
-              display: 'flex',
-              fontSize: 54,
-              fontWeight: 900,
-              color: '#facc15',
-              letterSpacing: '3px'
-            }}
-          >
-            {cleanText(parsedData.label || 'MATCH UPDATE')}
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              marginTop: 18,
-              fontSize: 28,
-              fontWeight: 700,
-              color: '#e2e8f0'
-            }}
-          >
-            FACTSPORT
-          </div>
-        </div>
-      ),
-      { width: 1200, height: 630 }
-    );
-  } catch (e) {
-    return new ImageResponse(
-      (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 1200,
-            height: 630,
-            backgroundColor: '#0a1428',
-            color: 'white',
-            fontFamily: 'Arial, sans-serif'
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              fontSize: 44,
-              fontWeight: 900,
-              color: '#facc15'
-            }}
-          >
-            FACTSPORT
-          </div>
-        </div>
-      ),
-      { width: 1200, height: 630 }
-    );
+    return `${data.publicUrl}?v=${Date.now()}`;
+  } catch {
+    return publicFallbackUrl;
   }
+};
+
+const isLineupsEvent = (eventKey: string | null) => eventKey === 'lineups';
+
+const normalizeLineupsEventConfig = (eventKey: string | null, evtConfig: any) => {
+  if (!isLineupsEvent(eventKey)) return evtConfig;
+
+  return {
+    ...evtConfig,
+
+    // LINEUPS LIVE CHANNELS ONLY:
+    // X via Make
+    make1: !!evtConfig.make1,
+
+    // X via Buffer
+    buf_x1: !!evtConfig.buf_x1,
+
+    // Facebook direct
+    fb1: !!evtConfig.fb1,
+
+    // Force everything else off for lineups.
+    buf_x2: false,
+    buf_fb1: false,
+    buf_fb2: false,
+    fb2: false,
+    make2: false,
+    tg_general: false
+  };
+};
+
+const fetchImageArrayBuffer = async (url: string) => {
+  try {
+    const imgResponse = await fetch(url, {
+      headers: { Accept: 'image/png' }
+    });
+
+    if (!imgResponse.ok) return null;
+
+    return await imgResponse.arrayBuffer();
+  } catch {
+    return null;
+  }
+};
+
+const uploadImageArrayBuffer = async (
+  arrayBuffer: ArrayBuffer,
+  fileName: string,
+  supabaseClient: any
+) => {
+  try {
+    const { error } = await supabaseClient.storage
+      .from('socials')
+      .upload(`${fileName}.png`, arrayBuffer, {
+        contentType: 'image/png',
+        upsert: true
+      });
+
+    if (error) return '';
+
+    const { data } = supabaseClient.storage
+      .from('socials')
+      .getPublicUrl(`${fileName}.png`);
+
+    return `${data.publicUrl}?v=${Date.now()}`;
+  } catch {
+    return '';
+  }
+};
+
+const generateStaticImage = async (
+  internalFetchUrl: string,
+  fileName: string,
+  supabaseClient: any
+) => {
+  const arrayBuffer = await fetchImageArrayBuffer(internalFetchUrl);
+
+  if (!arrayBuffer) {
+    return {
+      ok: false,
+      url: ''
+    };
+  }
+
+  const publicUrl = await uploadImageArrayBuffer(
+    arrayBuffer,
+    fileName,
+    supabaseClient
+  );
+
+  return {
+    ok: !!publicUrl,
+    url: publicUrl
+  };
+};
+
+const getValidGoals = (eventsArr: any[]) => {
+  if (!Array.isArray(eventsArr)) return [];
+
+  return eventsArr.filter((e: any) => {
+    if (!e) return false;
+
+    const text = String(e.text || '').toLowerCase();
+    const type = String(e.type || '').toLowerCase();
+
+    if (
+      text.includes('disallowed') ||
+      text.includes('cancelled') ||
+      text.includes('no goal') ||
+      type === 'var_overturn' ||
+      type === 'penalty_awarded'
+    ) {
+      return false;
+    }
+
+    return type === 'goal' || text === 'goal';
+  });
+};
+
+const getPenaltyEvents = (eventsArr: any[]) => {
+  if (!Array.isArray(eventsArr)) return [];
+
+  return eventsArr.filter((e: any) => {
+    if (!e) return false;
+
+    const type = String(e.type || '').toLowerCase();
+
+    return type === 'penalty_awarded';
+  });
+};
+
+const parseTime = (t: any) => {
+  const str = String(t || '').replace(/[^0-9+]/g, '');
+  const parts = str.split('+');
+
+  return (
+    (parseInt(parts[0]) || 0) * 100 + (parseInt(parts[1]) || 0)
+  );
+};
+
+const parseMinutes = (t: any) => {
+  const str = String(t || '').replace(/[^0-9+]/g, '');
+  const parts = str.split('+');
+
+  return (parseInt(parts[0]) || 0) + (parseInt(parts[1]) || 0);
+};
+
+const isTerminalStatus = (status: any) =>
+  TERMINAL_STATUSES.has(String(status || '').toUpperCase());
+
+const isLiveStatus = (status: any) =>
+  LIVE_STATUSES.has(String(status || '').toUpperCase());
+
+const isHtStatus = (status: any) =>
+  HT_STATUSES.has(String(status || '').toUpperCase());
+
+const isPreStatus = (status: any) =>
+  PRE_STATUSES.has(String(status || '').toUpperCase());
+
+const isEventFresh = (
+  event: any,
+  matchDate: string,
+  freshnessMs = EVENT_FRESHNESS_MS
+) => {
+  if (!event) return true;
+  if (!matchDate) return true;
+
+  const kickMs = Date.parse(matchDate);
+
+  if (!Number.isFinite(kickMs)) return true;
+
+  const eventMs =
+    kickMs + parseMinutes(event.time || event.minute) * 60000;
+
+  const age = Date.now() - eventMs;
+
+  return age <= freshnessMs;
+};
+
+const getLatestChangedGoal = (oldGoals: any[], newGoals: any[]) => {
+  const oldKeys = new Set(
+    oldGoals.map(
+      (g) => `${g.time || ''}|${g.player || ''}|${g.text || ''}`
+    )
+  );
+
+  const sorted = [...newGoals].sort(
+    (a, b) =>
+      parseTime(b.time || b.minute) - parseTime(a.time || a.minute)
+  );
+
+  return (
+    sorted.find(
+      (g) =>
+        !oldKeys.has(`${g.time || ''}|${g.player || ''}|${g.text || ''}`)
+    ) ||
+    sorted[0] ||
+    null
+  );
+};
+
+const getCompetitionStakes = (match: any) => {
+  const league = String(match.league || '').toLowerCase();
+  const stage = String(match.stage || '').toLowerCase();
+  const matchType = String(match.match_type || '').toLowerCase();
+  const group = String(match.match_group || match.group || '').replace(
+    /_/g,
+    ' '
+  );
+
+  const homeWins = Number(match.home_score) > Number(match.away_score);
+  const awayWins = Number(match.away_score) > Number(match.home_score);
+  const winner = homeWins ? match.home_team : awayWins ? match.away_team : null;
+
+  const combined = `${league} ${stage} ${matchType} ${group}`.toLowerCase();
+
+  if (combined.includes('final')) {
+    return {
+      short: 'Cup Final',
+      full: winner ? `${winner} wins the cup` : 'Cup final decided',
+      round: 'Final',
+      group: ''
+    };
+  }
+
+  if (combined.includes('semi')) {
+    return {
+      short: 'Semi-final',
+      full: winner
+        ? `${winner} advances to the final`
+        : 'Semi-final winner advances',
+      round: 'Semi-final',
+      group: ''
+    };
+  }
+
+  if (combined.includes('quarter')) {
+    return {
+      short: 'Quarter-final',
+      full: winner
+        ? `${winner} advances to the semi-finals`
+        : 'Quarter-final winner advances',
+      round: 'Quarter-final',
+      group: ''
+    };
+  }
+
+  if (combined.includes('round of')) {
+    return {
+      short: 'Knockout Round',
+      full: winner
+        ? `${winner} advances to the next round`
+        : 'Knockout winner advances',
+      round: 'Knockout Round',
+      group: ''
+    };
+  }
+
+  if (combined.includes('group')) {
+    return {
+      short: 'Group Stage',
+      full: group
+        ? `Group ${group} points can decide qualification.`
+        : 'Group-stage points can decide qualification.',
+      round: 'Group Stage',
+      group: group || ''
+    };
+  }
+
+  return {
+    short: league || 'Football',
+    full: '',
+    round: '',
+    group: ''
+  };
+};
+
+const getOgLabel = (eventKey: string, match: any, stakes: any) => {
+  if (eventKey === 'fulltime') {
+    if (stakes.short === 'Cup Final') return 'CUP FINAL FULL TIME';
+    if (stakes.short === 'Semi-final') return 'SEMI-FINAL FULL TIME';
+    if (stakes.short === 'Quarter-final')
+      return 'QUARTER-FINAL FULL TIME';
+    if (stakes.short === 'Group Stage') return 'GROUP STAGE FULL TIME';
+
+    return 'FULL TIME';
+  }
+
+  if (eventKey === 'goals') return 'GOAL ALERT!';
+  if (eventKey === 'lineups') return 'STARTING XI';
+  if (eventKey === 'kickoff') return 'KICK-OFF';
+  if (eventKey === 'halftime') return 'HALF TIME';
+  if (eventKey === 'var_overturn') return 'VAR DECISION';
+  if (eventKey === 'penalty_awarded') return 'PENALTY AWARDED';
+
+  return 'MATCH UPDATE';
+};
+
+export async function POST(request: Request) {
+  const authHeader = request.headers.get('Authorization');
+
+  if (authHeader !== `Bearer ${process.env.CRON_KEY}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const newState = body.record;
+
+  const oldState = body.old_record || {
+    home_score: 0,
+    away_score: 0,
+    status: 'PRE_MATCH',
+    lineups: { home: [], away: [] },
+    match_events: []
+  };
+
+  if (!newState) {
+    return NextResponse.json({ message: 'No record found' }, { status: 400 });
+  }
+
+  const oldStatus = String(oldState.status).toUpperCase();
+  const newStatus = String(newState.status).toUpperCase();
+
+  if (isTerminalStatus(oldStatus) && isTerminalStatus(newStatus)) {
+    return NextResponse.json({
+      message: 'Match already finished. Ignoring late correction.'
+    });
+  }
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { data: settingsData } = await supabase
+    .from('site_settings')
+    .select('social_config')
+    .single();
+
+  const config =
+    settingsData?.social_config || {
+      credentials: {},
+      vip_teams: [],
+      vip_leagues: [],
+      events: {},
+      templates: {}
+    };
+
+  const isVipTeam =
+    (config.vip_teams || []).includes(newState.home_team) ||
+    (config.vip_teams || []).includes(newState.away_team);
+
+  const isVipLeague = (config.vip_leagues || []).includes(newState.league);
+
+  let isVIP = isVipTeam || isVipLeague;
+
+  if (!isVIP) {
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data: todaysMatches } = await supabase
+      .from('matches')
+      .select('id, home_team, away_team, league')
+      .like('match_date', `${today}%`)
+      .order('match_date', { ascending: true });
+
+    const hasVIPToday = todaysMatches?.some(
+      (m) =>
+        (config.vip_teams || []).includes(m.home_team) ||
+        (config.vip_teams || []).includes(m.away_team) ||
+        (config.vip_leagues || []).includes(m.league)
+    );
+
+    if (hasVIPToday) {
+      return NextResponse.json({
+        message: 'Not a VIP team or league.'
+      });
+    }
+
+    if (todaysMatches && todaysMatches.length > 0 && newState.id === todaysMatches[0].id) {
+      isVIP = true;
+    } else {
+      return NextResponse.json({
+        message: 'Not the fallback match.'
+      });
+    }
+  }
+
+  const frontendUrl = 'https://factsport.com';
+  const internalOrigin = new URL(request.url).origin;
+  const matchUrl = `${frontendUrl}/match/${newState.id}`;
+
+  const stakes = getCompetitionStakes(newState);
+
+  const hashtags = `#${getTla(
+    newState.home_team,
+    newState.home_tla
+  )} #${getTla(newState.away_team, newState.away_tla)} ${getLeagueHashtags(
+    newState.league
+  )} #Football`;
+
+  let ctaText = '👇 Match Stats & Updates:\n';
+  let preMatchCta = '👇 See tactical setup & subs:\n';
+
+  if (newState.media_url || newState.stream_url) {
+    const streamTarget = newState.stream_url || newState.media_url;
+    const isAudio =
+      newState.media_mode === 'audio' ||
+      String(streamTarget).includes('audio') ||
+      String(streamTarget).includes('radio');
+
+    if (isAudio) {
+      ctaText = `🎧 Listen to Live Audio Commentary:\n👉 ${streamTarget}\n\n👇 Match Stats:\n`;
+      preMatchCta = `🎧 Live radio coverage begins at kick-off:\n👉 ${streamTarget}\n\n👇 Team Lineups:\n`;
+    } else {
+      ctaText = `📺 Watch Live Match Stream:\n👉 ${streamTarget}\n\n👇 Live Stats:\n`;
+      preMatchCta = `📺 Live video stream begins at kick-off:\n👉 ${streamTarget}\n\n👇 Team Formations:\n`;
+    }
+  }
+
+  const oldTotal =
+    (oldState.home_score || 0) + (oldState.away_score || 0);
+
+  const newTotal =
+    (newState.home_score || 0) + (newState.away_score || 0);
+
+  const oldGoalsList = getValidGoals(oldState.match_events || []);
+  const newGoalsList = getValidGoals(newState.match_events || []);
+  const oldPenaltiesList = getPenaltyEvents(oldState.match_events || []);
+  const newPenaltiesList = getPenaltyEvents(newState.match_events || []);
+
+  const getValidNames = (arr: any[]) =>
+    (Array.isArray(arr) ? arr : [])
+      .map(
+        (p) =>
+          p?.name ||
+          p?.player?.name ||
+          p?.playerName ||
+          (typeof p === 'string' ? p : null)
+      )
+      .filter(Boolean);
+
+  const oldValidH = getValidNames(oldState.lineups?.home);
+  const oldValidA = getValidNames(oldState.lineups?.away);
+  const newValidH = getValidNames(newState.lineups?.home);
+  const newValidA = getValidNames(newState.lineups?.away);
+
+  const oldHasFullLineups =
+    oldValidH.length >= 11 && oldValidA.length >= 11;
+
+  const newHasFullLineups =
+    newValidH.length >= 11 && newValidA.length >= 11;
+
+  let eventKey: string | null = null;
+
+  let extraData: any = {
+    ctaText,
+    preMatchCta,
+    hashtags,
+    stakes: stakes.full,
+    round: stakes.round,
+    group: stakes.group
+  };
+
+  let ogPayload = null;
+
+  if (!isTerminalStatus(oldStatus) && isTerminalStatus(newStatus)) {
+    eventKey = 'fulltime';
+
+    ogPayload = {
+      type: 'versus',
+      label: getOgLabel(eventKey, newState, stakes),
+      home: newState.home_team,
+      away: newState.away_team,
+      hScore: newState.home_score,
+      aScore: newState.away_score,
+      homeLogo: newState.home_logo,
+      awayLogo: newState.away_logo,
+      homeTla: getTla(newState.home_team, newState.home_tla),
+      awayTla: getTla(newState.away_team, newState.away_tla)
+    };
+  } else if (newTotal < oldTotal && !isTerminalStatus(newStatus)) {
+    if (
+      isEventFresh(
+        { time: '90+5' },
+        newState.match_date,
+        EVENT_FRESHNESS_MS
+      )
+    ) {
+      eventKey = 'var_overturn';
+    }
+  } else if (newTotal > oldTotal && !isTerminalStatus(newStatus)) {
+    if (newGoalsList.length < newTotal) {
+      return NextResponse.json({
+        message:
+          'Facts data lagging behind scoreboard. Waiting for next ping.'
+      });
+    }
+
+    const latestGoal = getLatestChangedGoal(oldGoalsList, newGoalsList);
+
+    if (
+      !latestGoal ||
+      !isEventFresh(latestGoal, newState.match_date, EVENT_FRESHNESS_MS)
+    ) {
+      return NextResponse.json({
+        message: 'Goal event is stale. Ignoring late goal trigger.'
+      });
+    }
+
+    eventKey = 'goals';
+    extraData.statusText = isLiveStatus(newStatus)
+      ? ''
+      : ` (${newState.status})`;
+
+    if (latestGoal) {
+      const player =
+        latestGoal.player || latestGoal.playerName || latestGoal.name || 'Unknown Player';
+
+      const time =
+        latestGoal.time || latestGoal.minute
+          ? `${latestGoal.time || latestGoal.minute}' `
+          : '';
+
+      extraData.scorer = `\n⚽ GOAL - ${player} (${time.trim()})\n`;
+    }
+
+    if (!extraData.scorer) {
+      extraData.scorer = '\n⚽ GOAL - Confirmed!\n';
+    }
+
+    ogPayload = {
+      type: 'versus',
+      label: ['PEN', 'PEN_SHOOT_OUT'].includes(newStatus)
+        ? 'PENALTY SCORED'
+        : 'GOAL ALERT!',
+      home: newState.home_team,
+      away: newState.away_team,
+      hScore: newState.home_score,
+      aScore: newState.away_score,
+      homeLogo: newState.home_logo,
+      awayLogo: newState.away_logo,
+      homeTla: getTla(newState.home_team, newState.home_tla),
+      awayTla: getTla(newState.away_team, newState.away_tla)
+    };
+  } else if (
+    newTotal === oldTotal &&
+    newPenaltiesList.length > oldPenaltiesList.length &&
+    !isTerminalStatus(newStatus)
+  ) {
+    const sortedPens = [...newPenaltiesList].sort(
+      (a, b) =>
+        parseTime(b.time || b.minute) - parseTime(a.time || a.minute)
+    );
+
+    const latestPenalty = sortedPens[0];
+
+    if (latestPenalty && isEventFresh(latestPenalty, newState.match_date, EVENT_FRESHNESS_MS)) {
+      eventKey = 'penalty_awarded';
+      extraData.time =
+        latestPenalty.time || latestPenalty.minute
+          ? `${latestPenalty.time || latestPenalty.minute}'`
+          : '';
+    }
+  } else if (!isHtStatus(oldStatus) && isHtStatus(newStatus)) {
+    eventKey = 'halftime';
+
+    ogPayload = {
+      type: 'versus',
+      label: 'HALF TIME',
+      home: newState.home_team,
+      away: newState.away_team,
+      hScore: newState.home_score,
+      aScore: newState.away_score,
+      homeLogo: newState.home_logo,
+      awayLogo: newState.away_logo,
+      homeTla: getTla(newState.home_team, newState.home_tla),
+      awayTla: getTla(newState.away_team, newState.away_tla)
+    };
+  } else if (isHtStatus(oldStatus) && (isLiveStatus(newStatus) || isPreStatus(newStatus))) {
+    eventKey = 'kickoff';
+  } else if (isPreStatus(oldStatus) && isLiveStatus(newStatus)) {
+    eventKey = 'kickoff';
+
+    ogPayload = {
+      type: 'versus',
+      label: 'KICK-OFF',
+      home: newState.home_team,
+      away: newState.away_team,
+      hScore: newState.home_score,
+      aScore: newState.away_score,
+      homeLogo: newState.home_logo,
+      awayLogo: newState.away_logo,
+      homeTla: getTla(newState.home_team, newState.home_tla),
+      awayTla: getTla(newState.away_team, newState.away_tla)
+    };
+  } else if (!oldHasFullLineups && newHasFullLineups) {
+    eventKey = 'lineups';
+
+    ogPayload = {
+      type: 'pitch',
+      label: 'STARTING XI',
+      home: newState.home_team,
+      away: newState.away_team,
+      homeFormation: newState.lineups?.formations?.home || '4-3-3',
+      awayFormation: newState.lineups?.formations?.away || '4-3-3',
+      homeXI: newValidH.slice(0, 11).map(compressPlayerName),
+      awayXI: newValidA.slice(0, 11).map(compressPlayerName)
+    };
+  }
+
+  if (!eventKey) {
+    return NextResponse.json({ message: 'No relevant trigger.' });
+  }
+
+  const baseSafetyConfig = SAFETY_MAP[eventKey] || {};
+  const dbEventConfig = config.events?.[eventKey] || {};
+
+  let evtConfig = {
+    ...baseSafetyConfig,
+    ...dbEventConfig
+  };
+
+  // LINEUPS ONLY: force off anything that is not X/Make, X/Buffer, FB1.
+  evtConfig = normalizeLineupsEventConfig(eventKey, evtConfig);
+
+  const tpl = config.templates?.[eventKey] || {};
+
+  extraData.activeCta =
+    eventKey === 'lineups' || eventKey === 'kickoff'
+      ? preMatchCta
+      : ctaText;
+
+  const fb1Text = evtConfig.fb1
+    ? parseTemplate(
+        tpl.fb1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[STAKES]\n[LINK]`,
+        newState,
+        matchUrl,
+        extraData
+      )
+    : null;
+
+  const fb2Text = evtConfig.fb2
+    ? parseTemplate(tpl.fb2 || fb1Text || '', newState, matchUrl, extraData)
+    : null;
+
+  const make1Text = evtConfig.make1
+    ? parseTemplate(
+        tpl.make1 || `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]\n[HASHTAGS]`,
+        newState,
+        matchUrl,
+        extraData
+      )
+    : null;
+
+  const make2Text = evtConfig.make2
+    ? parseTemplate(tpl.make2 || make1Text || '', newState, matchUrl, extraData)
+    : null;
+
+  const tgMsg = evtConfig.tg_general
+    ? parseTemplate(
+        tpl.tg_general ||
+          `<b>[HOME] [H_SCORE] - [A_SCORE] [AWAY]</b>\n[STAKES]\n<a href="[LINK]">Match Center</a>`,
+        newState,
+        matchUrl,
+        extraData
+      )
+    : null;
+
+  const bufX1Text = evtConfig.buf_x1
+    ? parseTemplate(
+        tpl.buf_x1 ||
+          tpl.make1 ||
+          `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]\n[HASHTAGS]`,
+        newState,
+        matchUrl,
+        extraData
+      )
+    : null;
+
+  const bufX2Text = evtConfig.buf_x2
+    ? parseTemplate(tpl.buf_x2 || tpl.make2 || bufX1Text || '', newState, matchUrl, extraData)
+    : null;
+
+  const bufFb1Text = evtConfig.buf_fb1
+    ? parseTemplate(
+        tpl.buf_fb1 ||
+          tpl.fb1 ||
+          `[HOME] [H_SCORE] - [A_SCORE] [AWAY]\n[LINK]`,
+        newState,
+        matchUrl,
+        extraData
+      )
+    : null;
+
+  const bufFb2Text = evtConfig.buf_fb2
+    ? parseTemplate(tpl.buf_fb2 || tpl.fb2 || bufFb1Text || '', newState, matchUrl, extraData)
+    : null;
+
+  const creds = config.credentials || {};
+
+  try {
+    const bufferToken =
+      creds.buffer_token || process.env.BUFFER_ACCESS_TOKEN;
+
+    let finalStaticImage = '';
+    let imageGenerationOk = false;
+
+    if (ogPayload) {
+      const payloadEncoded = encodeBase64Safe(ogPayload);
+      const internalFetchUrl = `${internalOrigin}/api/og?data=${payloadEncoded}`;
+      const publicFallbackUrl = `${frontendUrl}/api/og?data=${payloadEncoded}`;
+      const timestampKey = `match_${newState.id}_evt_${eventKey}_ts_${Date.now()}`;
+
+      if (isLineupsEvent(eventKey)) {
+        // LINEUPS RELIABLE FALLBACK:
+        // Only attach image if it was actually generated and uploaded.
+        // If OG generation/upload fails, post text-only.
+        const result = await generateStaticImage(
+          internalFetchUrl,
+          timestampKey,
+          supabase
+        );
+
+        if (result.ok && result.url) {
+          finalStaticImage = result.url;
+          imageGenerationOk = true;
+        } else {
+          finalStaticImage = '';
+          imageGenerationOk = false;
+
+          console.error(
+            `Lineups OG image generation/upload failed. Posting text-only for match ${newState.id}.`
+          );
+        }
+      } else {
+        // Keep existing behavior for non-lineups.
+        finalStaticImage = await secureStaticImage(
+          internalFetchUrl,
+          publicFallbackUrl,
+          timestampKey,
+          supabase
+        );
+
+        imageGenerationOk = !!finalStaticImage;
+      }
+    }
+
+    const makePayload1: any = {
+      fb2_text: fb1Text,
+      x_text: make1Text,
+      buf_x_text: bufX1Text,
+      buf_fb_text: bufFb1Text
+    };
+
+    if (finalStaticImage) {
+      makePayload1.x_image_url = finalStaticImage;
+    }
+
+    const makePayload2: any = {
+      fb2_text: fb2Text,
+      x_text: make2Text,
+      buf_x_text: bufX2Text,
+      buf_fb_text: bufFb2Text
+    };
+
+    if (finalStaticImage) {
+      makePayload2.x_image_url = finalStaticImage;
+    }
+
+    const stripImageFromBufferPayload = (payload: any) => {
+      const cloned = JSON.parse(JSON.stringify(payload || {}));
+      cloned.variables.input.assets = [];
+      return cloned;
+    };
+
+    const stripImageFromMakePayload = (payload: any) => {
+      const cloned = JSON.parse(JSON.stringify(payload || {}));
+      delete cloned.x_image_url;
+      return cloned;
+    };
+
+    const bufferPostFailed = (result: any) => {
+      if (!result || result.ok === false) return true;
+
+      const data = result.json?.data;
+
+      if (Array.isArray(result.json?.errors)) return true;
+      if (data?.createPost?.__typename === 'MutationError') return true;
+
+      return false;
+    };
+
+    const postToBufferDirectly = async (
+      text: string,
+      safeImgUrl: string,
+      profileId: string,
+      token: string,
+      allowImage = true
+    ) => {
+      const payload = {
+        query:
+          'mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }',
+        variables: {
+          input: {
+            text: text || '',
+            channelId: profileId,
+            schedulingType: 'automatic',
+            mode: 'shareNow',
+            assets:
+              allowImage &&
+              imageGenerationOk &&
+              safeImgUrl &&
+              safeImgUrl.length > 5
+                ? [{ image: { url: safeImgUrl } }]
+                : []
+          }
+        }
+      };
+
+      const res = await fetch('https://api.buffer.com/1/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      let json: any = {};
+
+      try {
+        json = await res.json();
+      } catch {
+        json = {};
+      }
+
+      return {
+        ok: res.ok,
+        json
+      };
+    };
+
+    const postToBufferWithRetry = async (
+      text: string,
+      safeImgUrl: string,
+      profileId: string,
+      token: string
+    ) => {
+      const result = await postToBufferDirectly(
+        text,
+        safeImgUrl,
+        profileId,
+        token,
+        true
+      );
+
+      // LINEUPS ONLY:
+      // If Buffer/X rejects the image, retry text-only.
+      if (isLineupsEvent(eventKey) && bufferPostFailed(result)) {
+        await postToBufferDirectly(text, '', profileId, token, false);
+      }
+    };
+
+    const postToMake = async (url: string, payload: any) => {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      let text = '';
+
+      try {
+        text = await res.text();
+      } catch {
+        text = '';
+      }
+
+      return {
+        ok: res.ok,
+        text
+      };
+    };
+
+    const postToMakeWithRetry = async (url: string, payload: any) => {
+      const result = await postToMake(url, payload);
+
+      // LINEUPS ONLY:
+      // If Make/X fails at HTTP level, retry without image.
+      if (isLineupsEvent(eventKey) && !result.ok) {
+        await postToMake(url, stripImageFromMakePayload(payload));
+      }
+    };
+
+    const postToFbWithRetry = async (
+      pageId: string,
+      token: string,
+      message: string,
+      imageUrl: string
+    ) => {
+      const feedUrl = `https://graph.facebook.com/v19.0/${pageId}/feed?message=${encodeURIComponent(
+        message
+      )}&access_token=${token}`;
+
+      if (imageUrl) {
+        const photoUrl = `https://graph.facebook.com/v19.0/${pageId}/photos?url=${encodeURIComponent(
+          imageUrl
+        )}&message=${encodeURIComponent(message)}&access_token=${token}`;
+
+        const photoRes = await fetch(photoUrl, {
+          method: 'POST'
+        });
+
+        // LINEUPS ONLY:
+        // If Facebook rejects the image, retry as plain text post.
+        if (!photoRes.ok && isLineupsEvent(eventKey)) {
+          await fetch(feedUrl, {
+            method: 'POST'
+          }).catch(() => {});
+        }
+      } else {
+        await fetch(feedUrl, {
+          method: 'POST'
+        }).catch(() => {});
+      }
+    };
+
+    if (evtConfig.buf_x1 && bufferToken && creds.buffer_x1_id) {
+      await postToBufferWithRetry(
+        bufX1Text!,
+        finalStaticImage,
+        creds.buffer_x1_id,
+        bufferToken
+      );
+    }
+
+    if (evtConfig.buf_x2 && bufferToken && creds.buffer_x2_id) {
+      await postToBufferWithRetry(
+        bufX2Text!,
+        finalStaticImage,
+        creds.buffer_x2_id,
+        bufferToken
+      );
+    }
+
+    if (evtConfig.buf_fb1 && bufferToken && creds.buffer_fb1_id) {
+      await postToBufferWithRetry(
+        bufFb1Text!,
+        finalStaticImage,
+        creds.buffer_fb1_id,
+        bufferToken
+      );
+    }
+
+    if (evtConfig.buf_fb2 && bufferToken && creds.buffer_fb2_id) {
+      await postToBufferWithRetry(
+        bufFb2Text!,
+        finalStaticImage,
+        creds.buffer_fb2_id,
+        bufferToken
+      );
+    }
+
+    if (
+      evtConfig.fb1 &&
+      (creds.fb1_id || process.env.FB_PAGE_ID) &&
+      (creds.fb1_token || process.env.FB_ACCESS_TOKEN)
+    ) {
+      const pageId = creds.fb1_id || process.env.FB_PAGE_ID;
+      const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
+
+      await postToFbWithRetry(
+        pageId,
+        token,
+        fb1Text || '',
+        finalStaticImage
+      );
+    }
+
+    if (evtConfig.fb2 && creds.fb2_id && creds.fb2_token) {
+      const url = finalStaticImage
+        ? `https://graph.facebook.com/v19.0/${creds.fb2_id}/photos?url=${encodeURIComponent(
+            finalStaticImage
+          )}&message=${encodeURIComponent(fb2Text!)}&access_token=${creds.fb2_token}`
+        : `https://graph.facebook.com/v19.0/${creds.fb2_id}/feed?message=${encodeURIComponent(
+            fb2Text!
+          )}&access_token=${creds.fb2_token}`;
+
+      await fetch(url, { method: 'POST' })
+        .then(async (r) => {
+          if (!r.ok) console.error('FB2 Error:', await r.text());
+        })
+        .catch(() => {});
+    }
+
+    if (evtConfig.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
+      await postToMakeWithRetry(
+        creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL,
+        makePayload1
+      );
+    }
+
+    if (evtConfig.make2 && creds.make_webhook_2) {
+      await postToMakeWithRetry(creds.make_webhook_2, makePayload2);
+    }
+
+    if (
+      evtConfig.tg_general &&
+      creds.telegram_bot_token &&
+      creds.tg_general_channels
+    ) {
+      for (const channel of creds.tg_general_channels) {
+        await fetch(
+          `https://api.telegram.org/bot${creds.telegram_bot_token}/sendMessage`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: channel.chatId,
+              text: tgMsg,
+              parse_mode: 'HTML',
+              disable_web_page_preview: false
+            })
+          }
+        ).catch(() => {});
+      }
+    }
+
+    fetch(`${frontendUrl}/api/index-url`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.CRON_KEY}`
+      },
+      body: JSON.stringify({
+        url: matchUrl,
+        type: 'URL_UPDATED'
+      })
+    }).catch(() => {});
+  } catch (err) {
+    console.error('Critical error firing socials:', err);
+  }
+
+  return NextResponse.json({
+    success: true,
+    event: eventKey
+  });
 }
