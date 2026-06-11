@@ -46,7 +46,7 @@ export default function FactSportPlayer({
       if (!isTimeLocked || isFinished || !matchDate) return;
 
       const kickoffTime = new Date(matchDate).getTime();
-      const unlockTime = kickoffTime - (5 * 60 * 1000);
+      const unlockTime = kickoffTime - (15 * 60 * 1000);
       const timeUntilUnlock = unlockTime - Date.now();
 
       if (timeUntilUnlock > 0) {
