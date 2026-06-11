@@ -2,73 +2,21 @@ export const runtime = 'edge';
 import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
 
-const normalizeFormation = (formationStr: string) => {
-  if (!formationStr) return '4-3-3';
+type ParsedData = Record<string, any>;
 
-  const counts = String(formationStr)
-    .split('-')
-    .map((n) => parseInt(n, 10) || 0);
+const cleanText = (str: unknown) => {
+  if (str === null || str === undefined) return '';
 
-  const total = counts.reduce((sum, n) => sum + n, 0);
-
-  if (total === 10) return counts;
-
-  if (total > 10) {
-    const normalized = [...counts];
-    normalized[normalized.length - 1] = Math.max(
-      0,
-      normalized[normalized.length - 1] - (total - 10)
-    );
-    return normalized;
-  }
-
-  return '4-3-3';
+  return String(str)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
 };
 
-const padPlayers = (players: string[], count: number, fallbackPrefix: string) => {
-  const safePlayers = Array.isArray(players)
-    ? players.filter(Boolean).map(String)
-    : [];
-
-  while (safePlayers.length < count) {
-    const index = safePlayers.length + 1;
-    safePlayers.push(`${fallbackPrefix} ${index}`);
-  }
-
-  return safePlayers.slice(0, count);
-};
-
-const parseFormationRows = (
-  players: string[],
-  formationStr: string,
-  fallbackPrefix: string
-) => {
-  const counts = normalizeFormation(formationStr);
-  const safePlayers = padPlayers(players, 11, fallbackPrefix);
-  const rows: string[][] = [];
-
-  rows.push([safePlayers[0] || `${fallbackPrefix} 1`]);
-
-  let curr = 1;
-
-  counts.forEach((count) => {
-    if (count > 0) {
-      const rowPlayers = safePlayers.slice(curr, curr + count);
-
-      while (rowPlayers.length < count) {
-        rowPlayers.push(`${fallbackPrefix} ${curr + rowPlayers.length}`);
-      }
-
-      rows.push(rowPlayers);
-      curr += count;
-    }
-  });
-
-  return rows;
-};
-
-function decodeBase64Safe(safeBase64: string) {
+const decodeBase64Safe = (safeBase64: string): ParsedData => {
   try {
+    if (!safeBase64) return {};
+
     let base64 = safeBase64.replace(/-/g, '+').replace(/_/g, '/');
 
     while (base64.length % 4) {
@@ -82,22 +30,157 @@ function decodeBase64Safe(safeBase64: string) {
       bytes[i] = binaryStr.charCodeAt(i);
     }
 
-    return new TextDecoder('utf-8').decode(bytes);
-  } catch (e) {
-    return '{}';
+    const jsonStr = new TextDecoder('utf-8').decode(bytes);
+    const parsed = JSON.parse(jsonStr);
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+
+    return parsed;
+  } catch {
+    return {};
   }
-}
+};
 
-function cleanText(str: string) {
-  if (!str) return '';
+const normalizeFormation = (formationStr: unknown): number[] => {
+  const fallback: number[] = [4, 3, 3];
 
-  return str
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase();
-}
+  if (formationStr === null || formationStr === undefined) {
+    return fallback;
+  }
 
-function shortTeamName(name: string, fallback: string) {
+  const raw = String(formationStr).trim();
+
+  if (!raw) {
+    return fallback;
+  }
+
+  let tokens: string[] = [];
+
+  const separatedMatch = raw.match(/\d{1,2}(?:[,\s.-]\d{1,2})+/);
+
+  if (separatedMatch) {
+    tokens = separatedMatch[0].split(/[\s,.-]+/);
+  } else {
+    const compactMatch = raw.match(/\d{3,4}/);
+
+    if (compactMatch) {
+      tokens = compactMatch[0].split('');
+    }
+  }
+
+  const counts = tokens
+    .map((token) => parseInt(token, 10))
+    .filter((count) => Number.isFinite(count) && count > 0);
+
+  if (!counts.length) {
+    return fallback;
+  }
+
+  const total = counts.reduce((sum, count) => sum + count, 0);
+
+  if (total === 10) {
+    return counts;
+  }
+
+  if (total < 10) {
+    return fallback;
+  }
+
+  const normalized = [...counts];
+  let diff = total - 10;
+
+  for (let i = normalized.length - 1; i >= 0 && diff > 0; i--) {
+    const canRemove = normalized[i] - 1;
+
+    if (canRemove <= 0) continue;
+
+    const remove = Math.min(canRemove, diff);
+    normalized[i] -= remove;
+    diff -= remove;
+  }
+
+  if (diff > 0) {
+    return fallback;
+  }
+
+  return normalized.filter((count) => count > 0);
+};
+
+const getPlayerName = (player: any): string => {
+  if (typeof player === 'string') {
+    return player.trim();
+  }
+
+  if (!player || typeof player !== 'object') {
+    return '';
+  }
+
+  const candidates = [
+    player.name,
+    player.playerName,
+    player.fullName,
+    player.player?.name,
+    player.player?.fullName
+  ];
+
+  const found = candidates.find((value) => {
+    if (value === null || value === undefined) return false;
+    return String(value).trim() !== '';
+  });
+
+  return found ? String(found).trim() : '';
+};
+
+const getValidPlayers = (players: any): string[] => {
+  if (!Array.isArray(players)) return [];
+
+  return players.map(getPlayerName).filter((name) => name.length > 0);
+};
+
+const padPlayers = (players: string[], count: number, fallbackPrefix: string) => {
+  const safePrefix = fallbackPrefix.trim() || 'PLAYER';
+  const safePlayers = [...players];
+
+  while (safePlayers.length < count) {
+    const index = safePlayers.length + 1;
+    safePlayers.push(`${safePrefix} ${index}`);
+  }
+
+  return safePlayers.slice(0, count);
+};
+
+const parseFormationRows = (
+  players: string[],
+  formationStr: unknown,
+  fallbackPrefix: string
+): string[][] => {
+  const counts: number[] = normalizeFormation(formationStr);
+  const safePlayers = padPlayers(players, 11, fallbackPrefix);
+  const rows: string[][] = [];
+
+  rows.push([safePlayers[0] || `${fallbackPrefix} 1`]);
+
+  let curr = 1;
+
+  counts.forEach((count) => {
+    if (count <= 0) return;
+
+    const rowPlayers = safePlayers.slice(curr, curr + count);
+
+    while (rowPlayers.length < count) {
+      rowPlayers.push(`${fallbackPrefix} ${curr + rowPlayers.length}`);
+    }
+
+    rows.push(rowPlayers);
+    curr += count;
+  });
+
+  return rows;
+};
+
+const shortTeamName = (name: unknown, fallback: string) => {
   const clean = cleanText(name);
 
   if (!clean) return fallback;
@@ -105,28 +188,43 @@ function shortTeamName(name: string, fallback: string) {
   const words = clean.split(/\s+/).filter(Boolean);
 
   if (words.length >= 2) {
-    return `${words[0].slice(0, 12)} ${words[words.length - 1].slice(0, 12)}`;
+    const first = words[0].length > 14 ? `${words[0].slice(0, 13)}...` : words[0];
+    const lastWord = words[words.length - 1];
+    const last = lastWord.length > 14 ? `${lastWord.slice(0, 13)}...` : lastWord;
+
+    return `${first} ${last}`;
   }
 
-  return clean.slice(0, 18);
-}
+  return clean.length > 18 ? `${clean.slice(0, 17)}...` : clean;
+};
 
-function cleanPlayerName(player: string) {
+const cleanPlayerName = (player: string) => {
   const playerStr = player ? String(player).trim() : '';
+
+  if (!playerStr) {
+    return {
+      number: '',
+      name: 'PLAYER'
+    };
+  }
+
   const numberMatch = playerStr.match(/\b(\d{1,2})\b/);
   const playerNumber = numberMatch ? numberMatch[0] : '';
+
   const nameCleaned = playerStr
     .replace(/\b\d{1,2}\b/g, '')
     .replace(/[()]/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
 
-  const lastName = nameCleaned ? nameCleaned.split(' ').pop() : '';
+  const parts = nameCleaned.split(' ').filter(Boolean);
+  const lastName = parts.length > 1 ? parts[parts.length - 1] : nameCleaned;
 
   return {
     number: playerNumber,
     name: lastName ? lastName.slice(0, 10) : 'PLAYER'
   };
-}
+};
 
 const PlayerIcon = () => (
   <svg
@@ -144,34 +242,97 @@ const PlayerIcon = () => (
   </svg>
 );
 
+const fallbackImage = (label = 'MATCH UPDATE') => {
+  const safeLabel = cleanText(label).slice(0, 40) || 'MATCH UPDATE';
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 1200,
+          height: 630,
+          backgroundColor: '#0a1428',
+          color: 'white',
+          fontFamily: 'Arial, sans-serif'
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              fontSize: 54,
+              fontWeight: 900,
+              color: '#facc15',
+              letterSpacing: '3px'
+            }}
+          >
+            {safeLabel}
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              marginTop: 24,
+              fontSize: 34,
+              fontWeight: 800,
+              color: '#e2e8f0'
+            }}
+          >
+            FACTSPORT
+          </div>
+        </div>
+      </div>
+    ),
+    { width: 1200, height: 630 }
+  );
+};
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const dataParam = searchParams.get('data');
 
     if (!dataParam) {
-      return new Response('Missing data', { status: 400 });
+      return fallbackImage('MATCH UPDATE');
     }
 
-    const jsonStr = decodeBase64Safe(dataParam);
-    const parsedData = JSON.parse(jsonStr);
+    const parsedData = decodeBase64Safe(dataParam);
 
     // 📋 TEMPLATE 1: PITCH LINEUP INTERFACE
     if (parsedData.type === 'pitch') {
       const home = shortTeamName(parsedData.home, 'HOME');
       const away = shortTeamName(parsedData.away, 'AWAY');
-      const homeFormation = parsedData.homeFormation || '4-3-3';
-      const awayFormation = parsedData.awayFormation || '4-3-3';
+
+      const homeFormationDisplay = normalizeFormation(
+        parsedData.homeFormation
+      ).join('-');
+
+      const awayFormationDisplay = normalizeFormation(
+        parsedData.awayFormation
+      ).join('-');
+
+      const homePlayers = getValidPlayers(parsedData.homeXI || []);
+      const awayPlayers = getValidPlayers(parsedData.awayXI || []);
 
       const homeRows = parseFormationRows(
-        parsedData.homeXI || [],
-        homeFormation,
+        homePlayers,
+        homeFormationDisplay,
         home
       );
 
       const awayRows = parseFormationRows(
-        parsedData.awayXI || [],
-        awayFormation,
+        awayPlayers,
+        awayFormationDisplay,
         away
       );
 
@@ -191,6 +352,7 @@ export async function GET(req: NextRequest) {
               fontFamily: 'Arial, sans-serif'
             }}
           >
+            {/* HEADER */}
             <div
               style={{
                 display: 'flex',
@@ -237,6 +399,7 @@ export async function GET(req: NextRequest) {
                   }}
                 >
                   <div style={{ display: 'flex', color: 'white' }}>{home}</div>
+
                   <div
                     style={{
                       display: 'flex',
@@ -247,16 +410,25 @@ export async function GET(req: NextRequest) {
                   >
                     VS
                   </div>
+
                   <div style={{ display: 'flex', color: 'white' }}>{away}</div>
                 </div>
               </div>
 
-              <img
-                src="https://factsport.com/logo.png"
-                style={{ display: 'flex', width: 44, height: 44 }}
-              />
+              <div
+                style={{
+                  display: 'flex',
+                  fontSize: 24,
+                  fontWeight: 900,
+                  color: '#facc15',
+                  letterSpacing: '2px'
+                }}
+              >
+                FACTSPORT
+              </div>
             </div>
 
+            {/* PITCH */}
             <div
               style={{
                 display: 'flex',
@@ -267,8 +439,7 @@ export async function GET(req: NextRequest) {
                 paddingBottom: 22,
                 paddingLeft: 22,
                 paddingRight: 22,
-                justifyContent: 'space-between',
-                gap: 20
+                justifyContent: 'space-between'
               }}
             >
               {/* HOME TEAM */}
@@ -282,7 +453,7 @@ export async function GET(req: NextRequest) {
                   borderRadius: 18,
                   borderWidth: 4,
                   borderStyle: 'solid',
-                  borderColor: '#ffffff33',
+                  borderColor: 'rgba(255,255,255,0.2)',
                   paddingTop: 16,
                   paddingBottom: 16
                 }}
@@ -307,6 +478,7 @@ export async function GET(req: NextRequest) {
                   >
                     {home}
                   </div>
+
                   <div
                     style={{
                       display: 'flex',
@@ -315,7 +487,7 @@ export async function GET(req: NextRequest) {
                       marginLeft: 8
                     }}
                   >
-                    ({homeFormation})
+                    ({homeFormationDisplay})
                   </div>
                 </div>
 
@@ -328,9 +500,9 @@ export async function GET(req: NextRequest) {
                     width: 550
                   }}
                 >
-                  {renderHomeRows.map((row, i) => (
+                  {renderHomeRows.map((row, rowIndex) => (
                     <div
-                      key={i}
+                      key={rowIndex}
                       style={{
                         display: 'flex',
                         flexDirection: 'row',
@@ -338,12 +510,12 @@ export async function GET(req: NextRequest) {
                         width: 550
                       }}
                     >
-                      {(row || []).map((player: string, j: number) => {
+                      {(row || []).map((player: string, playerIndex: number) => {
                         const { number, name } = cleanPlayerName(player);
 
                         return (
                           <div
-                            key={j}
+                            key={playerIndex}
                             style={{
                               display: 'flex',
                               flexDirection: 'column',
@@ -425,7 +597,7 @@ export async function GET(req: NextRequest) {
                   borderRadius: 18,
                   borderWidth: 4,
                   borderStyle: 'solid',
-                  borderColor: '#ffffff33',
+                  borderColor: 'rgba(255,255,255,0.2)',
                   paddingTop: 16,
                   paddingBottom: 16
                 }}
@@ -450,6 +622,7 @@ export async function GET(req: NextRequest) {
                   >
                     {away}
                   </div>
+
                   <div
                     style={{
                       display: 'flex',
@@ -458,7 +631,7 @@ export async function GET(req: NextRequest) {
                       marginLeft: 8
                     }}
                   >
-                    ({awayFormation})
+                    ({awayFormationDisplay})
                   </div>
                 </div>
 
@@ -471,9 +644,9 @@ export async function GET(req: NextRequest) {
                     width: 550
                   }}
                 >
-                  {renderAwayRows.map((row, i) => (
+                  {renderAwayRows.map((row, rowIndex) => (
                     <div
-                      key={i}
+                      key={rowIndex}
                       style={{
                         display: 'flex',
                         flexDirection: 'row',
@@ -481,12 +654,12 @@ export async function GET(req: NextRequest) {
                         width: 550
                       }}
                     >
-                      {(row || []).map((player: string, j: number) => {
+                      {(row || []).map((player: string, playerIndex: number) => {
                         const { number, name } = cleanPlayerName(player);
 
                         return (
                           <div
-                            key={j}
+                            key={playerIndex}
                             style={{
                               display: 'flex',
                               flexDirection: 'column',
@@ -563,7 +736,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // ⚔️ TEMPLATE 2: ELITE VERSUS INTERFACE
+    // ⚔️ TEMPLATE 2: VERSUS INTERFACE
     if (parsedData.type === 'versus') {
       const hScore =
         parsedData.hScore !== null && parsedData.hScore !== undefined
@@ -618,10 +791,17 @@ export async function GET(req: NextRequest) {
                 {cleanText(parsedData.label || 'MATCH UPDATE')}
               </div>
 
-              <img
-                src="https://factsport.com/logo.png"
-                style={{ display: 'flex', width: 50, height: 50 }}
-              />
+              <div
+                style={{
+                  display: 'flex',
+                  fontSize: 24,
+                  fontWeight: 900,
+                  color: '#facc15',
+                  letterSpacing: '2px'
+                }}
+              >
+                FACTSPORT
+              </div>
             </div>
 
             <div
@@ -722,8 +902,7 @@ export async function GET(req: NextRequest) {
                     fontSize: 72,
                     fontWeight: 900,
                     color: hasScore ? '#4ade80' : '#94a3b8',
-                    letterSpacing: '2px',
-                    boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)'
+                    letterSpacing: '2px'
                   }}
                 >
                   {hasScore ? `${hScore}-${aScore}` : 'VS'}
@@ -798,82 +977,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // ⏱️ TEMPLATE 3: RELIABLE FALLBACK
-    return new ImageResponse(
-      (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 1200,
-            height: 630,
-            backgroundColor: '#0a1428',
-            color: 'white',
-            fontFamily: 'Arial, sans-serif'
-          }}
-        >
-          <img
-            src="https://factsport.com/logo.png"
-            style={{ display: 'flex', height: 80, marginBottom: 24 }}
-          />
-
-          <div
-            style={{
-              display: 'flex',
-              fontSize: 54,
-              fontWeight: 900,
-              color: '#facc15',
-              letterSpacing: '3px'
-            }}
-          >
-            {cleanText(parsedData.label || 'MATCH UPDATE')}
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              marginTop: 18,
-              fontSize: 28,
-              fontWeight: 700,
-              color: '#e2e8f0'
-            }}
-          >
-            FACTSPORT
-          </div>
-        </div>
-      ),
-      { width: 1200, height: 630 }
-    );
-  } catch (e) {
-    return new ImageResponse(
-      (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 1200,
-            height: 630,
-            backgroundColor: '#0a1428',
-            color: 'white',
-            fontFamily: 'Arial, sans-serif'
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              fontSize: 44,
-              fontWeight: 900,
-              color: '#facc15'
-            }}
-          >
-            FACTSPORT
-          </div>
-        </div>
-      ),
-      { width: 1200, height: 630 }
-    );
+    return fallbackImage(parsedData.label || 'MATCH UPDATE');
+  } catch {
+    return fallbackImage('MATCH UPDATE');
   }
 }
