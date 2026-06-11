@@ -158,8 +158,14 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
                                 const isScheduled = ['SCHEDULED', 'PRE'].includes((match.status || '').toUpperCase());
                                 const isFinished = ['FT', 'FINISHED'].includes((match.status || '').toUpperCase());
                                 
-                                const stageText = match.match_group ? match.match_group.replace(/_/g, ' ') : (match.stage && match.stage !== 'REGULAR_SEASON' ? match.stage.replace(/_/g, ' ') : null);
-                                const isKnockout = match.stage && (match.stage.includes('FINAL') || match.stage.includes('KNOCKOUT'));
+                               const stageParts = [
+  match.match_group ? `Group ${match.match_group}`.replace(/_/g, ' ') : '',
+  match.stage && match.stage !== 'REGULAR_SEASON' ? match.stage.replace(/_/g, ' ') : '',
+  match.match_type && match.match_type !== 'REGULAR_SEASON' ? match.match_type.replace(/_/g, ' ') : ''
+].filter(Boolean);
+
+const stageText = stageParts.length > 0 ? stageParts.join(' • ') : null;
+const isKnockout = match.knockout || match.final || (match.match_type && ['FINAL', 'SEMI_FINAL', 'QUARTER_FINAL', 'KNOCKOUT_ROUND'].includes(String(match.match_type).toUpperCase()));
 
                                 const homePens = match.stats?.home_penalties;
                                 const awayPens = match.stats?.away_penalties;

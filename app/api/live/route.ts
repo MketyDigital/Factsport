@@ -1,113 +1,155 @@
+// app/api/live/route.ts
+
+// @ts-nocheck
 export const runtime = 'edge';
-export const dynamic = 'force-dynamic'; 
+export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const fetchCache = 'force-no-store';
 
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { fetchEspnLive, fetchEspnDetails, ESPN_LEAGUES } from '@/app/lib/espn';
+import { fetchEspnDetails } from '@/app/lib/espn';
+
+const TERMINAL_STATUSES = new Set(['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD']);
+const LIVE_STATUSES = new Set(['LIVE', 'HT', 'IN_PLAY', '1H', '2H', 'ET', 'P', 'PENALTIES']);
+const PRE_STATUSES = new Set(['SCHEDULED', 'PRE', 'NS', 'UPCOMING', 'TBD']);
 
 async function runLiveUpdate(request: Request) {
   const url = new URL(request.url);
-  if (url.searchParams.get('key') !== process.env.CRON_KEY) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  let logs: string[] = []; let updates = 0; const syncTasks: Promise<any>[] = []; 
+  if (url.searchParams.get('key') !== process.env.CRON_KEY) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const logs: string[] = [];
+  let updates = 0;
 
   try {
-      const now = Date.now();
-      const lookForward = new Date(now + (2 * 60 * 60 * 1000)).toISOString();
-      const lookBack = new Date(now - (24 * 60 * 60 * 1000)).toISOString(); 
+    const now = Date.now();
+    const lookBack = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+    const lookForward = new Date(now + 48 * 60 * 60 * 1000).toISOString();
 
-      const { data: windowMatches } = await supabase.from('matches').select('*').not('espn_id', 'is', null).gt('match_date', lookBack).lt('match_date', lookForward);
-      if (!windowMatches || windowMatches.length === 0) return NextResponse.json({ message: "No matches in window." });
+    const { data: windowMatches, error: fetchError } = await supabase
+      .from('matches')
+      .select('*')
+      .not('espn_id', 'is', null)
+      .gt('match_date', lookBack)
+      .lt('match_date', lookForward);
 
-      const activeMatches = windowMatches.filter(m => {
-          const isLiveOrUpcoming = ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE'].includes(m.status);
-          const isFinishedButBroken = ['FT', 'FINISHED'].includes(m.status) && (!m.match_events || m.match_events.length === 0);
-          return isLiveOrUpcoming || isFinishedButBroken;
-      });
+    if (fetchError) throw fetchError;
 
-      if (activeMatches.length === 0) return NextResponse.json({ message: "No active matches." });
+    if (!windowMatches || windowMatches.length === 0) {
+      return NextResponse.json({ message: 'No matches in window.' });
+    }
 
-      const activeLeagues = Array.from(new Set(activeMatches.map(m => m.league)));
-      const terminalStatuses = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'];
+    const activeMatches = windowMatches.filter((m) => {
+      const status = String(m.status || '').toUpperCase();
+      const kickMs = new Date(m.match_date).getTime();
+      const minutesToKick = Number.isFinite(kickMs) ? (kickMs - Date.now()) / 60000 : 999999;
 
-      for (const leagueName of activeLeagues) {
-        const espnCode = ESPN_LEAGUES[leagueName as string];
-        if (!espnCode) continue;
+      if (TERMINAL_STATUSES.has(status)) return false;
+      if (LIVE_STATUSES.has(status)) return true;
+      if ((PRE_STATUSES.has(status) || status === '') && minutesToKick <= 150 && minutesToKick > -240) return true;
+      if (!m.match_events || m.match_events.length === 0) return true;
+      if (!m.lineups || m.lineups.home?.length === 0) return true;
 
-        const espnMatches = await fetchEspnLive(espnCode);
-        const leagueDbMatches = activeMatches.filter(m => m.league === leagueName);
+      return false;
+    });
 
-        for (const dbMatch of leagueDbMatches) {
-             const espnGame = espnMatches.find((e: any) => String(e.espn_id) === dbMatch.espn_id);
-             const isFinishedButBroken = terminalStatuses.includes(dbMatch.status);
-             
-             if (espnGame || isFinishedButBroken) {
-                 const updateTask = (async () => {
-                     const richData = await fetchEspnDetails(dbMatch.espn_id);
-                     let newStatus = dbMatch.status;
-                     const payload: any = { updated_at: new Date().toISOString() };
+    if (activeMatches.length === 0) {
+      return NextResponse.json({ message: 'No active matches.' });
+    }
 
-                     if (espnGame) {
-                         if (espnGame.status === 'in') newStatus = 'LIVE';
-                         else if (espnGame.status === 'post') newStatus = 'FT'; 
-                         else if (espnGame.clock === 'HT') newStatus = 'HT';
-                         
-                         payload.status = newStatus;
-                         
-                         const isTrackedByFD = !!dbMatch.api_id;
-                         if (!terminalStatuses.includes(dbMatch.status) || !isTrackedByFD) {
-                             payload.home_score = espnGame.home_score;
-                             payload.away_score = espnGame.away_score;
-                             payload.displayClock = espnGame.clock;
-                         }
-                     }
+    const pool: Promise<any>[] = [];
+    const concurrency = Number(process.env.LIVE_SYNC_CONCURRENCY || 3);
 
-                     if (richData) {
-                         payload.match_events = richData.events; 
-                         payload.stats = richData.stats; 
-                         payload.lineups = richData.lineups;
-                         
-                         if (richData.venue) payload.venue = richData.venue;
-                         if (richData.stage) payload.stage = richData.stage;
-                         if (richData.match_group) payload.match_group = richData.match_group;
-                         
-                         if (richData.referees && richData.referees.length > 0) payload.referees = richData.referees;
-                         if (richData.predictor) payload.predictor = richData.predictor;
-                     }
+    const updateOne = async (dbMatch: any) => {
+      try {
+        const richData = await fetchEspnDetails(dbMatch.espn_id);
+        if (!richData) return;
 
-                     await supabase.from('matches').update(payload).eq('id', dbMatch.id);
-                     
-                     // 🟢 THE INTERNAL DISPATCH TRIGGER
-                     // Instantly forwards any critical status changes to the socials engine. No Webhook needed.
-                     const statusChangedToFT = newStatus === 'FT' && dbMatch.status !== 'FT';
-                     const scoresChanged = payload.home_score !== dbMatch.home_score || payload.away_score !== dbMatch.away_score;
-                     const lineupsAnnounced = dbMatch.status === 'SCHEDULED' && newStatus === 'LIVE';
+        const payload: any = {
+          updated_at: new Date().toISOString(),
+          last_live_sync_at: new Date().toISOString(),
+          status: richData.status,
+          home_score: richData.home_score,
+          away_score: richData.away_score,
+          displayClock: richData.displayClock,
+          match_events: richData.match_events || richData.events,
+          events: richData.events || richData.match_events,
+          stats: richData.stats,
+          lineups: richData.lineups,
+          venue: richData.venue,
+          referees: richData.referees,
+          predictor: richData.predictor,
+          stage: richData.stage,
+          match_group: richData.match_group,
+          match_type: richData.match_type,
+          round: richData.round,
+          group_summary: richData.group_summary,
+          knockout: richData.knockout,
+          final: richData.final
+        };
 
-                     if (statusChangedToFT || scoresChanged || lineupsAnnounced) {
-                         const internalOrigin = new URL(request.url).origin;
-                         const targetRecord = { ...dbMatch, ...payload };
-                         
-                         fetch(`${internalOrigin}/api/socials`, {
-                             method: 'POST',
-                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
-                             body: JSON.stringify({ record: targetRecord, old_record: dbMatch })
-                         }).catch(e => console.error(" Late FT Broadcast Intercept Failed:", e.message));
-                     }
+        if (richData.home_logo) payload.home_logo = richData.home_logo;
+        if (richData.away_logo) payload.away_logo = richData.away_logo;
 
-                     return true;
-                 })();
-                 syncTasks.push(updateTask); updates++; logs.push(`⚡ ESPN Synced: ${dbMatch.home_team}`);
-             }
+        await supabase.from('matches').update(payload).eq('id', dbMatch.id);
+
+        const targetRecord = { ...dbMatch, ...payload };
+
+        const statusChangedToFT = TERMINAL_STATUSES.has(String(targetRecord.status).toUpperCase()) && !TERMINAL_STATUSES.has(String(dbMatch.status).toUpperCase());
+        const scoresChanged = Number(targetRecord.home_score) !== Number(dbMatch.home_score) || Number(targetRecord.away_score) !== Number(dbMatch.away_score);
+        const lineupsAnnounced = String(dbMatch.status).toUpperCase() === 'SCHEDULED' && LIVE_STATUSES.has(String(targetRecord.status).toUpperCase());
+
+        if (statusChangedToFT || scoresChanged || lineupsAnnounced) {
+          const internalOrigin = new URL(request.url).origin;
+
+          fetch(`${internalOrigin}/api/social`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${process.env.CRON_KEY}`
+            },
+            body: JSON.stringify({
+              record: targetRecord,
+              old_record: dbMatch
+            })
+          }).catch((e) => console.error('Live social dispatch failed:', e.message));
         }
-      }
-      await Promise.all(syncTasks);
-      return NextResponse.json({ success: true, updates, logs });
 
-  } catch (error: any) { return NextResponse.json({ error: error.message }, { status: 500 }); }
+        updates++;
+        logs.push(`⚡ ESPN Synced: ${dbMatch.home_team} vs ${dbMatch.away_team}`);
+      } catch (e: any) {
+        logs.push(`⚠️ Failed ${dbMatch.espn_id}: ${e.message}`);
+      }
+    };
+
+    for (const dbMatch of activeMatches) {
+      pool.push(updateOne(dbMatch));
+
+      if (pool.length >= concurrency) {
+        await Promise.all(pool.splice(0, pool.length));
+      }
+    }
+
+    await Promise.all(pool);
+
+    return NextResponse.json({ success: true, updates, logs });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
 
-export async function GET(request: Request) { return runLiveUpdate(request); }
-export async function POST(request: Request) { return runLiveUpdate(request); }
+export async function GET(request: Request) {
+  return runLiveUpdate(request);
+}
+
+export async function POST(request: Request) {
+  return runLiveUpdate(request);
+}
