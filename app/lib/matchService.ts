@@ -6,6 +6,9 @@ import { fetchEspnDetails } from '@/app/lib/espn';
 const API_KEY = process.env.FOOTBALL_DATA_KEY || process.env.FOOTBALL_DATA_API_KEY || '';
 const BASE_URL = 'https://api.football-data.org/v4';
 
+const TERMINAL_STATUSES = new Set(['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD']);
+const PRE_STATUSES = new Set(['SCHEDULED', 'PRE', 'NS', 'UPCOMING', 'TBD', 'TIMED', '']);
+
 const LEAGUE_MAP: Record<string, string> = {
   'Premier League': 'PL',
   'La Liga': 'PD',
@@ -30,15 +33,15 @@ const normalizeStatus = (rawStatus: string) => {
   const status = rawStatus.toUpperCase();
 
   const map: Record<string, string> = {
-    'IN_PLAY': 'LIVE',
-    'PAUSED': 'HT',
-    'HALFTIME': 'HT',
-    'FINISHED': 'FT',
-    'AWARDED': 'FT',
-    'TIMED': 'SCHEDULED',
-    'SCHEDULED': 'SCHEDULED',
-    'POSTPONED': 'POSTPONED',
-    'POST': 'FT'
+    IN_PLAY: 'LIVE',
+    PAUSED: 'HT',
+    HALFTIME: 'HT',
+    FINISHED: 'FT',
+    AWARDED: 'FT',
+    TIMED: 'SCHEDULED',
+    SCHEDULED: 'SCHEDULED',
+    POSTPONED: 'POSTPONED',
+    POST: 'FT'
   };
 
   return map[status] || status;
@@ -104,7 +107,7 @@ export interface UnifiedMatchData {
   goals: any[];
   commentary: any[];
   stats: any;
-  lineups: { home: any[]; away: any[]; formations?: { home: string, away: string } };
+  lineups: { home: any[]; away: any[]; formations?: { home: string; away: string } };
   hasExternalData: boolean;
   widget_id?: string;
 
@@ -119,7 +122,7 @@ export interface UnifiedMatchData {
   knockout?: boolean;
   final?: boolean;
   h2h?: any;
-  predictor?: { home: number, away: number, draw: number } | null;
+  predictor?: { home: number; away: number; draw: number } | null;
 
   id?: string;
   home_team?: string;
@@ -136,10 +139,47 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
   let espnLive = null;
 
   if (dbData.espn_id) {
-    espnLive = await fetchEspnDetails(dbData.espn_id);
+    espnLive = await fetchEspnDetails(dbData.espn_id).catch(() => null);
   }
 
-  const lineups = espnLive?.lineups || dbData.lineups || { home: [], away: [], formations: { home: null, away: null } };
+  const dbStatus = String(dbData.status || '').toUpperCase();
+  const espnStatus = espnLive?.status ? String(espnLive.status).toUpperCase() : null;
+
+  /**
+   * Important fix:
+   * Prefer ESPN status/clock when ESPN is available and ESPN says the match is live/finished/HT,
+   * or when DB is still scheduled/pre.
+   *
+   * This fixes the bug where lineups/stats/events were from ESPN but status stayed stale from DB.
+   */
+  const shouldUseEspnStatus = Boolean(
+    espnStatus &&
+      (
+        TERMINAL_STATUSES.has(espnStatus) ||
+        espnStatus === 'LIVE' ||
+        espnStatus === 'HT' ||
+        PRE_STATUSES.has(dbStatus)
+      )
+  );
+
+  const status = shouldUseEspnStatus ? espnStatus : dbStatus;
+
+  const homeScore = espnLive?.home_score ?? dbData.home_score ?? 0;
+  const awayScore = espnLive?.away_score ?? dbData.away_score ?? 0;
+
+  const displayClock =
+    espnLive?.displayClock ||
+    dbData.displayClock ||
+    (status === 'LIVE' ? 'Live' : status === 'HT' ? 'HT' : '');
+
+  const lineups =
+    espnLive?.lineups ||
+    dbData.lineups || {
+      home: [],
+      away: [],
+      formations: { home: null, away: null }
+    };
+
   const stats = espnLive?.stats || dbData.stats || { home: {}, away: {} };
   const events = espnLive?.events || espnLive?.match_events || dbData.match_events || [];
 
@@ -160,34 +200,58 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
     };
   }
 
-  const rawStatus = (dbData.status || '').toUpperCase();
+  const homeTeam = dbData.home_team || espnLive?.home_team || '';
+  const awayTeam = dbData.away_team || espnLive?.away_team || '';
+  const homeLogo = dbData.home_logo || espnLive?.home_logo || null;
+  const awayLogo = dbData.away_logo || espnLive?.away_logo || null;
 
   return {
     ...dbData,
 
-    status: rawStatus,
-    displayClock: dbData.displayClock || (rawStatus === 'LIVE' ? 'Live' : (rawStatus === 'HT' ? 'HT' : '')),
-    home: { name: dbData.home_team, logo: dbData.home_logo, score: dbData.home_score ?? 0, id: 'home' },
-    away: { name: dbData.away_team, logo: dbData.away_logo, score: dbData.away_score ?? 0, id: 'away' },
+    id: dbData.id,
+    home_team: homeTeam,
+    away_team: awayTeam,
+    home_logo: homeLogo,
+    away_logo: awayLogo,
+    home_score: homeScore,
+    away_score: awayScore,
+    match_date: dbData.match_date,
+    league: dbData.league,
+
+    status,
+    displayClock,
+
+    home: {
+      name: homeTeam,
+      logo: homeLogo,
+      score: homeScore,
+      id: 'home'
+    },
+    away: {
+      name: awayTeam,
+      logo: awayLogo,
+      score: awayScore,
+      id: 'away'
+    },
 
     goals: events,
     commentary: [],
-    stats: stats,
-    lineups: lineups,
+    stats,
+    lineups,
 
     hasExternalData: hasRichData,
     widget_id: dbData.widget_id,
 
-    venue: espnLive?.venue || dbData.venue || null,
-    referees: espnLive?.referees || dbData.referees || [],
+    venue: espnLive?.venue ?? dbData.venue ?? null,
+    referees: espnLive?.referees ?? dbData.referees ?? [],
     predictor: finalPredictor,
 
-    stage: espnLive?.stage || dbData.stage || null,
-    group: espnLive?.match_group || dbData.match_group || null,
-    match_group: espnLive?.match_group || dbData.match_group || null,
-    match_type: espnLive?.match_type || dbData.match_type || null,
-    round: espnLive?.round || dbData.round || null,
-    group_summary: espnLive?.group_summary || dbData.group_summary || [],
+    stage: espnLive?.stage ?? dbData.stage ?? null,
+    group: espnLive?.match_group ?? dbData.match_group ?? dbData.group ?? null,
+    match_group: espnLive?.match_group ?? dbData.match_group ?? dbData.group ?? null,
+    match_type: espnLive?.match_type ?? dbData.match_type ?? null,
+    round: espnLive?.round ?? dbData.round ?? null,
+    group_summary: espnLive?.group_summary ?? dbData.group_summary ?? [],
     knockout: Boolean(espnLive?.knockout || dbData.knockout),
     final: Boolean(espnLive?.final || dbData.final),
     h2h: dbData.h2h || null
