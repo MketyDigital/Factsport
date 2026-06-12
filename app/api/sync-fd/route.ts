@@ -26,16 +26,23 @@ const DEFAULT_TARGET_LEAGUES = [
   'BSA'
 ];
 
+const normalizeFdStatusMap: Record<string, string> = {
+  'SCHEDULED': 'PRE_MATCH',
+  'TIMED': 'PRE_MATCH',
+  'IN_PLAY': 'LIVE',
+  'PAUSED': 'HT',
+  'FINISHED': 'FT',
+  'AWARDED': 'FT',
+  'CERTIFIED': 'FT',
+  'CANCELLED': 'CANC',
+  'POSTPONED': 'POST',
+  'SUSPENDED': 'SUSP'
+};
+
 const normalizeFdStatus = (status?: string) => {
   if (!status) return null;
-
   const s = String(status).toUpperCase();
-
-  if (s === 'FINISHED' || s === 'AWARDED') {
-    return 'FT';
-  }
-
-  return null;
+  return normalizeFdStatusMap[s] || null;
 };
 
 const hasNoEspnId = (match: any) => {
@@ -210,15 +217,11 @@ export async function GET(request: Request) {
   }
 
   const logs: string[] = [];
-  let matchesFinalized = 0;
+  let matchesUpdatedCount = 0;
   let matchUpdateFailures = 0;
   let skippedWithEspnId = 0;
+  let espnCorrections = 0;
 
-  /**
-   * FT-only window.
-   * This route does NOT fetch live status.
-   * It only asks FD for matches that may have finished.
-   */
   const now = new Date();
   const fromDate = new Date(now);
   fromDate.setUTCDate(now.getUTCDate() - 1);
@@ -252,15 +255,13 @@ export async function GET(request: Request) {
     targetLeagues.includes(String(m?.competition?.code))
   );
 
-  const finishedFdMatches = fdMatches.filter((m: any) => normalizeFdStatus(m.status));
-
-  if (finishedFdMatches.length === 0) {
+  if (fdMatches.length === 0) {
     const standingsUpdated = await syncStandings(supabase, targetLeagues, forceSync, logs);
 
     return NextResponse.json({
       success: true,
       matchesVerified: 0,
-      skippedNotFinished: fdMatches.length,
+      skippedNotFinished: 0,
       skippedWithEspnId,
       standingsUpdated,
       logs
@@ -268,7 +269,7 @@ export async function GET(request: Request) {
   }
 
   const apiIds = Array.from(
-    new Set(finishedFdMatches.map((m: any) => String(m.id)))
+    new Set(fdMatches.map((m: any) => String(m.id)))
   );
 
   const { data: dbMatches, error: dbError } = await supabase
@@ -287,66 +288,89 @@ export async function GET(request: Request) {
   const matchUpdates: Promise<any>[] = [];
   const socialDispatches: Promise<void>[] = [];
 
-  for (const fdMatch of finishedFdMatches) {
+  for (const fdMatch of fdMatches) {
     const dbMatch = dbMap.get(String(fdMatch.id));
-
     if (!dbMatch) continue;
 
-    /**
-     * Critical rule:
-     * sync-fd must never touch ESPN-owned matches.
-     * ESPN matches are owned by Cloudflare Worker /api/live-sync or Next /api/live.
-     */
-    if (!hasNoEspnId(dbMatch)) {
-      skippedWithEspnId++;
-      continue;
-    }
-
     const fdStatus = normalizeFdStatus(fdMatch.status);
-
     if (!fdStatus) continue;
 
-    const fdHomeScore = Number(fdMatch.score?.fullTime?.home ?? 0);
-    const fdAwayScore = Number(fdMatch.score?.fullTime?.away ?? 0);
-
+    const isFdTerminal = TERMINAL_STATUSES.has(fdStatus);
     const oldStatus = String(dbMatch.status || '').toUpperCase();
-    const statusChangedToFT =
-      !TERMINAL_STATUSES.has(oldStatus) && TERMINAL_STATUSES.has(fdStatus);
+    const isDbTerminal = TERMINAL_STATUSES.has(oldStatus);
+
+    let fdRawHomeScore = fdMatch.score?.fullTime?.home ?? fdMatch.score?.regularTime?.home ?? fdMatch.score?.halfTime?.home;
+    let fdRawAwayScore = fdMatch.score?.fullTime?.away ?? fdMatch.score?.regularTime?.away ?? fdMatch.score?.halfTime?.away;
+
+    if (fdStatus !== 'PRE_MATCH' && fdStatus !== 'POST' && fdStatus !== 'CANC') {
+        fdRawHomeScore = fdRawHomeScore ?? 0;
+        fdRawAwayScore = fdRawAwayScore ?? 0;
+    }
+
+    const fdHomeScore = Number(fdRawHomeScore);
+    const fdAwayScore = Number(fdRawAwayScore);
 
     const scoresChanged =
-      Number(dbMatch.home_score) !== fdHomeScore ||
-      Number(dbMatch.away_score) !== fdAwayScore;
+      Number(dbMatch.home_score ?? 0) !== fdHomeScore ||
+      Number(dbMatch.away_score ?? 0) !== fdAwayScore;
 
-    if (!statusChangedToFT && !scoresChanged) {
-      continue;
+    const statusChanged = oldStatus !== fdStatus;
+
+    let needsUpdate = false;
+    let isEspnCorrection = false;
+
+    if (!hasNoEspnId(dbMatch)) {
+      if (isFdTerminal && isDbTerminal) {
+        if (scoresChanged) {
+          needsUpdate = true;
+          isEspnCorrection = true;
+          espnCorrections++;
+          logs.push(`🚨 ESPN Correction on FT mismatch for ${dbMatch.id}: ESPN(${dbMatch.home_score}-${dbMatch.away_score}) vs FD(${fdHomeScore}-${fdAwayScore})`);
+        } else {
+            skippedWithEspnId++;
+        }
+      } else {
+          skippedWithEspnId++;
+      }
+    } else {
+      if (statusChanged || scoresChanged) {
+        needsUpdate = true;
+      }
     }
+
+    if (!needsUpdate) continue;
 
     const nowIso = new Date().toISOString();
 
-    const payload = {
+    const payload: any = {
       status: fdStatus,
-      home_score: fdHomeScore,
-      away_score: fdAwayScore,
       updated_at: nowIso
     };
 
-    const updatePromise = supabase
-      .from('matches')
-      .update(payload)
-      .eq('id', dbMatch.id)
-      .then((result: any) => {
-        if (result?.error) {
-          matchUpdateFailures++;
-          logs.push(`FD FT update failed ${dbMatch.id}: ${result.error.message}`);
-        } else {
-          matchesFinalized++;
-          logs.push(
-            `FD FT fallback: ${fdMatch.id} ${dbMatch.home_team} vs ${dbMatch.away_team} -> ${fdHomeScore}-${fdAwayScore}`
-          );
-        }
+    if (fdRawHomeScore !== undefined && fdRawHomeScore !== null) {
+        payload.home_score = fdHomeScore;
+    }
+    if (fdRawAwayScore !== undefined && fdRawAwayScore !== null) {
+        payload.away_score = fdAwayScore;
+    }
 
-        return result;
-      });
+    const updatePromise = (async () => {
+      const result = await supabase
+        .from('matches')
+        .update(payload)
+        .eq('id', dbMatch.id);
+        
+      if (result?.error) {
+        matchUpdateFailures++;
+        logs.push(`FD update failed ${dbMatch.id}: ${result.error.message}`);
+      } else {
+        matchesUpdatedCount++;
+        logs.push(
+          `FD update: ${fdMatch.id} ${dbMatch.home_team} vs ${dbMatch.away_team} -> ${fdHomeScore}-${fdAwayScore} (${fdStatus})`
+        );
+      }
+      return result;
+    })();
 
     matchUpdates.push(updatePromise);
 
@@ -355,7 +379,7 @@ export async function GET(request: Request) {
       ...payload
     };
 
-    if (statusChangedToFT || scoresChanged) {
+    if (statusChanged || scoresChanged) {
       const internalOrigin = url.origin;
 
       socialDispatches.push(
@@ -369,7 +393,7 @@ export async function GET(request: Request) {
             record: targetRecord,
             old_record: dbMatch
           })
-        }).catch((e: any) => {
+        }).then(() => {}).catch((e: any) => {
           logs.push(`Social dispatch failed for ${dbMatch.id}: ${e.message}`);
         })
       );
@@ -383,10 +407,10 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     success: true,
-    matchesVerified: matchesFinalized,
+    matchesUpdated: matchesUpdatedCount,
     matchUpdateFailures,
     skippedWithEspnId,
-    skippedNotFinished: fdMatches.length - finishedFdMatches.length,
+    espnCorrections,
     standingsUpdated,
     logs
   });
