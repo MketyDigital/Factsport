@@ -1,42 +1,42 @@
 // app/api/sync-fd/route.ts
 
-export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
+export const runtime = "edge";
+export const dynamic = "force-dynamic";
 export const revalidate = 0;
-export const fetchCache = 'force-no-store';
+export const fetchCache = "force-no-store";
 
-import { createClient } from '@supabase/supabase-js';
-import { NextResponse } from 'next/server';
+import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
 
-const TERMINAL_STATUSES = new Set(['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD']);
+const TERMINAL_STATUSES = new Set(["FT", "FINISHED", "AET", "PEN", "AWARDED", "ABD"]);
 
 const DEFAULT_TARGET_LEAGUES = [
-  'PL',
-  'PD',
-  'BL1',
-  'SA',
-  'FL1',
-  'CL',
-  'EL',
-  'UECL',
-  'EC',
-  'WC',
-  'PPL',
-  'DED',
-  'BSA'
+  "PL",
+  "PD",
+  "BL1",
+  "SA",
+  "FL1",
+  "CL",
+  "EL",
+  "UECL",
+  "EC",
+  "WC",
+  "PPL",
+  "DED",
+  "BSA"
 ];
 
 const normalizeFdStatusMap: Record<string, string> = {
-  'SCHEDULED': 'PRE_MATCH',
-  'TIMED': 'PRE_MATCH',
-  'IN_PLAY': 'LIVE',
-  'PAUSED': 'HT',
-  'FINISHED': 'FT',
-  'AWARDED': 'FT',
-  'CERTIFIED': 'FT',
-  'CANCELLED': 'CANC',
-  'POSTPONED': 'POST',
-  'SUSPENDED': 'SUSP'
+  SCHEDULED: "SCHEDULED",
+  TIMED: "SCHEDULED",
+  IN_PLAY: "LIVE",
+  PAUSED: "HT",
+  FINISHED: "FT",
+  AWARDED: "FT",
+  CERTIFIED: "FT",
+  CANCELLED: "CANC",
+  POSTPONED: "POST",
+  SUSPENDED: "SUSP"
 };
 
 const normalizeFdStatus = (status?: string) => {
@@ -46,7 +46,29 @@ const normalizeFdStatus = (status?: string) => {
 };
 
 const hasNoEspnId = (match: any) => {
-  return !match?.espn_id || String(match.espn_id).trim() === '';
+  return !match?.espn_id || String(match.espn_id).trim() === "";
+};
+
+const hasFdPenaltyShootout = (fdMatch: any) => {
+  return Boolean(
+    fdMatch?.score?.penalties &&
+    (
+      fdMatch.score.penalties.home !== null ||
+      fdMatch.score.penalties.home !== undefined ||
+      fdMatch.score.penalties.away !== null ||
+      fdMatch.score.penalties.away !== undefined
+    )
+  );
+};
+
+const hasDbPenaltyShootout = (dbMatch: any) => {
+  return Boolean(
+    dbMatch?.stats?.home_penalties !== null ||
+    dbMatch?.stats?.home_penalties !== undefined ||
+    dbMatch?.stats?.away_penalties !== null ||
+    dbMatch?.stats?.away_penalties !== undefined ||
+    String(dbMatch?.status || "").toUpperCase() === "PEN"
+  );
 };
 
 async function syncStandings(
@@ -60,8 +82,8 @@ async function syncStandings(
   if (!API_KEY) return 0;
 
   const { data: existingStandings, error: standingsFetchError } = await supabase
-    .from('standings')
-    .select('league_code');
+    .from("standings")
+    .select("league_code");
 
   if (standingsFetchError) {
     logs.push(`Standings fetch error: ${standingsFetchError.message}`);
@@ -88,7 +110,7 @@ async function syncStandings(
 
   if (isHalfHourInterval || forceSync) {
     targetLeagues.forEach((league) => leaguesNeedingStandingsUpdate.add(league));
-    logs.push('Background clock audit: syncing tables.');
+    logs.push("Background clock audit: syncing tables.");
   }
 
   const targetStandingsLeagues = Array.from(leaguesNeedingStandingsUpdate);
@@ -99,7 +121,7 @@ async function syncStandings(
 
   const standingsFetches = targetStandingsLeagues.map((leagueId) =>
     fetch(`https://api.football-data.org/v4/competitions/${leagueId}/standings`, {
-      headers: { 'X-Auth-Token': API_KEY }
+      headers: { "X-Auth-Token": API_KEY }
     })
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null)
@@ -114,7 +136,7 @@ async function syncStandings(
     if (!standData) return;
 
     const leagueId = targetStandingsLeagues[index];
-    const table = standData?.standings?.find((s: any) => s.type === 'TOTAL')?.table || [];
+    const table = standData?.standings?.find((s: any) => s.type === "TOTAL")?.table || [];
 
     if (table.length > 0) {
       const mappedTable = table.map((entry: any) => ({
@@ -144,9 +166,9 @@ async function syncStandings(
   }
 
   const { error: deleteError } = await supabase
-    .from('standings')
+    .from("standings")
     .delete()
-    .in('league_code', successfulLeagues);
+    .in("league_code", successfulLeagues);
 
   if (deleteError) {
     logs.push(`Standings delete error: ${deleteError.message}`);
@@ -154,7 +176,7 @@ async function syncStandings(
   }
 
   const { error: insertError } = await supabase
-    .from('standings')
+    .from("standings")
     .insert(allStandingsToInsert);
 
   if (insertError) {
@@ -168,16 +190,17 @@ async function syncStandings(
 export async function GET(request: Request) {
   const url = new URL(request.url);
 
-  const authHeader = request.headers.get('Authorization') || '';
+  const authHeader = request.headers.get("Authorization") || "";
   const key =
-    url.searchParams.get('key') ||
-    (authHeader.startsWith('Bearer ') ? authHeader.replace('Bearer ', '') : authHeader);
+    url.searchParams.get("key") ||
+    (authHeader.startsWith("Bearer ") ? authHeader.replace("Bearer ", "") : authHeader);
 
   if (key !== process.env.CRON_KEY) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const forceSync = url.searchParams.get('force') === 'true';
+  const forceSync = url.searchParams.get("force") === "true";
+  const FD_CAN_OVERRIDE_ESPN = process.env.FD_CAN_OVERRIDE_ESPN === "true";
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -191,7 +214,7 @@ export async function GET(request: Request) {
       {
         success: true,
         skipped: true,
-        reason: 'Missing Football Data API key'
+        reason: "Missing Football Data API key"
       },
       { status: 200 }
     );
@@ -199,9 +222,9 @@ export async function GET(request: Request) {
 
   const targetLeagues = (
     process.env.FD_SYNC_LEAGUES ||
-    DEFAULT_TARGET_LEAGUES.join(',')
+    DEFAULT_TARGET_LEAGUES.join(",")
   )
-    .split(',')
+    .split(",")
     .map((l) => l.trim())
     .filter(Boolean);
 
@@ -210,7 +233,7 @@ export async function GET(request: Request) {
       {
         success: true,
         skipped: true,
-        reason: 'No target leagues configured'
+        reason: "No target leagues configured"
       },
       { status: 200 }
     );
@@ -223,19 +246,23 @@ export async function GET(request: Request) {
   let espnCorrections = 0;
 
   const now = new Date();
+
+  const fdLookBackDays = Number(process.env.FD_SYNC_LOOKBACK_DAYS || 1);
+  const fdLookAheadDays = Number(process.env.FD_SYNC_LOOKAHEAD_DAYS || 1);
+
   const fromDate = new Date(now);
-  fromDate.setUTCDate(now.getUTCDate() - 1);
+  fromDate.setUTCDate(now.getUTCDate() - fdLookBackDays);
 
   const toDate = new Date(now);
-  toDate.setUTCDate(now.getUTCDate() + 1);
+  toDate.setUTCDate(now.getUTCDate() + fdLookAheadDays);
 
-  const fromStr = fromDate.toISOString().split('T')[0];
-  const toStr = toDate.toISOString().split('T')[0];
+  const fromStr = fromDate.toISOString().split("T")[0];
+  const toStr = toDate.toISOString().split("T")[0];
 
   const fdRes = await fetch(
     `https://api.football-data.org/v4/matches?dateFrom=${fromStr}&dateTo=${toStr}`,
     {
-      headers: { 'X-Auth-Token': API_KEY }
+      headers: { "X-Auth-Token": API_KEY }
     }
   );
 
@@ -273,9 +300,9 @@ export async function GET(request: Request) {
   );
 
   const { data: dbMatches, error: dbError } = await supabase
-    .from('matches')
-    .select('*')
-    .in('api_id', apiIds);
+    .from("matches")
+    .select("*")
+    .in("api_id", apiIds);
 
   if (dbError) {
     throw dbError;
@@ -296,41 +323,72 @@ export async function GET(request: Request) {
     if (!fdStatus) continue;
 
     const isFdTerminal = TERMINAL_STATUSES.has(fdStatus);
-    const oldStatus = String(dbMatch.status || '').toUpperCase();
+    const oldStatus = String(dbMatch.status || "").toUpperCase();
     const isDbTerminal = TERMINAL_STATUSES.has(oldStatus);
 
-    let fdRawHomeScore = fdMatch.score?.fullTime?.home ?? fdMatch.score?.regularTime?.home ?? fdMatch.score?.halfTime?.home;
-    let fdRawAwayScore = fdMatch.score?.fullTime?.away ?? fdMatch.score?.regularTime?.away ?? fdMatch.score?.halfTime?.away;
+    let fdRawHomeScore =
+      fdMatch.score?.fullTime?.home ??
+      fdMatch.score?.regularTime?.home ??
+      fdMatch.score?.halfTime?.home;
 
-    if (fdStatus !== 'PRE_MATCH' && fdStatus !== 'POST' && fdStatus !== 'CANC') {
-        fdRawHomeScore = fdRawHomeScore ?? 0;
-        fdRawAwayScore = fdRawAwayScore ?? 0;
+    let fdRawAwayScore =
+      fdMatch.score?.fullTime?.away ??
+      fdMatch.score?.regularTime?.away ??
+      fdMatch.score?.halfTime?.away;
+
+    if (fdStatus !== "SCHEDULED" && fdStatus !== "POST" && fdStatus !== "CANC") {
+      fdRawHomeScore = fdRawHomeScore ?? 0;
+      fdRawAwayScore = fdRawAwayScore ?? 0;
     }
 
     const fdHomeScore = Number(fdRawHomeScore);
     const fdAwayScore = Number(fdRawAwayScore);
 
+    const fdScoresAvailable =
+      fdRawHomeScore !== null &&
+      fdRawHomeScore !== undefined &&
+      fdRawAwayScore !== null &&
+      fdRawAwayScore !== undefined;
+
     const scoresChanged =
-      Number(dbMatch.home_score ?? 0) !== fdHomeScore ||
-      Number(dbMatch.away_score ?? 0) !== fdAwayScore;
+      fdScoresAvailable &&
+      (
+        Number(dbMatch.home_score ?? 0) !== fdHomeScore ||
+        Number(dbMatch.away_score ?? 0) !== fdAwayScore
+      );
 
     const statusChanged = oldStatus !== fdStatus;
+    const hasEspnId = !hasNoEspnId(dbMatch);
 
     let needsUpdate = false;
     let isEspnCorrection = false;
 
-    if (!hasNoEspnId(dbMatch)) {
-      if (isFdTerminal && isDbTerminal) {
-        if (scoresChanged) {
-          needsUpdate = true;
-          isEspnCorrection = true;
-          espnCorrections++;
-          logs.push(`🚨 ESPN Correction on FT mismatch for ${dbMatch.id}: ESPN(${dbMatch.home_score}-${dbMatch.away_score}) vs FD(${fdHomeScore}-${fdAwayScore})`);
-        } else {
-            skippedWithEspnId++;
-        }
+    if (hasEspnId) {
+      skippedWithEspnId++;
+
+      const fdHasPenaltyShootout = hasFdPenaltyShootout(fdMatch);
+      const dbHasPenaltyShootout = hasDbPenaltyShootout(dbMatch);
+
+      if (
+        FD_CAN_OVERRIDE_ESPN &&
+        isFdTerminal &&
+        isDbTerminal &&
+        scoresChanged &&
+        !fdHasPenaltyShootout &&
+        !dbHasPenaltyShootout
+      ) {
+        needsUpdate = true;
+        isEspnCorrection = true;
+        espnCorrections++;
+
+        logs.push(
+          `🚨 ESPN FT correction allowed for ${dbMatch.id}: ESPN(${dbMatch.home_score}-${dbMatch.away_score}) vs FD(${fdHomeScore}-${fdAwayScore})`
+        );
       } else {
-          skippedWithEspnId++;
+        logs.push(
+          `⏭️ Skipped ESPN-mapped match ${dbMatch.id}; ESPN is source of truth.`
+        );
+        continue;
       }
     } else {
       if (statusChanged || scoresChanged) {
@@ -348,18 +406,19 @@ export async function GET(request: Request) {
     };
 
     if (fdRawHomeScore !== undefined && fdRawHomeScore !== null) {
-        payload.home_score = fdHomeScore;
+      payload.home_score = fdHomeScore;
     }
+
     if (fdRawAwayScore !== undefined && fdRawAwayScore !== null) {
-        payload.away_score = fdAwayScore;
+      payload.away_score = fdAwayScore;
     }
 
     const updatePromise = (async () => {
       const result = await supabase
-        .from('matches')
+        .from("matches")
         .update(payload)
-        .eq('id', dbMatch.id);
-        
+        .eq("id", dbMatch.id);
+
       if (result?.error) {
         matchUpdateFailures++;
         logs.push(`FD update failed ${dbMatch.id}: ${result.error.message}`);
@@ -369,6 +428,7 @@ export async function GET(request: Request) {
           `FD update: ${fdMatch.id} ${dbMatch.home_team} vs ${dbMatch.away_team} -> ${fdHomeScore}-${fdAwayScore} (${fdStatus})`
         );
       }
+
       return result;
     })();
 
@@ -384,9 +444,9 @@ export async function GET(request: Request) {
 
       socialDispatches.push(
         fetch(`${internalOrigin}/api/social`, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
             Authorization: `Bearer ${process.env.CRON_KEY}`
           },
           body: JSON.stringify({

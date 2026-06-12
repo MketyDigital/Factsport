@@ -94,11 +94,11 @@ export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: 
     useSmartInterval(fetchUpdates, pollableMatches.length > 0 ? 10000 : null);
 
     const fixtures = liveMatches
-        .filter(m => !['FT', 'FINISHED', 'ABD'].includes((m.status || '').toUpperCase()))
+       .filter(m => !['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes((m.status || '').toUpperCase()))
         .sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
     
     const results = liveMatches
-        .filter(m => ['FT', 'FINISHED', 'ABD'].includes((m.status || '').toUpperCase()))
+       .filter(m => ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes((m.status || '').toUpperCase()))
         .sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
 
     const activeList = activeTab === 'fixtures' ? fixtures : results;

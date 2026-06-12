@@ -7,7 +7,7 @@ export default function PlayerRatingsWidget({ matchId, lineups, status }: { matc
     const [ratingsData, setRatingsData] = useState<any[]>([]);
     const [userRatings, setUserRatings] = useState<Record<string, number>>({});
     
-    const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'].includes((status || '').toUpperCase());
+   const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes((status || '').toUpperCase());
     const WORKER_URL = 'https://fse.mkpoikankes.workers.dev/api/ratings';
 
     const liveData = useMatchLive();

@@ -110,7 +110,25 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
 
     const fetchUpdates = async () => {
         if (isFetching.current) return;
-        const activeEspnIds = liveMatches.filter(m => ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'P'].includes((m.status || '').toUpperCase()) && m.espn_id).map(m => m.espn_id);
+       const activeEspnIds = liveMatches
+  .filter((m) => {
+    const status = String(m.status || "").toUpperCase();
+    return (
+      m.espn_id &&
+      [
+        "LIVE",
+        "IN_PLAY",
+        "IN",
+        "1H",
+        "2H",
+        "HT",
+        "ET",
+        "P",
+        "PENALTIES"
+      ].includes(status)
+    );
+  })
+  .map((m) => m.espn_id);
         if (activeEspnIds.length === 0) return;
         
         isFetching.current = true;
