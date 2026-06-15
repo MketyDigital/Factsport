@@ -19,8 +19,6 @@ const ESPN_CUPS = {
     'Coppa Italia': 'ita.copa_italia',
     'Coupe de France': 'fra.coupe_de_france',
     'DFB-Pokal': 'ger.dfb_pokal',
-    
-    // 🌍 INTERNATIONAL BREAK RESTORED
     'International Friendlies': 'fifa.friendly',
     'UEFA Nations League': 'uefa.nations',
     'CONCACAF Nations League': 'concacaf.nations',
@@ -28,14 +26,15 @@ const ESPN_CUPS = {
     'World Cup Qualifiers (UEFA)': 'fifa.worldq.uefa',
     'World Cup Qualifiers (AFC)': 'fifa.worldq.afc',
     'World Cup Qualifiers (CONCACAF)': 'fifa.worldq.concacaf',
-    'AFCON Qualifiers': 'caf.nations_qual'
+    'AFCON Qualifiers': 'caf.nations_qual',
+    'Euros': 'uefa.euro',
+    'Copa America': 'conmebol.america'
 };
 
 const normalizeEspnStatus = (state, matchDate) => {
     const matchTime = new Date(matchDate).getTime();
     const now = Date.now();
 
-    // 🟢 TIME SHIELD: Stops future matches from being marked as FT
     if (matchTime > now + (1000 * 60 * 60) && state === 'post') {
         return 'SCHEDULED';
     }
@@ -46,7 +45,6 @@ const normalizeEspnStatus = (state, matchDate) => {
     return 'SCHEDULED';
 };
 
-// 🟢 SMART FILTER: Detects fake/youth matches
 const isFakeMatch = (homeName, awayName) => {
     const combined = `${homeName} ${awayName}`.toLowerCase();
     return combined.includes(' u1') || 
@@ -81,17 +79,6 @@ async function fetchEspnCups() {
                 continue;
             }
 
-            // 🟢 PRE-FETCH PENDING MATCHES FOR ID SWAP CHECK
-            const { data: pendingMatches, error: fetchErr } = await supabase
-                .from('matches')
-                .select('api_id, home_team, away_team')
-                .eq('league', leagueName)
-                .in('status', ['SCHEDULED', 'HT', 'LIVE']); // Only look at unresolved games
-
-            if (fetchErr) {
-                console.error(`   ⚠️ Could not fetch pending matches to verify IDs: ${fetchErr.message}`);
-            }
-
             const matchesToUpsert = [];
 
             for (const e of events) {
@@ -102,29 +89,8 @@ async function fetchEspnCups() {
                 const homeName = homeCompetitor.team.displayName;
                 const awayName = awayCompetitor.team.displayName;
 
-                // 🟢 If it's a youth, women's, or eSports match, skip it entirely!
-                if (isFakeMatch(homeName, awayName)) {
-                    continue;
-                }
+                if (isFakeMatch(homeName, awayName)) continue;
 
-                // 🔥 SMART ID SWAPPER: Check if ESPN changed the ID for this specific fixture
-                if (pendingMatches) {
-                    const existingMatch = pendingMatches.find(m => 
-                        m.home_team === homeName && 
-                        m.away_team === awayName && 
-                        m.api_id !== espnId
-                    );
-
-                    if (existingMatch) {
-                        console.log(`   🔄 ID Change Detected! [${homeName} vs ${awayName}] old:${existingMatch.api_id} -> new:${espnId}`);
-                        // Force update the old row to hold the new ID so we don't create a duplicate
-                        await supabase
-                            .from('matches')
-                            .update({ api_id: espnId, espn_id: espnId })
-                            .eq('api_id', existingMatch.api_id);
-                    }
-                }
-                
                 matchesToUpsert.push({
                     api_id: espnId,     
                     espn_id: espnId,    
@@ -142,6 +108,7 @@ async function fetchEspnCups() {
             }
 
             if (matchesToUpsert.length > 0) {
+                // The SQL unique constraint we added makes this a true 'update if exists'
                 const { error } = await supabase.from('matches').upsert(matchesToUpsert, { onConflict: 'api_id' });
                 if (error) {
                     console.error(`   ❌ DB Error: ${error.message}`);
@@ -149,9 +116,8 @@ async function fetchEspnCups() {
                     console.log(`   ✅ Synced ${matchesToUpsert.length} matches for ${leagueName}`);
                 }
             }
-
         } catch (err) {
-            console.error(`   🔥 Error fetching ${leagueName}:`, err.message);
+            console.error(`   🔥 Error fetching ${leagueName}: ${err.message}`);
         }
     }
     console.log("\n🏁 ESPN Cup Sync Complete!");
