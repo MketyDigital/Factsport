@@ -27,6 +27,7 @@ const ESPN_CUPS = {
     'World Cup Qualifiers (AFC)': 'fifa.worldq.afc',
     'World Cup Qualifiers (CONCACAF)': 'fifa.worldq.concacaf',
     'AFCON Qualifiers': 'caf.nations_qual',
+    'World Cup': 'fifa.world',
     'Euros': 'uefa.euro',
     'Copa America': 'conmebol.america'
 };
