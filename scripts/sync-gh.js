@@ -154,8 +154,12 @@ async function run() {
           const formattedReferees = m.referees?.map(r => r.name) || existing?.referees || [];
 
           // 🟢 Pass the initialized Supabase client to the Logo script
-          const safeHomeLogo = await getSafeLogo(m.homeTeam.shortName || m.homeTeam.name, m.homeTeam.crest, supabase);
-          const safeAwayLogo = await getSafeLogo(m.awayTeam.shortName || m.awayTeam.name, m.awayTeam.crest, supabase);
+          let safeHomeLogo = await getSafeLogo(m.homeTeam.shortName || m.homeTeam.name, m.homeTeam.crest, supabase);
+          let safeAwayLogo = await getSafeLogo(m.awayTeam.shortName || m.awayTeam.name, m.awayTeam.crest, supabase);
+
+          // PROTECT EXISTING LOGOS: Pre-existing ESPN or Supabase uploaded logos should strongly NOT be overwritten by null or worse.
+          if ((!safeHomeLogo || !String(safeHomeLogo).includes('http')) && existing?.home_logo) safeHomeLogo = existing.home_logo;
+          if ((!safeAwayLogo || !String(safeAwayLogo).includes('http')) && existing?.away_logo) safeAwayLogo = existing.away_logo;
 
           let finalStatus = 'SCHEDULED';
           if (m.status === 'FINISHED' || m.status === 'AWARDED') finalStatus = 'FT';
@@ -177,18 +181,12 @@ async function run() {
              const existingStatus = (existing.status || '').toUpperCase();
              const isFdFinished = finalStatus === 'FT' || finalStatus === 'FINISHED';
              
-             // If FD says it's finished, we only update scores if they differ
+             // If FD says it's finished, we ensure status is updated to FT
              if (isFdFinished) {
-               if (existing.home_score !== homeScoreFd || existing.away_score !== awayScoreFd) {
-                 // Final FD score differs, let's update it
-                 statusToSave = finalStatus;
-                 homeScoreToSave = homeScoreFd;
-                 awayScoreToSave = awayScoreFd;
-               } else {
-                 statusToSave = existingStatus;
-                 homeScoreToSave = existing.home_score ?? 0;
-                 awayScoreToSave = existing.away_score ?? 0;
-               }
+               statusToSave = finalStatus;
+               // Only update scores if they differ, though we might as well sync them
+               homeScoreToSave = homeScoreFd;
+               awayScoreToSave = awayScoreFd;
              } else {
                // FD is not finished, but ESPN might be live/tracking it. Keep existing data
                statusToSave = existingStatus;
