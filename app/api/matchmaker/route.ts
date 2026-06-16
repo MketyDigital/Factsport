@@ -157,8 +157,8 @@ async function runMatchmaker(request: Request) {
 
         if (espnGame) {
           await supabase.from('matches').update({
-            espn_id: String(espnGame.espn_id),
-            api_id: String(espnGame.espn_id)
+            // Important fix: DO NOT update api_id! Keep football data's api_id to prevent duplicates on the next sync
+            espn_id: String(espnGame.espn_id)
           }).eq('id', dbMatch.id);
           mappedCount++;
           logs.push(`🔗 MAPPED: ${dbMatch.home_team} vs ${dbMatch.away_team}`);

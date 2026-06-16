@@ -132,7 +132,7 @@ const PRE_STATUSES = new Set([
   'TBD'
 ]);
 
-const EVENT_FRESHNESS_MS = 20 * 60 * 1000;
+const EVENT_FRESHNESS_MS = 5 * 60 * 1000; // 5 minutes freshness to strictly prevent late posting
 
 const KNOWN_TEAMS: Record<string, string> = {
   'manchester city': 'MCI',
@@ -431,7 +431,7 @@ const compressPlayerName = (player: string) => {
     .replace(/[()]/g, '')
     .trim();
 
-  const lastName = nameCleaned ? nameCleaned.split(' ').pop() : '';
+  const lastName = nameCleaned ? nameCleaned.split(' ')?.pop() : '';
 
   return num ? `${num} ${lastName}` : lastName;
 };
@@ -867,6 +867,8 @@ export async function POST(request: Request) {
   const isVipLeague = (config.vip_leagues || []).includes(newState.league);
 
   let isVIP = isVipTeam || isVipLeague;
+  
+  const postedEvents = Array.isArray(newState.posted_social_events) ? newState.posted_social_events : [];
 
   if (!isVIP) {
     const today = new Date().toISOString().split('T')[0];
@@ -953,6 +955,7 @@ export async function POST(request: Request) {
       )
       .filter(Boolean);
 
+  // 5 minutes freshness to strictly prevent late posting
   const oldValidH = getValidNames(oldState.lineups?.home);
   const oldValidA = getValidNames(oldState.lineups?.away);
   const newValidH = getValidNames(newState.lineups?.home);
@@ -1122,12 +1125,22 @@ export async function POST(request: Request) {
     };
   }
 
+  if (eventKey === 'goals') eventKey = `goals_${newTotal}`;
+  if (eventKey === 'var_overturn') eventKey = `var_overturn_${newTotal}`;
+  if (eventKey === 'penalty_awarded') eventKey = `penalty_awarded_${newPenaltiesList.length}`;
+
   if (!eventKey) {
     return NextResponse.json({ message: 'No relevant trigger.' });
   }
 
-  const baseSafetyConfig = SAFETY_MAP[eventKey] || {};
-  const dbEventConfig = config.events?.[eventKey] || {};
+  if (postedEvents.includes(eventKey)) {
+    return NextResponse.json({ message: 'Event already posted for this match.' });
+  }
+
+  const baseEventKey = eventKey.replace(/_\d+$/, '');
+
+  const baseSafetyConfig = SAFETY_MAP[baseEventKey] || {};
+  const dbEventConfig = config.events?.[baseEventKey] || {};
 
   let evtConfig = {
     ...baseSafetyConfig,
@@ -1135,12 +1148,12 @@ export async function POST(request: Request) {
   };
 
   // LINEUPS ONLY: force off anything that is not X/Make, X/Buffer, FB1.
-  evtConfig = normalizeLineupsEventConfig(eventKey, evtConfig);
+  evtConfig = normalizeLineupsEventConfig(baseEventKey, evtConfig);
 
-  const tpl = config.templates?.[eventKey] || {};
+  const tpl = config.templates?.[baseEventKey] || {};
 
   extraData.activeCta =
-    eventKey === 'lineups' || eventKey === 'kickoff'
+    baseEventKey === 'lineups' || baseEventKey === 'kickoff'
       ? preMatchCta
       : ctaText;
 
@@ -1551,6 +1564,16 @@ export async function POST(request: Request) {
         type: 'URL_UPDATED'
       })
     }).catch(() => {});
+
+    // Save that we successfully posted this event to prevent duplicates
+    if (eventKey) {
+      await supabase
+        .from('matches')
+        .update({
+          posted_social_events: [...postedEvents, eventKey]
+        })
+        .eq('id', newState.id);
+    }
   } catch (err) {
     console.error('Critical error firing socials:', err);
   }

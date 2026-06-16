@@ -164,16 +164,48 @@ async function run() {
           else if (m.status === 'SCHEDULED' && m.utcDate.endsWith('T00:00:00Z')) finalStatus = 'TBD';
           else if (m.status === 'TIMED') finalStatus = 'SCHEDULED';
           else finalStatus = m.status; 
+          
+          const homeScoreFd = m.score.fullTime.home ?? 0;
+          const awayScoreFd = m.score.fullTime.away ?? 0;
+          
+          let statusToSave = finalStatus;
+          let homeScoreToSave = homeScoreFd;
+          let awayScoreToSave = awayScoreFd;
+
+          // PREVENT OVERWRITING ESPN DATA
+          if (existing?.espn_id) {
+             const existingStatus = (existing.status || '').toUpperCase();
+             const isFdFinished = finalStatus === 'FT' || finalStatus === 'FINISHED';
+             
+             // If FD says it's finished, we only update scores if they differ
+             if (isFdFinished) {
+               if (existing.home_score !== homeScoreFd || existing.away_score !== awayScoreFd) {
+                 // Final FD score differs, let's update it
+                 statusToSave = finalStatus;
+                 homeScoreToSave = homeScoreFd;
+                 awayScoreToSave = awayScoreFd;
+               } else {
+                 statusToSave = existingStatus;
+                 homeScoreToSave = existing.home_score ?? 0;
+                 awayScoreToSave = existing.away_score ?? 0;
+               }
+             } else {
+               // FD is not finished, but ESPN might be live/tracking it. Keep existing data
+               statusToSave = existingStatus;
+               homeScoreToSave = existing.home_score ?? 0;
+               awayScoreToSave = existing.away_score ?? 0;
+             }
+          }
 
           matches.push({
             api_id: m.id,
             league: league.name,
             home_team: m.homeTeam.shortName || m.homeTeam.name,
             away_team: m.awayTeam.shortName || m.awayTeam.name,
-            home_score: m.score.fullTime.home ?? 0,
-            away_score: m.score.fullTime.away ?? 0,
+            home_score: homeScoreToSave,
+            away_score: awayScoreToSave,
             match_date: m.utcDate,
-            status: finalStatus, 
+            status: statusToSave, 
             home_logo: safeHomeLogo, 
             away_logo: safeAwayLogo, 
             updated_at: new Date().toISOString(),

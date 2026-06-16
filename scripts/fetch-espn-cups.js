@@ -10,6 +10,9 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Important fix to prevent duplicates: We removed 'World Cup' and 'Euros' from 
+// ESPN_CUPS because these are fetched and upserted by the football-data script. 
+// If they were here, this script would insert them under espn_id instead of the football-data api_id, creating duplicates!
 const ESPN_CUPS = {
     'Europa League': 'uefa.europa',
     'Europa Conference League': 'uefa.conference',
@@ -27,8 +30,6 @@ const ESPN_CUPS = {
     'World Cup Qualifiers (AFC)': 'fifa.worldq.afc',
     'World Cup Qualifiers (CONCACAF)': 'fifa.worldq.concacaf',
     'AFCON Qualifiers': 'caf.nations_qual',
-    'World Cup': 'fifa.world',
-    'Euros': 'uefa.euro',
     'Copa America': 'conmebol.america'
 };
 
@@ -109,7 +110,6 @@ async function fetchEspnCups() {
             }
 
             if (matchesToUpsert.length > 0) {
-                // The SQL unique constraint we added makes this a true 'update if exists'
                 const { error } = await supabase.from('matches').upsert(matchesToUpsert, { onConflict: 'api_id' });
                 if (error) {
                     console.error(`   ❌ DB Error: ${error.message}`);

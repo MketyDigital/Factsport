@@ -360,7 +360,8 @@ async function generateDailyPreview() {
       const h2hStr = await getMatchContext(g.league, g.match_date, g.home_team, g.away_team);
       const stakes = getStakesLine(g);
 
-      let liveCoverageString = 'Match Center Tracking Available.';
+      // NO need to constantly alert on Live Stream, handled smoothly.
+      let liveCoverageString = 'Match Available';
       if (g.stream_url || g.media_url) {
         liveCoverageString = g.media_mode === 'audio' ? 'Live Commentary Audio Active' : 'Live Stream Broadcast Active';
       }
@@ -385,8 +386,8 @@ async function generateDailyPreview() {
 
     STRICT PROMPT CAGE TO PREVENT HALLUCINATIONS:
     1. NO IMAGINED RESULTS: You MUST base your analysis purely on the factual data block provided above. Do not invent scores or guess player lists.
-    2. CUP AND GROUP INTELLIGENCE: If the data says FINAL, SEMI-FINAL, QUARTER-FINAL, KNOCKOUT, or GROUP STAGE, explain the stakes exactly: cup winners lift the trophy, knockout winners advance, group teams fight for qualification.
-    3. COMPLEMENTARY MEDIA INJECTION: If a fixture has a "BROADCAST METRIC" listing live audio or video streams, prominently state that fans can access live streams/commentary explicitly inside the FactSport Match Center.
+    2. CUP AND GROUP INTELLIGENCE: If the data says FINAL, SEMI-FINAL, QUARTER-FINAL, KNOCKOUT, or GROUP STAGE, explain the stakes exactly.
+    3. NATURAL BROADCAST MENTIONS: If there are streams mentioned, you can generally say there's action to follow on FactSport, but DO NOT monotonously repeat "Match Center" for every individual match. Keep it human.
     4. BANNED WORDS: Never use "Moreover", "Furthermore", "Delve into", "Tapestry", or "A thrilling encounter".
     5. HUMAN HEADLINE: Create a 100% human-like, realistic, gritty journalistic headline under 10 words. NO colons. NO puns. NO markdown.
     6. EMBEDDING MATCHES: After you finish analyzing a match, paste its "EXACT SHORTCODE TO USE" on a brand new line all by itself.
