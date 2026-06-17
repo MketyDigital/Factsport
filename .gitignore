@@ -5,7 +5,7 @@
 
 # Testing
 /coverage
-
+worker.js
 # Next.js
 /.next/
 /out/

@@ -1,8 +1,6 @@
 // app/lib/espn.ts
 
 // @ts-nocheck
-import { createClient } from "@/app/lib/supabase/client";
-
 export const ESPN_LEAGUES: Record<string, string> = {
   "Premier League": "eng.1",
   "La Liga": "esp.1",
@@ -28,7 +26,7 @@ export const ESPN_LEAGUES: Record<string, string> = {
   "International Friendlies": "fifa.friendly",
 
   "UEFA Nations League": "uefa.nations",
-  "CONCACAF Nations League": "concacaf.nations",
+  "CONCACAF Nations League": "concacac.nations",
   "World Cup Qualifiers (CONMEBOL)": "fifa.worldq.conmebol",
   "World Cup Qualifiers (UEFA)": "fifa.worldq.uefa",
   "World Cup Qualifiers (AFC)": "fifa.worldq.afc",
@@ -39,16 +37,25 @@ export const ESPN_LEAGUES: Record<string, string> = {
 
 const TERMINAL_STATUSES = new Set(["FT", "FINISHED", "AET", "PEN", "AWARDED", "ABD"]);
 
-const safeInt = (value: any) => {
-  if (value === null || value === undefined || value === "") return 0;
-  const n = parseInt(String(value).replace("%", ""), 10);
-  return Number.isFinite(n) ? n : 0;
+const safeNumber = (value: any) => {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(String(value).replace("%", ""));
+  return Number.isFinite(n) ? n : null;
 };
 
-const safeFloat = (value: any) => {
-  if (value === null || value === undefined || value === "") return 0;
-  const n = parseFloat(String(value).replace("%", ""));
-  return Number.isFinite(n) ? n : 0;
+const safeInt = (value: any, fallback = 0) => {
+  const n = safeNumber(value);
+  return n === null ? fallback : n;
+};
+
+const safeFloat = (value: any, fallback = 0) => {
+  const n = safeNumber(value);
+  return n === null ? fallback : n;
+};
+
+const safeNullableInt = (value: any) => {
+  const n = safeNumber(value);
+  return n === null ? null : n;
 };
 
 const safeText = (value: any) => {
@@ -64,7 +71,11 @@ const makeId = () => {
 const extractNotes = (competition: any) => {
   const notes = competition?.notes || [];
   if (!Array.isArray(notes)) return "";
-  return notes.map((n: any) => [n.headline, n.type, n.text].filter(Boolean).join(" ")).join(" | ").toLowerCase();
+
+  return notes
+    .map((n: any) => [n.headline, n.type, n.text].filter(Boolean).join(" "))
+    .join(" | ")
+    .toLowerCase();
 };
 
 const extractGroupSummary = (data: any) => {
@@ -82,14 +93,24 @@ const extractGroupSummary = (data: any) => {
     const summary: any[] = [];
 
     for (const group of candidate) {
-      const groupName = group?.name || group?.abbreviation || group?.id || group?.standings?.[0]?.group || null;
-      const table = Array.isArray(group?.standings)
-        ? group.standings
-        : Array.isArray(group?.table)
-          ? group.table
-          : Array.isArray(group)
-            ? group
-            : [];
+      const groupName =
+        group?.name ||
+        group?.abbreviation ||
+        group?.id ||
+        group?.header?.name ||
+        group?.standings?.[0]?.group ||
+        "Group";
+
+      const table =
+        Array.isArray(group?.standings)
+          ? group.standings
+          : Array.isArray(group?.table)
+            ? group.table
+            : Array.isArray(group?.entries)
+              ? group.entries
+              : Array.isArray(group)
+                ? group
+                : [];
 
       if (!table.length) continue;
 
@@ -98,7 +119,11 @@ const extractGroupSummary = (data: any) => {
         teams: table.slice(0, 8).map((entry: any) => ({
           name: entry?.team?.name || entry?.team?.displayName || entry?.team || "Unknown",
           points: safeInt(entry?.points ?? entry?.value),
-          played: safeInt(entry?.playedGames ?? entry?.played ?? entry?.stats?.find?.((s: any) => s.name === "Games Played")?.value),
+          played: safeInt(
+            entry?.playedGames ??
+            entry?.played ??
+            entry?.stats?.find?.((s: any) => s.name === "Games Played")?.value
+          ),
           goalDifference: entry?.goalDifference ?? entry?.goal_difference ?? null
         }))
       });
@@ -150,308 +175,11 @@ const extractContext = (data: any, header: any) => {
   };
 };
 
-const extractStats = (data: any, homeId: string) => {
-  const boxscore = data?.boxscore;
-  const homeComp = data?.header?.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === "home");
-  const awayComp = data?.header?.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === "away");
-
-  const stats: any = {
-    home: {},
-    away: {},
-    home_penalties: homeComp?.shootoutScore !== null && homeComp?.shootoutScore !== undefined ? safeInt(homeComp.shootoutScore) : null,
-    away_penalties: awayComp?.shootoutScore !== null && awayComp?.shootoutScore !== undefined ? safeInt(awayComp.shootoutScore) : null,
-    home_ht: homeComp?.linescores?.[0]?.value !== null && homeComp?.linescores?.[0]?.value !== undefined ? safeInt(homeComp.linescores[0].value) : null,
-    away_ht: awayComp?.linescores?.[0]?.value !== null && awayComp?.linescores?.[0]?.value !== undefined ? safeInt(awayComp.linescores[0].value) : null,
-    aggregate: homeComp?.series?.summary || awayComp?.series?.summary || data?.header?.series?.summary || null
-  };
-
-  const statMap: Record<string, string> = {
-    possessionPct: "possession",
-    Possession: "possession",
-    "Possession %": "possession",
-    foulsCommitted: "fouls",
-    Fouls: "fouls",
-    wonCorners: "corners",
-    Corners: "corners",
-    corners: "corners",
-    saves: "saves",
-    Saves: "saves",
-    shotsSummary: "shots",
-    totalShots: "shots",
-    Shots: "shots",
-    shots: "shots",
-    shotsOnTarget: "shotsOnTarget",
-    "Shots on Goal": "shotsOnTarget",
-    "Shots On Target": "shotsOnTarget",
-    shotsOffTarget: "shotsOffTarget",
-    "Shots off Goal": "shotsOffTarget",
-    "Shots Off Target": "shotsOffTarget",
-    yellowCards: "yellowCards",
-    "Yellow Cards": "yellowCards",
-    redCards: "redCards",
-    "Red Cards": "redCards",
-    offsides: "offsides",
-    Offsides: "offsides",
-    passAccuracy: "passAccuracy",
-    "Pass Accuracy": "passAccuracy"
-  };
-
-  if (boxscore?.teams && Array.isArray(boxscore.teams)) {
-    boxscore.teams.forEach((t: any) => {
-      const side = String(t.team?.id) === String(homeId) ? "home" : "away";
-
-      if (!t.statistics || !Array.isArray(t.statistics)) return;
-
-      t.statistics.forEach((s: any) => {
-        const key = statMap[s.name] || statMap[String(s.name).trim()] || s.name;
-        if (!key) return;
-
-        stats[side][key] = s.displayValue !== undefined && s.displayValue !== null
-          ? s.displayValue
-          : s.value;
-      });
-    });
-  }
-
-  return stats;
-};
-
-const extractLineups = (data: any, homeId: string, homeTeamName: string, awayTeamName: string) => {
-  const boxscore = data?.boxscore || {};
-  const lineups: any = {
-    home: [],
-    away: [],
-    formations: { home: null, away: null }
-  };
-
-  const rosterCandidates = [
-    boxscore?.rosters,
-    boxscore?.players,
-    data?.rosters
-  ].filter(Boolean);
-
-  const addRoster = (roster: any[]) => {
-    if (!Array.isArray(roster)) return;
-
-    roster.forEach((r: any) => {
-      const side = String(r.team?.id) === String(homeId) ? "home" : "away";
-      const teamName = side === "home" ? homeTeamName : awayTeamName;
-
-      if (r.formation) lineups.formations[side] = r.formation;
-
-      const athletes = r.athletes || r.roster || r.statistics?.[0]?.athletes || [];
-      if (!Array.isArray(athletes)) return;
-
-      lineups[side] = athletes.map((p: any) => ({
-        name: p.athlete?.displayName || p.athlete?.fullName || p.displayName || p.shortDisplayName || "",
-        number: p.jersey || p.uniform || "",
-        position: p.position?.abbreviation || p.position?.name || "P",
-        positionName: p.position?.name || "",
-        is_starter: Boolean(p.starter),
-        team: teamName
-      }));
-    });
-  };
-
-  rosterCandidates.forEach(addRoster);
-
-  if ((!lineups.home.length || !lineups.away.length) && boxscore?.teams && Array.isArray(boxscore.teams)) {
-    boxscore.teams.forEach((t: any) => {
-      const side = String(t.team?.id) === String(homeId) ? "home" : "away";
-      const teamName = side === "home" ? homeTeamName : awayTeamName;
-
-      if (!Array.isArray(t.roster)) return;
-
-      lineups[side] = t.roster.map((p: any) => ({
-        name: p.athlete?.displayName || p.athlete?.fullName || p.displayName || "",
-        number: p.jersey || p.uniform || "",
-        position: p.position?.abbreviation || p.position?.name || "P",
-        positionName: p.position?.name || "",
-        is_starter: Boolean(p.starter),
-        team: teamName
-      }));
-    });
-  }
-
-  return lineups;
-};
-
-const parseCommentaryEvents = (commentary: any[], rosterDict: any[]) => {
-  if (!Array.isArray(commentary) || commentary.length === 0) return [];
-
-  const parsed = commentary
-    .filter((c: any) => {
-      const text = String(c.text || "").toLowerCase();
-      const metaType = String(c.play?.type?.text || "").toLowerCase();
-
-      return (
-        text.includes("goal") ||
-        text.includes("penalty") ||
-        text.includes("card") ||
-        text.includes("substitution") ||
-        text.includes("subbed") ||
-        text.includes("var ") ||
-        text.includes("overturned") ||
-        text.includes("attempt") ||
-        metaType.includes("goal") ||
-        metaType.includes("card") ||
-        metaType.includes("penalty") ||
-        metaType.includes("shot") ||
-        metaType.includes("substitution")
-      );
-    })
-    .map((c: any) => {
-      const text = c.text || "";
-      const lowerText = text.toLowerCase();
-      const time = c.time?.displayValue || "0'";
-      const metaType = String(c.play?.type?.text || "").toLowerCase();
-
-      let type = "attempt";
-      let actionName = "Match Update";
-      let player = "";
-      let matchedPlayerName = "";
-      let matchedTeamName = "";
-      let matchedSide = "";
-
-      if (lowerText.includes("var decision") || lowerText.includes("overturned") || lowerText.includes("disallowed") || lowerText.includes("no goal") || metaType.includes("var")) {
-        type = "var_overturn";
-        actionName = "VAR Decision";
-      } else if (lowerText.includes("penalty conceded")) {
-        type = "penalty_awarded";
-        actionName = "Penalty Conceded";
-      } else if (lowerText.includes("penalty awarded")) {
-        type = "penalty_awarded";
-        actionName = "Penalty Awarded";
-      } else if (lowerText.includes("penalty") && (lowerText.includes("check") || lowerText.includes("var"))) {
-        type = "var_overturn";
-        actionName = "VAR Penalty Check";
-      } else if ((lowerText.includes("penalty") && (lowerText.includes("saved") || lowerText.includes("missed"))) || metaType === "penalty missed" || metaType === "penalty saved") {
-        type = "penalty_missed";
-        actionName = "Penalty Missed";
-      } else if (
-        metaType === "goal" ||
-        lowerText.includes("goal!") ||
-        lowerText.includes("scores!") ||
-        lowerText.includes("own goal by") ||
-        (lowerText.includes("goal") && /\d+/.test(lowerText)) ||
-        (lowerText.includes("penalty") && lowerText.includes("scored"))
-      ) {
-        type = "goal";
-        actionName = lowerText.includes("own goal") ? "Own Goal" : (lowerText.includes("penalty") ? "Penalty Goal" : "Goal");
-      } else if (lowerText.includes("card") || metaType.includes("card")) {
-        type = lowerText.includes("red") ? "red-card" : "card";
-        actionName = lowerText.includes("red") ? "Red Card" : "Yellow Card";
-      } else if (lowerText.includes("substitution") || lowerText.includes("subbed") || metaType.includes("substitution")) {
-        type = "sub";
-        actionName = "Substitution";
-      } else {
-        type = "attempt";
-        actionName = lowerText.includes("saved") ? "Shot Saved" : "Shot Missed";
-      }
-
-      const participants = c.play?.participants || [];
-
-      if (participants.length > 0) {
-        matchedPlayerName = participants[0]?.athlete?.displayName || "";
-        const exactMatch = rosterDict.find((r) => r.name === matchedPlayerName);
-
-        if (exactMatch) {
-          matchedTeamName = exactMatch.teamName;
-          matchedSide = exactMatch.side;
-        }
-
-        if (type === "sub" && participants.length > 1) {
-          const p1 = participants[0]?.athlete?.displayName || "";
-          const p2 = participants[1]?.athlete?.displayName || "";
-          const teamMatch = rosterDict.find((r) => r.name === p1);
-
-          if (p1 && p2) {
-            player = teamMatch ? `${p1} (In) / ${p2} (Out) (${teamMatch.teamName})` : `${p1} (In) / ${p2} (Out)`;
-            if (teamMatch) matchedSide = teamMatch.side;
-          }
-        }
-      }
-
-      if (!player) {
-        if (type === "sub") {
-          const matched = rosterDict
-            .filter((r) => text.includes(r.name))
-            .sort((a, b) => text.indexOf(a.name) - text.indexOf(b.name));
-
-          if (matched.length >= 2) {
-            player = `${matched[0].name} (In) / ${matched[1].name} (Out) (${matched[0].teamName})`;
-            matchedSide = matched[0].side;
-          } else if (matched.length === 1) {
-            player = `${matched[0].name} (${matched[0].teamName})`;
-            matchedSide = matched[0].side;
-          }
-        } else {
-          const ownGoal = text.match(/own goal by ([^.;]+)/i);
-          if (ownGoal && !matchedPlayerName) matchedPlayerName = ownGoal[1].trim();
-
-          if (!matchedPlayerName) {
-            const match = rosterDict.find((r) => text.includes(r.name));
-            if (match) {
-              matchedPlayerName = match.name;
-              matchedTeamName = match.teamName;
-              matchedSide = match.side;
-            }
-          } else {
-            const match = rosterDict.find((r) => r.name === matchedPlayerName);
-            if (match) {
-              matchedTeamName = match.teamName;
-              matchedSide = match.side;
-            }
-          }
-
-          if (matchedPlayerName) {
-            player = matchedTeamName ? `${matchedPlayerName} (${matchedTeamName})` : matchedPlayerName;
-          }
-        }
-      }
-
-      if (type === "goal" && lowerText.includes("assisted by")) {
-        const assistIndex = lowerText.indexOf("assisted by");
-        const assistText = text.substring(assistIndex);
-        const assistMatch = rosterDict.find((r) => assistText.includes(r.name) && r.name !== matchedPlayerName);
-
-        if (assistMatch) {
-          player = `${player || "Goal"} (Assist: ${assistMatch.name})`;
-        } else {
-          const regMatch = text.match(/Assisted by (.*?)(?: with|\.)/i);
-          if (regMatch) player = `${player || "Goal"} (Assist: ${regMatch[1].trim()})`;
-        }
-      }
-
-      if (!player || player.trim() === "" || player.length > 85 || player.toLowerCase().includes("unknown")) {
-        if (type === "goal") player = "Goal Confirmed";
-        else if (type === "var_overturn") player = "Goal Disallowed";
-        else if (type === "penalty_awarded") player = "Penalty Check";
-        else if (type === "penalty_missed") player = "Penalty Missed";
-        else if (type === "attempt") player = "Shot on Target";
-        else if (type === "card" || type === "red-card") player = "Booking";
-        else if (type === "sub") player = "Tactical Change";
-        else player = "Match Update";
-      }
-
-      return {
-        id: makeId(),
-        time,
-        type,
-        text: actionName,
-        player,
-        team: matchedSide
-      };
-    });
-
-  parsed.reverse();
-  return parsed;
-};
-
-export const normalizeName = (name: string) => {
+const normalizeName = (name: string) => {
   if (!name) return "";
 
-  const raw = name.toLowerCase()
+  const raw = name
+    .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9 ]/g, "")
@@ -523,6 +251,343 @@ export const normalizeName = (name: string) => {
   return aliases[raw] || raw;
 };
 
+const isHalftime = (description: string, clock: string) => {
+  const detail = String(description || "").toLowerCase();
+  const cleanClock = String(clock || "").toUpperCase();
+  return detail.includes("halftime") || detail.includes("half-time") || cleanClock === "HT";
+};
+
+const scoreFromCompetitor = (competitor: any) => {
+  const direct = safeNumber(competitor?.score);
+  if (direct !== null) return direct;
+
+  const linescores = Array.isArray(competitor?.linescores) ? competitor.linescores : [];
+  if (linescores.length > 0) {
+    return linescores.reduce((sum: number, line: any) => sum + (safeNumber(line?.value) || 0), 0);
+  }
+
+  return 0;
+};
+
+const extractStats = (data: any, homeId: string, homeTeamName: string, awayTeamName: string) => {
+  const boxscore = data?.boxscore || {};
+  const homeComp = data?.header?.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === "home");
+  const awayComp = data?.header?.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === "away");
+  const awayId = String(awayComp?.team?.id || "");
+
+  const stats: any = {
+    home: {},
+    away: {},
+    home_penalties: safeNullableInt(homeComp?.shootoutScore),
+    away_penalties: safeNullableInt(awayComp?.shootoutScore),
+    home_ht: safeNullableInt(homeComp?.linescores?.[0]?.value),
+    away_ht: safeNullableInt(awayComp?.linescores?.[0]?.value),
+    aggregate: homeComp?.series?.summary || awayComp?.series?.summary || data?.header?.series?.summary || null
+  };
+
+  const statMap: Record<string, string> = {
+    possessionPct: "possession",
+    Possession: "possession",
+    "Possession %": "possession",
+    foulsCommitted: "fouls",
+    Fouls: "fouls",
+    wonCorners: "corners",
+    Corners: "corners",
+    corners: "corners",
+    saves: "saves",
+    Saves: "saves",
+    shotsSummary: "shots",
+    totalShots: "shots",
+    Shots: "shots",
+    shots: "shots",
+    shotsOnTarget: "shotsOnTarget",
+    "Shots on Goal": "shotsOnTarget",
+    "Shots On Target": "shotsOnTarget",
+    shotsOffTarget: "shotsOffTarget",
+    "Shots off Goal": "shotsOffTarget",
+    "Shots Off Target": "shotsOffTarget",
+    yellowCards: "yellowCards",
+    "Yellow Cards": "yellowCards",
+    redCards: "redCards",
+    "Red Cards": "redCards",
+    offsides: "offsides",
+    Offsides: "offsides",
+    passAccuracy: "passAccuracy",
+    "Pass Accuracy": "passAccuracy"
+  };
+
+  if (boxscore?.teams && Array.isArray(boxscore.teams)) {
+    boxscore.teams.forEach((t: any) => {
+      const teamId = String(t.team?.id || "");
+      const teamName = safeText(t.team?.displayName || t.team?.name || "");
+
+      let side: string | null = null;
+      if (teamId === String(homeId)) side = "home";
+      else if (teamId === String(awayId)) side = "away";
+      else if (normalizeName(teamName) === normalizeName(homeTeamName)) side = "home";
+      else if (normalizeName(teamName) === normalizeName(awayTeamName)) side = "away";
+
+      if (!side || !t.statistics || !Array.isArray(t.statistics)) return;
+
+      t.statistics.forEach((s: any) => {
+        const key = statMap[s.name] || statMap[String(s.name).trim()] || s.name;
+        if (!key) return;
+
+        stats[side][key] =
+          s.displayValue !== undefined && s.displayValue !== null
+            ? String(s.displayValue)
+            : s.value;
+      });
+    });
+  }
+
+  return stats;
+};
+
+const normalizePlayer = (p: any) => {
+  const athlete = p?.athlete || {};
+
+  return {
+    name:
+      athlete?.displayName ||
+      athlete?.fullName ||
+      p?.displayName ||
+      p?.shortDisplayName ||
+      p?.name ||
+      "",
+    number: p?.jersey || p?.uniform || athlete?.jersey || "",
+    position: p?.position?.abbreviation || p?.position?.name || "P",
+    positionName: p?.position?.name || "",
+    is_starter: Boolean(p?.starter),
+    team: ""
+  };
+};
+
+const extractLineups = (data: any, homeId: string, homeTeamName: string, awayTeamName: string) => {
+  const boxscore = data?.boxscore || {};
+  const awayId = String(
+    data?.header?.competitions?.[0]?.competitors?.find((c: any) => c.homeAway === "away")?.team?.id || ""
+  );
+
+  const lineups: any = {
+    home: [],
+    away: [],
+    formations: { home: null, away: null }
+  };
+
+  const seen = new Set<string>();
+
+  const sideForTeam = (team: any) => {
+    const teamId = String(team?.id || "");
+    const teamName = safeText(team?.displayName || team?.name || "");
+
+    if (teamId === String(homeId) || normalizeName(teamName) === normalizeName(homeTeamName)) return "home";
+    if (teamId === String(awayId) || normalizeName(teamName) === normalizeName(awayTeamName)) return "away";
+    return null;
+  };
+
+  const mergePlayers = (side: string | null, players: any[], formation?: string) => {
+    if (!side || !Array.isArray(players)) return;
+
+    if (formation) lineups.formations[side] = formation;
+
+    players.forEach((raw: any) => {
+      const player = normalizePlayer(raw);
+      if (!player.name) return;
+
+      player.team = side === "home" ? homeTeamName : awayTeamName;
+
+      const key = `${player.name}|${player.number}|${player.position}`;
+      if (seen.has(key)) return;
+
+      seen.add(key);
+      lineups[side].push(player);
+    });
+  };
+
+  if (Array.isArray(boxscore?.teams)) {
+    boxscore.teams.forEach((t: any) => {
+      const side = sideForTeam(t.team);
+      mergePlayers(side, t.roster || t.players || t.athletes || [], t.formation);
+    });
+  }
+
+  const rosterGroups: any[] = [];
+
+  if (Array.isArray(boxscore?.players)) rosterGroups.push(...boxscore.players);
+  else if (boxscore?.players && typeof boxscore.players === "object") rosterGroups.push(...Object.values(boxscore.players));
+
+  if (Array.isArray(boxscore?.rosters)) rosterGroups.push(...boxscore.rosters);
+  else if (boxscore?.rosters && typeof boxscore.rosters === "object") rosterGroups.push(...Object.values(boxscore.rosters));
+
+  if (Array.isArray(data?.rosters)) rosterGroups.push(...data.rosters);
+  else if (data?.rosters && typeof data.rosters === "object") rosterGroups.push(...Object.values(data.rosters));
+
+  rosterGroups.forEach((r: any) => {
+    const side = sideForTeam(r.team);
+    const athletes = r.athletes || r.roster || r.players || r.statistics?.[0]?.athletes || [];
+    mergePlayers(side, athletes, r.formation);
+  });
+
+  return lineups;
+};
+
+const inferTeam = (lowerText: string, homeTeamName: string, awayTeamName: string) => {
+  const home = normalizeName(homeTeamName);
+  const away = normalizeName(awayTeamName);
+
+  if (home && lowerText.includes(home)) return "home";
+  if (away && lowerText.includes(away)) return "away";
+  return "";
+};
+
+const parseCommentaryEvents = (commentary: any[], homeId: string, awayId: string, homeTeamName: string, awayTeamName: string) => {
+  if (!Array.isArray(commentary) || commentary.length === 0) return [];
+
+  const seen = new Set<string>();
+
+  const parsed = commentary
+    .map((c: any, index: number) => {
+      const text = c.text || c.headline || "";
+      const lowerText = String(text).toLowerCase();
+      const metaType = String(c.play?.type?.text || c.type?.text || "").toLowerCase();
+      const time = c.time?.displayValue || c.clock?.displayValue || "0'";
+
+      let type = "attempt";
+      let actionName = "Match Update";
+
+      if (
+        lowerText.includes("var") ||
+        lowerText.includes("overturned") ||
+        lowerText.includes("disallowed") ||
+        lowerText.includes("no goal") ||
+        metaType.includes("var")
+      ) {
+        type = "var_overturn";
+        actionName = "VAR Decision";
+      } else if (lowerText.includes("penalty awarded") || metaType === "penalty awarded") {
+        type = "penalty_awarded";
+        actionName = "Penalty Awarded";
+      } else if (
+        lowerText.includes("penalty saved") ||
+        lowerText.includes("penalty missed") ||
+        metaType === "penalty saved" ||
+        metaType === "penalty missed"
+      ) {
+        type = "penalty_missed";
+        actionName = "Penalty Missed";
+      } else if (
+        metaType === "goal" ||
+        lowerText.includes("goal!") ||
+        lowerText.includes("scores!") ||
+        lowerText.includes("own goal by") ||
+        (lowerText.includes("goal") && /\d+/.test(lowerText)) ||
+        (lowerText.includes("penalty") && lowerText.includes("scored"))
+      ) {
+        type = "goal";
+        actionName = lowerText.includes("own goal") ? "Own Goal" : lowerText.includes("penalty") ? "Penalty Goal" : "Goal";
+      } else if (lowerText.includes("red card") || metaType.includes("red")) {
+        type = "red-card";
+        actionName = "Red Card";
+      } else if (lowerText.includes("card") || metaType.includes("card")) {
+        type = "card";
+        actionName = "Yellow Card";
+      } else if (lowerText.includes("substitution") || lowerText.includes("subbed") || metaType.includes("substitution")) {
+        type = "sub";
+        actionName = "Substitution";
+      } else if (lowerText.includes("penalty")) {
+        type = "penalty_awarded";
+        actionName = "Penalty Check";
+      }
+
+      const participants = c.play?.participants || [];
+      const first = participants[0];
+      let player = first?.athlete?.displayName || first?.athlete?.shortDisplayName || "";
+      let team = "";
+
+      const participantTeamId = String(first?.team?.id || "");
+      if (participantTeamId === String(homeId)) team = "home";
+      else if (participantTeamId === String(awayId)) team = "away";
+
+      if (!team) team = inferTeam(lowerText, homeTeamName, awayTeamName);
+
+      if (type === "sub" && participants.length > 1) {
+        const p1 = participants[0]?.athlete?.displayName || "";
+        const p2 = participants[1]?.athlete?.displayName || "";
+        player = p1 && p2 ? `${p1} (In) / ${p2} (Out)` : player;
+      }
+
+      if (!player || player.length > 85) {
+        if (type === "goal") player = "Goal Confirmed";
+        else if (type === "var_overturn") player = "Goal Disallowed";
+        else if (type === "penalty_awarded") player = "Penalty Check";
+        else if (type === "penalty_missed") player = "Penalty Missed";
+        else if (type === "attempt") player = "Shot on Target";
+        else if (type === "card" || type === "red-card") player = "Booking";
+        else if (type === "sub") player = "Tactical Change";
+        else player = "Match Update";
+      }
+
+      const id = c.id || `${index}-${time}-${type}`;
+      if (seen.has(id)) return null;
+      seen.add(id);
+
+      return {
+        id,
+        time,
+        type,
+        text: actionName,
+        player,
+        team
+      };
+    })
+    .filter(Boolean);
+
+  return parsed.reverse();
+};
+
+const extractStatus = (header: any, homeComp: any, awayComp: any) => {
+  const state = String(header?.status?.type?.state || "").toLowerCase();
+  const description = header?.status?.type?.description || "";
+  const clock = header?.status?.displayClock || "0:00";
+
+  let status = "SCHEDULED";
+
+  if (state === "in") status = "LIVE";
+  if (state === "post") status = "FT";
+  if (isHalftime(description, clock)) status = "HT";
+
+  if (
+    status === "FT" &&
+    (safeNullableInt(homeComp?.shootoutScore) !== null || safeNullableInt(awayComp?.shootoutScore) !== null)
+  ) {
+    status = "PEN";
+  }
+
+  return status;
+};
+
+async function fetchJsonWithFallback(urls: string[]) {
+  let lastError: any = null;
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" }
+      });
+
+      if (res.ok) return await res.json();
+
+      lastError = new Error(`ESPN fetch failed: ${res.status}`);
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error("ESPN fetch failed");
+}
+
 export async function fetchEspnLive(leagueCode: string, dates?: string) {
   const params = new URLSearchParams();
   if (dates) params.set("dates", dates);
@@ -531,7 +596,11 @@ export async function fetchEspnLive(leagueCode: string, dates?: string) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueCode}/scoreboard?${params.toString()}`;
 
   try {
-    const res = await fetch(url, { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" }
+    });
+
     if (!res.ok) return [];
 
     const data = await res.json();
@@ -568,7 +637,13 @@ export async function fetchEspnLive(leagueCode: string, dates?: string) {
       if (state === "in") status = "LIVE";
       if (state === "post") status = "FT";
       if (clock === "HT") status = "HT";
-      if (status === "FT" && (homeComp?.shootoutScore !== null || awayComp?.shootoutScore !== null)) status = "PEN";
+
+      if (
+        status === "FT" &&
+        (safeNullableInt(homeComp?.shootoutScore) !== null || safeNullableInt(awayComp?.shootoutScore) !== null)
+      ) {
+        status = "PEN";
+      }
 
       return {
         espn_id: String(e.id),
@@ -593,27 +668,12 @@ export async function fetchEspnLive(leagueCode: string, dates?: string) {
   }
 }
 
-async function fetchJsonWithFallback(urls: string[]) {
-  let lastError: any = null;
-
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
-      if (res.ok) return await res.json();
-      lastError = new Error(`ESPN fetch failed: ${res.status}`);
-    } catch (err) {
-      lastError = err;
-    }
-  }
-
-  throw lastError || new Error("ESPN fetch failed");
-}
-
 export async function fetchEspnDetails(gameId: string) {
   const encodedGameId = encodeURIComponent(gameId);
+
   const urls = [
-    `https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${encodedGameId}&_=${Date.now()}`,
-    `https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${encodedGameId}&_=${Date.now()}`
+    `https://site.web.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${encodedGameId}&_=${Date.now()}`,
+    `https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary?event=${encodedGameId}&_=${Date.now()}`
   ];
 
   try {
@@ -625,59 +685,32 @@ export async function fetchEspnDetails(gameId: string) {
 
     const homeCompetitor = competition.competitors?.find((c: any) => c.homeAway === "home");
     const awayCompetitor = competition.competitors?.find((c: any) => c.homeAway === "away");
+
     const homeId = String(homeCompetitor?.team?.id || "");
-    const homeTeamName = homeCompetitor?.team?.displayName || "";
-    const awayTeamName = awayCompetitor?.team?.displayName || "";
+    const awayId = String(awayCompetitor?.team?.id || "");
+    const homeTeamName = safeText(homeCompetitor?.team?.displayName || homeCompetitor?.team?.name || "");
+    const awayTeamName = safeText(awayCompetitor?.team?.displayName || awayCompetitor?.team?.name || "");
 
-    const currentStatus = header.status?.type?.state || "pre";
-    let currentClock = header.status?.type?.description === "Halftime" ? "HT" : (header.status?.displayClock || "0'");
-
-    if (data.commentary && data.commentary.length > 0 && currentClock !== "HT" && currentStatus === "in") {
-      const latestTimeStr = data.commentary[0]?.time?.displayValue;
-      if (latestTimeStr && latestTimeStr.includes("'")) {
-        const cleanClock = currentClock.replace(/:.*/, "");
-        const clockNum = safeInt(cleanClock.replace(/\D/g, ""));
-        const eventNum = safeInt(latestTimeStr.replace(/\D/g, ""));
-
-        if (eventNum > clockNum) currentClock = latestTimeStr;
-        else if (eventNum === clockNum && latestTimeStr.includes("+") && !currentClock.includes("+")) currentClock = latestTimeStr;
-      }
-    }
-
-    let mappedStatus = "SCHEDULED";
-    if (currentStatus === "in") mappedStatus = "LIVE";
-    if (currentStatus === "post") mappedStatus = "FT";
-    if (currentClock === "HT") mappedStatus = "HT";
-    if (mappedStatus === "FT" && (homeCompetitor?.shootoutScore !== null || awayCompetitor?.shootoutScore !== null)) mappedStatus = "PEN";
+    const status = extractStatus(header, homeCompetitor, awayCompetitor);
+    const displayClock = status === "HT" ? "HT" : (header.status?.displayClock || "0:00");
 
     const context = extractContext(data, header);
-    const rosterDict: { name: string, side: string, teamName: string }[] = [];
     const lineups = extractLineups(data, homeId, homeTeamName, awayTeamName);
-
-    ["home", "away"].forEach((side) => {
-      const teamName = side === "home" ? homeTeamName : awayTeamName;
-      if (Array.isArray(lineups[side])) {
-        lineups[side].forEach((p: any) => {
-          if (p.name) rosterDict.push({ name: p.name, side, teamName });
-        });
-      }
-    });
-
-    const events = parseCommentaryEvents(data.commentary, rosterDict);
+    const events = parseCommentaryEvents(data.commentary, homeId, awayId, homeTeamName, awayTeamName);
 
     return {
       events,
       match_events: events,
-      stats: extractStats(data, homeId),
+      stats: extractStats(data, homeId, homeTeamName, awayTeamName),
       lineups,
       venue: data.gameInfo?.venue?.fullName || null,
       attendance: data.gameInfo?.attendance || null,
       referees: data.gameInfo?.officials?.map((o: any) => o.displayName || o.fullName).filter(Boolean) || [],
-      predictor: data.predictor
+      predictor: data?.predictor
         ? {
-            home: safeFloat(data.predictor.homeTeam?.gameProjection || 0),
-            away: safeFloat(data.predictor.awayTeam?.gameProjection || 0),
-            draw: safeFloat(data.predictor.draw?.gameProjection || 0)
+            home: safeFloat(data.predictor.homeTeam?.gameProjection),
+            away: safeFloat(data.predictor.awayTeam?.gameProjection),
+            draw: safeFloat(data.predictor.draw?.gameProjection)
           }
         : null,
       stage: context.stage,
@@ -691,10 +724,10 @@ export async function fetchEspnDetails(gameId: string) {
       away_team: awayTeamName,
       home_logo: homeCompetitor?.team?.logo || null,
       away_logo: awayCompetitor?.team?.logo || null,
-      status: mappedStatus,
-      home_score: safeInt(homeCompetitor?.score),
-      away_score: safeInt(awayCompetitor?.score),
-      displayClock: currentClock
+      status,
+      home_score: scoreFromCompetitor(homeCompetitor),
+      away_score: scoreFromCompetitor(awayCompetitor),
+      displayClock
     };
   } catch (err) {
     console.error("ESPN Fetch Details Error:", err);

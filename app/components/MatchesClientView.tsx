@@ -9,6 +9,17 @@ import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 const PRIORITY_LEAGUES = ['Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Ligue 1', 'Champions League'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
+// 🟢 PATCH: Moved helper function after constants
+const sortMatchList = (list: any[], tab: 'fixtures' | 'results') => {
+  return [...list].sort((a, b) => {
+    const aDate = new Date(a.match_date).getTime();
+    const bDate = new Date(b.match_date).getTime();
+
+    if (tab === 'results') return bDate - aDate;
+    return aDate - bDate;
+  });
+};
+
 const getLocalYMD = (dateInput: string | Date | number) => {
     const d = new Date(dateInput);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -110,25 +121,25 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
 
     const fetchUpdates = async () => {
         if (isFetching.current) return;
-       const activeEspnIds = liveMatches
-  .filter((m) => {
-    const status = String(m.status || "").toUpperCase();
-    return (
-      m.espn_id &&
-      [
-        "LIVE",
-        "IN_PLAY",
-        "IN",
-        "1H",
-        "2H",
-        "HT",
-        "ET",
-        "P",
-        "PENALTIES"
-      ].includes(status)
-    );
-  })
-  .map((m) => m.espn_id);
+        const activeEspnIds = liveMatches
+            .filter((m) => {
+                const status = String(m.status || "").toUpperCase();
+                return (
+                    m.espn_id &&
+                    [
+                        "LIVE",
+                        "IN_PLAY",
+                        "IN",
+                        "1H",
+                        "2H",
+                        "HT",
+                        "ET",
+                        "P",
+                        "PENALTIES"
+                    ].includes(status)
+                );
+            })
+            .map((m) => m.espn_id);
         if (activeEspnIds.length === 0) return;
         
         isFetching.current = true;
@@ -170,38 +181,50 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
     // 🟢 THE API SHIELD HYDRATOR
     const handleLoadMore = async (activeList: any[]) => {
         if (visibleCount + 15 <= activeList.length) {
-            setVisibleCount(prev => prev + 15);
+            setVisibleCount((prev) => prev + 15);
             return;
         }
 
         setIsLoadingMore(true);
-        
+
         try {
             const edgeMatch = activeList[activeList.length - 1];
             const cursorDate = edgeMatch ? edgeMatch.match_date : new Date().toISOString();
-            
-            // Call the secure, cached API route
-            const res = await fetch(`/api/matches?league=${encodeURIComponent(selectedLeague)}&type=${activeTab}&cursor=${encodeURIComponent(cursorDate)}`);
-            
+
+            const excludeIds = activeList
+                .slice(-120)
+                .map((m: any) => String(m.id))
+                .filter(Boolean);
+
+            const res = await fetch(
+                `/api/matches?league=${encodeURIComponent(selectedLeague)}&type=${activeTab}&cursor=${encodeURIComponent(cursorDate)}&exclude_ids=${encodeURIComponent(excludeIds.join(','))}`
+            );
+
             if (res.ok) {
                 const fetchedData = await res.json();
-                
-                if (fetchedData.length > 0) {
-                    const newItems = fetchedData.filter((d: any) => !liveMatches.some((m: any) => m.id === d.id));
-                    if (newItems.length > 0) {
-                        setLiveMatches(prev => [...prev, ...newItems]);
-                    }
-                    setVisibleCount(prev => prev + 15);
+                const newItems = fetchedData.items || [];
+
+                if (newItems.length > 0) {
+                    setLiveMatches((prev) => {
+                        const existingIds = new Set(prev.map((m: any) => String(m.id)));
+                        const deduped = newItems.filter((d: any) => !existingIds.has(String(d.id)));
+
+                        return sortMatchList([...prev, ...deduped], activeTab === 'results' ? 'results' : 'fixtures');
+                    });
                 }
-                
-                if (fetchedData.length < 15) {
-                    setDbDepleted(prev => ({ ...prev, [activeTab]: true }));
+
+                if (newItems.length > 0) {
+                    setVisibleCount((prev) => prev + Math.min(15, newItems.length));
+                }
+
+                if (!fetchedData.hasMore || newItems.length < 15) {
+                    setDbDepleted((prev) => ({ ...prev, [activeTab]: true }));
                 }
             }
-        } catch(e) {
-            console.error("Failed to load more matches", e);
+        } catch (e) {
+            console.error('Failed to load more matches', e);
         }
-        
+
         setIsLoadingMore(false);
     };
 
@@ -294,7 +317,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         const activeList = activeTab === 'fixtures' ? fixtures : results;
         const displayMatches = activeList.slice(0, visibleCount);
         
-        // Button shows as long as we have local data OR the database hasn't signaled it's empty
         const showLoadMoreButton = visibleCount < activeList.length || !dbDepleted[activeTab];
 
         const groupedData: Record<string, any[]> = {};
@@ -465,6 +487,16 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                     </div>
                 </div>
             </aside>
+
+            <div className="md:hidden w-full bg-white border-b border-slate-200 sticky top-[52px] z-40 shadow-sm overflow-x-auto scrollbar-hide py-1.5">
+                <div className="flex px-2 space-x-1.5 min-w-max items-center">
+                    <button onClick={() => handleLeagueSelect('All')} className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${selectedLeague === 'All' && !teamFilter ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>All Matches</button>
+                    <div className="w-[1px] h-5 bg-slate-200 mx-0.5"></div>
+                    {allLeagues.map((league) => (
+                        <button key={league} onClick={() => handleLeagueSelect(league)} className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wide transition-all border ${selectedLeague === league && !teamFilter ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>{league === 'Premier League' ? 'EPL' : league}</button>
+                    ))}
+                </div>
+            </div>
 
             <div className="md:hidden w-full bg-white border-b border-slate-200 sticky top-[52px] z-40 shadow-sm overflow-x-auto scrollbar-hide py-1.5">
                 <div className="flex px-2 space-x-1.5 min-w-max items-center">
