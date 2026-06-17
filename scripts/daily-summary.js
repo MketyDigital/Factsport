@@ -1,12 +1,10 @@
-// scripts/daily-summary.js
-
 // @ts-nocheck
 const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const GEMINI_KEY = process.env.GEMINI_NEWS_KEY;
+const GEMINI_KEY = process.env.GEMINI_NEWS_KEY || process.env.GEMINI_API_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) {
   console.error('❌ Missing Keys.');
