@@ -1,5 +1,3 @@
-// app/api/live/route.ts
-
 // @ts-nocheck
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -196,25 +194,65 @@ async function runLiveUpdate(request: Request) {
           status: richData.status,
           home_score: richData.home_score,
           away_score: richData.away_score,
-          displayClock: richData.displayClock,
-          match_events: nextEvents,
-          events: nextEvents,
-          stats: nextStats,
-          lineups: nextLineups,
-          venue: richData.venue ?? dbMatch.venue ?? null,
-          referees: richData.referees ?? dbMatch.referees ?? [],
-          predictor: richData.predictor ?? dbMatch.predictor ?? null,
-          stage: richData.stage ?? dbMatch.stage ?? null,
-          match_group: richData.match_group ?? dbMatch.match_group ?? null,
-          match_type: richData.match_type ?? dbMatch.match_type ?? null,
-          round: richData.round ?? dbMatch.round ?? null,
-          group_summary: richData.group_summary ?? dbMatch.group_summary ?? [],
-          knockout: richData.knockout ?? dbMatch.knockout ?? false,
-          final: richData.final ?? dbMatch.final ?? false
+          displayClock: richData.displayClock
         };
 
-        if (richData.home_logo) payload.home_logo = richData.home_logo;
-        if (richData.away_logo) payload.away_logo = richData.away_logo;
+        const optionalColumns = [
+          "match_events",
+          "events",
+          "stats",
+          "lineups",
+          "venue",
+          "referees",
+          "predictor",
+          "stage",
+          "match_group",
+          "match_type",
+          "round",
+          "group_summary",
+          "knockout",
+          "final",
+          "home_logo",
+          "away_logo"
+        ];
+
+        for (const col of optionalColumns) {
+          if (col in dbMatch) {
+            if (col === "match_events") {
+              payload.match_events = nextEvents;
+            } else if (col === "events") {
+              payload.events = nextEvents;
+            } else if (col === "stats") {
+              payload.stats = nextStats;
+            } else if (col === "lineups") {
+              payload.lineups = nextLineups;
+            } else if (col === "venue") {
+              payload.venue = richData.venue ?? dbMatch.venue ?? null;
+            } else if (col === "referees") {
+              payload.referees = richData.referees ?? dbMatch.referees ?? [];
+            } else if (col === "predictor") {
+              payload.predictor = richData.predictor ?? dbMatch.predictor ?? null;
+            } else if (col === "stage") {
+              payload.stage = richData.stage ?? dbMatch.stage ?? null;
+            } else if (col === "match_group") {
+              payload.match_group = richData.match_group ?? dbMatch.match_group ?? null;
+            } else if (col === "match_type") {
+              payload.match_type = richData.match_type ?? dbMatch.match_type ?? null;
+            } else if (col === "round") {
+              payload.round = richData.round ?? dbMatch.round ?? null;
+            } else if (col === "group_summary") {
+              payload.group_summary = richData.group_summary ?? dbMatch.group_summary ?? [];
+            } else if (col === "knockout") {
+              payload.knockout = richData.knockout ?? dbMatch.knockout ?? false;
+            } else if (col === "final") {
+              payload.final = richData.final ?? dbMatch.final ?? false;
+            } else if (col === "home_logo") {
+              if (richData.home_logo) payload.home_logo = richData.home_logo;
+            } else if (col === "away_logo") {
+              if (richData.away_logo) payload.away_logo = richData.away_logo;
+            }
+          }
+        }
 
         const { error: updateError } = await supabase
           .from("matches")
