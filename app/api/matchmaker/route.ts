@@ -1,5 +1,3 @@
-// app/api/matchmaker/route.ts
-
 // @ts-nocheck
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -18,6 +16,7 @@ const getCanonicalName = (rawName: string) => {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9 ]/g, '')
+    .replace(/\b(1|fc|cf|afc|sc|sv|rc|fk|vfl|fsv|tsg|ssc|bayer|rcd|ud|as|us|osc|cfa|aja|ca|bc|ac|sk|olympique|de)\b/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -181,7 +180,6 @@ const getCanonicalName = (rawName: string) => {
     ghana: 'ghana',
     'ivory coast': 'ivory coast',
     "cote d'ivoire": 'ivory coast',
-    "côte d'ivoire": 'ivory coast',
     algeria: 'algeria',
     tunisia: 'tunisia',
     mali: 'mali',
@@ -305,7 +303,9 @@ async function runMatchmaker(request: Request) {
           const espnTimeString = e.date || e.startTime;
           const espnTime = espnTimeString ? new Date(espnTimeString).getTime() : 0;
 
-          if (espnTime && Math.abs(dbTime - espnTime) > 72 * 60 * 60 * 1000) return false;
+          // 🟢 CRITICAL BUG FIX: Enforce time limit strictly! Prevents mapping random old/future matches
+          if (!espnTime) return false;
+          if (Math.abs(dbTime - espnTime) > 48 * 60 * 60 * 1000) return false;
 
           const espnHome = getCanonicalName(e.home_team);
           const espnAway = getCanonicalName(e.away_team);
@@ -366,10 +366,5 @@ async function runMatchmaker(request: Request) {
   }
 }
 
-export async function GET(request: Request) {
-  return runMatchmaker(request);
-}
-
-export async function POST(request: Request) {
-  return runMatchmaker(request);
-}
+export async function GET(request: Request) { return runMatchmaker(request); }
+export async function POST(request: Request) { return runMatchmaker(request); }

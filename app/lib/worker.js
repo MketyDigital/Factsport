@@ -916,7 +916,7 @@ const buildUpdatePayload = (oldMatch, espnPayload) => {
 };
 
 const dispatchSocial = async (env, oldMatch, newMatch) => {
-  const frontendUrl = (env.FRONTEND_URL || "https://factsport.com").replace(/\/$/, "");
+  const frontendUrl = (env.FRONTEND_URL || env.APP_URL || "https://factsport.com").replace(/\/$/, "");
   const oldStatus = String(oldMatch.status || "").toUpperCase();
   const newStatus = String(newMatch.status || "").toUpperCase();
 
@@ -942,6 +942,29 @@ const dispatchSocial = async (env, oldMatch, newMatch) => {
 const runLiveSync = async (env) => {
   if (!env.SUPABASE_SERVICE_ROLE_KEY) {
     return { message: "Supabase service role is not configured." };
+  }
+
+  // First, let's try to trigger the unified main Next.js/Express app's /api/live endpoint!
+  const appUrl = (env.APP_URL || env.FRONTEND_URL || "https://factsport.com").replace(/\/$/, "");
+  const cronKey = env.CRON_KEY || "";
+  
+  try {
+    const response = await fetch(`${appUrl}/api/live?key=${cronKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        success: true,
+        method: "App Live Endpoint Triggered",
+        data
+      };
+    } else {
+      console.warn(`App API trigger returned status ${response.status}. Falling back to clean worker DB bypass...`);
+    }
+  } catch (e) {
+    console.warn(`App API trigger failed: ${e.message}. Falling back to clean worker DB bypass...`);
   }
 
   const activeMatches = await getActiveMatches(env);
@@ -999,6 +1022,7 @@ const runLiveSync = async (env) => {
 
   return {
     success: true,
+    method: "Fallback Direct Worker Update",
     updates,
     logs
   };

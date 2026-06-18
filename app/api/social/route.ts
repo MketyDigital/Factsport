@@ -647,16 +647,14 @@ const parseTime = (t: any) => {
   const str = String(t || '').replace(/[^0-9+]/g, '');
   const parts = str.split('+');
 
-  return (
-    (parseInt(parts[0]) || 0) * 100 + (parseInt(parts[1]) || 0)
-  );
+  return parseInt(parts[0] || '0') * 100 + parseInt(parts[1] || '0');
 };
 
 const parseMinutes = (t: any) => {
   const str = String(t || '').replace(/[^0-9+]/g, '');
   const parts = str.split('+');
 
-  return (parseInt(parts[0]) || 0) + (parseInt(parts[1]) || 0);
+  return parseInt(parts[0] || '0') + parseInt(parts[1] || '0');
 };
 
 const isTerminalStatus = (status: any) =>
@@ -955,7 +953,6 @@ export async function POST(request: Request) {
       )
       .filter(Boolean);
 
-  // 5 minutes freshness to strictly prevent late posting
   const oldValidH = getValidNames(oldState.lineups?.home);
   const oldValidA = getValidNames(oldState.lineups?.away);
   const newValidH = getValidNames(newState.lineups?.home);

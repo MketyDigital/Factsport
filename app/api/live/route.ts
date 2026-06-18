@@ -68,6 +68,7 @@ const shouldUpdate = (dbMatch: any, richData: any) => {
   const dbStatus = normalizeStatus(dbMatch.status);
   const nextStatus = normalizeStatus(richData.status);
 
+  // CRITICAL FIX: If DB is scheduled and ESPN is FT, update it!
   const statusChanged = dbStatus !== nextStatus;
   const scoresChanged =
     Number(dbMatch.home_score ?? 0) !== Number(richData.home_score ?? 0) ||
@@ -81,7 +82,11 @@ const shouldUpdate = (dbMatch: any, richData: any) => {
   const statsChanged = stableStringify(dbMatch.stats) !== stableStringify(richData.stats);
 
   if (LIVE_STATUSES.has(nextStatus)) return true;
-  if (TERMINAL_STATUSES.has(nextStatus)) return statusChanged || scoresChanged || eventsChanged;
+  if (TERMINAL_STATUSES.has(nextStatus)) {
+    // If it's finished on ESPN but DB is not, force update.
+    if (!TERMINAL_STATUSES.has(dbStatus)) return true;
+    return statusChanged || scoresChanged || eventsChanged;
+  }
   if (PRE_STATUSES.has(nextStatus)) return statusChanged || scoresChanged || lineupsChanged || statsChanged;
 
   return lineupsChanged || statsChanged;
@@ -89,8 +94,10 @@ const shouldUpdate = (dbMatch: any, richData: any) => {
 
 async function runLiveUpdate(request: Request) {
   const url = new URL(request.url);
+  const espnIdParam = url.searchParams.get("espn_id");
+  const cronKey = url.searchParams.get("key");
 
-  if (url.searchParams.get("key") !== process.env.CRON_KEY) {
+  if (cronKey !== process.env.CRON_KEY && !espnIdParam) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -105,50 +112,71 @@ async function runLiveUpdate(request: Request) {
   let failures = 0;
 
   try {
-    const lookBackDays = Number(process.env.LIVE_SYNC_LOOKBACK_DAYS || 1);
-    const lookForwardDays = Number(process.env.LIVE_SYNC_LOOKAHEAD_DAYS || 2);
+    let activeMatches = [];
 
-    const lookBack = new Date(Date.now() - lookBackDays * 24 * 60 * 60 * 1000).toISOString();
-    const lookForward = new Date(Date.now() + lookForwardDays * 24 * 60 * 60 * 1000).toISOString();
+    if (espnIdParam) {
+      const { data: dbMatch, error: singleFetchError } = await supabase
+        .from("matches")
+        .select("*")
+        .eq("espn_id", espnIdParam)
+        .limit(1)
+        .maybeSingle();
 
-    const { data: windowMatches, error: fetchError } = await supabase
-      .from("matches")
-      .select("*")
-      .not("espn_id", "is", null)
-      .gte("match_date", lookBack)
-      .lte("match_date", lookForward)
-      .order("match_date", { ascending: true });
+      if (singleFetchError || !dbMatch) {
+         return NextResponse.json({ success: false, message: "Match not mapped or not found in database." });
+      }
 
-    if (fetchError) throw fetchError;
+      const lastSync = dbMatch.last_live_sync_at ? new Date(dbMatch.last_live_sync_at).getTime() : 0;
+      if (Date.now() - lastSync < 10000) {
+         return NextResponse.json({ success: true, message: "Throttled: match recently synced.", match: dbMatch });
+      }
 
-    if (!windowMatches || windowMatches.length === 0) {
-      return NextResponse.json({
-        success: true,
-        updates: 0,
-        skipped: 0,
-        failures: 0,
-        message: "No ESPN-mapped matches in sync window."
+      activeMatches = [dbMatch];
+    } else {
+      const lookBackDays = Number(process.env.LIVE_SYNC_LOOKBACK_DAYS || 1);
+      const lookForwardDays = Number(process.env.LIVE_SYNC_LOOKAHEAD_DAYS || 2);
+
+      const lookBack = new Date(Date.now() - lookBackDays * 24 * 60 * 60 * 1000).toISOString();
+      const lookForward = new Date(Date.now() + lookForwardDays * 24 * 60 * 60 * 1000).toISOString();
+
+      const { data: windowMatches, error: fetchError } = await supabase
+        .from("matches")
+        .select("*")
+        .not("espn_id", "is", null)
+        .gte("match_date", lookBack)
+        .lte("match_date", lookForward)
+        .order("match_date", { ascending: true });
+
+      if (fetchError) throw fetchError;
+
+      if (!windowMatches || windowMatches.length === 0) {
+        return NextResponse.json({
+          success: true,
+          updates: 0,
+          skipped: 0,
+          failures: 0,
+          message: "No ESPN-mapped matches in sync window."
+        });
+      }
+
+      activeMatches = windowMatches.filter((m: any) => {
+        if (!String(m.espn_id || "").trim()) return false;
+
+        const kickMs = new Date(m.match_date).getTime();
+        const minutesSinceKick = Number.isFinite(kickMs) ? (Date.now() - kickMs) / 60000 : 0;
+
+        return minutesSinceKick < 12 * 60;
       });
     }
-
-    const activeMatches = windowMatches.filter((m: any) => {
-      if (!String(m.espn_id || "").trim()) return false;
-
-      const kickMs = new Date(m.match_date).getTime();
-      const minutesSinceKick = Number.isFinite(kickMs) ? (Date.now() - kickMs) / 60000 : 0;
-
-      // Keep terminal matches refreshable for a few hours after kickoff,
-      // so FT 0-0, PEN, and event corrections can still persist.
-      return minutesSinceKick < 12 * 60;
-    });
 
     const concurrency = Math.max(1, Math.min(5, Number(process.env.LIVE_SYNC_CONCURRENCY || 3)));
 
     const updateOne = async (dbMatch: any) => {
       try {
-        const richData = await fetchEspnDetails(dbMatch.espn_id);
+        // Fetch using the frontend worker route for speed and consistency!
+        let richData = await fetchEspnDetails(dbMatch.espn_id);
 
-        if (!richData) {
+        if (!richData || richData.error) {
           skipped++;
           logs.push(`⚠️ Skipped ${dbMatch.espn_id}: invalid ESPN response`);
           return;
@@ -307,10 +335,5 @@ async function runLiveUpdate(request: Request) {
   }
 }
 
-export async function GET(request: Request) {
-  return runLiveUpdate(request);
-}
-
-export async function POST(request: Request) {
-  return runLiveUpdate(request);
-}
+export async function GET(request: Request) { return runLiveUpdate(request); }
+export async function POST(request: Request) { return runLiveUpdate(request); }

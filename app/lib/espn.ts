@@ -31,7 +31,6 @@ export const ESPN_LEAGUES: Record<string, string> = {
   "World Cup Qualifiers (UEFA)": "fifa.worldq.uefa",
   "World Cup Qualifiers (AFC)": "fifa.worldq.afc",
   "World Cup Qualifiers (CONCACAF)": "fifa.worldq.concacaf",
-  "World Cup Qualifiers (CAF)": "fifa.worldq.caf",
   "AFCON Qualifiers": "caf.nations_qual"
 };
 
