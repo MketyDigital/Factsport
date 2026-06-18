@@ -12,6 +12,8 @@
 
 # Production
 /build
+package-lock.json
+
 
 # Misc
 .DS_Store
