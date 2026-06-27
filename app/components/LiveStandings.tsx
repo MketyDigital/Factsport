@@ -4,7 +4,8 @@ import { Trophy, ChevronUp, ChevronDown, Minus } from 'lucide-react';
 
 const LEAGUE_MAP: Record<string, string> = {
     'Premier League': 'PL', 'La Liga': 'PD', 'Bundesliga': 'BL1',
-    'Serie A': 'SA', 'Ligue 1': 'FL1', 'Champions League': 'CL'
+    'Serie A': 'SA', 'Ligue 1': 'FL1', 'Champions League': 'CL',
+    'Euros': 'EC', 'World Cup': 'WC'
 };
 
 const normalizeName = (name: string) => {
@@ -31,7 +32,6 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
             }
 
             try {
-                // 🟢 FETCHES FROM YOUR EDGE CACHE
                 const res = await fetch(`/api/cache/standings?league=${leagueCode}`);
                 if (res.ok) {
                     const data = await res.json();
@@ -91,60 +91,60 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
         }
     }
 
-    // Sort live table
-    liveTable.sort((a, b) => {
-        if (b.points !== a.points) return b.points - a.points;
-        return b.goal_difference - a.goal_difference;
-    });
-
-    liveTable.forEach((team, index) => {
-        team.live_position = index + 1;
-    });
-
-    const homeIndex = liveTable.findIndex(t => normalizeName(t.team_short_name || t.team_name) === normHome || normalizeName(t.team_name).includes(normHome));
-    const awayIndex = liveTable.findIndex(t => normalizeName(t.team_short_name || t.team_name) === normAway || normalizeName(t.team_name).includes(normAway));
-    
-    // ---------------------------------------------------------
-    // 🟢 NEW: SMART CONTEXT SNIPPET LOGIC
-    // ---------------------------------------------------------
+    const isGroupStage = liveTable.length > 0 && liveTable[0].league_code.includes('_GROUP');
     let displayTable = liveTable;
-    
-    if (liveTable.length > 8) {
-        if (homeIndex !== -1 && awayIndex !== -1) {
-            const minIdx = Math.min(homeIndex, awayIndex);
-            const maxIdx = Math.max(homeIndex, awayIndex);
 
-            if (maxIdx - minIdx <= 5) {
-                // Teams are close enough, show them in one continuous block
-                let start = Math.max(0, minIdx - 1);
-                let end = Math.min(liveTable.length, maxIdx + 2);
-                
-                // Expand to show about 6-8 rows to keep the UI looking full
-                while (end - start < 6 && start > 0) start--;
-                while (end - start < 6 && end < liveTable.length) end++;
-                
-                displayTable = liveTable.slice(start, end); 
+    if (isGroupStage) {
+        const myGroup = liveTable.find(t => normalizeName(t.team_short_name || t.team_name) === normHome || normalizeName(t.team_name).includes(normHome))?.league_code;
+        if (myGroup) {
+            displayTable = liveTable.filter(t => t.league_code === myGroup);
+            displayTable = displayTable.map((team, index) => ({ ...team, original_position: index + 1 }));
+            
+            displayTable.sort((a, b) => {
+                if (b.points !== a.points) return b.points - a.points;
+                return b.goal_difference - a.goal_difference;
+            });
+            displayTable.forEach((team, index) => {
+                team.live_position = index + 1;
+            });
+        }
+    } else {
+        liveTable.sort((a, b) => {
+            if (b.points !== a.points) return b.points - a.points;
+            return b.goal_difference - a.goal_difference;
+        });
+
+        liveTable.forEach((team, index) => {
+            team.live_position = index + 1;
+        });
+
+        const homeIndex = liveTable.findIndex(t => normalizeName(t.team_short_name || t.team_name) === normHome || normalizeName(t.team_name).includes(normHome));
+        const awayIndex = liveTable.findIndex(t => normalizeName(t.team_short_name || t.team_name) === normAway || normalizeName(t.team_name).includes(normAway));
+        
+        if (liveTable.length > 8) {
+            if (homeIndex !== -1 && awayIndex !== -1) {
+                const minIdx = Math.min(homeIndex, awayIndex);
+                const maxIdx = Math.max(homeIndex, awayIndex);
+
+                if (maxIdx - minIdx <= 5) {
+                    let start = Math.max(0, minIdx - 1);
+                    let end = Math.min(liveTable.length, maxIdx + 2);
+                    while (end - start < 6 && start > 0) start--;
+                    while (end - start < 6 && end < liveTable.length) end++;
+                    displayTable = liveTable.slice(start, end); 
+                } else {
+                    const indicesToKeep = new Set<number>();
+                    indicesToKeep.add(Math.max(0, minIdx - 1));
+                    indicesToKeep.add(minIdx);
+                    indicesToKeep.add(Math.min(liveTable.length - 1, minIdx + 1));
+                    indicesToKeep.add(Math.max(0, maxIdx - 1));
+                    indicesToKeep.add(maxIdx);
+                    indicesToKeep.add(Math.min(liveTable.length - 1, maxIdx + 1));
+                    displayTable = Array.from(indicesToKeep).sort((a, b) => a - b).map(idx => liveTable[idx]);
+                }
             } else {
-                // Teams are far apart! Show two distinct blocks of context
-                const indicesToKeep = new Set<number>();
-                
-                // Block 1: Surround the Higher Team
-                indicesToKeep.add(Math.max(0, minIdx - 1));
-                indicesToKeep.add(minIdx);
-                indicesToKeep.add(Math.min(liveTable.length - 1, minIdx + 1));
-
-                // Block 2: Surround the Lower Team
-                indicesToKeep.add(Math.max(0, maxIdx - 1));
-                indicesToKeep.add(maxIdx);
-                indicesToKeep.add(Math.min(liveTable.length - 1, maxIdx + 1));
-
-                // Extract, sort, and map to teams
-                const sortedIndices = Array.from(indicesToKeep).sort((a, b) => a - b);
-                displayTable = sortedIndices.map(idx => liveTable[idx]);
+                displayTable = liveTable.slice(0, 8);
             }
-        } else {
-            // Fallback if the teams aren't strictly found
-            displayTable = liveTable.slice(0, 8);
         }
     }
 
@@ -177,11 +177,10 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
                             const isPlaying = normalizeName(team.team_short_name || team.team_name) === normHome || normalizeName(team.team_short_name || team.team_name) === normAway;
                             const posChange = team.original_position - team.live_position;
                             
-                            // 🟢 Checks if there is a massive jump in the table (e.g. from position 3 to 14)
                             const showGap = index > 0 && (team.live_position - displayTable[index - 1].live_position > 1);
 
                             return (
-                                <Fragment key={team.id}>
+                                <Fragment key={team.id || index}>
                                     {showGap && (
                                         <tr className="bg-slate-50/50 border-b border-slate-100">
                                             <td colSpan={5} className="py-2 text-center">

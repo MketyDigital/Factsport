@@ -23,7 +23,8 @@ export async function GET(request: Request) {
     const API_KEY = process.env.FOOTBALL_DATA_KEY;
     if (!API_KEY) return NextResponse.json({ error: 'Missing API Key' }, { status: 500 });
 
-    const TARGET_LEAGUES = ['PL', 'PD', 'BL1', 'SA', 'FL1', 'CL', 'EC', 'WC'];
+    // 🟢 NEW: Added EL (Europa League) and other cups to the target list
+    const TARGET_LEAGUES = ['PL', 'PD', 'BL1', 'SA', 'FL1', 'CL', 'EC', 'WC', 'EL'];
 
     try {
         const today = new Date();
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
                 const apiIds = fdMatches.map((m: any) => m.id);
                 const { data: dbMatches } = await supabase
                     .from('matches')
-                    .select('*') // Grabs the full structural row footprint for social forwarding
+                    .select('*') 
                     .in('api_id', apiIds);
 
                 const dbMap = new Map(dbMatches?.map(m => [m.api_id, m]) || []);
@@ -90,7 +91,6 @@ export async function GET(request: Request) {
                             shouldUpdateMatch = true;
                             leaguesNeedingStandingsUpdate.add(compCode); 
                             
-                            // 🟢 FIX 2: TRIGGER FALLBACK SOCIAL DELIVERY FOR LATE RESULTS
                             const internalOrigin = new URL(request.url).origin;
                             const targetRecord = { ...dbMatch, home_score: fdHomeScore, away_score: fdAwayScore, status: 'FT' };
                             
@@ -137,7 +137,7 @@ export async function GET(request: Request) {
         const presentLeagues = new Set(existingStandings?.map(s => s.league_code) || []);
         
         TARGET_LEAGUES.forEach(league => {
-            if (!presentLeagues.has(league) && league !== 'EC' && league !== 'WC') {
+            if (!presentLeagues.has(league)) {
                 leaguesNeedingStandingsUpdate.add(league);
                 logs.push(`🛡️ Self-Healing Triggered: ${league} table fetched.`);
             }
@@ -151,7 +151,7 @@ export async function GET(request: Request) {
             logs.push(`⏱️ Background Clock Audit: Syncing tables.`);
         }
 
-        const targetStandingsLeagues = Array.from(leaguesNeedingStandingsUpdate).filter(l => l !== 'EC' && l !== 'WC');
+        const targetStandingsLeagues = Array.from(leaguesNeedingStandingsUpdate);
 
         if (targetStandingsLeagues.length > 0) {
             const standingsFetches = targetStandingsLeagues.map(leagueId => 
@@ -167,26 +167,42 @@ export async function GET(request: Request) {
             standingsResults.forEach((standData, index) => {
                 if (!standData) return;
                 const leagueId = targetStandingsLeagues[index];
-                const table = standData?.standings?.find((s: any) => s.type === 'TOTAL')?.table || [];
+                
+                // 🟢 NEW: Cup Support - Iterate through all standings nodes (Groups + Total)
+                const standingsNodes = standData?.standings || [];
+                let addedForLeague = false;
 
-                if (table.length > 0) {
-                    const mappedTable = table.map((entry: any) => ({
-                        league_code: leagueId,
-                        position: entry.position,
-                        team_id: entry.team.id,
-                        team_name: entry.team.name,
-                        team_short_name: entry.team.shortName || entry.team.name,
-                        team_crest: entry.team.crest,
-                        played_games: entry.playedGames,
-                        won: entry.won,
-                        draw: entry.draw,
-                        lost: entry.lost,
-                        goal_difference: entry.goalDifference,
-                        points: entry.points,
-                        updated_at: new Date().toISOString()
-                    }));
-                    
-                    allStandingsToInsert = allStandingsToInsert.concat(mappedTable);
+                standingsNodes.forEach((node: any) => {
+                    // Accept TOTAL for leagues, or any node that has a 'group' for Cups
+                    if (node.type === 'TOTAL' || node.group) {
+                        const table = node.table || [];
+                        const groupName = node.group ? node.group.replace(/_/g, ' ') : null;
+
+                        if (table.length > 0) {
+                            const mappedTable = table.map((entry: any) => ({
+                                league_code: leagueId,
+                                group_name: groupName, // 🟢 MUST ADD THIS COLUMN TO SUPABASE
+                                position: entry.position,
+                                team_id: entry.team.id,
+                                team_name: entry.team.name,
+                                team_short_name: entry.team.shortName || entry.team.name,
+                                team_crest: entry.team.crest,
+                                played_games: entry.playedGames,
+                                won: entry.won,
+                                draw: entry.draw,
+                                lost: entry.lost,
+                                goal_difference: entry.goalDifference,
+                                points: entry.points,
+                                updated_at: new Date().toISOString()
+                            }));
+                            
+                            allStandingsToInsert = allStandingsToInsert.concat(mappedTable);
+                            addedForLeague = true;
+                        }
+                    }
+                });
+
+                if (addedForLeague) {
                     successfulLeagues.push(leagueId);
                     logs.push(`Standings Prepared: ${leagueId}`);
                 }

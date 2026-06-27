@@ -64,7 +64,6 @@ export default function FactSportPlayer({
       return () => setIsPageActive(false);
   }, [activeMatchId, matchId, setIsPageActive]);
 
-  // 🟢 GLOBAL REGISTRATION SHIELD
   useEffect(() => {
       if (isTimeLocked || !mediaUrl || mediaUrl === 'streamio' || activeMatchId === matchId) return;
 
@@ -80,8 +79,6 @@ export default function FactSportPlayer({
               finalUrl = `https://www.youtube.com/embed/${videoId}`;
           }
           
-          // 🔥 THE GHOST TAG: Safely pass the audio state inside the URL string 
-          // without breaking the Provider's strict 2-argument TypeScript rule!
           if (mode === 'audio') {
               finalUrl += '#is-audio-mode';
           }
@@ -148,9 +145,8 @@ export default function FactSportPlayer({
     else if (mediaUrl.includes('.be/')) videoId = mediaUrl.split('.be/')[1];
     else if (mediaUrl.includes('embed/')) videoId = mediaUrl.split('embed/')[1];
 
-    const embedUrl = `https://www.youtube.com/embed/${videoId}`;
+    const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0&iv_load_policy=3&controls=0&playsinline=1&fs=0&disablekb=1`;
 
-    // Once we hit this early return, TypeScript knows `mode` can no longer be 'audio' down below!
     if (mode === 'audio') {
       return (
         <div className="w-full h-[100px] md:h-[120px] bg-[#0a1428] relative overflow-hidden border-b border-slate-800 flex items-center justify-center shadow-inner">
@@ -161,8 +157,10 @@ export default function FactSportPlayer({
                     <span className="w-1 h-1 bg-red-500 rounded-full animate-pulse"></span> Radio Station
                 </span>
             </div>
+            {/* Overlay to block interaction */}
+            <div className="absolute inset-0 z-30 bg-transparent"></div>
             <div className="relative z-20 w-[80px] h-[60px] overflow-hidden rounded-lg shadow-[0_0_20px_rgba(0,0,0,0.8)] border border-white/20 ml-12 bg-black scale-90 md:scale-100">
-                <iframe src={`${embedUrl}?playsinline=1`} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '320px', height: '240px' }} frameBorder="0" allow="autoplay; encrypted-media"></iframe>
+                <iframe src={embedUrl} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '320px', height: '240px', pointerEvents: 'none' }} frameBorder="0" allow="autoplay; encrypted-media"></iframe>
             </div>
         </div>
       );
@@ -172,7 +170,6 @@ export default function FactSportPlayer({
         return (
             <div className="w-full aspect-video bg-[#0a1428] relative flex flex-col items-center justify-center border-b border-slate-800 animate-in fade-in duration-500">
                 <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-sm"></div>
-                {/* 🔥 FIXED: Removed the impossible ternary check. It just passes embedUrl directly. */}
                 <button onClick={() => tuneInVideo(matchId, embedUrl)} className="relative z-10 flex items-center gap-2 px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-black tracking-widest uppercase rounded-full shadow-lg transition-all active:scale-95">
                     <Play size={18} fill="currentColor" /> Watch Live TV
                 </button>
@@ -192,7 +189,9 @@ export default function FactSportPlayer({
                 <Tv size={8} className="text-blue-400"/> FactSport TV
             </span>
         </div>
-        <iframe src={`${embedUrl}?autoplay=1&modestbranding=1&rel=0&iv_load_policy=3&controls=1&playsinline=1&fs=1`} className="w-full h-full scale-[1.03]" allowFullScreen></iframe>
+        {/* Overlay to block interactions and hide YouTube UI */}
+        <div className="absolute inset-0 z-30 bg-transparent"></div>
+        <iframe src={embedUrl} className="w-full h-full scale-[1.3] pointer-events-none relative z-10" allow="autoplay; encrypted-media" frameBorder="0"></iframe>
       </div>
     );
   };
@@ -246,7 +245,9 @@ export default function FactSportPlayer({
              <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1518605368461-1e1e1a8a29a6?q=80')] bg-cover opacity-20 blur-sm pointer-events-none"></div>
          )}
          
-         <iframe src={mediaUrl} className="relative z-10 w-full h-full" frameBorder="0" scrolling="no" sandbox="allow-scripts allow-same-origin" allowFullScreen></iframe>
+         {/* Overlay to block interaction */}
+         <div className="absolute inset-0 z-30 bg-transparent"></div>
+         <iframe src={mediaUrl} className="relative z-10 w-full h-full pointer-events-none scale-[1.05]" frameBorder="0" scrolling="no" sandbox="allow-scripts allow-same-origin" allowFullScreen></iframe>
          
          <div className="absolute bottom-0 left-0 w-full h-[30px] bg-[#0a1428] border-t border-slate-800 z-40 flex items-center justify-between px-3 pointer-events-none">
              <div className="flex items-center gap-1.5">

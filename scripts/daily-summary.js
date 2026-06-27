@@ -12,7 +12,6 @@ if (!SUPABASE_URL || !SUPABASE_KEY || !GEMINI_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-// Powered via 2.5-flash for strict context token processing speeds
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -20,7 +19,6 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function postToBufferDirectly(text, safeImgUrl, profileId, token) { 
     if (!profileId || !token) return;
     
-    // Exact 2026 production compliant graph payload
     const payload = {
         query: "mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { ... on PostActionSuccess { post { id } } ... on MutationError { message } } }",
         variables: {
@@ -91,17 +89,14 @@ async function generateDailySummaries() {
         factualDataPayload += `\nCOMPETITION: ${leagueName.toUpperCase()}\n`;
         
         leagueMatches.forEach(m => {
-            // Determine match format details cleanly
             const isCupTie = ['Champions League', 'Europa League', 'FA Cup', 'World Cup', 'Euros'].includes(m.league);
             const venueProfile = isCupTie ? `Tournament Venue Setting (Check if neutral final/knockout)` : `Domestic League Home Ground`;
             
-            // Format score logs safely including any penalty scores explicitly
             let scoreLine = `${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team}`;
             if (m.status === 'PEN' && m.stats?.home_penalties !== null) {
                 scoreLine += ` (${m.stats.home_penalties}-${m.stats.away_penalties} on penalties)`;
             }
 
-            // Extract explicit true event logs directly from the database schema
             const trueEvents = Array.isArray(m.match_events) 
                 ? m.match_events.filter(e => e.type === 'goal' || e.type === 'red-card').map(e => `[${e.time}] ${e.text}: ${e.player}`).join('; ')
                 : "No major event details logged.";
@@ -110,6 +105,7 @@ async function generateDailySummaries() {
         });
     }
 
+    // 🟢 NEW: STRICT ANTI-AI PROMPT
     const prompt = `
         You are a gritty, veteran European football pundit writing for 'FactSport'.
         Write a direct, professional, completely factual "Daily Matchday Round-Up" article.
@@ -123,14 +119,13 @@ async function generateDailySummaries() {
         1. ZERO GUESSING ALLOWED: Write *only* about the matches, scores, scorers, and times provided above. If an event or goalscorer is not explicitly listed in the data payload, do not invent one. Focus your commentary entirely on the tactical impact of the final result.
         2. TOURNAMENT AND VENUE CONTEXT: Pay attention to the competition. If it is a Cup tie or Tournament (like World Cup or Champions League), frame the analysis around progression, knockout stakes, or lifting the trophy. If it is a league match, focus on standings and points.
         3. HUMAN HEADLINE RULES: Create a 100% realistic, gritty journalistic headline under 10 words. NO colons. NO puns. NO markdown symbols. Write exactly like a veteran editor. 
-        4. ANTI-AI FILLER: Avoid repetitive filler like "Furthermore", "Delve into", "Tapestry", or "In conclusion". Write punchy, human-like news.
+        4. ANTI-AI FILLER: Avoid repetitive filler like "Furthermore", "Delve into", "Tapestry", "Testament", "Crucial", "Pivotal", or "In conclusion". Write punchy, human-like news.
         5. EMBEDDING MATCHES: When you finish discussing a match result, paste its "EXACT SHORTCODE TO USE" on a brand new line all by itself.
         6. LENGTH: 400-700 words. Plain text markdown format. 
         7. FB_POST: At the very end, skip a line and write "FB_POST:" followed by a professional Facebook summary tracking major scores. No emojis.
     `;
 
     try {
-        // 🟢 SEARCH TOOL IS ABSOLUTELY DISABLED HERE TO FORCE THE ANTI-HALLUCINATION GATE
         const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
         const text = (await result.response).text();
 

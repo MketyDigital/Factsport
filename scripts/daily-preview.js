@@ -18,7 +18,7 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const ESPN_LEAGUES = { 'Premier League': 'eng.1', 'La Liga': 'esp.1', 'Bundesliga': 'ger.1', 'Serie A': 'ita.1', 'Ligue 1': 'fra.1', 'Champions League': 'uefa.champions', 'Europa League': 'uefa.europa', 'FA Cup': 'eng.fa', 'World Cup': 'fifa.world', 'Euros': 'uefa.euro' };
-const FD_LEAGUES = { 'Premier League': 'PL', 'La Liga': 'PD', 'Bundesliga': 'BL1', 'Serie A': 'SA', 'Ligue 1': 'FL1', 'Champions League': 'CL' };
+const FD_LEAGUES = { 'Premier League': 'PL', 'La Liga': 'PD', 'Bundesliga': 'BL1', 'Serie A': 'SA', 'Ligue 1': 'FL1', 'Champions League': 'CL', 'World Cup': 'WC', 'Euros': 'EC', 'Europa League': 'EL' };
 
 const getCanonicalName = (rawName) => {
     if (!rawName) return "";
@@ -41,27 +41,17 @@ async function getLeagueStandings(leagueName) {
     
     if (standingsCache[mappedLeague]) return standingsCache[mappedLeague];
 
-    const domesticLeagues = ['PL', 'PD', 'BL1', 'SA', 'FL1']; 
-    if (!domesticLeagues.includes(mappedLeague)) return "TOURNAMENT PROFILE: Cup/Knockout format tie. Standings mapping omitted.";
-
     try {
-        if (FD_API_KEY) {
-            const liveRes = await fetch(`https://api.football-data.org/v4/competitions/${mappedLeague}/standings`, { headers: { 'X-Auth-Token': FD_API_KEY } });
-            if (liveRes.ok) {
-                const data = await liveRes.json();
-                if (data.standings && data.standings[0]) {
-                    const resultStr = `FULL LEAGUE TABLE: ` + data.standings[0].table.map(t => `${t.position}. ${t.team.shortName} (${t.points}pts)`).join(', ');
-                    standingsCache[mappedLeague] = resultStr; 
-                    return resultStr;
-                }
-            }
-        }
-    } catch (e) {}
-
-    try {
-        const { data: dbStandings, error } = await supabase.from('standings').select('position, team_short_name, team_name, points').eq('league_code', mappedLeague).order('position', { ascending: true });
+        // 🟢 NEW: Fetches and groups standings for Cups (World Cup, Euros, UCL)
+        const { data: dbStandings, error } = await supabase.from('standings').select('position, team_short_name, team_name, points, group_name').eq('league_code', mappedLeague).order('group_name', { ascending: true }).order('position', { ascending: true });
         if (!error && dbStandings && dbStandings.length > 0) {
-            const resultStr = `FULL LEAGUE TABLE: ` + dbStandings.map(t => `${t.position}. ${t.team_short_name || t.team_name} (${t.points}pts)`).join(', ');
+            const groups = {};
+            dbStandings.forEach(t => {
+                const g = t.group_name || 'LEAGUE';
+                if (!groups[g]) groups[g] = [];
+                groups[g].push(`${t.position}. ${t.team_short_name || t.team_name} (${t.points}pts)`);
+            });
+            const resultStr = Object.entries(groups).map(([g, teams]) => `[${g}] ` + teams.join(', ')).join(' | ');
             standingsCache[mappedLeague] = resultStr; 
             return resultStr;
         }
@@ -175,7 +165,6 @@ async function generateDailyPreview() {
             const time = new Date(g.match_date).toLocaleTimeString('en-GB', {timeZone: 'UTC', hour: '2-digit', minute:'2-digit'});
             const h2hStr = await getMatchContext(g.league, g.match_date, g.home_team, g.away_team);
             
-            // Explicit tracking for dynamic broadcasting metrics
             let liveCoverageString = "Match Center Tracking Available.";
             if (g.stream_url || g.media_url) {
                 liveCoverageString = g.media_mode === 'audio' ? `Live Commentary Audio Active` : `Live Stream Broadcast Active`;
@@ -185,6 +174,7 @@ async function generateDailyPreview() {
         }
     }
 
+    // 🟢 NEW: STRICT ANTI-AI PROMPT
     const prompt = `
         You are a gritty, highly experienced European football pundit writing for 'FactSport'. 
         You speak plainly, directly, and from a place of deep tactical knowledge. 
@@ -198,15 +188,14 @@ async function generateDailyPreview() {
         STRICT PROMPT CAGE TO PREVENT HALLUCINATIONS:
         1. NO IMAGINED RESULTS: You MUST base your analysis of form, metrics, and motivation purely on the factual data block provided above. Do not invent scores or guess player lists.
         2. COMPLEMENTARY MEDIA INJECTION: If a fixture has a "BROADCAST METRIC" listing live audio or video streams, prominently state in that match section that fans can access live streams/commentary explicitly inside the FactSport Match Center.
-        3. TOURNAMENT TYPE MODELING: Differentiate your narrative style dynamically. If the competition data block notes a Cup/Knockout tie (such as Champions League knockout stages, Cups, World Cup or Euro formats), ignore point margins and focus entirely on high-stakes, single-elimination context.
-        4. BANNED WORDS: Never use "Moreover", "Furthermore", "Delve into", "Tapestry", or "A thrilling encounter".
+        3. TOURNAMENT TYPE MODELING: Differentiate your narrative style dynamically. If the competition data block notes a Cup/Knockout tie (such as Champions League knockout stages, Cups, World Cup or Euro formats), ignore point margins and focus entirely on high-stakes, single-elimination context. If it shows Groups, mention the group standings.
+        4. BANNED WORDS: Never use "Moreover", "Furthermore", "Delve into", "Tapestry", "Testament", "Crucial", "Pivotal", or "A thrilling encounter". Write like a real human journalist.
         5. HUMAN HEADLINE: Create a 100% realistic, gritty journalistic headline under 10 words. NO colons. NO puns. NO markdown.
         6. EMBEDDING MATCHES: After you finish analyzing a match, paste its "EXACT SHORTCODE TO USE" on a brand new line all by itself.
         7. FB_POST: At the very end, skip a line and write "FB_POST:" followed by a professional Facebook summary.
     `;
 
     try {
-        // 🟢 SEARCH ENGINE REMOVED TO PREVENT HALLUCINATORY DATA INTERPRETATIONS
         const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
         const text = (await result.response).text();
 

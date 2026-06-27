@@ -34,11 +34,10 @@ const model = genAI.getGenerativeModel({
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// 🟢 HTML SANITIZER: Prevents Telegram from crashing if the AI uses < or > symbols
 const escapeHTML = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-const ESPN_LEAGUES = { 'Premier League': 'eng.1', 'La Liga': 'esp.1', 'Bundesliga': 'ger.1', 'Serie A': 'ita.1', 'Ligue 1': 'fra.1', 'Champions League': 'uefa.champions', 'Europa League': 'uefa.europa', 'FA Cup': 'eng.fa' };
-const FD_LEAGUES = { 'Premier League': 'PL', 'La Liga': 'PD', 'Bundesliga': 'BL1', 'Serie A': 'SA', 'Ligue 1': 'FL1', 'Champions League': 'CL' };
+const ESPN_LEAGUES = { 'Premier League': 'eng.1', 'La Liga': 'esp.1', 'Bundesliga': 'ger.1', 'Serie A': 'ita.1', 'Ligue 1': 'fra.1', 'Champions League': 'uefa.champions', 'Europa League': 'uefa.europa', 'FA Cup': 'eng.fa', 'World Cup': 'fifa.world', 'Euros': 'uefa.euro' };
+const FD_LEAGUES = { 'Premier League': 'PL', 'La Liga': 'PD', 'Bundesliga': 'BL1', 'Serie A': 'SA', 'Ligue 1': 'FL1', 'Champions League': 'CL', 'World Cup': 'WC', 'Euros': 'EC', 'Europa League': 'EL' };
 
 const getCanonicalName = (rawName) => {
     if (!rawName) return "";
@@ -61,27 +60,17 @@ async function getLeagueStandings(leagueName) {
     
     if (standingsCache[mappedLeague]) return standingsCache[mappedLeague];
 
-    const domesticLeagues = ['PL', 'PD', 'BL1', 'SA', 'FL1']; 
-    if (!domesticLeagues.includes(mappedLeague)) return "Tournament/Cup tie - League table not applicable. Focus strictly on knockout stakes, recent form, and H2H.";
-
     try {
-        if (FD_API_KEY) {
-            const liveRes = await fetch(`https://api.football-data.org/v4/competitions/${mappedLeague}/standings`, { headers: { 'X-Auth-Token': FD_API_KEY } });
-            if (liveRes.ok) {
-                const data = await liveRes.json();
-                if (data.standings && data.standings[0]) {
-                    const resultStr = `FULL LEAGUE TABLE: ` + data.standings[0].table.map(t => `${t.position}. ${t.team.shortName} (${t.points}pts)`).join(', ');
-                    standingsCache[mappedLeague] = resultStr; 
-                    return resultStr;
-                }
-            }
-        }
-    } catch (e) { console.log(`⚠️ Live API failed for ${leagueName}, falling back to DB cache...`); }
-
-    try {
-        const { data: dbStandings, error } = await supabase.from('standings').select('position, team_short_name, team_name, points').eq('league_code', mappedLeague).order('position', { ascending: true });
+        // 🟢 NEW: Fetches and groups standings for Cups (World Cup, Euros, UCL)
+        const { data: dbStandings, error } = await supabase.from('standings').select('position, team_short_name, team_name, points, group_name').eq('league_code', mappedLeague).order('group_name', { ascending: true }).order('position', { ascending: true });
         if (!error && dbStandings && dbStandings.length > 0) {
-            const resultStr = `FULL LEAGUE TABLE: ` + dbStandings.map(t => `${t.position}. ${t.team_short_name || t.team_name} (${t.points}pts)`).join(', ');
+            const groups = {};
+            dbStandings.forEach(t => {
+                const g = t.group_name || 'LEAGUE';
+                if (!groups[g]) groups[g] = [];
+                groups[g].push(`${t.position}. ${t.team_short_name || t.team_name} (${t.points}pts)`);
+            });
+            const resultStr = Object.entries(groups).map(([g, teams]) => `[${g}] ` + teams.join(', ')).join(' | ');
             standingsCache[mappedLeague] = resultStr; 
             return resultStr;
         }
@@ -150,7 +139,6 @@ async function getMatchContext(leagueName, dateString, homeTeam, awayTeam) {
     return { textContext: contextStr || "[NO H2H/FORM FOUND]", translatedH2H };
 }
 
-// 🟢 LOUD API: Tracks true success and logs actual errors
 async function postToBufferDirectly(text, safeImgUrl, profileId, token) { 
     if (!profileId || !token) return false;
     const hasImg = safeImgUrl && safeImgUrl.length > 5;
@@ -181,7 +169,6 @@ function parseTemplate(templateText, match, analysis, link, dateStr) {
     return text;
 }
 
-// 🟢 LOUD API: Tracks true success and logs actual Telegram parsing crashes
 async function postToTelegram(botToken, chatId, text, parseMode = 'HTML') {
     if (!botToken || !chatId) {
         console.error("❌ Telegram skipped: Missing botToken or chatId");
@@ -264,17 +251,19 @@ async function runProSlipEngine() {
                 const tableStr = await getLeagueStandings(match.league);
                 const { textContext, translatedH2H } = await getMatchContext(match.league, match.match_date, match.home_team, match.away_team);
                 
+                // 🟢 NEW: STRICT ANTI-AI PROMPT
                 const prompt = `
                     You are a gritty, elite football tactical analyst in ${currentMonthYear}. 
                     Provide a highly accurate "Pro Betting Slip" for: ${match.home_team} vs ${match.away_team} (${match.league}). 
                     
                     FACTUAL CONTEXT:
-                    LEAGUE STANDING: ${tableStr}
+                    LEAGUE/GROUP STANDING: ${tableStr}
                     MATCH FORM & H2H: ${textContext}
                     
                     CRITICAL RULES: 
                     1. TONE: Be direct, expert, and authoritative. Speak from experience.
-                    2. THE "NO DATA" FAIL-SAFE: NEVER complain to the reader about missing data. NEVER use phrases like "With no available data", "Information is scarce", or "Tactical analysis is impossible." If the Factual Context above is sparse or missing, seamlessly rely on your vast internal expert knowledge of these clubs' historical playstyles, pedigree, and league tendencies to formulate a confident rationale.
+                    2. NO AI FILLER: Do not use words like "tapestry", "delve", "moreover", "testament", "crucial", or "pivotal". Write like a real human bettor.
+                    3. THE "NO DATA" FAIL-SAFE: NEVER complain to the reader about missing data. NEVER use phrases like "With no available data", "Information is scarce", or "Tactical analysis is impossible." If the Factual Context above is sparse or missing, seamlessly rely on your vast internal expert knowledge of these clubs' historical playstyles, pedigree, and league tendencies to formulate a confident rationale.
                 `;
                 
                 let text = await generateWithRetry(prompt);
@@ -301,7 +290,6 @@ async function runProSlipEngine() {
             for (const channel of tgVipChannels) {
                 for (const item of newlyGeneratedSlips) {
                     const matchDateObj = formatDate(item.match.match_date); 
-                    // 🟢 SANITIZED FOR TELEGRAM HTML PARSER
                     const safeRationale = escapeHTML(item.analysis.rationale);
                     const safePrimary = escapeHTML(item.analysis.primary);
                     const safeAcca = escapeHTML(item.analysis.safe);
@@ -365,7 +353,6 @@ async function runProSlipEngine() {
         const matchLink = `https://factsport.com/match/${freeTipMatch.id}`;
         const matchDateObj = formatDate(freeTipMatch.match_date); 
         
-        // 🟢 SANITIZE FREE TIP TEXT SO TELEGRAM DOESN'T CRASH
         const safeAnalysis = {
             ...freeTipMatch.pro_analysis,
             primary: escapeHTML(freeTipMatch.pro_analysis.primary),
@@ -398,7 +385,6 @@ async function runProSlipEngine() {
         if (eventsConfig.free_tips?.buf_fb1) { const ok = await postToBufferDirectly(fb1Text, null, creds.buffer_fb1_id, bufferToken); if (ok) successfullyPosted = true; }
         if (eventsConfig.free_tips?.buf_fb2) { const ok = await postToBufferDirectly(fb2Text, null, creds.buffer_fb2_id, bufferToken); if (ok) successfullyPosted = true; }
 
-        // 🟢 LOUD API: Tracks Webhook Success
         if (eventsConfig.free_tips?.make1 && (creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL)) {
             try {
                 const res = await fetch(creds.make_webhook_1 || process.env.MAKE_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fb2_text: fb1Text, x_text: make1Text, x_image_url: null }) });
@@ -415,7 +401,6 @@ async function runProSlipEngine() {
             } catch(e) { console.error("❌ Webhook 2 Network Error:", e.message); }
         }
 
-        // 🟢 LOUD API: Tracks FB Graph Success
         if (eventsConfig.free_tips?.fb1 && (creds.fb1_id || process.env.FB_PAGE_ID) && (creds.fb1_token || process.env.FB_ACCESS_TOKEN)) {
             const pageId = creds.fb1_id || process.env.FB_PAGE_ID; const token = creds.fb1_token || process.env.FB_ACCESS_TOKEN;
             try {
@@ -425,7 +410,6 @@ async function runProSlipEngine() {
             } catch(e) { console.error("❌ FB1 Graph Network Error:", e.message); }
         }
 
-        // 🟢 STRICT DB LOCK: Only locks if one of the APIs above successfully returned a 200 OK status
         if (successfullyPosted) {
             freeTipMatch.pro_analysis.was_freetip_date = todayDateString;
             await supabase.from('matches').update({ pro_analysis: freeTipMatch.pro_analysis }).eq('id', freeTipMatch.id);

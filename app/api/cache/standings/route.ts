@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-export const revalidate = 60; // 🟢 Cache for exactly 60 seconds
+export const revalidate = 60;
 
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
@@ -12,10 +12,16 @@ export async function GET(request: Request) {
 
     try {
         const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-        const { data, error } = await supabase
-            .from('standings')
-            .select('*')
-            .eq('league_code', leagueCode)
+        let query = supabase.from('standings').select('*');
+        
+        if (['WC', 'EC', 'CL'].includes(leagueCode)) {
+            query = query.ilike('league_code', `${leagueCode}_%`);
+        } else {
+            query = query.eq('league_code', leagueCode);
+        }
+        
+        const { data, error } = await query
+            .order('league_code', { ascending: true })
             .order('position', { ascending: true });
 
         if (error) throw error;

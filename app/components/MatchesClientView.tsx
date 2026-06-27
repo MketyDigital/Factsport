@@ -6,7 +6,7 @@ import CompactMatchRow from '@/app/components/CompactMatchRow';
 import { useSmartInterval } from '@/app/hooks/useSmartInterval';
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
-const PRIORITY_LEAGUES = ['Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Ligue 1', 'Champions League'];
+const PRIORITY_LEAGUES = ['Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Ligue 1', 'Champions League', 'World Cup', 'Euros'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
 const getLocalYMD = (dateInput: string | Date | number) => {
@@ -149,7 +149,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    // 🟢 THE API SHIELD HYDRATOR
     const handleLoadMore = async (activeList: any[]) => {
         if (visibleCount + 15 <= activeList.length) {
             setVisibleCount(prev => prev + 15);
@@ -162,7 +161,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
             const edgeMatch = activeList[activeList.length - 1];
             const cursorDate = edgeMatch ? edgeMatch.match_date : new Date().toISOString();
             
-            // Call the secure, cached API route
             const res = await fetch(`/api/matches?league=${encodeURIComponent(selectedLeague)}&type=${activeTab}&cursor=${encodeURIComponent(cursorDate)}`);
             
             if (res.ok) {
@@ -276,7 +274,6 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         const activeList = activeTab === 'fixtures' ? fixtures : results;
         const displayMatches = activeList.slice(0, visibleCount);
         
-        // Button shows as long as we have local data OR the database hasn't signaled it's empty
         const showLoadMoreButton = visibleCount < activeList.length || !dbDepleted[activeTab];
 
         const groupedData: Record<string, any[]> = {};

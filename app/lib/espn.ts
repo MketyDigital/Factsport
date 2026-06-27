@@ -74,11 +74,22 @@ export async function fetchEspnDetails(gameId: string) {
     let stageName = comps?.type?.abbreviation || comps?.type?.text || data.header.season?.type?.text || null;
     let groupName = null;
     
+    // 🟢 NEW: Check notes for Group or Knockout specifics
     if (comps?.notes && Array.isArray(comps.notes)) {
-        const groupNote = comps.notes.find((n: any) => n.headline?.includes('Group'));
+        const groupNote = comps.notes.find((n: any) => n.headline?.toLowerCase().includes('group'));
         if (groupNote) {
             groupName = groupNote.headline;
-            stageName = 'Group Stage';
+            if (!stageName || stageName.toLowerCase() === 'regular season') stageName = 'Group Stage';
+        }
+        
+        const knockoutNote = comps.notes.find((n: any) => 
+            n.headline?.toLowerCase().includes('round of') || 
+            n.headline?.toLowerCase().includes('quarter') || 
+            n.headline?.toLowerCase().includes('semi') || 
+            n.headline?.toLowerCase().includes('final')
+        );
+        if (knockoutNote) {
+            stageName = knockoutNote.headline;
         }
     }
 
@@ -269,8 +280,8 @@ export async function fetchEspnDetails(gameId: string) {
         venue,        
         referees,     
         predictor,
-        stage: stageName,     // 🟢 NEW: EXPLICITLY RETURN STAGE
-        match_group: groupName // 🟢 NEW: EXPLICITLY RETURN GROUP
+        stage: stageName,     
+        match_group: groupName 
     };
 
   } catch (err) { 
