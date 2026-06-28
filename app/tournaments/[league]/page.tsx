@@ -4,7 +4,7 @@ export const revalidate = 60;
 import { createClient } from '@supabase/supabase-js'; 
 import Link from 'next/link';
 import { Metadata, ResolvingMetadata } from 'next';
-import { ChevronLeft, Trophy, Calendar, CheckCircle, Search, CalendarDays } from 'lucide-react';
+import { ChevronLeft, Trophy, Calendar, CheckCircle, Search, CalendarDays, BarChart2 } from 'lucide-react';
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import LeagueMatchGroup from '@/app/components/LeagueMatchGroup';
 import LiveStandings from '@/app/components/LiveStandings';
