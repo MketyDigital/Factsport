@@ -22,8 +22,6 @@ import BettingPromo from '@/app/components/BettingPromo';
 import { getExternalData } from '@/app/lib/matchService';
 import { getTeamForm } from '@/app/lib/teamForm';
 import { MatchLiveProvider } from '@/app/providers/MatchLiveProvider';
-
-// 🟢 NEW: Import the GPU-accelerated Goal Rush Ticker
 import GoalRushTicker from '@/app/components/GoalRushTicker';
 
 const sanitizeUrl = (url: string | null | undefined) => {
@@ -42,9 +40,17 @@ const getSupabaseData = cache(async (id: string) => {
     return data;
 });
 
-export async function generateMetadata({ params }: { params: { id: string } }, parent: ResolvingMetadata): Promise<Metadata> {
+// Next 15 Dynamic Route Types
+type Props = {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
+
+export async function generateMetadata({ params, searchParams }: Props, parent: ResolvingMetadata): Promise<Metadata> {
     const resolvedParams = await params;
+    const resolvedSearchParams = await searchParams;
     const match = await getSupabaseData(resolvedParams.id);
+    
     if (!match) return { title: 'Match Not Found | FactSport' };
 
     const status = (match.status || '').toUpperCase();
@@ -69,25 +75,95 @@ export async function generateMetadata({ params }: { params: { id: string } }, p
 
     let title = `${match.home_team} vs ${match.away_team} Predictions, H2H & Live Score | FactSport`;
     let description = `Get expert predictions, pro betting analysis, starting lineups, and live updates for ${match.home_team} vs ${match.away_team} in the ${match.league}.`;
+    let label = 'UPCOMING MATCH';
 
     if (isLive) {
         title = `🔴 LIVE: ${match.home_team} ${hScore}-${aScore} ${match.away_team}`;
         description = `Follow the live score, minute-by-minute text commentary, and live match stats for ${match.home_team} vs ${match.away_team}.`;
+        label = 'LIVE MATCH UPDATE';
     } else if (isFinished) {
         title = `${match.home_team} ${hScore}-${aScore} ${match.away_team} Result, Highlights & Match Stats`;
         description = `Full time result: ${match.home_team} ${hScore}-${aScore} ${match.away_team}. Watch the highlights, review the pro analysis, and check the final match stats.`;
+        label = 'FULL TIME RESULT';
     }
 
+    // 🟢 DYNAMIC OG IMAGE GENERATOR PAYLOAD
+    const ogDataObj = {
+        type: 'versus',
+        home: match.home_team,
+        away: match.away_team,
+        homeLogo: match.home_logo,
+        awayLogo: match.away_logo,
+        hScore: isLive || isFinished ? hScore : undefined,
+        aScore: isLive || isFinished ? aScore : undefined,
+        label: label,
+        homeTla: match.home_team?.substring(0, 3).toUpperCase(),
+        awayTla: match.away_team?.substring(0, 3).toUpperCase()
+    };
+    
+    // Safely encode to base64 for Edge Runtime
+    const jsonStr = JSON.stringify(ogDataObj);
+    const bytes = new TextEncoder().encode(jsonStr);
+    const binStr = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("");
+    const encodedData = btoa(binStr).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://factsport.com';
+    const ogImageUrl = `${appUrl}/api/og?data=${encodedData}`;
+
     const previousImages = (await parent).openGraph?.images || [];
+    const activeVideoUrl = sanitizeUrl(isFinished ? match.video_url : match.livestream_url);
+    
+    // 🟢 OPTION A VS OPTION B DETECTOR (?embed=true)
+    const isPlayerShare = resolvedSearchParams?.embed === 'true' || resolvedSearchParams?.play === 'true';
+
+    // Option A: Player Meta Tags
+    if (isPlayerShare && activeVideoUrl) {
+        return { 
+            title, 
+            description, 
+            openGraph: { 
+                title, 
+                description, 
+                type: 'video.other', 
+                images: [ogImageUrl, ...previousImages],
+                videos: [{ url: activeVideoUrl, secureUrl: activeVideoUrl }]
+            }, 
+            twitter: { 
+                card: 'player', 
+                title, 
+                description,
+                images: [ogImageUrl],
+                players: [{
+                    // The embedded iframe route (app/embed/[id]/page.tsx)
+                    playerUrl: `${appUrl}/embed/${match.id}`, 
+                    streamUrl: activeVideoUrl,
+                    width: 1280,
+                    height: 720
+                }]
+            } 
+        };
+    }
+
+    // Option B: Standard Image Meta Tags (Default)
     return { 
         title, 
         description, 
-        openGraph: { title, description, type: 'website', images: match.home_logo && match.away_logo ? [match.home_logo, ...previousImages] : previousImages }, 
-        twitter: { card: 'summary_large_image', title, description } 
+        openGraph: { 
+            title, 
+            description, 
+            type: 'website', 
+            images: [ogImageUrl, ...previousImages] 
+        }, 
+        twitter: { 
+            card: 'summary_large_image', 
+            title, 
+            description,
+            images: [ogImageUrl]
+        } 
     };
 }
 
-export default async function MatchDetailsPage({ params }: { params: { id: string } }) {
+export default async function MatchDetailsPage({ params, searchParams }: Props) {
   const resolvedParams = await params;
   if (!resolvedParams?.id) return notFound();
 
@@ -142,7 +218,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       ]
   };
 
-  // 🟢 NEW: Fetch a 24-hour window for the Goal Rush Ticker (Highly optimized DB call)
   const now = new Date();
   const windowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
   const windowEnd = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
@@ -153,13 +228,12 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
       .select('id, espn_id, home_team, away_team, status, home_score, away_score, match_date, displayClock')
       .gte('match_date', windowStart)
       .lte('match_date', windowEnd)
-      .limit(50); // Kept strictly capped to prevent RAM/DB bloat
+      .limit(50); 
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      {/* 🟢 NEW: Ultra-slim ticker at the absolute top edge of the page */}
       <GoalRushTicker allMatches={tickerMatches || []} currentMatchId={dbData.id} />
 
       <MatchLiveProvider espnId={dbData.espn_id} initialData={data}>
@@ -203,7 +277,6 @@ export default async function MatchDetailsPage({ params }: { params: { id: strin
                   <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={sanitizeUrl(dbData.affiliate_link) || undefined} />
               )}
 
-              {/* 🟢 Post-Match Purge: Destroy Predictions and Betting Promos after the match */}
               {!hasWidget && !isUniversallyFinished && (
                   <div className="mt-4 space-y-4">
                       <div id="predictions" className="bg-white rounded-lg shadow-sm p-3 border border-slate-200 scroll-mt-20">
