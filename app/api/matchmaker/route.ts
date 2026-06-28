@@ -109,11 +109,18 @@ const isTokenMatch = (s1: string, s2: string) => {
 // 3. THE MASTER MATCHMAKER
 async function runMatchmaker(request: Request) {
   const url = new URL(request.url);
-  if (url.searchParams.get('key') !== process.env.CRON_KEY) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (url.searchParams.get('key') !== process.env.CRON_KEY) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Check critical environment configurations before proceeding
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json({ success: false, error: "[CONFIG_ERROR] Missing Supabase Environment Variables keys." }, { status: 500 });
+  }
 
   const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
   );
 
   let logs: string[] = [];
@@ -125,14 +132,21 @@ async function runMatchmaker(request: Request) {
       const lookBack = new Date(now - (48 * 60 * 60 * 1000)).toISOString(); 
       const todayEnd = new Date(now + (48 * 60 * 60 * 1000)).toISOString(); 
 
-      const { data: dbMatches } = await supabase
+      // --- ISOLATED STEP 1: SUPABASE MATCH SELECTION ---
+      const { data: dbMatches, error: dbError } = await supabase
         .from('matches')
         .select('id, home_team, away_team, match_date, league')
         .is('espn_id', null)
         .gt('match_date', lookBack)
         .lt('match_date', todayEnd);
 
-      if (!dbMatches || dbMatches.length === 0) return NextResponse.json({ message: "No unmatched games." });
+      if (dbError) {
+          throw new Error(`[SUPABASE_SELECT_ERROR] Code ${dbError.code}: ${dbError.message}`);
+      }
+
+      if (!dbMatches || dbMatches.length === 0) {
+          return NextResponse.json({ message: "No unmatched games." });
+      }
 
       const activeLeagues = Array.from(new Set(dbMatches.map(m => m.league)));
 
@@ -140,7 +154,18 @@ async function runMatchmaker(request: Request) {
         const espnCode = ESPN_LEAGUES[leagueName as string];
         if (!espnCode) continue;
 
-        const espnMatches = await fetchEspnLive(espnCode);
+        // --- ISOLATED STEP 2: THIRD PARTY API FETCH ---
+        let espnMatches: any[] = [];
+        try {
+            const fetchedData = await fetchEspnLive(espnCode);
+            if (!fetchedData || !Array.isArray(fetchedData)) {
+                throw new Error("ESPN fetch did not resolve to a valid Array.");
+            }
+            espnMatches = fetchedData;
+        } catch (apiErr: any) {
+            throw new Error(`[ESPN_API_ERROR] League ${leagueName} failed: ${apiErr.message}`);
+        }
+
         const leagueDbMatches = dbMatches.filter(m => m.league === leagueName);
 
         for (const dbMatch of leagueDbMatches) {
@@ -149,6 +174,7 @@ async function runMatchmaker(request: Request) {
              const dbAway = getCanonicalName(dbMatch.away_team);
              
              const espnGame = espnMatches.find((e: any) => {
+                 if (!e) return false;
                  const espnTimeString = e.date || e.startTime;
                  const espnTime = espnTimeString ? new Date(espnTimeString).getTime() : 0;
                  
@@ -160,7 +186,6 @@ async function runMatchmaker(request: Request) {
                  const homeScore = similarity(dbHome, espnHome);
                  const awayScore = similarity(dbAway, espnAway);
                  
-                 // 🔥 THE NEW 99.9% LOGIC: Check Substrings, Token Words, or High Fuzzy Score
                  const homeMatch = isStrongSubstring(dbHome, espnHome) || isTokenMatch(dbHome, espnHome) || homeScore > 0.75;
                  const awayMatch = isStrongSubstring(dbAway, espnAway) || isTokenMatch(dbAway, espnAway) || awayScore > 0.75;
 
@@ -168,15 +193,22 @@ async function runMatchmaker(request: Request) {
              });
 
              if (espnGame) {
+                 // --- ISOLATED STEP 3: DATABASE MUTATION TASKS ---
                  const updateTask = (async () => {
                     const { error } = await supabase
                         .from('matches')
                         .update({ espn_id: String(espnGame.espn_id) })
                         .eq('id', dbMatch.id);
                     
-                    if (error) throw error;
+                    if (error) {
+                        throw new Error(`[SUPABASE_UPDATE_ERROR] ID ${dbMatch.id}: ${error.message}`);
+                    }
                     return true;
-                 })();
+                 })().catch(e => {
+                     // Catch failures on individual updates silently so it doesn't crash the entire list sync
+                     logs.push(`❌ UPDATE ROW CRASH: ${e.message}`);
+                     return false;
+                 });
 
                  syncTasks.push(updateTask);
                  mappedCount++;
@@ -189,7 +221,12 @@ async function runMatchmaker(request: Request) {
       return NextResponse.json({ success: true, mappedCount, logs });
 
   } catch (error: any) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      const msg = error.message || "Unknown unexpected system error.";
+      // Format response prefix to make debugging on GitHub actions obvious
+      if (msg.startsWith("[SUPABASE_") || msg.startsWith("[ESPN_API_")) {
+          return NextResponse.json({ success: false, error: msg }, { status: 500 });
+      }
+      return NextResponse.json({ success: false, error: `[RUNTIME_ERROR] ${msg}` }, { status: 500 });
   }
 }
 
