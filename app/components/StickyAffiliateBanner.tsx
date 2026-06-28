@@ -8,14 +8,11 @@ import Link from 'next/link';
 export default function StickyAffiliateBanner() {
     const { activeMatchId, mediaType: contextMediaType, videoUrl: rawVideoUrl, isPageActive, stopMedia } = useGlobalMedia();
     
-    // 🟢 NEW: State to force the iframe to reload on user click
     const [playTrigger, setPlayTrigger] = useState(0);
 
-    // 🔥 THE GHOST PROTOCOL: Extract the hidden tag to accurately detect forced audio mode
     const isForcedAudio = rawVideoUrl?.includes('#is-audio-mode');
-    const videoUrl = rawVideoUrl?.replace('#is-audio-mode', ''); // Strip the tag so it doesn't break the iframe
+    const videoUrl = rawVideoUrl?.replace('#is-audio-mode', '');
     
-    // Override the context's mediaType if the URL explicitly demands audio UI
     const mediaType = isForcedAudio ? 'audio' : contextMediaType;
 
     const showFloatingAudio = mediaType === 'audio' && !isPageActive && !!videoUrl;
@@ -32,25 +29,25 @@ export default function StickyAffiliateBanner() {
         return `${url.replace(/[?&]autoplay=0/, '')}${separator}autoplay=1&playsinline=1&mute=0`;
     };
 
+    // Strip YouTube controls out and aggressively limit branding for the PIP
+    const getYouTubeWhiteLabelUrl = (url: string) => {
+        const autoPlayUrl = getAutoPlayUrl(url);
+        return `${autoPlayUrl}&controls=0&modestbranding=1&rel=0&disablekb=1&fs=0&showinfo=0&iv_load_policy=3`;
+    };
+
     return (
         <div className="fixed bottom-4 left-0 right-0 z-[100] w-full flex flex-col items-center justify-end px-4 pointer-events-none gap-3">
             
-            {/* 🟢 UNIVERSAL BACKGROUND AUDIO PLAYER 
-                Opacity is 0.01 instead of 0. True '0' causes desktop browsers 
-                to immediately pause the iframe. This keeps it technically visible to the DOM.
-            */}
             {showFloatingAudio && (
                 <div className="absolute top-[-9999px] left-[-9999px] w-[10px] h-[10px] opacity-[0.01] overflow-hidden pointer-events-none">
-                    {/* 🟢 NEW: Added key={playTrigger} to force remount on click, bypassing browser autoplay blocks */}
                     {isRawMedia && <video key={playTrigger} src={videoUrl!} autoPlay playsInline controls={false} />}
-                    {isYouTube && <iframe key={playTrigger} src={getAutoPlayUrl(videoUrl!)} allow="autoplay; encrypted-media" title="Background Audio" />}
+                    {isYouTube && <iframe key={playTrigger} src={getYouTubeWhiteLabelUrl(videoUrl!)} allow="autoplay; encrypted-media" title="Background Audio" />}
                 </div>
             )}
 
-            {/* 🟢 FLOATING VIDEO PLAYER (PIP Mode) */}
             {showFloatingVideo && (
                 <div className="w-full max-w-[320px] md:max-w-[400px] aspect-video bg-black rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] border border-blue-500/50 overflow-hidden pointer-events-auto relative animate-in slide-in-from-bottom-10 group self-end md:self-center flex flex-col">
-                    <div className="absolute top-0 left-0 w-full h-12 bg-gradient-to-b from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end gap-2 p-2 z-20 pointer-events-none">
+                    <div className="absolute top-0 left-0 w-full h-12 bg-gradient-to-b from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end gap-2 p-2 z-30 pointer-events-none">
                         <Link 
                             href={activeMatchId === 'global-goal-rush' ? '/live' : `/match/${activeMatchId}`} 
                             className="p-1.5 bg-blue-600/80 backdrop-blur rounded text-white hover:bg-blue-600 hover:scale-105 transition-all shadow-lg pointer-events-auto"
@@ -68,16 +65,23 @@ export default function StickyAffiliateBanner() {
                     </div>
 
                     {isYouTube ? (
-                        <iframe src={getAutoPlayUrl(videoUrl!)} className="w-full h-full relative z-10" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen title="PIP Video" />
+                        <div className="relative w-full h-full overflow-hidden flex items-center justify-center">
+                            {/* Shield to prevent clicking through to YouTube within PIP */}
+                            <div className="absolute inset-0 z-20 pointer-events-auto"></div>
+                            {/* Scaled iframe to hide artifacts */}
+                            <iframe src={getYouTubeWhiteLabelUrl(videoUrl!)} className="absolute inset-0 w-[120%] h-[120%] left-[-10%] top-[-10%] pointer-events-none z-10 object-cover" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen title="PIP Video" />
+                        </div>
                     ) : isRawMedia ? (
                         <video src={videoUrl!} className="w-full h-full object-contain relative z-10" autoPlay playsInline controls={false} />
                     ) : (
-                        <iframe src={videoUrl!} className="w-full h-full relative z-10" allow="autoplay; encrypted-media; fullscreen" title="PIP Video" />
+                        <div className="relative w-full h-full">
+                           <div className="absolute inset-0 z-20 pointer-events-auto"></div>
+                           <iframe src={videoUrl!} className="w-full h-full relative z-10 pointer-events-none" allow="autoplay; encrypted-media; fullscreen" title="PIP Video" />
+                        </div>
                     )}
                 </div>
             )}
 
-            {/* 🟢 FLOATING AUDIO CONTROLS (Live Radio Only) */}
             {showFloatingAudio && (
                 <div className="bg-[#0a1428]/95 backdrop-blur-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.9)] rounded-full px-5 py-2.5 flex items-center justify-between gap-4 max-w-[240px] pointer-events-auto animate-in slide-in-from-bottom-10 mx-auto">
                     <Link href={activeMatchId === 'global-goal-rush' ? '/live' : `/match/${activeMatchId}`} className="flex flex-col hover:opacity-70 transition-opacity">
@@ -94,7 +98,6 @@ export default function StickyAffiliateBanner() {
                     
                     <div className="w-[1px] h-6 bg-white/10"></div>
 
-                    {/* 🟢 NEW: Added a Play button wrapper to hold both controls */}
                     <div className="flex items-center gap-2">
                         <button 
                             onClick={() => setPlayTrigger(prev => prev + 1)} 

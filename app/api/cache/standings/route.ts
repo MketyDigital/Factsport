@@ -16,7 +16,8 @@ export async function GET(request: Request) {
             .from('standings')
             .select('*')
             .eq('league_code', leagueCode)
-            .order('position', { ascending: true });
+            .order('match_group', { ascending: true }) // 🟢 SORTS BY GROUP A-Z
+            .order('position', { ascending: true }); // 🟢 SORTS BY RANK
 
         if (error) throw error;
         return NextResponse.json(data, { headers: { 'Cache-Control': 'max-age=0, s-maxage=60' } });

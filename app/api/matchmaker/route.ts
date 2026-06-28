@@ -55,11 +55,19 @@ const getCanonicalName = (rawName: string) => {
         'toulouse fc': 'toulouse', 'le havre ac': 'le havre', 'mhsc': 'montpellier', 'montpellier hsc': 'montpellier',
         'st etienne': 'saint etienne', 'asse': 'saint etienne', 'lille osc': 'lille', 'ogc nice': 'nice',
         'sporting': 'sporting cp', 'sporting lisbon': 'sporting cp', 'porto': 'fc porto',
-        'benfica': 'sl benfica', 'usa': 'united states', 'korea republic': 'south korea',
-        'korea': 'south korea', 'bosnia': 'bosnia and herzegovina', 'dr congo': 'congo dr',
-        'cote divoire': 'ivory coast', 'fc copenhagen': 'copenhagen', 'shakhtar donetsk': 'shakhtar', 
+        'benfica': 'sl benfica', 'fc copenhagen': 'copenhagen', 'shakhtar donetsk': 'shakhtar', 
         'galatasaray sk': 'galatasaray', 'fenerbahce sk': 'fenerbahce', 'red bull salzburg': 'fc salzburg', 
-        'slavia praha': 'slavia prague', 'ajax': 'afc ajax', 'psv': 'psv eindhoven', 'celtic fc': 'celtic', 'rangers fc': 'rangers'
+        'slavia praha': 'slavia prague', 'ajax': 'afc ajax', 'psv': 'psv eindhoven', 'celtic fc': 'celtic', 'rangers fc': 'rangers',
+        
+        // NATIONS / INTERNATIONAL ALIASES
+        'usa': 'united states', 'usmnt': 'united states', 'uswnt': 'united states',
+        'korea republic': 'south korea', 'korea': 'south korea',
+        'bosnia': 'bosnia and herzegovina', 'dr congo': 'congo dr',
+        'cote divoire': 'ivory coast', "cote d'ivoire": 'ivory coast', "côte d'ivoire": 'ivory coast',
+        'brasil': 'brazil', 'españa': 'spain', 'espana': 'spain',
+        'italia': 'italy', 'deutschland': 'germany', 'holland': 'netherlands',
+        'hrvatska': 'croatia', 'turkiye': 'turkey', 'türkiye': 'turkey',
+        'czechia': 'czech republic', 'republic of ireland': 'ireland', 'canmnt': 'canada'
     };
     return aliases[name] || name;
 };
