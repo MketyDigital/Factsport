@@ -90,7 +90,7 @@ async function runLiveUpdate(request: Request) {
                          const internalOrigin = new URL(request.url).origin;
                          const targetRecord = { ...dbMatch, ...payload };
                          
-                         fetch(`${internalOrigin}/api/socials`, {
+                         fetch(`${internalOrigin}/api/social`, {
                              method: 'POST',
                              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
                              body: JSON.stringify({ record: targetRecord, old_record: dbMatch })
