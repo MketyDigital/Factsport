@@ -5,7 +5,7 @@ export const fetchCache = 'force-no-store';
 import { createClient } from '@supabase/supabase-js'; 
 import Link from 'next/link';
 import { Metadata } from 'next';
-import { ChevronLeft, Radio, MessageCircle } from 'lucide-react';
+import { ChevronLeft, Radio, MessageCircle, Trophy } from 'lucide-react';
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import FactSportMediaRoom from '@/app/components/FactSportMediaRoom'; 
 import FanZoneChat from '@/app/components/FanZoneChat'; 
@@ -19,12 +19,10 @@ export const metadata: Metadata = {
 export default async function LiveMediaPage() {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-  // 🟢 FIX 1: The Time Bounding Box. Kills "ghost" matches from days ago.
   const now = Date.now();
-  const lookBack = new Date(now - (24 * 60 * 60 * 1000)).toISOString(); // 24 hours ago
-  const lookForward = new Date(now + (48 * 60 * 60 * 1000)).toISOString(); // 48 hours ahead
+  const lookBack = new Date(now - (24 * 60 * 60 * 1000)).toISOString(); 
+  const lookForward = new Date(now + (48 * 60 * 60 * 1000)).toISOString(); 
 
-  // Fetch ALL active/upcoming matches within the strict time window
   const { data: matches } = await supabase
     .from('matches')
     .select('*')
@@ -33,10 +31,8 @@ export default async function LiveMediaPage() {
     .lt('match_date', lookForward)
     .order('match_date', { ascending: true });
 
-  // 🟢 FIX 2: Fetches fresh Studio Data (Protected by force-dynamic)
   const { data: studioData } = await supabase.from('global_studio').select('*').eq('id', 1).single();
 
-  // Loose boolean check just in case DB returns a string
   const isStudioActive = studioData?.is_active === true || studioData?.is_active === 'true';
   const globalMediaUrl = studioData?.video_url || studioData?.audio_url || null;
   const studioTitle = studioData?.title || "Goal Rush Studio";
@@ -45,20 +41,25 @@ export default async function LiveMediaPage() {
     <div className="min-h-screen bg-[#0a1428] pb-20 font-sans text-white selection:bg-red-500">
       
       {/* HEADER */}
-      <div className="bg-[#0f1c3a] border-b border-white/10 text-white p-4 sticky top-0 z-50 shadow-2xl flex items-center gap-4 backdrop-blur-lg">
-          <Link href="/" className="p-1.5 bg-white/5 rounded-full hover:bg-white/10 transition border border-white/5"><ChevronLeft size={20} /></Link>
-          <div>
-            <h1 className="font-black text-lg leading-none italic uppercase flex items-center gap-2 tracking-tight">
-                <Radio className="text-red-500 animate-pulse"/> Live Center
-            </h1>
-            <p className="text-[10px] text-slate-400 font-bold tracking-widest mt-0.5">VIDEO|AUDIO COVERAGE & LIVE SCORES</p>
+      <div className="bg-[#0f1c3a] border-b border-white/10 text-white p-4 sticky top-0 z-50 shadow-2xl flex items-center justify-between backdrop-blur-lg">
+          <div className="flex items-center gap-4">
+              <Link href="/" className="p-1.5 bg-white/5 rounded-full hover:bg-white/10 transition border border-white/5"><ChevronLeft size={20} /></Link>
+              <div>
+                <h1 className="font-black text-lg leading-none italic uppercase flex items-center gap-2 tracking-tight">
+                    <Radio className="text-red-500 animate-pulse"/> Live Center
+                </h1>
+                <p className="text-[10px] text-slate-400 font-bold tracking-widest mt-0.5">VIDEO|AUDIO COVERAGE & LIVE SCORES</p>
+              </div>
           </div>
+          <Link href="/tournaments" className="hidden sm:flex items-center gap-1 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 px-3 py-1.5 rounded-lg border border-yellow-500/30 transition-colors">
+              <Trophy size={14} />
+              <span className="text-[10px] font-black uppercase tracking-widest">Tournament Hub</span>
+          </Link>
       </div>
 
       <div className="p-4 space-y-8 max-w-7xl mx-auto mt-4">
         <AdsterraStandardBanner />
 
-        {/* STUDIO SECTION */}
         {isStudioActive && globalMediaUrl && (
             <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="lg:col-span-2 flex flex-col h-full">
@@ -87,7 +88,6 @@ export default async function LiveMediaPage() {
             </div>
         )}
 
-        {/* DELEGATE FILTERING AND RENDERING TO THE CLIENT */}
         <LiveMediaClient matches={matches || []} />
 
       </div>

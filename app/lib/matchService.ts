@@ -9,9 +9,9 @@ const LEAGUE_MAP: Record<string, string> = {
   'Premier League': 'PL', 'La Liga': 'PD', 'Bundesliga': 'BL1',
   'Serie A': 'SA', 'Ligue 1': 'FL1', 'Champions League': 'CL',
   'Euros': 'EC', 'World Cup': 'WC', 'Europa League': 'EL', 
+  'Copa America': 'CLI', 'AFCON': 'AFCON' // 🟢 ADDED TOURNAMENTS
 };
 
-// 🟢 POLISH: Forces uppercase to guarantee frontend arrays always match
 const normalizeStatus = (rawStatus: string) => {
   if (!rawStatus) return '';
   const status = rawStatus.toUpperCase();
@@ -20,7 +20,7 @@ const normalizeStatus = (rawStatus: string) => {
     'IN_PLAY': 'LIVE', 'PAUSED': 'HT', 'HALFTIME': 'HT',
     'FINISHED': 'FT', 'AWARDED': 'FT', 'TIMED': 'SCHEDULED',
     'SCHEDULED': 'SCHEDULED', 'POSTPONED': 'POSTPONED',
-    'POST': 'FT' // Translates ESPN's POST to FT just to be safe
+    'POST': 'FT' 
   };
   return map[status] || status;
 };
@@ -88,7 +88,6 @@ export interface UnifiedMatchData {
   h2h?: any;
   predictor?: { home: number, away: number, draw: number } | null; 
 
-  // 🔥 RESTORED DB FLAT KEYS FOR HEADER UI
   id?: string;
   home_team?: string;
   away_team?: string;
@@ -126,12 +125,11 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
       };
   }
   
-  // 🟢 POLISH: Guarantee standard status output to the frontend
   const rawStatus = (dbData.status || '').toUpperCase();
   const safeStatus = rawStatus === 'SCHEDULED' ? 'PRE' : rawStatus;
 
   return {
-    ...dbData, // 🔥 MAGIC FIX: Spreads all DB keys so the Header Logos and Time never break!
+    ...dbData, 
     
     status: safeStatus,
     displayClock: dbData.displayClock || (safeStatus === 'LIVE' ? 'Live' : (safeStatus === 'HT' ? 'HT' : '')),

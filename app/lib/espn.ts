@@ -4,7 +4,8 @@ import { createClient } from '@/app/lib/supabase/client';
 export const ESPN_LEAGUES: Record<string, string> = {
   'Premier League': 'eng.1', 'La Liga': 'esp.1', 'Bundesliga': 'ger.1',
   'Serie A': 'ita.1', 'Ligue 1': 'fra.1', 'Champions League': 'uefa.champions',
-  'Euros': 'uefa.euro', 'World Cup': 'fifa.world',
+  'Euros': 'uefa.euro', 'World Cup': 'fifa.world', 
+  'Copa America': 'conmebol.america', 'AFCON': 'caf.nations', // 🟢 ADDED TOURNAMENTS
   
   'Europa League': 'uefa.europa', 'Europa Conference League': 'uefa.conference',
   'FA Cup': 'eng.fa', 'Carabao Cup': 'eng.league_cup', 'Copa del Rey': 'esp.copa_del_rey',
@@ -70,7 +71,6 @@ export async function fetchEspnDetails(gameId: string) {
     const homeTeamName = homeCompetitor?.team?.displayName || '';
     const awayTeamName = awayCompetitor?.team?.displayName || '';
 
-    // 🟢 DEEP ESPN METADATA AUDIT: Extract specific stage names and groups
     let stageName = comps?.type?.abbreviation || comps?.type?.text || data.header.season?.type?.text || null;
     let groupName = null;
     
@@ -269,8 +269,8 @@ export async function fetchEspnDetails(gameId: string) {
         venue,        
         referees,     
         predictor,
-        stage: stageName,     // 🟢 NEW: EXPLICITLY RETURN STAGE
-        match_group: groupName // 🟢 NEW: EXPLICITLY RETURN GROUP
+        stage: stageName,     
+        match_group: groupName 
     };
 
   } catch (err) { 
