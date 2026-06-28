@@ -99,9 +99,9 @@ const isStrongSubstring = (s1: string, s2: string) => {
     return s1.includes(s2) || s2.includes(s1);
 };
 
-// 🔥 2.6 THE NEW TOKEN MATCHER (Catches "Man United" vs "Manchester United")
+// 🔥 2.6 THE NEW TOKEN MATCHER
 const isTokenMatch = (s1: string, s2: string) => {
-    const tokens1 = s1.split(' ').filter(w => w.length > 4); // Only care about substantial words
+    const tokens1 = s1.split(' ').filter(w => w.length > 4); 
     const tokens2 = s2.split(' ').filter(w => w.length > 4);
     return tokens1.some(t1 => tokens2.includes(t1));
 };
@@ -127,10 +127,25 @@ async function runMatchmaker(request: Request) {
   let mappedCount = 0;
   const syncTasks: Promise<any>[] = [];
 
+  // 🔥 CREATE A SET TO TRACK ASSIGNED ESPN IDs
+  const assignedEspnIds = new Set<string>();
+
   try {
       const now = Date.now();
       const lookBack = new Date(now - (48 * 60 * 60 * 1000)).toISOString(); 
       const todayEnd = new Date(now + (48 * 60 * 60 * 1000)).toISOString(); 
+
+      // 🔥 NEW: PRE-FILL THE SET WITH IDs ALREADY IN THE DATABASE
+      const { data: existingIds } = await supabase
+          .from('matches')
+          .select('espn_id')
+          .not('espn_id', 'is', null)
+          .gt('match_date', lookBack)
+          .lt('match_date', todayEnd);
+          
+      if (existingIds) {
+          existingIds.forEach(row => assignedEspnIds.add(String(row.espn_id)));
+      }
 
       // --- ISOLATED STEP 1: SUPABASE MATCH SELECTION ---
       const { data: dbMatches, error: dbError } = await supabase
@@ -175,6 +190,10 @@ async function runMatchmaker(request: Request) {
              
              const espnGame = espnMatches.find((e: any) => {
                  if (!e) return false;
+
+                 // 🔥 PROTECT AGAINST DUPLICATE ESPN IDs
+                 if (assignedEspnIds.has(String(e.espn_id))) return false;
+
                  const espnTimeString = e.date || e.startTime;
                  const espnTime = espnTimeString ? new Date(espnTimeString).getTime() : 0;
                  
@@ -193,11 +212,16 @@ async function runMatchmaker(request: Request) {
              });
 
              if (espnGame) {
+                 const targetEspnId = String(espnGame.espn_id);
+                 
+                 // Immediately mark this ID as assigned so other local rows cannot claim it
+                 assignedEspnIds.add(targetEspnId);
+
                  // --- ISOLATED STEP 3: DATABASE MUTATION TASKS ---
                  const updateTask = (async () => {
                     const { error } = await supabase
                         .from('matches')
-                        .update({ espn_id: String(espnGame.espn_id) })
+                        .update({ espn_id: targetEspnId })
                         .eq('id', dbMatch.id);
                     
                     if (error) {
