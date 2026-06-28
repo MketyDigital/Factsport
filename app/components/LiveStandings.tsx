@@ -136,8 +136,8 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
                 
                 // Only run snippet logic for giant 20-team domestic leagues
                 if (groupKey === 'League' && displayTable.length > 8) {
-                    const homeIndex = displayTable.findIndex(t => normalizeName(t.team_short_name || t.team_name) === normHome || normalizeName(t.team_name).includes(normHome));
-                    const awayIndex = displayTable.findIndex(t => normalizeName(t.team_short_name || t.team_name) === normAway || normalizeName(t.team_name).includes(normAway));
+                    const homeIndex = displayTable.findIndex((t: any) => normalizeName(t.team_short_name || t.team_name) === normHome || normalizeName(t.team_name).includes(normHome));
+                    const awayIndex = displayTable.findIndex((t: any) => normalizeName(t.team_short_name || t.team_name) === normAway || normalizeName(t.team_name).includes(normAway));
 
                     if (homeIndex !== -1 && awayIndex !== -1) {
                         const minIdx = Math.min(homeIndex, awayIndex);
