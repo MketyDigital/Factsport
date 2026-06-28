@@ -184,7 +184,7 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {displayTable.map((team, index) => {
+                                    {displayTable.map((team: any, index: number) => {
                                         const isPlaying = normalizeName(team.team_short_name || team.team_name) === normHome || normalizeName(team.team_short_name || team.team_name) === normAway;
                                         const posChange = team.original_position - team.live_position;
                                         const showGap = index > 0 && (team.live_position - displayTable[index - 1].live_position > 1);
