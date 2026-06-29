@@ -201,9 +201,14 @@ async function runMatchmaker(request: Request) {
                  const targetEspnId = String(espnGame.id || espnGame.espn_id);
                  assignedEspnIds.add(targetEspnId);
                  syncTasks.push(
-                    supabase.from('matches').update({ espn_id: targetEspnId }).eq('id', dbMatch.id)
-                    .then(({ error }) => { if (error) throw error; return true; })
-                    .catch(e => { logs.push(`❌ UPDATE CRASH: ${e.message}`); return false; })
+                    (async () => {
+                        const { error } = await supabase.from('matches').update({ espn_id: targetEspnId }).eq('id', dbMatch.id);
+                        if (error) {
+                            logs.push(`❌ UPDATE CRASH: ${error.message}`);
+                            return false;
+                        }
+                        return true;
+                    })()
                  );
                  mappedCount++;
                  logs.push(`🔗 MAPPED: ${dbMatch.home_team} vs ${dbMatch.away_team}`);
