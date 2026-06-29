@@ -41,7 +41,7 @@ export default function TermsPage() {
                 <h3 className="font-bold text-xl text-slate-900 mb-3">3. Prediction Game & Contest Rules</h3>
                 <p>Our "Predict & Win" game is a game of skill, not chance. To participate:</p>
                 <ul className="list-disc pl-5 space-y-2">
-                    <li><strong>Virtual Points:</strong> Points awarded (3pts for Outcome, 10pts for Exact Score) have no cash value and cannot be exchanged for currency.</li>
+                    <li><strong>Virtual Points:</strong> Points awarded (e.g 3pts for Outcome, 10pts for Exact Score) have no cash value and cannot be exchanged for currency.</li>
                     <li><strong>Prize Eligibility:</strong> Monthly prizes are reserved strictly for <strong>VIP Members</strong>. Free users may appear on the leaderboard but are not eligible for physical or cash rewards.</li>
                     <li><strong>Winning Criteria:</strong> To claim a 1st, 2nd, or 3rd place prize, a user must meet the specific criteria set out in our "How to Play" rules page (e.g., minimum 4 Correct Scores per month).</li>
                     <li><strong>Fair Play:</strong> We reserve the right to disqualify any user suspected of multi-accounting, bot usage, or exploiting system glitches.</li>

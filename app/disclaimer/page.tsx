@@ -38,7 +38,7 @@ export default function DisclaimerPage() {
             <section>
                 <h3 className="font-bold text-xl text-slate-900 mb-3">2. Affiliate Disclosure</h3>
                 <p>
-                    FactSport acts as an affiliate marketer. We may display advertisements or links to third-party sports betting operators (e.g., 1xBet, Bet9ja, BetKing).
+                    FactSport acts as an affiliate marketer. We may display advertisements or links to third-party sports betting operators.
                 </p>
                 <p className="italic text-slate-600 border-l-2 border-slate-300 pl-4 mt-2">
                     "If you click on these links and register or place a bet, FactSport may receive a commission. This comes at no extra cost to you and helps support our free content."

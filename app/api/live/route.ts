@@ -24,8 +24,14 @@ async function runLiveUpdate(request: Request) {
 
       const activeMatches = windowMatches.filter(m => {
           const isLiveOrUpcoming = ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE'].includes(m.status);
+          
+          // 🧠 FIX: Keep polling for up to 5 hours after kickoff to ensure all final events and social FT triggers fire properly.
+          const kickMs = Date.parse(m.match_date);
+          const hoursSinceKick = (Date.now() - kickMs) / (1000 * 60 * 60);
+          const isRecentlyFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(m.status) && hoursSinceKick < 5;
+          
           const isFinishedButBroken = ['FT', 'FINISHED'].includes(m.status) && (!m.match_events || m.match_events.length === 0);
-          return isLiveOrUpcoming || isFinishedButBroken;
+          return isLiveOrUpcoming || isRecentlyFinished || isFinishedButBroken;
       });
 
       if (activeMatches.length === 0) return NextResponse.json({ message: "No active matches." });
@@ -44,7 +50,7 @@ async function runLiveUpdate(request: Request) {
              const espnGame = espnMatches.find((e: any) => String(e.espn_id) === dbMatch.espn_id);
              const isFinishedButBroken = terminalStatuses.includes(dbMatch.status);
              
-             if (espnGame || isFinishedButBroken) {
+             if (espnGame || isFinishedButBroken || terminalStatuses.includes(dbMatch.status)) {
                  const updateTask = (async () => {
                      const richData = await fetchEspnDetails(dbMatch.espn_id);
                      let newStatus = dbMatch.status;
@@ -63,6 +69,10 @@ async function runLiveUpdate(request: Request) {
                              payload.away_score = espnGame.away_score;
                              payload.displayClock = espnGame.clock;
                          }
+                     } else if (richData && richData.stats?.home_score !== undefined) {
+                         // Fallback if dropped from live scoreboard but rich data exists
+                         payload.home_score = richData.stats.home_score;
+                         payload.away_score = richData.stats.away_score;
                      }
 
                      if (richData) {
@@ -81,10 +91,11 @@ async function runLiveUpdate(request: Request) {
                      await supabase.from('matches').update(payload).eq('id', dbMatch.id);
                      
                      // 🟢 THE INTERNAL DISPATCH TRIGGER
-                     // Instantly forwards any critical status changes to the socials engine. No Webhook needed.
                      const statusChangedToFT = newStatus === 'FT' && dbMatch.status !== 'FT';
                      const scoresChanged = payload.home_score !== dbMatch.home_score || payload.away_score !== dbMatch.away_score;
-                     const lineupsAnnounced = dbMatch.status === 'SCHEDULED' && newStatus === 'LIVE';
+                     
+                     // 🧠 FIX: Fire lineups perfectly even if match is PRE_MATCH, just check if 11 players arrived
+                     const lineupsAnnounced = payload.lineups && payload.lineups.home?.length >= 11 && (!dbMatch.lineups?.home || dbMatch.lineups.home.length < 11);
 
                      if (statusChangedToFT || scoresChanged || lineupsAnnounced) {
                          const internalOrigin = new URL(request.url).origin;
