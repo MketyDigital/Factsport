@@ -74,13 +74,12 @@ export default async function TournamentDetailsPage({ params }: { params: { leag
                     </div>
 
                     <div className="lg:col-span-1 space-y-6">
-                        <div className="bg-[#0a1428] rounded-2xl p-6 shadow-xl border border-slate-800 text-center relative overflow-hidden group">
-                             <div className="absolute inset-0 bg-gradient-to-tr from-blue-600/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                             <h3 className="text-white font-black uppercase tracking-widest text-sm mb-2 relative z-10">Tournament Standings</h3>
-                             <p className="text-slate-400 text-xs font-medium mb-4 relative z-10">View official group tables and knockout brackets.</p>
-                             <Link href={`/standings?league=${encodeURIComponent(leagueName)}`} className="bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-widest py-3 px-6 rounded-xl inline-flex items-center gap-2 shadow-lg transition-all active:scale-95 relative z-10 w-full justify-center">
-                                 <BarChart2 size={16} /> View Standings
-                             </Link>
+                        <div className="bg-[#0a1428] rounded-2xl shadow-xl border border-slate-800 overflow-hidden">
+                             <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+                                 <h3 className="text-white font-black uppercase tracking-widest text-xs flex items-center gap-2"><Trophy size={14} className="text-yellow-500" /> Standings</h3>
+                                 <Link href={`/standings?league=${encodeURIComponent(leagueName)}`} className="text-[10px] text-blue-400 font-bold uppercase hover:text-blue-300">Full Table</Link>
+                             </div>
+                             <LiveStandings leagueName={leagueName} />
                         </div>
                     </div>
                 </div>

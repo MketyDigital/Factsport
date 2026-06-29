@@ -81,7 +81,6 @@ async function runLiveUpdate(request: Request) {
                      await supabase.from('matches').update(payload).eq('id', dbMatch.id);
                      
                      // 🟢 THE INTERNAL DISPATCH TRIGGER
-                     // Instantly forwards any critical status changes to the socials engine. No Webhook needed.
                      const statusChangedToFT = newStatus === 'FT' && dbMatch.status !== 'FT';
                      const scoresChanged = payload.home_score !== dbMatch.home_score || payload.away_score !== dbMatch.away_score;
                      const lineupsAnnounced = dbMatch.status === 'SCHEDULED' && newStatus === 'LIVE';
