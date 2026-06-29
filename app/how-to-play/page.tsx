@@ -103,7 +103,7 @@ export default async function HowToPlay() {
                  <Zap size={64} className="text-orange-400" />
              </div>
             <h3 className="text-xl font-bold text-orange-400 mb-2 flex items-center gap-2">
-                ⚡ Special Tournaments
+                🏆 Special Tournaments
             </h3>
             <p className="text-xs text-slate-300 leading-relaxed mb-4 pr-8">
                 During major events (World Cups, Finals, Weekend Giveaways), we launch Special Tournaments with independent leaderboards and custom point multipliers!
