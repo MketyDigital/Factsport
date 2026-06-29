@@ -1,5 +1,3 @@
-// app/api/social/route.ts
-
 // @ts-nocheck
 export const runtime = 'edge';
 
@@ -7,100 +5,19 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
 const SAFETY_MAP: Record<string, any> = {
-  goals: {
-    buf_x1: false,
-    buf_x2: false,
-    buf_fb1: false,
-    buf_fb2: false,
-    fb1: true,
-    fb2: false,
-    make1: true,
-    make2: false,
-    tg_general: false
-  },
-  lineups: {
-    buf_x1: true,
-    buf_x2: false,
-    buf_fb1: false,
-    buf_fb2: false,
-    fb1: true,
-    fb2: false,
-    make1: true,
-    make2: false,
-    tg_general: false
-  },
-  kickoff: {
-    buf_x1: false,
-    buf_x2: false,
-    buf_fb1: false,
-    buf_fb2: false,
-    fb1: true,
-    fb2: false,
-    make1: true,
-    make2: false,
-    tg_general: false
-  },
-  fulltime: {
-    buf_x1: false,
-    buf_x2: false,
-    buf_fb1: false,
-    buf_fb2: false,
-    fb1: true,
-    fb2: false,
-    make1: true,
-    make2: false,
-    tg_general: false
-  },
-  halftime: {
-    buf_x1: false,
-    buf_x2: false,
-    buf_fb1: false,
-    buf_fb2: false,
-    fb1: true,
-    fb2: false,
-    make1: false,
-    make2: false,
-    tg_general: false
-  },
-  var_overturn: {
-    buf_x1: false,
-    buf_x2: false,
-    buf_fb1: false,
-    buf_fb2: false,
-    fb1: true,
-    fb2: false,
-    make1: false,
-    make2: false,
-    tg_general: false
-  },
-  penalty_awarded: {
-    buf_x1: false,
-    buf_x2: false,
-    buf_fb1: false,
-    buf_fb2: false,
-    fb1: true,
-    fb2: false,
-    make1: false,
-    make2: false,
-    tg_general: false
-  }
+  goals: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: true, make2: false, tg_general: false },
+  lineups: { buf_x1: true, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: true, make2: false, tg_general: false },
+  kickoff: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: true, make2: false, tg_general: false },
+  fulltime: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: true, make2: false, tg_general: false },
+  halftime: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: false, make2: false, tg_general: false },
+  var_overturn: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: false, make2: false, tg_general: false },
+  penalty_awarded: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: false, make2: false, tg_general: false }
 };
 
-const TERMINAL_STATUSES = new Set([
-  'FT', 'FINISHED', 'ABD', 'AET', 'AWARDED', 'PEN'
-]);
-
-const LIVE_STATUSES = new Set([
-  'IN_PLAY', 'LIVE', '1H', 'FIRST_HALF', 'FIRST HALF', '2H', 'SECOND_HALF', 'SECOND HALF'
-]);
-
-const HT_STATUSES = new Set([
-  'HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME', 'PAUSED'
-]);
-
-const PRE_STATUSES = new Set([
-  'PRE_MATCH', 'SCHEDULED', 'PRE', 'NS', 'UPCOMING', 'TBD'
-]);
+const TERMINAL_STATUSES = new Set(['FT', 'FINISHED', 'ABD', 'AET', 'AWARDED', 'PEN']);
+const LIVE_STATUSES = new Set(['IN_PLAY', 'LIVE', '1H', 'FIRST_HALF', 'FIRST HALF', '2H', 'SECOND_HALF', 'SECOND HALF']);
+const HT_STATUSES = new Set(['HT', 'HALFTIME', 'HALF TIME', 'HALF-TIME', 'PAUSED']);
+const PRE_STATUSES = new Set(['PRE_MATCH', 'SCHEDULED', 'PRE', 'NS', 'UPCOMING', 'TBD']);
 
 const KNOWN_TEAMS: Record<string, string> = {
   'manchester city': 'MCI', 'man city': 'MCI', 'manchester united': 'MUN', 'man united': 'MUN', 'man utd': 'MUN',
@@ -152,25 +69,12 @@ const getTla = (name: string, fallbackTla?: string) => {
 
 const getLeagueHashtags = (leagueName: string) => {
   const map: Record<string, string> = {
-    'Premier League': '#PremierLeague #EPL',
-    'La Liga': '#LaLiga',
-    Bundesliga: '#Bundesliga',
-    'Serie A': '#SerieA',
-    'Ligue 1': '#Ligue1',
-    'Champions League': '#UCL #ChampionsLeague',
-    'Europa League': '#UEL #EuropaLeague',
-    'Europa Conference League': '#UECL #ConferenceLeague',
-    'FA Cup': '#FACup',
-    'Carabao Cup': '#CarabaoCup #EFLCup',
-    'Copa del Rey': '#CopaDelRey',
-    'Coppa Italia': '#CoppaItalia',
-    'Coupe de France': '#CoupeDeFrance',
-    'DFB-Pokal': '#DFBPokal',
-    'World Cup': '#WorldCup #FIFAWorldCup',
-    Euros: '#EURO2024 #Euro',
-    'Copa America': '#CopaAmerica',
-    AFCON: '#AFCON',
-    'UEFA Nations League': '#NationsLeague',
+    'Premier League': '#PremierLeague #EPL', 'La Liga': '#LaLiga', Bundesliga: '#Bundesliga', 'Serie A': '#SerieA',
+    'Ligue 1': '#Ligue1', 'Champions League': '#UCL #ChampionsLeague', 'Europa League': '#UEL #EuropaLeague',
+    'Europa Conference League': '#UECL #ConferenceLeague', 'FA Cup': '#FACup', 'Carabao Cup': '#CarabaoCup #EFLCup',
+    'Copa del Rey': '#CopaDelRey', 'Coppa Italia': '#CoppaItalia', 'Coupe de France': '#CoupeDeFrance',
+    'DFB-Pokal': '#DFBPokal', 'World Cup': '#WorldCup #FIFAWorldCup', Euros: '#EURO2024 #Euro',
+    'Copa America': '#CopaAmerica', AFCON: '#AFCON', 'UEFA Nations League': '#NationsLeague',
     'CONCACAF Nations League': '#ConcacafNationsLeague'
   };
   return map[leagueName] || `#${String(leagueName).replace(/[^a-zA-Z0-9]/g, '')}`;
@@ -238,9 +142,7 @@ const secureStaticImage = async (internalFetchUrl: string, publicFallbackUrl: st
     if (error) return publicFallbackUrl;
     const { data } = supabaseClient.storage.from('socials').getPublicUrl(`${fileName}.png`);
     return `${data.publicUrl}?v=${Date.now()}`;
-  } catch {
-    return publicFallbackUrl;
-  }
+  } catch { return publicFallbackUrl; }
 };
 
 const isLineupsEvent = (eventKey: string | null) => eventKey === 'lineups';
@@ -255,9 +157,7 @@ const fetchImageArrayBuffer = async (url: string) => {
     const imgResponse = await fetch(url, { headers: { Accept: 'image/png' } });
     if (!imgResponse.ok) return null;
     return await imgResponse.arrayBuffer();
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 };
 
 const uploadImageArrayBuffer = async (arrayBuffer: ArrayBuffer, fileName: string, supabaseClient: any) => {
@@ -268,9 +168,7 @@ const uploadImageArrayBuffer = async (arrayBuffer: ArrayBuffer, fileName: string
     if (error) return '';
     const { data } = supabaseClient.storage.from('socials').getPublicUrl(`${fileName}.png`);
     return `${data.publicUrl}?v=${Date.now()}`;
-  } catch {
-    return '';
-  }
+  } catch { return ''; }
 };
 
 const generateStaticImage = async (internalFetchUrl: string, fileName: string, supabaseClient: any) => {
@@ -286,9 +184,7 @@ const getValidGoals = (eventsArr: any[]) => {
     if (!e) return false;
     const text = String(e.text || '').toLowerCase();
     const type = String(e.type || '').toLowerCase();
-    if (text.includes('disallowed') || text.includes('cancelled') || text.includes('no goal') || type === 'var_overturn' || type === 'penalty_awarded') {
-      return false;
-    }
+    if (text.includes('disallowed') || text.includes('cancelled') || text.includes('no goal') || type === 'var_overturn' || type === 'penalty_awarded') return false;
     return type === 'goal' || text === 'goal';
   });
 };
@@ -319,7 +215,6 @@ const isLiveStatus = (status: any) => LIVE_STATUSES.has(String(status || '').toU
 const isHtStatus = (status: any) => HT_STATUSES.has(String(status || '').toUpperCase());
 const isPreStatus = (status: any) => PRE_STATUSES.has(String(status || '').toUpperCase());
 
-// 🧠 FIX: Massive improvement to freshness calculation for real-world timings.
 const isEventFresh = (event: any, matchDate: string, freshnessMs = 20 * 60 * 1000) => {
   if (!event) return true;
   if (!matchDate) return true;
@@ -328,17 +223,10 @@ const isEventFresh = (event: any, matchDate: string, freshnessMs = 20 * 60 * 100
   if (!Number.isFinite(kickMs)) return true;
 
   let elapsedMinutes = parseMinutes(event.time || event.minute);
-  
-  // Account for the artificial 15-minute gap in football for second-half events
-  if (elapsedMinutes > 45) {
-    elapsedMinutes += 15;
-  }
+  if (elapsedMinutes > 45) elapsedMinutes += 15;
 
   const eventMs = kickMs + elapsedMinutes * 60000;
   const age = Date.now() - eventMs;
-
-  // Use a generous 20 minute rolling buffer to safely cover injury time + VAR + DB delays. 
-  // It handles negative ages safely in case of system clock shifts.
   const maxAgeMs = Math.max(freshnessMs, 20 * 60 * 1000);
   return age <= maxAgeMs && age >= -maxAgeMs;
 };
@@ -360,21 +248,11 @@ const getCompetitionStakes = (match: any) => {
   const winner = homeWins ? match.home_team : awayWins ? match.away_team : null;
   const combined = `${league} ${stage} ${matchType} ${group}`.toLowerCase();
 
-  if (combined.includes('final')) {
-    return { short: 'Cup Final', full: winner ? `${winner} wins the cup` : 'Cup final decided', round: 'Final', group: '' };
-  }
-  if (combined.includes('semi')) {
-    return { short: 'Semi-final', full: winner ? `${winner} advances to the final` : 'Semi-final winner advances', round: 'Semi-final', group: '' };
-  }
-  if (combined.includes('quarter')) {
-    return { short: 'Quarter-final', full: winner ? `${winner} advances to the semi-finals` : 'Quarter-final winner advances', round: 'Quarter-final', group: '' };
-  }
-  if (combined.includes('round of')) {
-    return { short: 'Knockout Round', full: winner ? `${winner} advances to the next round` : 'Knockout winner advances', round: 'Knockout Round', group: '' };
-  }
-  if (combined.includes('group')) {
-    return { short: 'Group Stage', full: group ? `Group ${group} points can decide qualification.` : 'Group-stage points can decide qualification.', round: 'Group Stage', group: group || '' };
-  }
+  if (combined.includes('final')) return { short: 'Cup Final', full: winner ? `${winner} wins the cup` : 'Cup final decided', round: 'Final', group: '' };
+  if (combined.includes('semi')) return { short: 'Semi-final', full: winner ? `${winner} advances to the final` : 'Semi-final winner advances', round: 'Semi-final', group: '' };
+  if (combined.includes('quarter')) return { short: 'Quarter-final', full: winner ? `${winner} advances to the semi-finals` : 'Quarter-final winner advances', round: 'Quarter-final', group: '' };
+  if (combined.includes('round of')) return { short: 'Knockout Round', full: winner ? `${winner} advances to the next round` : 'Knockout winner advances', round: 'Knockout Round', group: '' };
+  if (combined.includes('group')) return { short: 'Group Stage', full: group ? `Group ${group} points can decide qualification.` : 'Group-stage points can decide qualification.', round: 'Group Stage', group: group || '' };
   return { short: league || 'Football', full: '', round: '', group: '' };
 };
 
@@ -416,15 +294,40 @@ export async function POST(request: Request) {
   const { data: settingsData } = await supabase.from('site_settings').select('social_config').single();
   const config = settingsData?.social_config || { credentials: {}, vip_teams: [], vip_leagues: [], events: {}, templates: {} };
 
-  const isVipTeam = (config.vip_teams || []).includes(newState.home_team) || (config.vip_teams || []).includes(newState.away_team);
-  const isVipLeague = (config.vip_leagues || []).includes(newState.league);
+  // 🟢 🧠 FIX: HARDCODED VIP TEAMS AND LEAGUES FALLBACK (Unbreakable)
+  const HARDCODED_VIP_LEAGUES = [
+    'Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Ligue 1', 
+    'Champions League', 'Europa League', 'Europa Conference League', 
+    'FA Cup', 'Carabao Cup', 'Copa del Rey', 'Coppa Italia', 'Coupe de France', 
+    'DFB-Pokal', 'World Cup', 'Euros', 'Copa America', 'AFCON', 
+    'UEFA Nations League', 'CONCACAF Nations League'
+  ];
+  const HARDCODED_VIP_TEAMS = [
+    'Arsenal', 'Aston Villa', 'Chelsea', 'Everton', 'Liverpool', 'Manchester City', 'Man City', 'Manchester United', 'Man Utd', 'Newcastle United', 'Tottenham Hotspur', 'Spurs', 
+    'Real Madrid', 'Barcelona', 'Atletico Madrid', 
+    'Bayern Munich', 'Borussia Dortmund', 'Bayer Leverkusen', 
+    'Juventus', 'AC Milan', 'Inter Milan', 'Napoli', 
+    'Paris Saint Germain', 'PSG', 'Marseille', 'Lyon',
+    'Argentina', 'Brazil', 'France', 'England', 'Spain', 'Italy', 'Germany', 'Portugal', 'Netherlands', 'Belgium', 'Uruguay', 'Colombia', 'USA', 'Mexico', 'Senegal', 'Morocco', 'Nigeria'
+  ];
+
+  const mergedVipTeams = [...(config.vip_teams || []), ...HARDCODED_VIP_TEAMS];
+  const mergedVipLeagues = [...(config.vip_leagues || []), ...HARDCODED_VIP_LEAGUES];
+
+  const homeTeamStr = String(newState.home_team || '').toLowerCase();
+  const awayTeamStr = String(newState.away_team || '').toLowerCase();
+  const leagueStr = String(newState.league || '').toLowerCase();
+
+  const isVipTeam = mergedVipTeams.some(t => homeTeamStr.includes(t.toLowerCase()) || awayTeamStr.includes(t.toLowerCase()));
+  const isVipLeague = mergedVipLeagues.some(l => leagueStr === l.toLowerCase() || leagueStr.includes(l.toLowerCase()));
   let isVIP = isVipTeam || isVipLeague;
+  
   const postedEvents = Array.isArray(newState.posted_social_events) ? newState.posted_social_events : [];
 
   if (!isVIP) {
     const today = new Date().toISOString().split('T')[0];
     const { data: todaysMatches } = await supabase.from('matches').select('id, home_team, away_team, league').like('match_date', `${today}%`).order('match_date', { ascending: true });
-    const hasVIPToday = todaysMatches?.some((m) => (config.vip_teams || []).includes(m.home_team) || (config.vip_teams || []).includes(m.away_team) || (config.vip_leagues || []).includes(m.league));
+    const hasVIPToday = todaysMatches?.some((m) => mergedVipTeams.some(t => m.home_team?.toLowerCase().includes(t.toLowerCase()) || m.away_team?.toLowerCase().includes(t.toLowerCase())) || mergedVipLeagues.some(l => m.league?.toLowerCase().includes(l.toLowerCase())));
     if (hasVIPToday) return NextResponse.json({ message: 'Not a VIP team or league.' });
     if (todaysMatches && todaysMatches.length > 0 && newState.id === todaysMatches[0].id) {
       isVIP = true;
@@ -482,32 +385,29 @@ export async function POST(request: Request) {
       homeTla: getTla(newState.home_team, newState.home_tla), awayTla: getTla(newState.away_team, newState.away_tla)
     };
   } else if (newTotal < oldTotal && !isTerminalStatus(newStatus)) {
-    // 🧠 FIX: Ensure VAR corrections are only posted if the match is naturally active. 
-    // This blocks random DB corrections hours/days later.
     const kickMs = Date.parse(newState.match_date);
     const hoursSinceKickoff = (Date.now() - kickMs) / (1000 * 60 * 60);
     if (hoursSinceKickoff < 5) {
       eventKey = 'var_overturn';
     }
   } else if (newTotal > oldTotal && !isTerminalStatus(newStatus)) {
-    if (newGoalsList.length < newTotal) {
-      return NextResponse.json({ message: 'Facts data lagging behind scoreboard. Waiting for next ping.' });
-    }
-    const latestGoal = getLatestChangedGoal(oldGoalsList, newGoalsList);
     
-    // Check freshness intelligently with our updated logic
-    if (!latestGoal || !isEventFresh(latestGoal, newState.match_date)) {
-      return NextResponse.json({ message: 'Goal event is stale. Ignoring late goal trigger.' });
-    }
-
+    // 🧠 FIX: Instant Generic Goal Post if text commentary is lagging behind the scoreboard tick!
     eventKey = 'goals';
     extraData.statusText = isLiveStatus(newStatus) ? '' : ` (${newState.status})`;
-    if (latestGoal) {
+    
+    if (newGoalsList.length < newTotal) {
+      // Scoreboard ticked up, but text commentary hasn't arrived yet. Don't wait. Post generic instantly.
+      extraData.scorer = '\n⚽ GOAL - Confirmed!\n';
+    } else {
+      const latestGoal = getLatestChangedGoal(oldGoalsList, newGoalsList);
+      if (!latestGoal || !isEventFresh(latestGoal, newState.match_date)) {
+        return NextResponse.json({ message: 'Goal event is stale. Ignoring late goal trigger.' });
+      }
       const player = latestGoal.player || latestGoal.playerName || latestGoal.name || 'Unknown Player';
       const time = latestGoal.time || latestGoal.minute ? `${latestGoal.time || latestGoal.minute}' ` : '';
       extraData.scorer = `\n⚽ GOAL - ${player} (${time.trim()})\n`;
     }
-    if (!extraData.scorer) extraData.scorer = '\n⚽ GOAL - Confirmed!\n';
 
     ogPayload = {
       type: 'versus', label: ['PEN', 'PEN_SHOOT_OUT'].includes(newStatus) ? 'PENALTY SCORED' : 'GOAL ALERT!',
