@@ -144,7 +144,11 @@ async function runMatchmaker(request: Request) {
           .lt('match_date', todayEnd);
           
       if (existingIds) {
-          existingIds.forEach(row => assignedEspnIds.add(String(row.espn_id)));
+          existingIds.forEach(row => {
+              if (row.espn_id && String(row.espn_id) !== 'undefined') {
+                  assignedEspnIds.add(String(row.espn_id));
+              }
+          });
       }
 
       // --- ISOLATED STEP 1: SUPABASE MATCH SELECTION ---
@@ -191,16 +195,24 @@ async function runMatchmaker(request: Request) {
              const espnGame = espnMatches.find((e: any) => {
                  if (!e) return false;
 
-                 // 🔥 PROTECT AGAINST DUPLICATE ESPN IDs
-                 if (assignedEspnIds.has(String(e.espn_id))) return false;
+                 // 🔥 PROTECT AGAINST DUPLICATE ESPN IDs & AVOID 'undefined' CORRUPTION
+                 const currentEspnId = String(e.id || e.espn_id); 
+                 if (!currentEspnId || currentEspnId === 'undefined') return false;
+                 if (assignedEspnIds.has(currentEspnId)) return false;
 
                  const espnTimeString = e.date || e.startTime;
                  const espnTime = espnTimeString ? new Date(espnTimeString).getTime() : 0;
                  
-                 if (espnTime && Math.abs(dbTime - espnTime) > (48 * 60 * 60 * 1000)) return false;
+                 if (espnTime && !isNaN(espnTime) && Math.abs(dbTime - espnTime) > (48 * 60 * 60 * 1000)) {
+                     return false;
+                 }
 
-                 const espnHome = getCanonicalName(e.home_team);
-                 const espnAway = getCanonicalName(e.away_team);
+                 // Safely extract names depending on ESPN's payload structure
+                 const rawEspnHome = e.home_team || e.homeTeam || "";
+                 const rawEspnAway = e.away_team || e.awayTeam || "";
+                 
+                 const espnHome = getCanonicalName(rawEspnHome);
+                 const espnAway = getCanonicalName(rawEspnAway);
                  
                  const homeScore = similarity(dbHome, espnHome);
                  const awayScore = similarity(dbAway, espnAway);
@@ -212,7 +224,7 @@ async function runMatchmaker(request: Request) {
              });
 
              if (espnGame) {
-                 const targetEspnId = String(espnGame.espn_id);
+                 const targetEspnId = String(espnGame.id || espnGame.espn_id);
                  
                  // Immediately mark this ID as assigned so other local rows cannot claim it
                  assignedEspnIds.add(targetEspnId);
