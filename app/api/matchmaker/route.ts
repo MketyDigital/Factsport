@@ -5,9 +5,9 @@ export const fetchCache = 'force-no-store';
 
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { ESPN_LEAGUES, fetchEspnLive } from '@/app/lib/espn';
+import { ESPN_LEAGUES } from '@/app/lib/espn';
 
-// 1. THE EXHAUSTIVE DICTIONARY (Upgraded)
+// 1. THE EXHAUSTIVE DICTIONARY
 const getCanonicalName = (rawName: string) => {
     if (!rawName) return "";
     let name = rawName.toLowerCase()
@@ -58,8 +58,6 @@ const getCanonicalName = (rawName: string) => {
         'benfica': 'sl benfica', 'fc copenhagen': 'copenhagen', 'shakhtar donetsk': 'shakhtar', 
         'galatasaray sk': 'galatasaray', 'fenerbahce sk': 'fenerbahce', 'red bull salzburg': 'fc salzburg', 
         'slavia praha': 'slavia prague', 'ajax': 'afc ajax', 'psv': 'psv eindhoven', 'celtic fc': 'celtic', 'rangers fc': 'rangers',
-        
-        // NATIONS / INTERNATIONAL ALIASES
         'usa': 'united states', 'usmnt': 'united states', 'uswnt': 'united states',
         'korea republic': 'south korea', 'korea': 'south korea',
         'bosnia': 'bosnia and herzegovina', 'dr congo': 'congo dr',
@@ -72,7 +70,7 @@ const getCanonicalName = (rawName: string) => {
     return aliases[name] || name;
 };
 
-// 2. FUZZY MATCHER 
+// 2. FUZZY MATCHER
 const similarity = (s1: string, s2: string) => {
     let longer = s1, shorter = s2;
     if (s1.length < s2.length) { longer = s2; shorter = s1; }
@@ -93,18 +91,38 @@ const similarity = (s1: string, s2: string) => {
     return (longer.length - costs[longer.length]) / longer.length;
 };
 
-// 🔥 2.5 THE NEW SUBSTRING SAFETY NET
 const isStrongSubstring = (s1: string, s2: string) => {
     if (s1.length < 4 || s2.length < 4) return false; 
     return s1.includes(s2) || s2.includes(s1);
 };
 
-// 🔥 2.6 THE NEW TOKEN MATCHER
 const isTokenMatch = (s1: string, s2: string) => {
     const tokens1 = s1.split(' ').filter(w => w.length > 4); 
     const tokens2 = s2.split(' ').filter(w => w.length > 4);
     return tokens1.some(t1 => tokens2.includes(t1));
 };
+
+// HELPER: DATE FORMATTER FOR ESPN API
+const formatEspnDate = (date: Date) => {
+    return date.toISOString().split('T')[0].replace(/-/g, '');
+};
+
+// HELPER: FETCH ESPN DATA
+async function fetchEspnLive(espnCode: string) {
+    const now = new Date();
+    // Fetch 24h before and 24h after to ensure complete coverage of 48h window
+    const startDate = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+    const endDate = new Date(now.getTime() + (24 * 60 * 60 * 1000));
+    const dateRange = `${formatEspnDate(startDate)}-${formatEspnDate(endDate)}`;
+    
+    const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${espnCode}/scoreboard?dates=${dateRange}&limit=100`;
+    const response = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36" }
+    });
+    if (!response.ok) throw new Error(`ESPN API returned ${response.status}`);
+    const data = await response.json();
+    return data.events || [];
+}
 
 // 3. THE MASTER MATCHMAKER
 async function runMatchmaker(request: Request) {
@@ -113,21 +131,14 @@ async function runMatchmaker(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Check critical environment configurations before proceeding
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return NextResponse.json({ success: false, error: "[CONFIG_ERROR] Missing Supabase Environment Variables keys." }, { status: 500 });
+      return NextResponse.json({ success: false, error: "[CONFIG_ERROR] Missing Supabase Keys." }, { status: 500 });
   }
 
-  const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-  );
-
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
   let logs: string[] = [];
   let mappedCount = 0;
   const syncTasks: Promise<any>[] = [];
-
-  // 🔥 CREATE A SET TO TRACK ASSIGNED ESPN IDs
   const assignedEspnIds = new Set<string>();
 
   try {
@@ -135,78 +146,44 @@ async function runMatchmaker(request: Request) {
       const lookBack = new Date(now - (48 * 60 * 60 * 1000)).toISOString(); 
       const todayEnd = new Date(now + (48 * 60 * 60 * 1000)).toISOString(); 
 
-      // Pre-fill the Set with existing IDs
-      const { data: existingIds } = await supabase
-          .from('matches')
-          .select('espn_id')
-          .not('espn_id', 'is', null)
-          .gt('match_date', lookBack)
-          .lt('match_date', todayEnd);
-          
+      const { data: existingIds } = await supabase.from('matches').select('espn_id').not('espn_id', 'is', null).gt('match_date', lookBack).lt('match_date', todayEnd);
       if (existingIds) {
-          existingIds.forEach(row => {
-              if (row.espn_id && String(row.espn_id) !== 'undefined') {
-                  assignedEspnIds.add(String(row.espn_id));
-              }
-          });
+          existingIds.forEach(row => { if (row.espn_id) assignedEspnIds.add(String(row.espn_id)); });
       }
 
-      const { data: dbMatches, error: dbError } = await supabase
-        .from('matches')
-        .select('id, home_team, away_team, match_date, league')
-        .is('espn_id', null)
-        .gt('match_date', lookBack)
-        .lt('match_date', todayEnd);
-
+      const { data: dbMatches, error: dbError } = await supabase.from('matches').select('id, home_team, away_team, match_date, league').is('espn_id', null).gt('match_date', lookBack).lt('match_date', todayEnd);
       if (dbError) throw new Error(`[SUPABASE_SELECT_ERROR] ${dbError.message}`);
-
-      if (!dbMatches || dbMatches.length === 0) {
-          return NextResponse.json({ message: "No unmatched games found in database within 48hr window." });
-      }
-
-      logs.push(`🔍 Found ${dbMatches.length} unmatched games in DB.`);
+      if (!dbMatches || dbMatches.length === 0) return NextResponse.json({ message: "No unmatched games." });
 
       const activeLeagues = Array.from(new Set(dbMatches.map(m => m.league)));
-      logs.push(`🌍 Active Leagues in DB: ${activeLeagues.join(', ')}`);
 
       for (const leagueName of activeLeagues) {
         const espnCode = ESPN_LEAGUES[leagueName as string];
-        if (!espnCode) {
-            logs.push(`⚠️ SKIPPED LEAGUE: '${leagueName}' - Not found in ESPN_LEAGUES dictionary.`);
-            continue;
-        }
+        if (!espnCode) continue;
 
         let espnMatches: any[] = [];
         try {
-            const fetchedData = await fetchEspnLive(espnCode);
-            espnMatches = Array.isArray(fetchedData) ? fetchedData : [];
-            logs.push(`📡 ESPN API: Fetched ${espnMatches.length} games for ${leagueName} (Code: ${espnCode})`);
+            espnMatches = await fetchEspnLive(espnCode);
         } catch (apiErr: any) {
-            logs.push(`❌ ESPN API ERROR for ${leagueName}: ${apiErr.message}`);
+            logs.push(`❌ ESPN API ERROR ${leagueName}: ${apiErr.message}`);
             continue;
         }
 
         const leagueDbMatches = dbMatches.filter(m => m.league === leagueName);
-
         for (const dbMatch of leagueDbMatches) {
              const dbTime = new Date(dbMatch.match_date).getTime();
              const dbHome = getCanonicalName(dbMatch.home_team);
              const dbAway = getCanonicalName(dbMatch.away_team);
              
-             logs.push(`--- Checking DB Game: ${dbHome} vs ${dbAway} ---`);
-
-             let closestMatchLog = "No similar teams found in ESPN payload.";
-
              const espnGame = espnMatches.find((e: any) => {
                  if (!e) return false;
-
                  const currentEspnId = String(e.id || e.espn_id); 
                  if (!currentEspnId || currentEspnId === 'undefined' || assignedEspnIds.has(currentEspnId)) return false;
 
                  const espnTimeString = e.date || e.startTime;
                  const espnTime = espnTimeString ? new Date(espnTimeString).getTime() : 0;
-                 
-                 // Safely extract names
+                 if (espnTime && !isNaN(espnTime) && Math.abs(dbTime - espnTime) > (48 * 60 * 60 * 1000)) return false;
+
                  const rawEspnHome = e.home_team || e.homeTeam || "";
                  const rawEspnAway = e.away_team || e.awayTeam || "";
                  const espnHome = getCanonicalName(rawEspnHome);
@@ -214,17 +191,6 @@ async function runMatchmaker(request: Request) {
                  
                  const homeScore = similarity(dbHome, espnHome);
                  const awayScore = similarity(dbAway, espnAway);
-
-                 // Log the highest similarity score we see just in case it's rejecting a near-match
-                 if (homeScore > 0.4 || awayScore > 0.4) {
-                     closestMatchLog = `Closest ESPN game was '${espnHome} vs ${espnAway}'. Scores: Home(${homeScore.toFixed(2)}), Away(${awayScore.toFixed(2)})`;
-                 }
-
-                 // Check Time Window
-                 if (espnTime && !isNaN(espnTime) && Math.abs(dbTime - espnTime) > (48 * 60 * 60 * 1000)) {
-                     return false; 
-                 }
-
                  const homeMatch = isStrongSubstring(dbHome, espnHome) || isTokenMatch(dbHome, espnHome) || homeScore > 0.75;
                  const awayMatch = isStrongSubstring(dbAway, espnAway) || isTokenMatch(dbAway, espnAway) || awayScore > 0.75;
 
@@ -234,21 +200,13 @@ async function runMatchmaker(request: Request) {
              if (espnGame) {
                  const targetEspnId = String(espnGame.id || espnGame.espn_id);
                  assignedEspnIds.add(targetEspnId);
-
-                 const updateTask = (async () => {
-                    const { error } = await supabase.from('matches').update({ espn_id: targetEspnId }).eq('id', dbMatch.id);
-                    if (error) throw new Error(error.message);
-                    return true;
-                 })().catch(e => {
-                     logs.push(`❌ UPDATE CRASH: ${e.message}`);
-                     return false;
-                 });
-
-                 syncTasks.push(updateTask);
+                 syncTasks.push(
+                    supabase.from('matches').update({ espn_id: targetEspnId }).eq('id', dbMatch.id)
+                    .then(({ error }) => { if (error) throw error; return true; })
+                    .catch(e => { logs.push(`❌ UPDATE CRASH: ${e.message}`); return false; })
+                 );
                  mappedCount++;
-                 logs.push(`✅ MAPPED: ${dbMatch.home_team} vs ${dbMatch.away_team} to ESPN ID ${targetEspnId}`);
-             } else {
-                 logs.push(`🚫 FAILED TO MAP: ${dbHome} vs ${dbAway}. ${closestMatchLog}`);
+                 logs.push(`🔗 MAPPED: ${dbMatch.home_team} vs ${dbMatch.away_team}`);
              }
         }
       }
@@ -257,13 +215,7 @@ async function runMatchmaker(request: Request) {
       return NextResponse.json({ success: true, mappedCount, logs });
 
   } catch (error: any) {
-      // ... keep your existing catch block here ...
-      const msg = error.message || "Unknown unexpected system error.";
-      // Format response prefix to make debugging on GitHub actions obvious
-      if (msg.startsWith("[SUPABASE_") || msg.startsWith("[ESPN_API_")) {
-          return NextResponse.json({ success: false, error: msg }, { status: 500 });
-      }
-      return NextResponse.json({ success: false, error: `[RUNTIME_ERROR] ${msg}` }, { status: 500 });
+      return NextResponse.json({ success: false, error: `[RUNTIME_ERROR] ${error.message}` }, { status: 500 });
   }
 }
 
