@@ -115,7 +115,7 @@ export default function FactSportPlayer({
           setUiBlocker(true);
           // HOW TO EDIT UI BLOCKER TIMEOUT:
           // Change the '4000' below (in milliseconds) to adjust how long the top/bottom bars hide the YouTube UI
-          setTimeout(() => setUiBlocker(false), 4000);
+          setTimeout(() => setUiBlocker(false), 4250);
       } else if (mediaRef.current) {
           mediaRef.current.play();
       }
@@ -132,7 +132,7 @@ export default function FactSportPlayer({
             setUiBlocker(true);
             // HOW TO EDIT UI BLOCKER TIMEOUT:
             // Change the '4000' below (in milliseconds) to adjust how long the top/bottom bars hide the YouTube UI
-            setTimeout(() => setUiBlocker(false), 4000);
+            setTimeout(() => setUiBlocker(false), 4250);
         }
         setIsPlaying(!isPlaying);
     } else if (mediaRef.current) {
