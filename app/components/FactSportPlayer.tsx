@@ -150,8 +150,29 @@ export default function FactSportPlayer({
 
   const handleFullscreen = () => {
     const container = playerWrapperRef.current;
-    if (container && !document.fullscreenElement) container.requestFullscreen();
-    else if (document.fullscreenElement) document.exitFullscreen();
+    if (!container) return;
+
+    if (!document.fullscreenElement && !(document as any).webkitFullscreenElement && !(document as any).mozFullScreenElement && !(document as any).msFullscreenElement) {
+      if (container.requestFullscreen) {
+        container.requestFullscreen().catch(err => console.error(err));
+      } else if ((container as any).webkitRequestFullscreen) {
+        (container as any).webkitRequestFullscreen();
+      } else if ((container as any).msRequestFullscreen) {
+        (container as any).msRequestFullscreen();
+      } else if ((container as any).mozRequestFullScreen) {
+        (container as any).mozRequestFullScreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      } else if ((document as any).msExitFullscreen) {
+        (document as any).msExitFullscreen();
+      } else if ((document as any).mozCancelFullScreen) {
+        (document as any).mozCancelFullScreen();
+      }
+    }
   };
 
   const DefaultPreview = () => (
@@ -186,7 +207,7 @@ export default function FactSportPlayer({
   const AnnouncementMarquee = () => {
       if (!announcement?.enabled || !announcement.text) return null;
       return (
-          <div className="absolute bottom-[44px] left-0 w-full z-40 overflow-hidden bg-black/60 backdrop-blur-sm pointer-events-auto border-y border-white/5">
+          <div className="absolute bottom-12 left-0 w-full z-40 overflow-hidden bg-black/60 backdrop-blur-sm pointer-events-auto border-y border-white/10 shadow-[0_0_15px_rgba(0,0,0,0.5)]">
               <style dangerouslySetInnerHTML={{__html: `
                 @keyframes fs-marquee {
                   0% { transform: translateX(100vw); }
@@ -196,7 +217,7 @@ export default function FactSportPlayer({
                   animation: fs-marquee 20s linear infinite;
                 }
               `}} />
-              <div className="whitespace-nowrap animate-fs-marquee py-1.5 flex items-center inline-block">
+              <div className="whitespace-nowrap animate-fs-marquee py-2 flex items-center inline-block">
                   {announcement.link ? (
                       <a href={announcement.link} target="_blank" rel="noreferrer" className="text-white font-bold text-xs md:text-sm uppercase hover:text-blue-400 px-4 transition-colors">
                           {announcement.text}
@@ -234,13 +255,13 @@ export default function FactSportPlayer({
   if (mediaUrl === 'streamio') return <FactSportMediaRoom matchId={matchId} mediaUrl="streamio" />;
 
   const CustomControls = () => (
-     <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent px-4 py-2 pt-8 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-50 pointer-events-auto">
+     <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/90 via-black/60 to-transparent px-4 py-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-50 pointer-events-auto">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={togglePlay} className="text-white hover:text-blue-500 transition shadow-sm bg-black/40 p-1.5 rounded-full backdrop-blur-md">
+            <button onClick={togglePlay} className="text-white hover:text-blue-500 transition shadow-sm bg-white/10 p-1.5 rounded-full backdrop-blur-md">
               {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
             </button>
-            <button onClick={toggleMute} className="text-white hover:text-slate-300 transition shadow-sm bg-black/40 p-1.5 rounded-full backdrop-blur-md">
+            <button onClick={toggleMute} className="text-white hover:text-slate-300 transition shadow-sm bg-white/10 p-1.5 rounded-full backdrop-blur-md">
               {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
             </button>
             <span className="text-white text-[10px] font-black tracking-widest uppercase flex items-center gap-1.5 drop-shadow-md">
@@ -248,14 +269,16 @@ export default function FactSportPlayer({
             </span>
           </div>
           {!(mode === 'audio' || isRawAudio) && (
-              <button onClick={handleFullscreen} className="text-white hover:text-blue-500 transition shadow-sm bg-black/40 p-1.5 rounded-full backdrop-blur-md"><Maximize size={16} /></button>
+              <button onClick={handleFullscreen} className="text-white hover:text-blue-500 transition shadow-sm bg-white/10 p-1.5 rounded-full backdrop-blur-md"><Maximize size={16} /></button>
           )}
         </div>
       </div>
   );
 
   const PlayOverlay = () => (
-     <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/30 backdrop-blur-sm">
+     <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#0a1428]/80 backdrop-blur-sm">
+         <div className="absolute inset-0 bg-[url('/tournaments/default-bg.jpg')] bg-cover opacity-10 blur-sm pointer-events-none"></div>
+         
          <button onClick={startPlayback} className="relative z-10 w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.6)] hover:scale-110 transition-transform border border-red-400/50">
              <Play className="text-white w-8 h-8 ml-1" fill="currentColor" />
          </button>
@@ -312,18 +335,32 @@ export default function FactSportPlayer({
       <div ref={playerWrapperRef} className="w-full aspect-video bg-black relative overflow-hidden border-b border-slate-800 shadow-inner group flex items-center justify-center">
         <div className="absolute inset-0 z-20 cursor-pointer" onClick={togglePlay}></div>
 
-        {/* Adjusted scale from 120% to 104% to preserve scorelines while minimizing branding */}
         <iframe 
             ref={iframeRef} 
             src={embedUrl} 
-            className="absolute inset-0 w-[104%] h-[104%] left-[-2%] top-[-2%] pointer-events-none object-cover z-10" 
+            className="absolute inset-0 w-full h-full pointer-events-none object-cover z-10" 
             allow="autoplay; encrypted-media; fullscreen" 
             allowFullScreen
         ></iframe>
 
+        {/* Permanent Watermark cover for bottom right YouTube logo */}
+        <div className="absolute bottom-[10px] right-[10px] w-[100px] h-[35px] bg-black/95 z-30 pointer-events-none flex items-center justify-center rounded border border-white/10 shadow-lg">
+           <span className="text-white text-[10px] font-black tracking-widest opacity-90">FACTSPORT</span>
+        </div>
+
+        {/* Solid cover when paused to hide YouTube title, channel name and related videos */}
+        {hasStarted && !isPlaying && (
+            <div className="absolute inset-0 bg-[#0a1428] z-30 flex flex-col items-center justify-center pointer-events-none">
+                <button onClick={togglePlay} className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.6)] pointer-events-auto hover:scale-110 transition-transform">
+                    <Play className="text-white w-8 h-8 ml-1" fill="currentColor" />
+                </button>
+                <span className="text-white mt-4 text-[10px] font-black tracking-widest uppercase opacity-80">Stream Paused</span>
+            </div>
+        )}
+
         <AnnouncementMarquee />
         {!hasStarted && <PlayOverlay />}
-        {hasStarted && <CustomControls />}
+        {hasStarted && isPlaying && <CustomControls />}
       </div>
     );
   };
@@ -352,22 +389,22 @@ export default function FactSportPlayer({
         <AnnouncementMarquee />
         {!hasStarted && <PlayOverlay />}
         {hasStarted && (
-            <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent px-4 py-2 pt-8 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-50 pointer-events-auto">
-              <div className="w-full h-1 bg-white/20 rounded-full mb-3 cursor-pointer overflow-hidden backdrop-blur-sm">
+            <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/90 to-transparent px-4 py-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-50 pointer-events-auto">
+              <div className="w-full h-1.5 bg-white/20 rounded-full mb-3 cursor-pointer overflow-hidden backdrop-blur-sm">
                 <div className="h-full bg-blue-600 transition-all duration-100" style={{ width: `${progress}%` }}></div>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <button onClick={togglePlay} className="text-white hover:text-blue-500 transition shadow-sm bg-black/40 p-1.5 rounded-full backdrop-blur-md">
+                  <button onClick={togglePlay} className="text-white hover:text-blue-500 transition shadow-sm bg-white/10 p-1.5 rounded-full backdrop-blur-md">
                     {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
                   </button>
-                  <button onClick={toggleMute} className="text-white hover:text-slate-300 transition shadow-sm bg-black/40 p-1.5 rounded-full backdrop-blur-md">
+                  <button onClick={toggleMute} className="text-white hover:text-slate-300 transition shadow-sm bg-white/10 p-1.5 rounded-full backdrop-blur-md">
                     {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
                   </button>
                   <span className="text-white text-[10px] font-bold tracking-widest"><span className="text-red-600 animate-pulse">●</span> FACTSPORT PLAYER</span>
                 </div>
                 {!(mode === 'audio' || isRawAudio) && (
-                    <button onClick={handleFullscreen} className="text-white hover:text-blue-500 transition shadow-sm bg-black/40 p-1.5 rounded-full backdrop-blur-md"><Maximize size={16} /></button>
+                    <button onClick={handleFullscreen} className="text-white hover:text-blue-500 transition shadow-sm bg-white/10 p-1.5 rounded-full backdrop-blur-md"><Maximize size={16} /></button>
                 )}
               </div>
             </div>

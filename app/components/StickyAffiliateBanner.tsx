@@ -58,7 +58,7 @@ export default function StickyAffiliateBanner() {
 
             {showFloatingVideo && (
                 <div className="w-full max-w-[320px] md:max-w-[400px] aspect-video bg-black rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] border border-blue-500/50 overflow-hidden pointer-events-auto relative animate-in slide-in-from-bottom-10 group self-end md:self-center flex flex-col">
-                    <div className="absolute top-0 left-0 w-full h-12 bg-gradient-to-b from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end gap-2 p-2 z-30 pointer-events-none">
+                    <div className="absolute top-0 left-0 w-full h-12 bg-gradient-to-b from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end gap-2 p-2 z-40 pointer-events-none">
                         <Link 
                             href={activeMatchId === 'global-goal-rush' ? '/live' : `/match/${activeMatchId}`} 
                             className="p-1.5 bg-blue-600/80 backdrop-blur rounded text-white hover:bg-blue-600 hover:scale-105 transition-all shadow-lg pointer-events-auto"
@@ -75,16 +75,36 @@ export default function StickyAffiliateBanner() {
                         </button>
                     </div>
 
+                    {/* Floating Play/Pause Overlay */}
+                    <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-[2px]">
+                        <button 
+                            onClick={(e) => { e.preventDefault(); togglePlay(); }}
+                            className="w-14 h-14 bg-red-600 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.6)] hover:scale-110 transition-transform pointer-events-auto"
+                        >
+                            {isPlaying ? <Pause className="text-white w-6 h-6" fill="currentColor" /> : <Play className="text-white w-6 h-6 ml-1" fill="currentColor" />}
+                        </button>
+                    </div>
+
+                    {/* Bottom Logo Watermark to hide YouTube logo */}
+                    {isYouTube && (
+                        <div className="absolute bottom-[5px] right-[5px] w-[80px] h-[25px] bg-black/95 z-40 pointer-events-none flex items-center justify-center rounded border border-white/10 shadow-md">
+                           <span className="text-white text-[8px] font-black tracking-widest opacity-90">FACTSPORT</span>
+                        </div>
+                    )}
+
                     {isYouTube ? (
                         <div className="relative w-full h-full overflow-hidden flex items-center justify-center">
-                            <div className="absolute inset-0 z-20 pointer-events-auto"></div>
-                            <iframe ref={pipIframeRef} src={getYouTubeWhiteLabelUrl(videoUrl!)} className="absolute inset-0 w-[104%] h-[104%] left-[-2%] top-[-2%] pointer-events-none z-10 object-cover" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen title="PIP Video" />
+                            <div className="absolute inset-0 z-20 pointer-events-auto cursor-pointer" onClick={togglePlay}></div>
+                            <iframe ref={pipIframeRef} src={getYouTubeWhiteLabelUrl(videoUrl!)} className="absolute inset-0 w-full h-full pointer-events-none z-10 object-cover" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen title="PIP Video" />
                         </div>
                     ) : isRawMedia ? (
-                        <video ref={pipVideoRef} src={videoUrl!} className="w-full h-full object-contain relative z-10" autoPlay playsInline controls={false} />
+                        <div className="relative w-full h-full">
+                            <div className="absolute inset-0 z-20 pointer-events-auto cursor-pointer" onClick={togglePlay}></div>
+                            <video ref={pipVideoRef} src={videoUrl!} className="w-full h-full object-contain relative z-10" autoPlay playsInline controls={false} />
+                        </div>
                     ) : (
                         <div className="relative w-full h-full">
-                           <div className="absolute inset-0 z-20 pointer-events-auto"></div>
+                           <div className="absolute inset-0 z-20 pointer-events-auto cursor-pointer" onClick={togglePlay}></div>
                            <iframe src={videoUrl!} className="w-full h-full relative z-10 pointer-events-none" allow="autoplay; encrypted-media; fullscreen" title="PIP Video" />
                         </div>
                     )}
