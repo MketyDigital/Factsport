@@ -89,22 +89,6 @@ async function runLiveUpdate(request: Request) {
 
                      await supabase.from('matches').update(payload).eq('id', dbMatch.id);
                      
-                     const statusChangedToFT = newStatus === 'FT' && dbMatch.status !== 'FT';
-                     const scoresChanged = payload.home_score !== dbMatch.home_score || payload.away_score !== dbMatch.away_score;
-                     
-                     const lineupsAnnounced = payload.lineups && payload.lineups.home?.length >= 11 && (!dbMatch.lineups?.home || dbMatch.lineups.home.length < 11);
-
-                     if (statusChangedToFT || scoresChanged || lineupsAnnounced) {
-                         const internalOrigin = new URL(request.url).origin;
-                         const targetRecord = { ...dbMatch, ...payload };
-                         
-                         fetch(`${internalOrigin}/api/social`, {
-                             method: 'POST',
-                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
-                             body: JSON.stringify({ record: targetRecord, old_record: dbMatch })
-                         }).catch(e => console.error("Social Broadcast Intercept Failed:", e.message));
-                     }
-
                      return true;
                  })();
                  syncTasks.push(updateTask); updates++; logs.push(`⚡ ESPN Synced: ${dbMatch.home_team}`);
