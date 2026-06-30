@@ -139,15 +139,6 @@ export async function GET(request: Request) {
                         if (dbMatch.status !== 'FT' || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
                             shouldUpdateMatch = true;
                             leaguesNeedingStandingsUpdate.add(compCode); 
-                            
-                            const internalOrigin = new URL(request.url).origin;
-                            const targetRecord = { ...dbMatch, home_score: fdHomeScore, away_score: fdAwayScore, status: 'FT' };
-                            
-                            fetch(`${internalOrigin}/api/socials`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
-                                body: JSON.stringify({ record: targetRecord, old_record: dbMatch })
-                            }).catch(e => console.error(" Late FT Broadcast Intercept Failed:", e.message));
                         }
                     } 
                     else if (hasEspnId && (fdStatusMapped === 'LIVE' || fdStatusMapped === 'HT' || isDbLive)) {
