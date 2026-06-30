@@ -37,6 +37,7 @@ export default function FactSportPlayer({
   const [progress, setProgress] = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const [uiBlocker, setUiBlocker] = useState(false);
   
   const [isTimeLocked, setIsTimeLocked] = useState(isLocked);
   const [coverageTimeText, setCoverageTimeText] = useState('Coverage starts 5 mins to Kick-off');
@@ -110,6 +111,8 @@ export default function FactSportPlayer({
       setIsPlaying(true);
       if (isYouTube && iframeRef.current) {
           iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo' }), '*');
+          setUiBlocker(true);
+          setTimeout(() => setUiBlocker(false), 3500);
       } else if (mediaRef.current) {
           mediaRef.current.play();
       }
@@ -122,6 +125,10 @@ export default function FactSportPlayer({
     }
     if (isYouTube && iframeRef.current) {
         iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: isPlaying ? 'pauseVideo' : 'playVideo' }), '*');
+        if (!isPlaying) {
+            setUiBlocker(true);
+            setTimeout(() => setUiBlocker(false), 3500);
+        }
         setIsPlaying(!isPlaying);
     } else if (mediaRef.current) {
       if (isPlaying) mediaRef.current.pause();
@@ -152,26 +159,21 @@ export default function FactSportPlayer({
     const container = playerWrapperRef.current;
     if (!container) return;
 
-    if (!document.fullscreenElement && !(document as any).webkitFullscreenElement && !(document as any).mozFullScreenElement && !(document as any).msFullscreenElement) {
-      if (container.requestFullscreen) {
-        container.requestFullscreen().catch(err => console.error(err));
-      } else if ((container as any).webkitRequestFullscreen) {
-        (container as any).webkitRequestFullscreen();
-      } else if ((container as any).msRequestFullscreen) {
-        (container as any).msRequestFullscreen();
-      } else if ((container as any).mozRequestFullScreen) {
-        (container as any).mozRequestFullScreen();
-      }
+    if (container.classList.contains('fixed') && container.classList.contains('z-[9999]')) {
+        container.classList.remove('fixed', 'inset-0', 'z-[9999]', 'w-screen', 'h-screen');
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+        else if ((document as any).webkitExitFullscreen) (document as any).webkitExitFullscreen();
+        return;
+    }
+
+    const requestFS = container.requestFullscreen || (container as any).webkitRequestFullscreen || (container as any).msRequestFullscreen || (container as any).mozRequestFullScreen;
+    
+    if (requestFS) {
+      requestFS.call(container).catch(() => {
+        container.classList.add('fixed', 'inset-0', 'z-[9999]', 'w-screen', 'h-screen');
+      });
     } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      } else if ((document as any).webkitExitFullscreen) {
-        (document as any).webkitExitFullscreen();
-      } else if ((document as any).msExitFullscreen) {
-        (document as any).msExitFullscreen();
-      } else if ((document as any).mozCancelFullScreen) {
-        (document as any).mozCancelFullScreen();
-      }
+      container.classList.add('fixed', 'inset-0', 'z-[9999]', 'w-screen', 'h-screen');
     }
   };
 
@@ -255,7 +257,7 @@ export default function FactSportPlayer({
   if (mediaUrl === 'streamio') return <FactSportMediaRoom matchId={matchId} mediaUrl="streamio" />;
 
   const CustomControls = () => (
-     <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/90 via-black/60 to-transparent px-4 py-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-50 pointer-events-auto">
+     <div className="absolute bottom-0 left-0 w-full bg-[#0a1428] px-4 py-3 z-50 pointer-events-auto border-t border-white/10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button onClick={togglePlay} className="text-white hover:text-blue-500 transition shadow-sm bg-white/10 p-1.5 rounded-full backdrop-blur-md">
@@ -343,14 +345,22 @@ export default function FactSportPlayer({
             allowFullScreen
         ></iframe>
 
+        {uiBlocker && (
+            <div className="absolute inset-0 z-30 pointer-events-none">
+                <div className="absolute top-0 left-0 w-full h-[70px] bg-[#0a1428]"></div>
+                <div className="absolute bottom-0 left-0 w-full h-[60px] bg-[#0a1428]"></div>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150px] h-[150px] bg-[#0a1428] rounded-full blur-xl"></div>
+            </div>
+        )}
+
         {/* Permanent Watermark cover for bottom right YouTube logo */}
-        <div className="absolute bottom-[10px] right-[10px] w-[100px] h-[35px] bg-black/95 z-30 pointer-events-none flex items-center justify-center rounded border border-white/10 shadow-lg">
+        <div className="absolute bottom-[55px] right-[10px] w-[100px] h-[35px] bg-[#0a1428] z-30 pointer-events-none flex items-center justify-center rounded border border-white/10 shadow-lg">
            <span className="text-white text-[10px] font-black tracking-widest opacity-90">FACTSPORT</span>
         </div>
 
         {/* Solid cover when paused to hide YouTube title, channel name and related videos */}
         {hasStarted && !isPlaying && (
-            <div className="absolute inset-0 bg-[#0a1428] z-30 flex flex-col items-center justify-center pointer-events-none">
+            <div className="absolute inset-0 bg-[#0a1428] z-40 flex flex-col items-center justify-center pointer-events-none">
                 <button onClick={togglePlay} className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.6)] pointer-events-auto hover:scale-110 transition-transform">
                     <Play className="text-white w-8 h-8 ml-1" fill="currentColor" />
                 </button>
@@ -360,7 +370,7 @@ export default function FactSportPlayer({
 
         <AnnouncementMarquee />
         {!hasStarted && <PlayOverlay />}
-        {hasStarted && isPlaying && <CustomControls />}
+        {hasStarted && <CustomControls />}
       </div>
     );
   };
