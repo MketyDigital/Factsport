@@ -276,7 +276,7 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
                   <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={sanitizeUrl(dbData.affiliate_link) || undefined} />
               )}
 
-              {!hasWidget && (
+              {!hasWidget && !isUniversallyFinished && (
                   <div className="mt-4 space-y-4">
                       <div id="predictions" className="bg-white rounded-lg shadow-sm p-3 border border-slate-200 scroll-mt-20">
                           <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 flex items-center gap-1 mb-2">
