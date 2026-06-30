@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Square, Maximize2, Play } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { X, Square, Maximize2, Play, Pause } from 'lucide-react';
 import { useGlobalMedia } from '@/app/providers/GlobalMediaProvider'; 
 import Link from 'next/link';
 
 export default function StickyAffiliateBanner() {
     const { activeMatchId, mediaType: contextMediaType, videoUrl: rawVideoUrl, isPageActive, stopMedia } = useGlobalMedia();
     
-    const [playTrigger, setPlayTrigger] = useState(0);
+    const [isPlaying, setIsPlaying] = useState(true);
+    const pipVideoRef = useRef<HTMLVideoElement>(null);
+    const pipIframeRef = useRef<HTMLIFrameElement>(null);
 
     const isForcedAudio = rawVideoUrl?.includes('#is-audio-mode');
     const videoUrl = rawVideoUrl?.replace('#is-audio-mode', '');
@@ -29,10 +31,19 @@ export default function StickyAffiliateBanner() {
         return `${url.replace(/[?&]autoplay=0/, '')}${separator}autoplay=1&playsinline=1&mute=0`;
     };
 
-    // Strip YouTube controls out and aggressively limit branding for the PIP
     const getYouTubeWhiteLabelUrl = (url: string) => {
         const autoPlayUrl = getAutoPlayUrl(url);
-        return `${autoPlayUrl}&controls=0&modestbranding=1&rel=0&disablekb=1&fs=0&showinfo=0&iv_load_policy=3`;
+        return `${autoPlayUrl}&controls=0&modestbranding=1&rel=0&disablekb=1&fs=0&showinfo=0&iv_load_policy=3&enablejsapi=1`;
+    };
+
+    const togglePlay = () => {
+        if (isYouTube && pipIframeRef.current) {
+            pipIframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: isPlaying ? 'pauseVideo' : 'playVideo' }), '*');
+        } else if (pipVideoRef.current) {
+            if (isPlaying) pipVideoRef.current.pause();
+            else pipVideoRef.current.play();
+        }
+        setIsPlaying(!isPlaying);
     };
 
     return (
@@ -40,8 +51,8 @@ export default function StickyAffiliateBanner() {
             
             {showFloatingAudio && (
                 <div className="absolute top-[-9999px] left-[-9999px] w-[10px] h-[10px] opacity-[0.01] overflow-hidden pointer-events-none">
-                    {isRawMedia && <video key={playTrigger} src={videoUrl!} autoPlay playsInline controls={false} />}
-                    {isYouTube && <iframe key={playTrigger} src={getYouTubeWhiteLabelUrl(videoUrl!)} allow="autoplay; encrypted-media" title="Background Audio" />}
+                    {isRawMedia && <video ref={pipVideoRef} src={videoUrl!} autoPlay playsInline controls={false} />}
+                    {isYouTube && <iframe ref={pipIframeRef} src={getYouTubeWhiteLabelUrl(videoUrl!)} allow="autoplay; encrypted-media" title="Background Audio" />}
                 </div>
             )}
 
@@ -66,13 +77,11 @@ export default function StickyAffiliateBanner() {
 
                     {isYouTube ? (
                         <div className="relative w-full h-full overflow-hidden flex items-center justify-center">
-                            {/* Shield to prevent clicking through to YouTube within PIP */}
                             <div className="absolute inset-0 z-20 pointer-events-auto"></div>
-                            {/* Scaled iframe to hide artifacts */}
-                            <iframe src={getYouTubeWhiteLabelUrl(videoUrl!)} className="absolute inset-0 w-[120%] h-[120%] left-[-10%] top-[-10%] pointer-events-none z-10 object-cover" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen title="PIP Video" />
+                            <iframe ref={pipIframeRef} src={getYouTubeWhiteLabelUrl(videoUrl!)} className="absolute inset-0 w-[104%] h-[104%] left-[-2%] top-[-2%] pointer-events-none z-10 object-cover" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen title="PIP Video" />
                         </div>
                     ) : isRawMedia ? (
-                        <video src={videoUrl!} className="w-full h-full object-contain relative z-10" autoPlay playsInline controls={false} />
+                        <video ref={pipVideoRef} src={videoUrl!} className="w-full h-full object-contain relative z-10" autoPlay playsInline controls={false} />
                     ) : (
                         <div className="relative w-full h-full">
                            <div className="absolute inset-0 z-20 pointer-events-auto"></div>
@@ -89,10 +98,16 @@ export default function StickyAffiliateBanner() {
                             <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_red]"></span> LIVE RADIO
                         </span>
                         <div className="flex items-end gap-[2px] h-3 mt-1 opacity-80 justify-center">
-                            <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.1s] h-[60%]"></div>
-                            <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.3s] h-[100%]"></div>
-                            <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.2s] h-[40%]"></div>
-                            <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.5s] h-[80%]"></div>
+                            {isPlaying ? (
+                                <>
+                                    <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.1s] h-[60%]"></div>
+                                    <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.3s] h-[100%]"></div>
+                                    <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.2s] h-[40%]"></div>
+                                    <div className="w-1 bg-blue-500 rounded-t animate-[bounce_1s_infinite_ease-in-out_0.5s] h-[80%]"></div>
+                                </>
+                            ) : (
+                                <div className="w-full h-[2px] bg-blue-500 rounded-full mt-auto"></div>
+                            )}
                         </div>
                     </Link>
                     
@@ -100,11 +115,11 @@ export default function StickyAffiliateBanner() {
 
                     <div className="flex items-center gap-2">
                         <button 
-                            onClick={() => setPlayTrigger(prev => prev + 1)} 
+                            onClick={togglePlay} 
                             className="w-8 h-8 bg-blue-500/20 text-blue-500 rounded-full flex items-center justify-center hover:bg-blue-500 hover:text-white transition-all shadow-sm"
-                            title="Play/Resume Audio"
+                            title={isPlaying ? "Pause Audio" : "Play/Resume Audio"}
                         >
-                            <Play size={14} fill="currentColor" className="ml-0.5" />
+                            {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
                         </button>
                         <button 
                             onClick={stopMedia} 
