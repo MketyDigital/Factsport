@@ -103,7 +103,7 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
     const jsonStr = JSON.stringify(ogDataObj);
     const bytes = new TextEncoder().encode(jsonStr);
     const binStr = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("");
-    const encodedData = btoa(binStr).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const encodedData = btoa(binStr).replace(/\+/g, '-',).replace(/\//g, '_').replace(/=+$/, '');
     
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://factsport.com';
     const ogImageUrl = `${appUrl}/api/og?data=${encodedData}`;
@@ -111,7 +111,9 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
     const previousImages = (await parent).openGraph?.images || [];
     const activeVideoUrl = sanitizeUrl(isFinished ? match.video_url : match.livestream_url);
 
-    if (activeVideoUrl) {
+    const isPlayerShare = resolvedSearchParams?.embed === 'true' || resolvedSearchParams?.play === 'true';
+
+    if (isPlayerShare && activeVideoUrl) {
         return { 
             title, 
             description, 
