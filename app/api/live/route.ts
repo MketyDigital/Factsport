@@ -25,7 +25,6 @@ async function runLiveUpdate(request: Request) {
       const activeMatches = windowMatches.filter(m => {
           const isLiveOrUpcoming = ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE'].includes(m.status);
           
-          // 🧠 FIX: Keep polling for up to 5 hours after kickoff to ensure all final events and social FT triggers fire properly.
           const kickMs = Date.parse(m.match_date);
           const hoursSinceKick = (Date.now() - kickMs) / (1000 * 60 * 60);
           const isRecentlyFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(m.status) && hoursSinceKick < 5;
@@ -59,6 +58,7 @@ async function runLiveUpdate(request: Request) {
                      if (espnGame) {
                          if (espnGame.status === 'in') newStatus = 'LIVE';
                          else if (espnGame.status === 'post') newStatus = 'FT'; 
+                         else if (espnGame.status === 'pre') newStatus = 'PRE_MATCH';
                          else if (espnGame.clock === 'HT') newStatus = 'HT';
                          
                          payload.status = newStatus;
@@ -70,7 +70,6 @@ async function runLiveUpdate(request: Request) {
                              payload.displayClock = espnGame.clock;
                          }
                      } else if (richData && richData.stats?.home_score !== undefined) {
-                         // Fallback if dropped from live scoreboard but rich data exists
                          payload.home_score = richData.stats.home_score;
                          payload.away_score = richData.stats.away_score;
                      }
@@ -90,11 +89,9 @@ async function runLiveUpdate(request: Request) {
 
                      await supabase.from('matches').update(payload).eq('id', dbMatch.id);
                      
-                     // 🟢 THE INTERNAL DISPATCH TRIGGER
                      const statusChangedToFT = newStatus === 'FT' && dbMatch.status !== 'FT';
                      const scoresChanged = payload.home_score !== dbMatch.home_score || payload.away_score !== dbMatch.away_score;
                      
-                     // 🧠 FIX: Fire lineups perfectly even if match is PRE_MATCH, just check if 11 players arrived
                      const lineupsAnnounced = payload.lineups && payload.lineups.home?.length >= 11 && (!dbMatch.lineups?.home || dbMatch.lineups.home.length < 11);
 
                      if (statusChangedToFT || scoresChanged || lineupsAnnounced) {
@@ -105,7 +102,7 @@ async function runLiveUpdate(request: Request) {
                              method: 'POST',
                              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
                              body: JSON.stringify({ record: targetRecord, old_record: dbMatch })
-                         }).catch(e => console.error(" Late FT Broadcast Intercept Failed:", e.message));
+                         }).catch(e => console.error("Social Broadcast Intercept Failed:", e.message));
                      }
 
                      return true;

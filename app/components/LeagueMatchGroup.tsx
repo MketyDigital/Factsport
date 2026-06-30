@@ -1,282 +1,417 @@
-// @ts-nocheck
 'use client';
-import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
-import { Calendar, Zap, Ticket, ExternalLink, BarChart2, ChevronRight, Clock, CheckCircle, Trophy, RefreshCcw } from 'lucide-react';
-import MatchTime from '@/app/components/MatchTime';
-import { useSmartInterval } from '@/app/hooks/useSmartInterval';
-import { fetchLiveMatchDeduplicated } from '@/app/utils/liveFetcher';
 
-const groupByDate = (matchList: any[]) => {
-    const groups: { [date: string]: any[] } = {};
-    matchList.forEach(m => {
-        const dateObj = new Date(m.match_date);
-        const dateKey = dateObj.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-        if (!groups[dateKey]) groups[dateKey] = [];
-        groups[dateKey].push(m);
-    });
-    return groups;
+import React, { useState, useEffect } from 'react';
+import { Trophy, Calendar, MapPin, Play, Tv, ChevronRight, Activity, Award, Star, Compass } from 'lucide-react';
+import Link from 'next/link';
+
+interface Match {
+    id?: string;
+    api_id?: number;
+    home_team: string;
+    away_team: string;
+    home_score: number;
+    away_score: number;
+    match_date: string;
+    status: string;
+    home_logo?: string;
+    away_logo?: string;
+    stage?: string | null;
+    match_group?: string | null;
+    venue?: string | null;
+}
+
+interface LeagueMatchGroupProps {
+    leagueName: string;
+    matches: Match[];
+}
+
+// Map stage names to beautiful display titles
+const STAGE_DISPLAY_MAP: Record<string, string> = {
+    'ROUND_OF_32': 'Round of 32',
+    'ROUND_OF_16': 'Round of 16',
+    'QUARTER_FINALS': 'Quarter-Finals',
+    'SEMI_FINALS': 'Semi-Finals',
+    'FINAL': 'The Grand Final',
+    'GROUP_STAGE': 'Group Stage',
 };
 
-const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599";
+export default function LeagueMatchGroup({ leagueName, matches }: LeagueMatchGroupProps) {
+    const cleanLeagueName = leagueName.replace(' Matches', '');
+    const isCup = ['World Cup', 'Euros', 'Champions League', 'Copa America', 'AFCON'].includes(cleanLeagueName);
+    
+    const hasRoundOf32 = cleanLeagueName === 'World Cup' || matches.some(m => String(m.stage || '').toUpperCase() === 'ROUND_OF_32');
 
-export default function LeagueMatchGroup({ leagueName, matches }: { leagueName: string, matches: any[] }) {
-    const [activeTab, setActiveTab] = useState<'fixtures' | 'results'>('fixtures');
-    const [liveMatches, setLiveMatches] = useState(matches);
-    const isFetching = useRef(false);
-    const [visibleCount, setVisibleCount] = useState(10);
-
-    const handleTabChange = (tab: 'fixtures' | 'results') => {
-        setActiveTab(tab);
-        setVisibleCount(10);
-    };
-
-    useEffect(() => {
-        setLiveMatches(prev => {
-            const prevIds = prev.map(p => p.id).join(',');
-            const newIds = matches.map(n => n.id).join(',');
-            if (prevIds !== newIds) return matches;
-            return prev;
-        });
-    }, [matches]);
-
-    const pollableMatches = liveMatches.filter(m => {
-        if (!m.espn_id) return false;
-        const status = (m.status || '').toUpperCase();
-        if (['FT', 'FINISHED', 'ABD', 'AET', 'PEN'].includes(status)) return false;
-        if (['LIVE', 'IN_PLAY', 'HT', '1H', '2H', 'ET', 'P'].includes(status)) return true;
-        
-        const matchTime = new Date(m.match_date).getTime();
-        const now = Date.now();
-        return (matchTime - now) < 3600000; 
+    // Filter matches
+    const knockoutStages = ['ROUND_OF_32', 'ROUND_OF_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'FINAL'];
+    
+    const knockoutMatches = matches.filter(m => {
+        const stageUpper = String(m.stage || '').toUpperCase();
+        return knockoutStages.includes(stageUpper);
     });
 
-    const fetchUpdates = async () => {
-        if (isFetching.current || pollableMatches.length === 0) return;
+    const [activeTab, setActiveTab] = useState<'fixtures' | 'bracket'>(
+        isCup && knockoutMatches.length > 0 ? 'bracket' : 'fixtures'
+    );
 
-        isFetching.current = true;
-        try {
-            const updatePromises = pollableMatches.map(async (m) => {
-                try {
-                    const data = await fetchLiveMatchDeduplicated(m.espn_id);
-                    if (data && !data.error) {
-                        return { id: m.id, status: data.status, home_score: data.home_score, away_score: data.away_score, displayClock: data.displayClock, stats: data.stats };
-                    }
-                } catch (e) {}
-                return null;
-            });
+    const groupStageMatches = matches.filter(m => {
+        const stageUpper = String(m.stage || '').toUpperCase();
+        return !knockoutStages.includes(stageUpper);
+    });
 
-            const results = await Promise.all(updatePromises);
-            
-            let hasChanges = false;
-            const newLiveMatches = liveMatches.map(m => {
-                const update = results.find(r => r && r.id === m.id);
-                if (update && (update.status !== m.status || update.home_score !== m.home_score || update.away_score !== m.away_score || update.displayClock !== m.displayClock || JSON.stringify(update.stats) !== JSON.stringify(m.stats))) {
-                    hasChanges = true;
-                    return { ...m, status: update.status, home_score: update.home_score, away_score: update.away_score, displayClock: update.displayClock, stats: update.stats };
-                }
-                return m;
-            });
-
-            if (hasChanges) setLiveMatches(newLiveMatches);
-
-        } catch(e) { } 
-        finally {
-            isFetching.current = false;
-        }
+    // Group knockout matches by stage
+    const groupedKnockout: Record<string, Match[]> = {
+        'ROUND_OF_32': [],
+        'ROUND_OF_16': [],
+        'QUARTER_FINALS': [],
+        'SEMI_FINALS': [],
+        'FINAL': []
     };
 
-    useEffect(() => {
-        fetchUpdates();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    knockoutMatches.forEach(m => {
+        const stageUpper = String(m.stage || '').toUpperCase();
+        if (groupedKnockout[stageUpper]) {
+            groupedKnockout[stageUpper].push(m);
+        }
+    });
 
-    useSmartInterval(fetchUpdates, pollableMatches.length > 0 ? 10000 : null);
+    // Sort knockout stage matches chronologically
+    Object.keys(groupedKnockout).forEach(key => {
+        groupedKnockout[key].sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
+    });
 
-    const fixtures = liveMatches
-        .filter(m => !['FT', 'FINISHED', 'ABD'].includes((m.status || '').toUpperCase()))
-        .sort((a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
-    
-    const results = liveMatches
-        .filter(m => ['FT', 'FINISHED', 'ABD'].includes((m.status || '').toUpperCase()))
-        .sort((a, b) => new Date(b.match_date).getTime() - new Date(a.match_date).getTime());
+    // Group group stage/fixtures by date or matchday
+    const groupedFixtures: Record<string, Match[]> = {};
+    groupStageMatches.forEach(m => {
+        // Use group name or date as key
+        const key = m.match_group || (m.match_date ? new Date(m.match_date).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' }) : 'Scheduled Matches');
+        if (!groupedFixtures[key]) groupedFixtures[key] = [];
+        groupedFixtures[key].push(m);
+    });
 
-    const activeList = activeTab === 'fixtures' ? fixtures : results;
-    const displayMatches = activeList.slice(0, visibleCount);
-    const hasMore = visibleCount < activeList.length;
-    const dateGroups = groupByDate(displayMatches);
-    const hasData = displayMatches.length > 0;
+    const formatMatchTime = (isoString: string) => {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+
+    const getWinnerBadge = (m: Match) => {
+        if (!['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'].includes(m.status)) return null;
+        if (m.home_score > m.away_score) return 'home';
+        if (m.away_score > m.home_score) return 'away';
+        return null;
+    };
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6 flex flex-col">
-            <div className="bg-slate-50 border-b border-slate-200">
-                <div className="px-4 py-3 flex justify-between items-center">
-                    <h2 className="font-black text-sm uppercase text-slate-800 tracking-wider truncate">{leagueName}</h2>
-                    <Link href={`/standings?league=${encodeURIComponent(leagueName.replace(' Matches', ''))}`} className="text-[10px] font-bold text-blue-600 flex items-center gap-1 hover:underline">
-                        Full Table <ChevronRight size={10} />
-                    </Link>
-                </div>
-                
-                <div className="flex px-2 gap-2 pb-2">
-                    <button 
-                        onClick={() => handleTabChange('fixtures')} 
-                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'fixtures' ? 'bg-white shadow-sm text-blue-600 border border-slate-100' : 'text-slate-400 hover:bg-slate-100'}`}
+        <div className="space-y-6">
+            {/* COMPOSITE SELECTOR TABS FOR CUPS */}
+            {isCup && knockoutMatches.length > 0 && (
+                <div className="flex bg-[#0a1428] p-1 rounded-2xl border border-slate-800 shadow-lg max-w-md mx-auto">
+                    <button
+                        onClick={() => setActiveTab('bracket')}
+                        className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition duration-200 flex items-center justify-center gap-2 cursor-pointer ${
+                            activeTab === 'bracket' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                        }`}
                     >
-                        <Calendar size={12} /> Fixtures
-                        <span className={`px-1.5 rounded-full text-[9px] ${activeTab === 'fixtures' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{fixtures.length}</span>
+                        <Trophy size={14} className={activeTab === 'bracket' ? 'text-yellow-400' : ''} /> Knockout Bracket
                     </button>
-                    <button 
-                        onClick={() => handleTabChange('results')} 
-                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'results' ? 'bg-white shadow-sm text-blue-600 border border-slate-100' : 'text-slate-400 hover:bg-slate-100'}`}
+                    <button
+                        onClick={() => setActiveTab('fixtures')}
+                        className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition duration-200 flex items-center justify-center gap-2 cursor-pointer ${
+                            activeTab === 'fixtures' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                        }`}
                     >
-                        <CheckCircle size={12} /> Results
-                        <span className={`px-1.5 rounded-full text-[9px] ${activeTab === 'results' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{results.length}</span>
-                    </button>
-                    <Link href={`/standings?league=${encodeURIComponent(leagueName.replace(' Matches', ''))}`} className="flex-1 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:bg-slate-100 flex items-center justify-center gap-2 transition-all">
-                        <BarChart2 size={12} /> Table
-                    </Link>
-                </div>
-            </div>
-
-            <div className="divide-y divide-slate-50 min-h-[100px]">
-                {!hasData ? (
-                    <div className="flex flex-col items-center justify-center py-8 text-slate-400">
-                        <Calendar size={24} className="mb-2 opacity-50"/>
-                        <p className="text-xs font-medium">No {activeTab} available.</p>
-                    </div>
-                ) : (
-                    Object.keys(dateGroups).map((dateKey) => (
-                        <div key={dateKey}>
-                            <div className="bg-slate-100/80 backdrop-blur-sm px-4 py-1.5 border-b border-slate-50 sticky top-0 z-10">
-                                <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
-                                    <Clock size={10}/> {dateKey}
-                                </span>
-                            </div>
-
-                            {dateGroups[dateKey].map((match) => {
-                                const isLive = ['LIVE', 'HT', 'IN_PLAY'].includes((match.status || '').toUpperCase());
-                                const isScheduled = ['SCHEDULED', 'PRE'].includes((match.status || '').toUpperCase());
-                                const isFinished = ['FT', 'FINISHED'].includes((match.status || '').toUpperCase());
-                                
-                                const stageText = match.match_group ? match.match_group.replace(/_/g, ' ') : (match.stage && match.stage !== 'REGULAR_SEASON' ? match.stage.replace(/_/g, ' ') : null);
-                                const isKnockout = match.stage && (match.stage.includes('FINAL') || match.stage.includes('KNOCKOUT'));
-
-                                const homePens = match.stats?.home_penalties;
-                                const awayPens = match.stats?.away_penalties;
-                                const hasPens = homePens !== null && homePens !== undefined;
-                                const homeHT = match.stats?.home_ht;
-                                const awayHT = match.stats?.away_ht;
-                                const hasHT = homeHT !== null && homeHT !== undefined;
-                                const aggregateText = match.stats?.aggregate;
-
-                                return (
-                                <div key={match.id} className={`block hover:bg-slate-50 transition p-4 ${isKnockout ? 'bg-amber-50/30' : ''}`}>
-                                    <Link href={`/match/${match.id}`} className="flex items-center justify-between mb-3">
-                                        
-                                        <div className="flex-1 space-y-3">
-                                            {stageText && (
-                                                <div className={`text-[8px] font-black uppercase tracking-wider mb-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${isKnockout ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-white shadow-sm' : 'text-blue-500 bg-blue-50'}`}>
-                                                    {isKnockout && <Trophy size={8} />} {stageText}
-                                                </div>
-                                            )}
-
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-7 h-7 flex items-center justify-center shrink-0">
-                                                    {match.home_logo ? <img src={match.home_logo} className="w-full h-full object-contain drop-shadow-sm" /> : <div className="w-5 h-5 bg-slate-200 rounded-full"/>}
-                                                </div>
-                                                <span className={`text-sm font-black uppercase tracking-tight truncate max-w-[120px] sm:max-w-none ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-500'}`}>
-                                                    {match.home_team}
-                                                </span>
-                                                {!isScheduled && (
-                                                    <div className="ml-auto flex items-baseline gap-1.5">
-                                                        {hasPens && <span className="text-[9px] font-bold text-amber-500">({homePens})</span>}
-                                                        <span className={`font-black text-lg ${isFinished && match.home_score > match.away_score ? 'text-slate-900' : 'text-slate-400'}`}>{match.home_score}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-7 h-7 flex items-center justify-center shrink-0">
-                                                    {match.away_logo ? <img src={match.away_logo} className="w-full h-full object-contain drop-shadow-sm" /> : <div className="w-5 h-5 bg-slate-200 rounded-full"/>}
-                                                </div>
-                                                <span className={`text-sm font-black uppercase tracking-tight truncate max-w-[120px] sm:max-w-none ${isFinished && match.away_score > match.home_score ? 'text-slate-900' : 'text-slate-500'}`}>
-                                                    {match.away_team}
-                                                </span>
-                                                {!isScheduled && (
-                                                    <div className="ml-auto flex items-baseline gap-1.5">
-                                                        {hasPens && <span className="text-[9px] font-bold text-amber-500">({awayPens})</span>}
-                                                        <span className={`font-black text-lg ${isFinished && match.away_score > match.home_score ? 'text-slate-900' : 'text-slate-400'}`}>{match.away_score}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {(hasHT || aggregateText) && (
-                                                <div className="flex items-center gap-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-2 pt-1 border-t border-slate-100/50">
-                                                    {hasHT && <span>HT: {homeHT}-{awayHT}</span>}
-                                                    {hasHT && aggregateText && <span className="w-1 h-1 bg-slate-300 rounded-full"></span>}
-                                                    {aggregateText && <span className="text-blue-500">{aggregateText}</span>}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="flex flex-col items-end justify-center pl-4 border-l border-slate-100 ml-4 w-16 shrink-0">
-                                            {isLive ? (
-                                                <div className="flex flex-col items-center">
-                                                    <span className="animate-pulse text-red-600 font-black text-[10px] bg-red-50 px-2 py-0.5 rounded border border-red-100">LIVE</span>
-                                                    <span className="text-[9px] text-red-500 font-bold mt-1">{match.status === 'HT' ? 'HT' : match.displayClock || 'On Going'}</span>
-                                                </div>
-                                            ) : isFinished ? (
-                                                <div className="flex flex-col items-center">
-                                                    <span className="text-slate-400 font-black text-[10px] bg-slate-100 px-2 py-0.5 rounded">FT</span>
-                                                </div>
-                                            ) : (
-                                                <div className="flex flex-col items-center bg-slate-50 p-1.5 rounded border border-slate-100 shadow-sm">
-                                                    <span className="text-slate-800 font-black text-xs">
-                                                        <MatchTime date={match.match_date} />
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </Link>
-
-                                    {!isFinished && (
-                                        <div className="flex gap-2 mt-2 pt-3 border-t border-slate-50">
-                                            {isScheduled && (
-                                                <Link href={`/match/${match.id}`} className="flex-1 bg-gradient-to-b from-white to-slate-50 border border-slate-200 text-slate-700 rounded-lg py-1.5 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 hover:border-slate-300 transition shadow-sm">
-                                                    <Zap size={10} className="text-blue-600 fill-blue-600"/> Predict
-                                                </Link>
-                                            )}
-                                            
-                                            {match.booking_code ? (
-                                                <button className="flex-1 bg-[#0a1428] text-white rounded-lg py-1.5 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-md hover:bg-[#1a2b4c] transition">
-                                                    <Ticket size={10} className="text-yellow-400"/> Code: {match.booking_code}
-                                                </button>
-                                            ) : (
-                                                <a href={match.affiliate_link || DEFAULT_AFFILIATE_LINK} target="_blank" rel="noopener noreferrer" className="flex-1 bg-green-50 text-green-700 border border-green-200 rounded-lg py-1.5 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 hover:bg-green-100 transition shadow-sm">
-                                                    <ExternalLink size={10}/> Bet Now
-                                                </a>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                                );
-                            })}
-                        </div>
-                    ))
-                )}
-            </div>
-
-            {hasMore && (
-                <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-                    <button 
-                        onClick={() => setVisibleCount(prev => prev + 10)}
-                        className="w-full bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-slate-600 font-black text-[10px] uppercase tracking-widest py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
-                    >
-                        <RefreshCcw size={14} className="text-blue-500" /> 
-                        Load {Math.min(10, activeList.length - visibleCount)} More {activeTab === 'fixtures' ? 'Upcoming Matches' : 'Recent Results'}
+                        <Calendar size={14} /> Group Stage & Matches
                     </button>
                 </div>
             )}
+
+            {/* BRACKET DISPLAY */}
+            {activeTab === 'bracket' && isCup && (
+                <div className="w-full overflow-x-auto pb-6 scrollbar-hide select-none rounded-3xl bg-[#0b1329] border border-slate-800 p-4 md:p-6 shadow-2xl">
+                    <div className="flex items-center gap-2 mb-6 px-1 border-b border-slate-800 pb-3">
+                        <Compass className="text-blue-500 animate-spin" size={16} style={{ animationDuration: '8s' }} />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            Tournament Bracket Explorer &bull; Scroll Horizontally
+                        </span>
+                    </div>
+
+                    <div 
+                        className="grid gap-4 md:gap-6 px-1 relative"
+                        style={{
+                            gridTemplateColumns: `repeat(${hasRoundOf32 ? 5 : 4}, minmax(220px, 1fr))`,
+                            minWidth: hasRoundOf32 ? '1250px' : '1000px'
+                        }}
+                    >
+                        {/* Column 1: Round of 32 (Optional) */}
+                        {hasRoundOf32 && (
+                            <div className="space-y-6 flex flex-col justify-around bg-[#0a1428]/45 p-3 rounded-2xl border border-slate-800/60">
+                                <div className="text-center bg-slate-900/80 border border-slate-800 rounded-xl py-2 px-3 mb-2 shadow-sm">
+                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 block">Round of 32</span>
+                                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block mt-0.5">16 Matchups</span>
+                                </div>
+                                {groupedKnockout['ROUND_OF_32'].length > 0 ? (
+                                    groupedKnockout['ROUND_OF_32'].map((m) => (
+                                        <BracketMatchCard key={m.id || m.api_id} match={m} getWinnerBadge={getWinnerBadge} formatMatchTime={formatMatchTime} />
+                                    ))
+                                ) : (
+                                    <BracketPlaceholder count={8} text="Matches to be determined" />
+                                )}
+                            </div>
+                        )}
+
+                        {/* Column 2: Round of 16 */}
+                        <div className="space-y-6 flex flex-col justify-around bg-[#0a1428]/45 p-3 rounded-2xl border border-slate-800/60">
+                            <div className="text-center bg-slate-900/80 border border-slate-800 rounded-xl py-2 px-3 mb-2 shadow-sm">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 block">Round of 16</span>
+                                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block mt-0.5">8 Matchups</span>
+                            </div>
+                            {groupedKnockout['ROUND_OF_16'].length > 0 ? (
+                                groupedKnockout['ROUND_OF_16'].map((m) => (
+                                    <BracketMatchCard key={m.id || m.api_id} match={m} getWinnerBadge={getWinnerBadge} formatMatchTime={formatMatchTime} />
+                                ))
+                            ) : (
+                                <BracketPlaceholder count={hasRoundOf32 ? 4 : 8} text="Matches to be announced" />
+                            )}
+                        </div>
+
+                        {/* Column 3: Quarter-Finals */}
+                        <div className="space-y-6 flex flex-col justify-around bg-[#0a1428]/45 p-3 rounded-2xl border border-slate-800/60">
+                            <div className="text-center bg-slate-900/80 border border-slate-800 rounded-xl py-2 px-3 mb-2 shadow-sm">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 block">Quarter-Finals</span>
+                                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block mt-0.5">4 Matchups</span>
+                            </div>
+                            {groupedKnockout['QUARTER_FINALS'].length > 0 ? (
+                                groupedKnockout['QUARTER_FINALS'].map((m) => (
+                                    <BracketMatchCard key={m.id || m.api_id} match={m} getWinnerBadge={getWinnerBadge} formatMatchTime={formatMatchTime} />
+                                ))
+                            ) : (
+                                <BracketPlaceholder count={4} text="TBD" />
+                            )}
+                        </div>
+
+                        {/* Column 4: Semi-Finals */}
+                        <div className="space-y-6 flex flex-col justify-around bg-[#0a1428]/45 p-3 rounded-2xl border border-slate-800/60">
+                            <div className="text-center bg-slate-900/80 border border-slate-800 rounded-xl py-2 px-3 mb-2 shadow-sm">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 block">Semi-Finals</span>
+                                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block mt-0.5">2 Matchups</span>
+                            </div>
+                            {groupedKnockout['SEMI_FINALS'].length > 0 ? (
+                                groupedKnockout['SEMI_FINALS'].map((m) => (
+                                    <BracketMatchCard key={m.id || m.api_id} match={m} getWinnerBadge={getWinnerBadge} formatMatchTime={formatMatchTime} />
+                                ))
+                            ) : (
+                                <BracketPlaceholder count={2} text="TBD" />
+                            )}
+                        </div>
+
+                        {/* Column 5: Final */}
+                        <div className="space-y-6 flex flex-col justify-center bg-[#0d1630]/65 p-4 rounded-2xl border border-yellow-500/15">
+                            <div className="text-center bg-yellow-500/10 border border-yellow-500/30 rounded-xl py-2.5 px-3 mb-4 shadow-[0_0_20px_rgba(234,179,8,0.05)]">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-yellow-500 flex items-center justify-center gap-1">
+                                    <Trophy size={12} className="text-yellow-400" /> Grand Final
+                                </span>
+                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block mt-0.5">1 Matchup</span>
+                            </div>
+                            {groupedKnockout['FINAL'].length > 0 ? (
+                                groupedKnockout['FINAL'].map((m) => (
+                                    <BracketMatchCard key={m.id || m.api_id} match={m} getWinnerBadge={getWinnerBadge} formatMatchTime={formatMatchTime} isFinal={true} />
+                                ))
+                            ) : (
+                                <BracketPlaceholder count={1} text="TBD" isFinal={true} />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* NORMAL CHRONOLOGICAL MATCH LISTINGS / FIXTURES */}
+            {(activeTab === 'fixtures' || !isCup || knockoutMatches.length === 0) && (
+                <div className="space-y-8 animate-in fade-in duration-300">
+                    {Object.keys(groupedFixtures).length === 0 ? (
+                        <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 flex flex-col items-center">
+                            <Calendar size={48} className="text-slate-400 mb-4 opacity-50" />
+                            <h3 className="text-lg font-black uppercase tracking-tight text-slate-700">No Fixtures Available</h3>
+                            <p className="text-slate-500 text-xs font-medium mt-1">There are no matches currently scheduled in this bracket.</p>
+                        </div>
+                    ) : (
+                        Object.keys(groupedFixtures).map((groupKey) => (
+                            <div key={groupKey} className="space-y-3.5">
+                                <div className="flex items-center gap-2 border-b border-slate-200/80 pb-2">
+                                    <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div>
+                                    <h3 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-xs">
+                                        {groupKey}
+                                    </h3>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {groupedFixtures[groupKey].map((m) => {
+                                        const isLive = ['LIVE', '1H', '2H', 'HT', 'ET', 'P', 'IN_PLAY'].includes(m.status);
+                                        const winner = getWinnerBadge(m);
+
+                                        return (
+                                            <div 
+                                                key={m.id || m.api_id} 
+                                                className="bg-white hover:bg-slate-50/50 border border-slate-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group cursor-pointer"
+                                            >
+                                                <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                                    <span>{m.stage ? STAGE_DISPLAY_MAP[m.stage] || m.stage.replace(/_/g, ' ') : 'Match'}</span>
+                                                    {isLive ? (
+                                                        <span className="bg-red-500 text-white text-[8px] font-black tracking-widest px-2 py-0.5 rounded-md flex items-center gap-1 animate-pulse">
+                                                            <Activity size={10} /> LIVE
+                                                        </span>
+                                                    ) : (
+                                                        <span>{m.match_date ? new Date(m.match_date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}</span>
+                                                    )}
+                                                </div>
+
+                                                <div className="my-4 space-y-2.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            {m.home_logo ? (
+                                                                <img src={m.home_logo} className="w-4.5 h-4.5 object-contain" alt="" />
+                                                            ) : (
+                                                                <div className="w-4.5 h-4.5 bg-slate-100 rounded-full flex items-center justify-center text-[8px] font-black">H</div>
+                                                            )}
+                                                            <span className={`text-xs font-black ${winner === 'home' ? 'text-blue-600' : 'text-slate-800'}`}>
+                                                                {m.home_team}
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-xs font-black text-slate-900">{m.home_score}</span>
+                                                    </div>
+
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            {m.away_logo ? (
+                                                                <img src={m.away_logo} className="w-4.5 h-4.5 object-contain" alt="" />
+                                                            ) : (
+                                                                <div className="w-4.5 h-4.5 bg-slate-100 rounded-full flex items-center justify-center text-[8px] font-black">A</div>
+                                                            )}
+                                                            <span className={`text-xs font-black ${winner === 'away' ? 'text-blue-600' : 'text-slate-800'}`}>
+                                                                {m.away_team}
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-xs font-black text-slate-900">{m.away_score}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="border-t border-slate-100 pt-2.5 flex justify-between items-center">
+                                                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1">
+                                                        <MapPin size={10} /> {m.venue || 'Stadium Arena'}
+                                                    </span>
+                                                    <div className="flex gap-1.5">
+                                                        <Link 
+                                                            href={`/matches?id=${m.api_id || m.id}`}
+                                                            className="text-[9px] font-black uppercase text-blue-600 hover:text-blue-700 flex items-center gap-0.5 group-hover:translate-x-1 transition-transform"
+                                                        >
+                                                            Details <ChevronRight size={10} />
+                                                        </Link>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// Sub-component: Bracket Placeholder Card
+function BracketPlaceholder({ count, text, isFinal }: { count: number; text: string; isFinal?: boolean }) {
+    return (
+        <div className="space-y-4 my-auto w-full">
+            {Array.from({ length: count }).map((_, i) => (
+                <div 
+                    key={i} 
+                    className={`rounded-2xl border border-slate-850 bg-[#0c1428]/45 p-4 flex flex-col items-center justify-center text-center opacity-40 select-none ${
+                        isFinal ? 'border-dashed border-yellow-500/50 min-h-[110px]' : 'min-h-[85px]'
+                    }`}
+                >
+                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-500 mb-1">MATCH {i + 1}</span>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">{text}</span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// Sub-component: Bracket Match Card
+function BracketMatchCard({ match, getWinnerBadge, formatMatchTime, isFinal }: { match: Match; getWinnerBadge: (m: Match) => string | null; formatMatchTime: (s: string) => string; isFinal?: boolean }) {
+    const isLive = ['LIVE', '1H', '2H', 'HT', 'ET', 'P', 'IN_PLAY'].includes(match.status);
+    const winner = getWinnerBadge(match);
+
+    return (
+        <div 
+            className={`rounded-2xl p-3 shadow-md border bg-[#0a1428] relative overflow-hidden transition-all duration-300 hover:border-blue-500/50 ${
+                isFinal 
+                    ? 'border-yellow-500/40 bg-gradient-to-br from-[#0c1630] to-[#1e1c25] shadow-[0_4px_30px_rgba(234,179,8,0.15)] ring-1 ring-yellow-500/20' 
+                    : 'border-slate-800/80 hover:shadow-[0_4px_25px_rgba(37,99,235,0.15)]'
+            }`}
+        >
+            {/* Ambient decoration */}
+            <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 rounded-full blur-xl"></div>
+            
+            <div className="flex justify-between items-center text-[7px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
+                <span>{match.match_date ? new Date(match.match_date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Date TBD'}</span>
+                {isLive ? (
+                    <span className="bg-red-600 text-white text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest animate-pulse">LIVE</span>
+                ) : (
+                    <span>{match.match_date ? formatMatchTime(match.match_date) : ''}</span>
+                )}
+            </div>
+
+            <div className="space-y-2 relative z-10">
+                {/* Home Team Row */}
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 truncate max-w-[80%]">
+                        {match.home_logo ? (
+                            <img src={match.home_logo} className="w-4.5 h-4.5 object-contain" alt="" />
+                        ) : (
+                            <div className="w-4.5 h-4.5 bg-slate-800 rounded-full flex items-center justify-center text-[6px] font-bold">H</div>
+                        )}
+                        <span className={`text-[10px] font-black truncate ${winner === 'home' ? 'text-yellow-400 font-extrabold' : 'text-slate-300'}`}>
+                            {match.home_team}
+                        </span>
+                    </div>
+                    <span className={`text-[10px] font-black ${winner === 'home' ? 'text-yellow-400' : 'text-slate-400'}`}>
+                        {match.home_score}
+                    </span>
+                </div>
+
+                {/* Away Team Row */}
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 truncate max-w-[80%]">
+                        {match.away_logo ? (
+                            <img src={match.away_logo} className="w-4.5 h-4.5 object-contain" alt="" />
+                        ) : (
+                            <div className="w-4.5 h-4.5 bg-slate-800 rounded-full flex items-center justify-center text-[6px] font-bold">A</div>
+                        )}
+                        <span className={`text-[10px] font-black truncate ${winner === 'away' ? 'text-yellow-400 font-extrabold' : 'text-slate-300'}`}>
+                            {match.away_team}
+                        </span>
+                    </div>
+                    <span className={`text-[10px] font-black ${winner === 'away' ? 'text-yellow-400' : 'text-slate-400'}`}>
+                        {match.away_score}
+                    </span>
+                </div>
+            </div>
+
+            {/* Bottom Details Action */}
+            <div className="border-t border-slate-800/80 mt-2.5 pt-2 flex items-center justify-between">
+                <span className="text-[7px] text-slate-500 font-bold uppercase truncate max-w-[65%]">
+                    {match.venue || 'Stadium Arena'}
+                </span>
+                <Link 
+                    href={`/matches?id=${match.api_id || match.id}`}
+                    className="text-[7px] font-black uppercase text-blue-400 hover:text-blue-300 flex items-center gap-0.5"
+                >
+                    Match <ChevronRight size={8} />
+                </Link>
+            </div>
         </div>
     );
 }
