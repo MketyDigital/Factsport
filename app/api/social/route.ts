@@ -4,6 +4,9 @@ export const runtime = 'edge';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
+// Global cache for Edge isolate to prevent immediate concurrent duplicate processing
+const edgeRecentPosts = new Set<string>();
+
 const SAFETY_MAP: Record<string, any> = {
   goals: { buf_x1: false, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: true, make2: false, tg_general: false },
   lineups: { buf_x1: true, buf_x2: false, buf_fb1: false, buf_fb2: false, fb1: true, fb2: false, make1: true, make2: false, tg_general: false },
@@ -294,7 +297,6 @@ export async function POST(request: Request) {
   const { data: settingsData } = await supabase.from('site_settings').select('social_config').single();
   const config = settingsData?.social_config || { credentials: {}, vip_teams: [], vip_leagues: [], events: {}, templates: {} };
 
-  // 🟢 🧠 FIX: HARDCODED VIP TEAMS AND LEAGUES FALLBACK (Unbreakable)
   const HARDCODED_VIP_LEAGUES = [
     'Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Ligue 1', 
     'Champions League', 'Europa League', 'Europa Conference League', 
@@ -322,8 +324,6 @@ export async function POST(request: Request) {
   const isVipLeague = mergedVipLeagues.some(l => leagueStr === l.toLowerCase() || leagueStr.includes(l.toLowerCase()));
   let isVIP = isVipTeam || isVipLeague;
   
-  const postedEvents = Array.isArray(newState.posted_social_events) ? newState.posted_social_events : [];
-
   if (!isVIP) {
     const today = new Date().toISOString().split('T')[0];
     const { data: todaysMatches } = await supabase.from('matches').select('id, home_team, away_team, league').like('match_date', `${today}%`).order('match_date', { ascending: true });
@@ -360,7 +360,7 @@ export async function POST(request: Request) {
   const oldTotal = (oldState.home_score || 0) + (oldState.away_score || 0);
   const newTotal = (newState.home_score || 0) + (newState.away_score || 0);
   const oldGoalsList = getValidGoals(oldState.match_events || []);
-  const newGoalsList = getValidGoals(newState.match_events || []);
+  let newGoalsList = getValidGoals(newState.match_events || []);
   const oldPenaltiesList = getPenaltyEvents(oldState.match_events || []);
   const newPenaltiesList = getPenaltyEvents(newState.match_events || []);
 
@@ -391,22 +391,35 @@ export async function POST(request: Request) {
       eventKey = 'var_overturn';
     }
   } else if (newTotal > oldTotal && !isTerminalStatus(newStatus)) {
-    
-    // 🧠 FIX: Instant Generic Goal Post if text commentary is lagging behind the scoreboard tick!
     eventKey = 'goals';
     extraData.statusText = isLiveStatus(newStatus) ? '' : ` (${newState.status})`;
     
-    if (newGoalsList.length < newTotal) {
-      // Scoreboard ticked up, but text commentary hasn't arrived yet. Don't wait. Post generic instantly.
-      extraData.scorer = '\n⚽ GOAL - Confirmed!\n';
+    let latestGoal = getLatestChangedGoal(oldGoalsList, newGoalsList);
+    
+    if (newGoalsList.length < newTotal || !latestGoal) {
+      // 8-second delay allows the DB to catch up via another webhook while this function waits
+      await new Promise(resolve => setTimeout(resolve, 8000));
+      const { data: freshMatch } = await supabase.from('matches').select('match_events').eq('id', newState.id).single();
+      if (freshMatch) {
+          newGoalsList = getValidGoals(freshMatch.match_events || []);
+          latestGoal = getLatestChangedGoal(oldGoalsList, newGoalsList);
+      }
+    }
+    
+    if (!latestGoal) {
+      extraData.scorer = '\n⚽ GOAL!\n';
     } else {
-      const latestGoal = getLatestChangedGoal(oldGoalsList, newGoalsList);
-      if (!latestGoal || !isEventFresh(latestGoal, newState.match_date)) {
+      if (!isEventFresh(latestGoal, newState.match_date)) {
         return NextResponse.json({ message: 'Goal event is stale. Ignoring late goal trigger.' });
       }
-      const player = latestGoal.player || latestGoal.playerName || latestGoal.name || 'Unknown Player';
+      const player = latestGoal.player || latestGoal.playerName || latestGoal.name;
       const time = latestGoal.time || latestGoal.minute ? `${latestGoal.time || latestGoal.minute}' ` : '';
-      extraData.scorer = `\n⚽ GOAL - ${player} (${time.trim()})\n`;
+      
+      if (player) {
+          extraData.scorer = `\n⚽ GOAL - ${player} ${time ? `(${time.trim()})` : ''}\n`;
+      } else {
+          extraData.scorer = `\n⚽ GOAL! ${time ? `(${time.trim()})` : ''}\n`;
+      }
     }
 
     ogPayload = {
@@ -452,7 +465,13 @@ export async function POST(request: Request) {
   if (eventKey === 'penalty_awarded') eventKey = `penalty_awarded_${newPenaltiesList.length}`;
 
   if (!eventKey) return NextResponse.json({ message: 'No relevant trigger.' });
-  if (postedEvents.includes(eventKey)) return NextResponse.json({ message: 'Event already posted for this match.' });
+
+  const uniqueEventIdentifier = `${newState.id}_${eventKey}`;
+  if (edgeRecentPosts.has(uniqueEventIdentifier)) {
+    return NextResponse.json({ message: 'Event already processing/processed concurrently (caught by Edge cache).' });
+  }
+  edgeRecentPosts.add(uniqueEventIdentifier);
+  setTimeout(() => edgeRecentPosts.delete(uniqueEventIdentifier), 90000);
 
   const baseEventKey = eventKey.replace(/_\d+$/, '');
   const baseSafetyConfig = SAFETY_MAP[baseEventKey] || {};
@@ -631,9 +650,6 @@ export async function POST(request: Request) {
       body: JSON.stringify({ url: matchUrl, type: 'URL_UPDATED' })
     }).catch(() => {});
 
-    if (eventKey) {
-      await supabase.from('matches').update({ posted_social_events: [...postedEvents, eventKey] }).eq('id', newState.id);
-    }
   } catch (err) {
     console.error('Critical error firing socials:', err);
   }
