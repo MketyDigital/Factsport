@@ -133,34 +133,31 @@ export async function GET(request: Request) {
                     const fdAwayScore = m.score?.fullTime?.away ?? 0;
                     let shouldUpdateMatch = false;
 
+                    // Trigger standings update if active
                     if (['LIVE', 'HT', 'FT', 'FINISHED', 'AWARDED'].includes(fdStatusMapped) || isDbLive) {
                         leaguesNeedingStandingsUpdate.add(compCode);
                     }
 
+                    // Strict Update Logic
                     if (fdStatusMapped === 'FT') {
+                        // We check FT regardless of espn_id to verify final scores
                         if (dbMatch.status !== 'FT' || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
                             shouldUpdateMatch = true;
                             leaguesNeedingStandingsUpdate.add(compCode); 
-                            
-                            const internalOrigin = new URL(request.url).origin;
-                            const targetRecord = { ...dbMatch, home_score: fdHomeScore, away_score: fdAwayScore, status: 'FT' };
-                            
-                            fetch(`${internalOrigin}/api/social`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
-                                body: JSON.stringify({ record: targetRecord, old_record: dbMatch })
-                            }).catch(e => console.error(" Late FT Broadcast Intercept Failed:", e.message));
                         }
                     } 
-                    else if (hasEspnId && (fdStatusMapped === 'LIVE' || fdStatusMapped === 'HT' || isDbLive)) {
+                    else if (hasEspnId) {
+                        // Skip Scheduled, Live, Postponed, etc., if the match has an ESPN ID
                         continue; 
                     } 
-                    else if (!hasEspnId && ['LIVE', 'HT'].includes(fdStatusMapped)) {
+                    else if (['LIVE', 'HT'].includes(fdStatusMapped)) {
+                        // No ESPN ID: Update live scores
                         if (dbMatch.status !== fdStatusMapped || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
                             shouldUpdateMatch = true;
                         }
                     }
                     else if (['POSTPONED', 'SCHEDULED'].includes(fdStatusMapped)) {
+                        // No ESPN ID: Update pre-match statuses
                         if (dbMatch.status !== fdStatusMapped && !isDbLive) {
                             shouldUpdateMatch = true;
                         }
