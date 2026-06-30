@@ -40,7 +40,7 @@ export default function FactSportPlayer({
   const [uiBlocker, setUiBlocker] = useState(false);
   
   const [isTimeLocked, setIsTimeLocked] = useState(isLocked);
-  const [coverageTimeText, setCoverageTimeText] = useState('Coverage starts 5 mins to Kick-off');
+  const [coverageTimeText, setCoverageTimeText] = useState('Coverage starts 5 mins to Kick-off'); // EDIT HERE: Default coverage text
   
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -55,6 +55,7 @@ export default function FactSportPlayer({
       setIsTimeLocked(isLocked);
       if (matchDate && isLocked) {
           const timeStr = new Date(matchDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          // EDIT HERE: Coverage time text when locked and matchDate is present
           setCoverageTimeText(`Coverage begins at ${timeStr}`);
       }
   }, [isLocked, matchDate]);
@@ -112,7 +113,9 @@ export default function FactSportPlayer({
       if (isYouTube && iframeRef.current) {
           iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo' }), '*');
           setUiBlocker(true);
-          setTimeout(() => setUiBlocker(false), 3500);
+          // HOW TO EDIT UI BLOCKER TIMEOUT:
+          // Change the '4000' below (in milliseconds) to adjust how long the top/bottom bars hide the YouTube UI
+          setTimeout(() => setUiBlocker(false), 4000);
       } else if (mediaRef.current) {
           mediaRef.current.play();
       }
@@ -127,7 +130,9 @@ export default function FactSportPlayer({
         iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: isPlaying ? 'pauseVideo' : 'playVideo' }), '*');
         if (!isPlaying) {
             setUiBlocker(true);
-            setTimeout(() => setUiBlocker(false), 3500);
+            // HOW TO EDIT UI BLOCKER TIMEOUT:
+            // Change the '4000' below (in milliseconds) to adjust how long the top/bottom bars hide the YouTube UI
+            setTimeout(() => setUiBlocker(false), 4000);
         }
         setIsPlaying(!isPlaying);
     } else if (mediaRef.current) {
@@ -194,6 +199,7 @@ export default function FactSportPlayer({
               </div>
               <div className="flex flex-col items-center gap-2">
                   <span className="text-blue-400 font-bold uppercase tracking-widest text-[9px] md:text-[10px] bg-blue-900/60 px-4 py-1.5 rounded-full border border-blue-500/30 shadow-lg backdrop-blur-sm">
+                      {/* EDIT HERE: Default status text */}
                       {isFinished ? 'Match Finished' : 'Live Match Updates & Stats'}
                   </span>
               </div>
@@ -241,6 +247,7 @@ export default function FactSportPlayer({
                      <Clock className="text-slate-400 w-4 h-4 animate-pulse" />
                   </div>
                   <div className="flex flex-col items-center gap-1 px-4">
+                      {/* EDIT HERE: Locked state title text */}
                       <span className="text-white font-black uppercase tracking-widest text-[9px] md:text-[10px] text-center drop-shadow-md">
                           {mode === 'audio' ? 'Live Radio Broadcast' : 'Live Match Stream'}
                       </span>
@@ -266,6 +273,7 @@ export default function FactSportPlayer({
             <button onClick={toggleMute} className="text-white hover:text-slate-300 transition shadow-sm bg-white/10 p-1.5 rounded-full backdrop-blur-md">
               {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
             </button>
+            {/* EDIT HERE: Player controls brand text */}
             <span className="text-white text-[10px] font-black tracking-widest uppercase flex items-center gap-1.5 drop-shadow-md">
                 <span className="text-red-500 animate-pulse w-1.5 h-1.5 bg-red-500 rounded-full shadow-[0_0_5px_red]"></span> FACTSPORT {mode === 'audio' ? 'RADIO' : 'PLAYER'}
             </span>
@@ -284,6 +292,7 @@ export default function FactSportPlayer({
          <button onClick={startPlayback} className="relative z-10 w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.6)] hover:scale-110 transition-transform border border-red-400/50">
              <Play className="text-white w-8 h-8 ml-1" fill="currentColor" />
          </button>
+         {/* EDIT HERE: Play button subtitle text */}
          <span className="relative z-10 text-white mt-4 text-[10px] font-black tracking-widest uppercase drop-shadow-md">
              {mode === 'audio' ? 'Listen Live' : 'Watch Live Stream'}
          </span>
@@ -349,14 +358,8 @@ export default function FactSportPlayer({
             <div className="absolute inset-0 z-30 pointer-events-none">
                 <div className="absolute top-0 left-0 w-full h-[70px] bg-[#0a1428]"></div>
                 <div className="absolute bottom-0 left-0 w-full h-[60px] bg-[#0a1428]"></div>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150px] h-[150px] bg-[#0a1428] rounded-full blur-xl"></div>
             </div>
         )}
-
-        {/* Permanent Watermark cover for bottom right YouTube logo */}
-        <div className="absolute bottom-[55px] right-[10px] w-[100px] h-[35px] bg-[#0a1428] z-30 pointer-events-none flex items-center justify-center rounded border border-white/10 shadow-lg">
-           <span className="text-white text-[10px] font-black tracking-widest opacity-90">FACTSPORT</span>
-        </div>
 
         {/* Solid cover when paused to hide YouTube title, channel name and related videos */}
         {hasStarted && !isPlaying && (
@@ -364,6 +367,7 @@ export default function FactSportPlayer({
                 <button onClick={togglePlay} className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.6)] pointer-events-auto hover:scale-110 transition-transform">
                     <Play className="text-white w-8 h-8 ml-1" fill="currentColor" />
                 </button>
+                {/* EDIT HERE: Paused state text */}
                 <span className="text-white mt-4 text-[10px] font-black tracking-widest uppercase opacity-80">Stream Paused</span>
             </div>
         )}
