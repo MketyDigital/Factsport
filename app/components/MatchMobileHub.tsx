@@ -11,7 +11,6 @@ import MOTMVoteWidget from '@/app/components/MOTMVoteWidget';
 import { useMatchLive } from '@/app/providers/MatchLiveProvider';
 
 export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
-    // 🟢 Default tab is now set to 'stats'
     const [activeTab, setActiveTab] = useState<'chat' | 'stats' | 'pro' | 'table'>('stats');
     const liveData = useMatchLive();
 
@@ -20,7 +19,14 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
     
     const matchDateMs = new Date(dbData.match_date).getTime();
     const minutesToKick = (matchDateMs - Date.now()) / 60000;
+    // 🟢 TRUE if match has been over for more than 4 hours (Garbage Collection Trigger)
     const isUniversallyFinished = isFinished || minutesToKick < -240;
+
+    useEffect(() => {
+        if (isUniversallyFinished && (activeTab === 'table' || activeTab === 'pro')) {
+            setActiveTab('stats');
+        }
+    }, [isUniversallyFinished, activeTab]);
 
     const scrollToSection = (id: string) => {
         const element = document.getElementById(id);
@@ -43,15 +49,19 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
                     <BarChart2 size={14} /> Stats & XI
                 </button>
                 
-                {/* 🟢 Post-Match Purge Removed: Table tab now stays indefinitely */}
-                <button onClick={() => setActiveTab('table')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'table' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
-                    <Table size={14} /> Table
-                </button>
+                {/* 🟢 Post-Match Purge: Destroy the Table tab */}
+                {!isUniversallyFinished && (
+                    <button onClick={() => setActiveTab('table')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'table' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
+                        <Table size={14} /> Table
+                    </button>
+                )}
 
-                {/* 🟢 Post-Match Purge Removed: Pro slip tab now stays indefinitely */}
-                <button onClick={() => setActiveTab('pro')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'pro' ? 'text-yellow-600 border-b-2 border-yellow-500 bg-yellow-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
-                    <BrainCircuit size={14} className={activeTab === 'pro' ? 'text-yellow-500' : ''}/> Pro Slip
-                </button>
+                {/* 🟢 Post-Match Purge: Destroy the Pro slip tab */}
+                {!isUniversallyFinished && (
+                    <button onClick={() => setActiveTab('pro')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'pro' ? 'text-yellow-600 border-b-2 border-yellow-500 bg-yellow-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
+                        <BrainCircuit size={14} className={activeTab === 'pro' ? 'text-yellow-500' : ''}/> Pro Slip
+                    </button>
+                )}
 
                 {!isUniversallyFinished && (
                     <button onClick={() => scrollToSection('predictions')} className="flex-1 py-3 px-4 min-w-max text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 flex items-center justify-center gap-1.5 border-l border-slate-100">
@@ -74,14 +84,12 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
                 
                 {activeTab === 'stats' && <div className="p-2 md:p-4 bg-white"><StatsLineupsTabs matchId={matchId} dbData={dbData} /></div>}
                 
-                {/* 🟢 Table Content stays accessible */}
-                {activeTab === 'table' && (
+                {!isUniversallyFinished && activeTab === 'table' && (
                     <div className="p-2 md:p-4 bg-white">
                         <LiveStandings leagueName={dbData.league} homeTeam={dbData.home_team} awayTeam={dbData.away_team} homeScore={liveData?.home_score} awayScore={liveData?.away_score} status={liveData?.status} />
                     </div>
                 )}
                 
-                {/* 🟢 Pro Slip Content stays accessible */}
                 {activeTab === 'pro' && <div className="p-3 md:p-6 bg-slate-900"><ProBettingSlipLock homeTeam={dbData.home_team} awayTeam={dbData.away_team} status={dbData.status} proAnalysis={dbData.pro_analysis} /></div>}
             </div>
         </div>
