@@ -73,12 +73,13 @@ const TOURNAMENTS = [
 export default async function TournamentsPage() {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-  const { data: activeMatches } = await supabase
+  const { data: allTourneyMatches } = await supabase
     .from('matches')
     .select('league, status')
-    .in('status', ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'P']);
+    .in('league', TOURNAMENTS.map(t => t.id));
 
-  const liveLeagues = new Set(activeMatches?.map(m => m.league));
+  const liveLeagues = new Set(allTourneyMatches?.filter(m => ['LIVE', 'IN_PLAY', '1H', '2H', 'HT', 'ET', 'P'].includes(m.status)).map(m => m.league));
+  const activeLeagues = new Set(allTourneyMatches?.map(m => m.league));
 
   return (
     <div className="min-h-screen bg-[#0a1428] text-white pb-24 font-sans select-none">
@@ -109,7 +110,7 @@ export default async function TournamentsPage() {
                     The Global Football <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500 font-black">Championship Stages</span>
                 </h2>
                 <p className="text-slate-300 text-xs md:text-sm font-medium leading-relaxed max-w-2xl">
-                    Get up-to-the-second livescores, official group standings, live tournament commentary, and full bracket structures. Our server architecture is streamlined to handle peak live traffic with zero lag.
+                    Get up-to-the-second livescores, official group standings, live tournament commentary, and full bracket structures. Experience the most comprehensive football coverage available.
                 </p>
                 
                 {/* Stats panel inside Hero */}
@@ -125,8 +126,8 @@ export default async function TournamentsPage() {
                         <span className="text-xs font-black text-white uppercase tracking-wider mt-0.5">5 Cups & Leagues</span>
                     </div>
                     <div className="hidden sm:block">
-                        <span className="text-slate-400 text-[9px] font-black tracking-widest uppercase block">Database Status</span>
-                        <span className="text-xs font-black text-blue-400 uppercase tracking-wider mt-0.5">Fully Synchronized</span>
+                        <span className="text-slate-400 text-[9px] font-black tracking-widest uppercase block">Data Sync</span>
+                        <span className="text-xs font-black text-blue-400 uppercase tracking-wider mt-0.5">Automated</span>
                     </div>
                 </div>
             </div>
@@ -142,6 +143,7 @@ export default async function TournamentsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {TOURNAMENTS.map(t => {
                     const isLive = liveLeagues.has(t.id);
+                    const hasMatches = activeLeagues.has(t.id);
                     return (
                         <Link 
                             key={t.id} 
@@ -160,9 +162,13 @@ export default async function TournamentsPage() {
                                         <span className="bg-red-600 text-white text-[9px] font-black px-2.5 py-1 rounded shadow-lg uppercase tracking-widest animate-pulse flex items-center gap-1.5 border border-red-500">
                                             <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE
                                         </span>
-                                    ) : (
+                                    ) : hasMatches ? (
                                         <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md border ${t.badgeColor}`}>
-                                            Active
+                                            Ongoing
+                                        </span>
+                                    ) : (
+                                        <span className="text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md border border-slate-600/30 text-slate-500 bg-slate-800/20">
+                                            Upcoming
                                         </span>
                                     )}
                                 </div>

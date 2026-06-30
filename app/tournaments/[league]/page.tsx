@@ -53,6 +53,7 @@ const LEAGUE_STYLES: Record<string, { themeClass: string; gradient: string; acce
     }
 };
 
+// Remove generateMockMatchesFor completely
 
 export default async function TournamentDetailsPage({ params }: { params: Promise<{ league: string }> }) {
     const resolvedParams = await params;
@@ -114,7 +115,7 @@ export default async function TournamentDetailsPage({ params }: { params: Promis
                                 <Trophy className="text-yellow-500 shrink-0" size={32} /> {leagueName}
                             </h1>
                             <p className="text-slate-400 text-xs font-semibold leading-relaxed tracking-wide max-w-xl">
-                                Official bracket, livescores, head-to-heads, and tournament statistics. Fully synchronized from sports commentary terminals.
+                                Comprehensive coverage including official standings, live scores, match statistics, and breaking updates from the tournament.
                             </p>
                         </div>
 
@@ -126,10 +127,20 @@ export default async function TournamentDetailsPage({ params }: { params: Promis
                             </div>
                             <div className="w-px h-8 bg-white/10"></div>
                             <div>
-                                <span className="text-[8px] text-slate-400 font-black tracking-widest uppercase block">Live Data</span>
-                                <span className="text-xs font-black text-green-400 uppercase tracking-wider flex items-center gap-1 mt-1">
-                                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping"></span> Active
-                                </span>
+                                <span className="text-[8px] text-slate-400 font-black tracking-widest uppercase block">Tournament Status</span>
+                                {hasLive ? (
+                                    <span className="text-xs font-black text-red-500 uppercase tracking-wider flex items-center gap-1 mt-1 animate-pulse">
+                                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span> Live
+                                    </span>
+                                ) : matches.length > 0 ? (
+                                    <span className="text-xs font-black text-blue-400 uppercase tracking-wider flex items-center gap-1 mt-1">
+                                        Ongoing
+                                    </span>
+                                ) : (
+                                    <span className="text-xs font-black text-slate-500 uppercase tracking-wider flex items-center gap-1 mt-1">
+                                        Upcoming
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -183,7 +194,7 @@ export default async function TournamentDetailsPage({ params }: { params: Promis
                         <div className="bg-blue-600/10 border border-blue-500/20 rounded-2xl p-4 flex gap-3">
                             <Info className="text-blue-400 shrink-0 mt-0.5" size={16} />
                             <div>
-                                <span className="text-[9px] font-black uppercase tracking-wider text-blue-400 block mb-1">FactSport Smart Engine</span>
+                                <span className="text-[9px] font-black uppercase tracking-wider text-blue-400 block mb-1">Official Tie-Breakers</span>
                                 <p className="text-slate-300 text-[11px] font-medium leading-relaxed">
                                     When teams tie in points, rankings are calculated based on Head-to-Head results, followed by Goal Difference, then Goals Scored according to official tournament regulations.
                                 </p>

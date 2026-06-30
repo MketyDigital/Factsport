@@ -20,6 +20,11 @@ const STAGE_DISPLAY: Record<string, string> = {
 
 const stageOrder = ['ROUND_OF_32', 'ROUND_OF_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'FINAL'];
 
+const normalizeStage = (stage: string) => {
+    if (!stage) return '';
+    return stage.toUpperCase().replace(/-/g, '_').replace(/ /g, '_');
+};
+
 const normalizeName = (name: string) => {
     if (!name) return "";
     return name.toLowerCase()
@@ -29,6 +34,8 @@ const normalizeName = (name: string) => {
         .replace(/\s+/g, ' ') 
         .trim();
 };
+
+// Remove generateMockMatches completely
 
 export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScore, awayScore, status, matchGroup, stage }: any) {
     const [standings, setStandings] = useState<any[]>([]);
@@ -82,18 +89,18 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
 
     // Handle initial knockout stage selection
     useEffect(() => {
-        const knockoutMatches = matches.filter(m => stageOrder.includes(String(m.stage || '').toUpperCase()));
+        const knockoutMatches = matches.filter(m => stageOrder.includes(normalizeStage(m.stage)));
 
         if (knockoutMatches.length > 0) {
             const activeOrLive = knockoutMatches.find(m => ['LIVE', '1H', '2H', 'HT', 'ET', 'P', 'IN_PLAY'].includes(m.status));
             if (activeOrLive && activeOrLive.stage) {
-                setSelectedStage(activeOrLive.stage.toUpperCase());
+                setSelectedStage(normalizeStage(activeOrLive.stage));
             } else {
                 const scheduled = knockoutMatches.find(m => m.status === 'SCHEDULED');
                 if (scheduled && scheduled.stage) {
-                    setSelectedStage(scheduled.stage.toUpperCase());
+                    setSelectedStage(normalizeStage(scheduled.stage));
                 } else {
-                    setSelectedStage(knockoutMatches[knockoutMatches.length - 1].stage?.toUpperCase() || 'FINAL');
+                    setSelectedStage(normalizeStage(knockoutMatches[knockoutMatches.length - 1].stage) || 'FINAL');
                 }
             }
         }
@@ -111,17 +118,17 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
     const isCup = ['World Cup', 'Euros', 'Champions League', 'Copa America', 'AFCON'].includes(cleanLeagueName);
     
     // Determine if knockout stage is active
-    const knockoutMatches = matches.filter(m => stageOrder.includes(String(m.stage || '').toUpperCase()));
-    const hasActiveGroupMatches = matches.some(m => !stageOrder.includes(String(m.stage || '').toUpperCase()) && ['LIVE', '1H', '2H', 'HT', 'ET', 'P', 'SCHEDULED'].includes(m.status));
+    const knockoutMatches = matches.filter(m => stageOrder.includes(normalizeStage(m.stage)));
+    const hasActiveGroupMatches = matches.some(m => !stageOrder.includes(normalizeStage(m.stage)) && ['LIVE', '1H', '2H', 'HT', 'ET', 'P', 'SCHEDULED'].includes(m.status));
     
-    const isKnockoutActive = stage ? stageOrder.includes(stage.toUpperCase()) : 
+    const isKnockoutActive = stage ? stageOrder.includes(normalizeStage(stage)) : 
         (isCup && knockoutMatches.length > 0 && !hasActiveGroupMatches);
 
     // 🏆 KNOCKOUT STAGE RENDERING
     if (isKnockoutActive) {
-        const activeStages = stageOrder.filter(s => knockoutMatches.some(m => String(m.stage || '').toUpperCase() === s));
+        const activeStages = stageOrder.filter(s => knockoutMatches.some(m => normalizeStage(m.stage) === s));
         const currentStageToRender = selectedStage || activeStages[0] || 'ROUND_OF_16';
-        const stageMatches = knockoutMatches.filter(m => String(m.stage || '').toUpperCase() === currentStageToRender);
+        const stageMatches = knockoutMatches.filter(m => normalizeStage(m.stage) === currentStageToRender);
         const isLive = stageMatches.some(m => ['LIVE', '1H', '2H', 'HT', 'ET', 'P', 'IN_PLAY'].includes(m.status?.toUpperCase()));
 
         const normHome = normalizeName(homeTeam);

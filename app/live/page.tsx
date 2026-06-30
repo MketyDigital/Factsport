@@ -77,59 +77,6 @@ export default async function LiveMediaPage() {
       <div className="p-4 space-y-6 max-w-7xl mx-auto mt-4">
         <AdsterraStandardBanner />
 
-        {/* COMPACT LIVE TOURNAMENTS SNIPPETS PANEL */}
-        <div className="bg-[#0f1c3a]/75 backdrop-blur-md border border-white/5 rounded-3xl p-5 shadow-2xl space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
-                <div className="flex items-center gap-2">
-                    <Trophy className="text-yellow-500 shrink-0" size={16} />
-                    <div>
-                        <h3 className="font-black text-xs uppercase tracking-widest text-white">Live Tournament Tracker</h3>
-                        <p className="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5">RAPID TRANSITIONS TO BRACKETS & STANDINGS</p>
-                    </div>
-                </div>
-                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                    <Activity size={12} className="text-emerald-500" /> Auto-Synchronized Terminal
-                </span>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                {LIVE_TOURNAMENTS_METADATA.map(t => {
-                    const activeLiveCount = liveCountByLeague.get(t.id) || 0;
-                    const isLive = activeLiveCount > 0;
-                    
-                    return (
-                        <Link 
-                            key={t.id} 
-                            href={`/tournaments/${encodeURIComponent(t.id)}`}
-                            className={`relative overflow-hidden rounded-2xl p-3 border transition-all duration-300 hover:scale-[1.02] flex flex-col justify-between min-h-[90px] group bg-gradient-to-br ${t.bg} hover:brightness-125`}
-                        >
-                            <div className="flex justify-between items-start gap-2">
-                                <span className="text-xl drop-shadow-md">{t.icon}</span>
-                                {isLive ? (
-                                    <span className="bg-red-600 text-white text-[7px] font-black px-1.5 py-0.5 rounded tracking-widest uppercase animate-pulse shrink-0">
-                                        {activeLiveCount} LIVE
-                                    </span>
-                                ) : (
-                                    <span className="text-slate-500 text-[7px] font-black tracking-widest uppercase bg-white/5 px-1.5 py-0.5 rounded border border-white/5 shrink-0">
-                                        SOON
-                                    </span>
-                                )}
-                            </div>
-
-                            <div className="mt-2.5">
-                                <span className="text-[10px] font-black uppercase text-white tracking-tight block truncate group-hover:text-yellow-400 transition-colors">
-                                    {t.name}
-                                </span>
-                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block mt-0.5 flex items-center gap-0.5">
-                                    Explore <ArrowRight size={8} className="group-hover:translate-x-1 transition-transform" />
-                                </span>
-                            </div>
-                        </Link>
-                    );
-                })}
-            </div>
-        </div>
-
         {isStudioActive && globalMediaUrl && (
             <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="lg:col-span-2 flex flex-col h-full">
@@ -159,6 +106,57 @@ export default async function LiveMediaPage() {
         )}
 
         <LiveMediaClient matches={matches || []} />
+
+        {/* COMPACT LIVE TOURNAMENTS SNIPPETS PANEL (Moved below and made horizontal) */}
+        {LIVE_TOURNAMENTS_METADATA.filter(t => (matches || []).some(m => m.league === t.id)).length > 0 && (
+            <div className="bg-[#0f1c3a]/75 backdrop-blur-md border border-white/5 rounded-3xl p-5 shadow-2xl space-y-4 mt-8">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
+                    <div className="flex items-center gap-2">
+                        <Trophy className="text-yellow-500 shrink-0" size={16} />
+                        <div>
+                            <h3 className="font-black text-xs uppercase tracking-widest text-white">Live Tournament Tracker</h3>
+                            <p className="text-[9px] text-slate-400 font-bold tracking-wider mt-0.5">RAPID TRANSITIONS TO BRACKETS & STANDINGS</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
+                    {LIVE_TOURNAMENTS_METADATA
+                        .filter(t => (matches || []).some(m => m.league === t.id))
+                        .map(t => {
+                        const activeLiveCount = liveCountByLeague.get(t.id) || 0;
+                        const isLive = activeLiveCount > 0;
+                        
+                        return (
+                            <Link 
+                                key={t.id} 
+                                href={`/tournaments/${encodeURIComponent(t.id)}`}
+                                className={`snap-start relative overflow-hidden rounded-2xl p-4 border transition-all duration-300 hover:scale-[1.02] flex flex-col justify-between min-w-[200px] h-[100px] group bg-gradient-to-br ${t.bg} hover:brightness-125 shrink-0`}
+                            >
+                                <div className="flex justify-between items-start gap-2">
+                                    <span className="text-2xl drop-shadow-md">{t.icon}</span>
+                                    {isLive ? (
+                                        <span className="bg-red-600 text-white text-[8px] font-black px-2 py-0.5 rounded tracking-widest uppercase animate-pulse shrink-0">
+                                            {activeLiveCount} LIVE
+                                        </span>
+                                    ) : (
+                                        <span className="text-blue-400 text-[8px] font-black tracking-widest uppercase bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20 shrink-0">
+                                            ACTIVE
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="mt-auto pt-2">
+                                    <span className="text-xs font-black uppercase text-white tracking-tight block truncate group-hover:text-yellow-400 transition-colors">
+                                        {t.name}
+                                    </span>
+                                </div>
+                            </Link>
+                        );
+                    })}
+                </div>
+            </div>
+        )}
 
       </div>
     </div>

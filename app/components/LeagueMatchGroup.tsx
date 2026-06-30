@@ -39,13 +39,18 @@ export default function LeagueMatchGroup({ leagueName, matches }: LeagueMatchGro
     const cleanLeagueName = leagueName.replace(' Matches', '');
     const isCup = ['World Cup', 'Euros', 'Champions League', 'Copa America', 'AFCON'].includes(cleanLeagueName);
     
-    const hasRoundOf32 = cleanLeagueName === 'World Cup' || matches.some(m => String(m.stage || '').toUpperCase() === 'ROUND_OF_32');
+    const normalizeStage = (stage: string) => {
+        if (!stage) return '';
+        return stage.toUpperCase().replace(/-/g, '_').replace(/ /g, '_');
+    };
+
+    const hasRoundOf32 = cleanLeagueName === 'World Cup' || matches.some(m => normalizeStage(m.stage || '') === 'ROUND_OF_32');
 
     // Filter matches
     const knockoutStages = ['ROUND_OF_32', 'ROUND_OF_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'FINAL'];
     
     const knockoutMatches = matches.filter(m => {
-        const stageUpper = String(m.stage || '').toUpperCase();
+        const stageUpper = normalizeStage(m.stage || '');
         return knockoutStages.includes(stageUpper);
     });
 
@@ -54,7 +59,7 @@ export default function LeagueMatchGroup({ leagueName, matches }: LeagueMatchGro
     );
 
     const groupStageMatches = matches.filter(m => {
-        const stageUpper = String(m.stage || '').toUpperCase();
+        const stageUpper = normalizeStage(m.stage || '');
         return !knockoutStages.includes(stageUpper);
     });
 
@@ -68,7 +73,7 @@ export default function LeagueMatchGroup({ leagueName, matches }: LeagueMatchGro
     };
 
     knockoutMatches.forEach(m => {
-        const stageUpper = String(m.stage || '').toUpperCase();
+        const stageUpper = normalizeStage(m.stage || '');
         if (groupedKnockout[stageUpper]) {
             groupedKnockout[stageUpper].push(m);
         }
@@ -369,9 +374,9 @@ function BracketMatchCard({ match, getWinnerBadge, formatMatchTime, isFinal }: {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 truncate max-w-[80%]">
                         {match.home_logo ? (
-                            <img src={match.home_logo} className="w-4.5 h-4.5 object-contain" alt="" />
+                            <img src={match.home_logo} className="w-4 h-4 object-contain" alt="" />
                         ) : (
-                            <div className="w-4.5 h-4.5 bg-slate-800 rounded-full flex items-center justify-center text-[6px] font-bold">H</div>
+                            <div className="w-4 h-4 bg-slate-800 rounded-full flex items-center justify-center text-[6px] font-bold">H</div>
                         )}
                         <span className={`text-[10px] font-black truncate ${winner === 'home' ? 'text-yellow-400 font-extrabold' : 'text-slate-300'}`}>
                             {match.home_team}
@@ -386,9 +391,9 @@ function BracketMatchCard({ match, getWinnerBadge, formatMatchTime, isFinal }: {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 truncate max-w-[80%]">
                         {match.away_logo ? (
-                            <img src={match.away_logo} className="w-4.5 h-4.5 object-contain" alt="" />
+                            <img src={match.away_logo} className="w-4 h-4 object-contain" alt="" />
                         ) : (
-                            <div className="w-4.5 h-4.5 bg-slate-800 rounded-full flex items-center justify-center text-[6px] font-bold">A</div>
+                            <div className="w-4 h-4 bg-slate-800 rounded-full flex items-center justify-center text-[6px] font-bold">A</div>
                         )}
                         <span className={`text-[10px] font-black truncate ${winner === 'away' ? 'text-yellow-400 font-extrabold' : 'text-slate-300'}`}>
                             {match.away_team}
