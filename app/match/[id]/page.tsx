@@ -87,7 +87,6 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
         label = 'FULL TIME RESULT';
     }
 
-    // 🟢 DYNAMIC OG IMAGE GENERATOR PAYLOAD
     const ogDataObj = {
         type: 'versus',
         home: match.home_team,
@@ -101,7 +100,6 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
         awayTla: match.away_team?.substring(0, 3).toUpperCase()
     };
     
-    // Safely encode to base64 for Edge Runtime
     const jsonStr = JSON.stringify(ogDataObj);
     const bytes = new TextEncoder().encode(jsonStr);
     const binStr = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("");
@@ -113,10 +111,8 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
     const previousImages = (await parent).openGraph?.images || [];
     const activeVideoUrl = sanitizeUrl(isFinished ? match.video_url : match.livestream_url);
     
-    // 🟢 OPTION A VS OPTION B DETECTOR (?embed=true)
     const isPlayerShare = resolvedSearchParams?.embed === 'true' || resolvedSearchParams?.play === 'true';
 
-    // Option A: Player Meta Tags
     if (isPlayerShare && activeVideoUrl) {
         return { 
             title, 
@@ -134,7 +130,6 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
                 description,
                 images: [ogImageUrl],
                 players: [{
-                    // The embedded iframe route (app/embed/[id]/page.tsx)
                     playerUrl: `${appUrl}/embed/${match.id}`, 
                     streamUrl: activeVideoUrl,
                     width: 1280,
@@ -144,7 +139,6 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
         };
     }
 
-    // Option B: Standard Image Meta Tags (Default)
     return { 
         title, 
         description, 
@@ -166,9 +160,6 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
 export default async function MatchDetailsPage({ params, searchParams }: Props) {
   const resolvedParams = await params;
   if (!resolvedParams?.id) return notFound();
-
-  const supabaseServer = createServerClient();
-  await supabaseServer.auth.getUser();
 
   const dbData = await getSupabaseData(resolvedParams.id);
   if (!dbData) return notFound();
@@ -229,6 +220,14 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
       .gte('match_date', windowStart)
       .lte('match_date', windowEnd)
       .limit(50); 
+      
+  const siteSettingsQuery = await publicSupabase.from('site_settings').select('*').limit(1).maybeSingle();
+  const siteSettings = siteSettingsQuery.data || {};
+  const announcement = {
+      text: siteSettings.announcement_text || '',
+      link: siteSettings.announcement_link || null,
+      enabled: siteSettings.announcement_enabled === true
+  };
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-24 font-sans">
@@ -255,9 +254,9 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
                   {(activeVideoUrl || activeAudioUrl) && (
                       <div className="w-full bg-black">
                           {activeVideoUrl ? (
-                              <FactSportPlayer mediaUrl={activeVideoUrl} matchId={dbData.id} mode="video" isLocked={isServerLocked} matchDate={dbData.match_date} isFinished={isUniversallyFinished} />
+                              <FactSportPlayer mediaUrl={activeVideoUrl} matchId={dbData.id} mode="video" isLocked={isServerLocked} matchDate={dbData.match_date} isFinished={isUniversallyFinished} announcement={announcement} />
                           ) : (
-                              <FactSportPlayer mediaUrl={activeAudioUrl!} matchId={dbData.id} mode="audio" isLocked={isServerLocked} matchDate={dbData.match_date} isFinished={isUniversallyFinished} />
+                              <FactSportPlayer mediaUrl={activeAudioUrl!} matchId={dbData.id} mode="audio" isLocked={isServerLocked} matchDate={dbData.match_date} isFinished={isUniversallyFinished} announcement={announcement} />
                           )}
                       </div>
                   )}
@@ -277,7 +276,7 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
                   <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={sanitizeUrl(dbData.affiliate_link) || undefined} />
               )}
 
-              {!hasWidget && !isUniversallyFinished && (
+              {!hasWidget && (
                   <div className="mt-4 space-y-4">
                       <div id="predictions" className="bg-white rounded-lg shadow-sm p-3 border border-slate-200 scroll-mt-20">
                           <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 flex items-center gap-1 mb-2">

@@ -22,7 +22,26 @@ const stageOrder = ['ROUND_OF_32', 'ROUND_OF_16', 'QUARTER_FINALS', 'SEMI_FINALS
 
 const normalizeStage = (stage: string) => {
     if (!stage) return '';
-    return stage.toUpperCase().replace(/-/g, '_').replace(/ /g, '_');
+    let norm = String(stage).toUpperCase().replace(/-/g, '_').replace(/ /g, '_');
+    
+    // Map API variations to our standard keys
+    if (norm.includes('16TH') || norm.includes('1/16') || norm.includes('LAST_32') || norm.includes('ROUND_OF_32')) {
+        return 'ROUND_OF_32';
+    }
+    if (norm.includes('8TH') || norm.includes('1/8') || norm.includes('LAST_16') || norm.includes('ROUND_OF_16')) {
+        return 'ROUND_OF_16';
+    }
+    if (norm.includes('QUARTER') || norm.includes('1/4') || norm.includes('LAST_8') || norm === 'QF') {
+        return 'QUARTER_FINALS';
+    }
+    if (norm.includes('SEMI') || norm.includes('1/2') || norm.includes('LAST_4') || norm === 'SF') {
+        return 'SEMI_FINALS';
+    }
+    if (norm === 'FINAL' || norm === 'FINALS' || norm === 'F' || norm === 'CHAMPIONSHIP' || norm === 'FINAL_STAGE') {
+        return 'FINAL';
+    }
+    
+    return norm;
 };
 
 const normalizeName = (name: string) => {
@@ -35,8 +54,6 @@ const normalizeName = (name: string) => {
         .trim();
 };
 
-// Remove generateMockMatches completely
-
 export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScore, awayScore, status, matchGroup, stage }: any) {
     const [standings, setStandings] = useState<any[]>([]);
     const [matches, setMatches] = useState<any[]>([]);
@@ -45,6 +62,25 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
 
     useEffect(() => {
         let isMounted = true;
+
+        // Handle initial knockout stage selection
+        const updateInitialStage = (currentMatches: any[]) => {
+            const knockoutMatches = currentMatches.filter(m => stageOrder.includes(normalizeStage(m.stage)));
+            if (knockoutMatches.length > 0 && !selectedStage) {
+                const activeOrLive = knockoutMatches.find(m => ['LIVE', '1H', '2H', 'HT', 'ET', 'P', 'IN_PLAY'].includes(m.status));
+                if (activeOrLive && activeOrLive.stage) {
+                    setSelectedStage(normalizeStage(activeOrLive.stage));
+                } else {
+                    const scheduled = knockoutMatches.find(m => m.status === 'SCHEDULED');
+                    if (scheduled && scheduled.stage) {
+                        setSelectedStage(normalizeStage(scheduled.stage));
+                    } else {
+                        setSelectedStage(normalizeStage(knockoutMatches[knockoutMatches.length - 1].stage) || 'FINAL');
+                    }
+                }
+            }
+        };
+
         const fetchStandingsAndMatches = async () => {
             const cleanLeague = leagueName.replace(' Matches', '');
             const leagueCode = LEAGUE_MAP[cleanLeague];
@@ -75,6 +111,7 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
 
                 if (isMounted && dbMatches) {
                     setMatches(dbMatches);
+                    updateInitialStage(dbMatches);
                 }
             } catch (e) {
                 console.error("Error fetching standings/matches:", e);
@@ -85,26 +122,7 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
 
         fetchStandingsAndMatches();
         return () => { isMounted = false; };
-    }, [leagueName]);
-
-    // Handle initial knockout stage selection
-    useEffect(() => {
-        const knockoutMatches = matches.filter(m => stageOrder.includes(normalizeStage(m.stage)));
-
-        if (knockoutMatches.length > 0) {
-            const activeOrLive = knockoutMatches.find(m => ['LIVE', '1H', '2H', 'HT', 'ET', 'P', 'IN_PLAY'].includes(m.status));
-            if (activeOrLive && activeOrLive.stage) {
-                setSelectedStage(normalizeStage(activeOrLive.stage));
-            } else {
-                const scheduled = knockoutMatches.find(m => m.status === 'SCHEDULED');
-                if (scheduled && scheduled.stage) {
-                    setSelectedStage(normalizeStage(scheduled.stage));
-                } else {
-                    setSelectedStage(normalizeStage(knockoutMatches[knockoutMatches.length - 1].stage) || 'FINAL');
-                }
-            }
-        }
-    }, [matches, leagueName]);
+    }, [leagueName, selectedStage]);
 
     if (isLoading) {
         return (
@@ -119,10 +137,11 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
     
     // Determine if knockout stage is active
     const knockoutMatches = matches.filter(m => stageOrder.includes(normalizeStage(m.stage)));
-    const hasActiveGroupMatches = matches.some(m => !stageOrder.includes(normalizeStage(m.stage)) && ['LIVE', '1H', '2H', 'HT', 'ET', 'P', 'SCHEDULED'].includes(m.status));
+    const hasStartedKnockout = knockoutMatches.some(m => !['SCHEDULED', 'TIMED', 'POSTPONED', 'CANCELLED'].includes(m.status));
+    const hasActiveGroupMatches = matches.some(m => !stageOrder.includes(normalizeStage(m.stage)) && ['LIVE', '1H', '2H', 'HT', 'ET', 'P', 'SCHEDULED', 'TIMED'].includes(m.status));
     
     const isKnockoutActive = stage ? stageOrder.includes(normalizeStage(stage)) : 
-        (isCup && knockoutMatches.length > 0 && !hasActiveGroupMatches);
+        (isCup && knockoutMatches.length > 0 && (hasStartedKnockout || !hasActiveGroupMatches));
 
     // 🏆 KNOCKOUT STAGE RENDERING
     if (isKnockoutActive) {

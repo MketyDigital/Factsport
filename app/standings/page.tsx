@@ -21,7 +21,7 @@ const LEAGUE_MAP: Record<string, string> = {
     'AFCON': 'AFCON'
 };
 
-export async function generateMetadata({ searchParams }: { searchParams: { league?: string } }): Promise<Metadata> {
+export async function generateMetadata({ searchParams }: { searchParams: Promise<any> }): Promise<Metadata> {
     const resolvedParams = await searchParams;
     const league = resolvedParams?.league || 'Premier League';
     const title = `${league} Table & Standings | FactSport`;
@@ -133,7 +133,7 @@ async function getStandings(leagueName: string) {
     }
 }
 
-export default async function StandingsPage({ searchParams }: { searchParams: { league: string } }) {
+export default async function StandingsPage({ searchParams }: { searchParams: Promise<any> }) {
     const resolvedParams = await searchParams;
     const currentLeague = resolvedParams?.league || 'Premier League';
     
@@ -190,8 +190,6 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
 
             <div className="p-1.5 md:p-4 max-w-5xl mx-auto mt-2">
                 
-                <AdsterraStandardBanner />
-
                 {error && (
                     <div className="bg-red-50 border-2 border-red-500 text-red-700 p-4 rounded-xl mb-4 shadow-sm flex flex-col items-center text-center">
                         <AlertTriangle size={32} className="mb-2 text-red-500" />
@@ -200,54 +198,55 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                     </div>
                 )}
 
-                <div className="bg-white rounded-xl md:rounded-2xl shadow-xl border border-slate-200 overflow-hidden mt-4">
-                    <div className="bg-slate-50 p-2.5 md:p-4 border-b border-slate-200 flex justify-between items-center">
-                         <h2 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-sm">{validLeague} Table</h2>
-                    </div>
-                    
-                    {/* 🟢 DYNAMICALLY RENDERS GROUPS OR LEAGUE */}
-                    {groupKeys.map((groupKey, idx) => {
-                        const tableGroup = groupedStandings[groupKey];
-                        const totalTeams = tableGroup.length;
-                        return (
-                        <div key={groupKey} className={idx > 0 ? "border-t-4 border-slate-100" : ""}>
-                            {groupKey !== 'League' && (
-                                <div className="bg-slate-100/80 px-4 py-2 border-b border-slate-200">
-                                    <span className="text-xs font-black text-slate-700 uppercase tracking-widest">{groupKey}</span>
-                                </div>
-                            )}
-                            <div className="overflow-x-auto scrollbar-hide">
-                                <table className={`w-full text-[10px] md:text-xs ${hasFormData ? 'min-w-[340px] md:min-w-[550px]' : 'min-w-[280px] md:min-w-[400px]'}`}>
-                                    <thead className="bg-[#f8f9fa] border-b-2 border-slate-200 text-slate-500 font-black uppercase tracking-widest text-[8px] md:text-[9px]">
-                                        <tr>
-                                            <th className="py-2 md:py-3 px-1 md:px-2 text-center w-6 md:w-8">#</th>
-                                            <th className="py-2 md:py-3 px-1 md:px-2 text-left">Club</th>
-                                            <th className="py-2 md:py-3 px-0.5 md:px-1 text-center w-5 md:w-6" title="Played">P</th>
-                                            <th className="py-2 md:py-3 px-0.5 md:px-1 text-center w-5 md:w-6" title="Won">W</th>
-                                            <th className="py-2 md:py-3 px-0.5 md:px-1 text-center w-5 md:w-6" title="Drawn">D</th>
-                                            <th className="py-2 md:py-3 px-0.5 md:px-1 text-center w-5 md:w-6" title="Lost">L</th>
-                                            <th className="py-2 md:py-3 px-0.5 md:px-1 text-center w-6 md:w-8" title="Goal Difference">GD</th>
-                                            <th className="py-2 md:py-3 px-1 md:px-2 text-center w-8 md:w-10 text-slate-800" title="Points">Pts</th>
-                                            {hasFormData && <th className="py-2 md:py-3 px-1 md:px-2 text-center w-16 md:w-24">Form</th>}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {tableGroup.map((entry: any, index: number) => {
-                                            const isUCL = index < 4 && validLeague !== 'Champions League' && groupKey === 'League';
-                                            const isRelegation = index >= totalTeams - 3 && validLeague !== 'Champions League' && groupKey === 'League';
+                <div className="flex flex-col lg:flex-row gap-4 mt-4">
+                    <div className="w-full lg:w-2/3 bg-white rounded-xl md:rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                        <div className="bg-slate-50 p-2.5 md:p-4 border-b border-slate-200 flex justify-between items-center">
+                             <h2 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-sm">{validLeague} Table</h2>
+                        </div>
+                        
+                        {/* 🟢 DYNAMICALLY RENDERS GROUPS OR LEAGUE */}
+                        {groupKeys.map((groupKey, idx) => {
+                            const tableGroup = groupedStandings[groupKey];
+                            const totalTeams = tableGroup.length;
+                            return (
+                            <div key={groupKey} className={idx > 0 ? "border-t-4 border-slate-100" : ""}>
+                                {groupKey !== 'League' && (
+                                    <div className="bg-slate-100/80 px-4 py-2 border-b border-slate-200">
+                                        <span className="text-xs font-black text-slate-700 uppercase tracking-widest">{groupKey}</span>
+                                    </div>
+                                )}
+                                <div className="overflow-x-auto scrollbar-hide">
+                                    <table className={`w-full text-[10px] md:text-xs ${hasFormData ? 'min-w-[340px] md:min-w-[550px]' : 'min-w-[280px] md:min-w-[400px]'}`}>
+                                        <thead className="bg-[#f8f9fa] border-b-2 border-slate-200 text-slate-500 font-black uppercase tracking-widest text-[8px] md:text-[9px]">
+                                            <tr>
+                                                <th className="py-2 md:py-3 px-1 md:px-2 text-center w-6 md:w-8">#</th>
+                                                <th className="py-2 md:py-3 px-1 md:px-2 text-left">Club</th>
+                                                <th className="py-2 md:py-3 px-0.5 md:px-1 text-center w-5 md:w-6" title="Played">P</th>
+                                                <th className="py-2 md:py-3 px-0.5 md:px-1 text-center w-5 md:w-6" title="Won">W</th>
+                                                <th className="py-2 md:py-3 px-0.5 md:px-1 text-center w-5 md:w-6" title="Drawn">D</th>
+                                                <th className="py-2 md:py-3 px-0.5 md:px-1 text-center w-5 md:w-6" title="Lost">L</th>
+                                                <th className="py-2 md:py-3 px-0.5 md:px-1 text-center w-6 md:w-8" title="Goal Difference">GD</th>
+                                                <th className="py-2 md:py-3 px-1 md:px-2 text-center w-8 md:w-10 text-slate-800" title="Points">Pts</th>
+                                                {hasFormData && <th className="py-2 md:py-3 px-1 md:px-2 text-center w-16 md:w-24">Form</th>}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {tableGroup.map((entry: any, index: number) => {
+                                                const isUCL = index < 4 && validLeague !== 'Champions League' && groupKey === 'League';
+                                                const isRelegation = index >= totalTeams - 3 && validLeague !== 'Champions League' && groupKey === 'League';
 
-                                            const rawForm = String(entry.form || '');
-                                            const formArray = rawForm ? (rawForm.includes(',') ? rawForm.split(',') : rawForm.split('')) : [];
-                                            
-                                            const teamName = entry.team.shortName || entry.team.name;
-                                            const safeUrlName = teamName.replace(/['"]/g, '');
+                                                const rawForm = String(entry.form || '');
+                                                const formArray = rawForm ? (rawForm.includes(',') ? rawForm.split(',') : rawForm.split('')) : [];
+                                                
+                                                const teamName = entry.team.shortName || entry.team.name;
+                                                const safeUrlName = teamName.replace(/['"]/g, '');
 
-                                            return (
-                                                <tr key={entry.team.id} className={`hover:bg-slate-50 transition-colors ${isUCL ? 'bg-blue-50/20' : ''} ${isRelegation ? 'bg-red-50/20' : ''}`}>
-                                                    <td className="py-2 md:py-2.5 px-1 md:px-2 relative text-center font-bold text-slate-500">
-                                                        {isUCL && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-r-sm"></div>}
-                                                        {isRelegation && <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r-sm"></div>}
-                                                        {entry.position}
+                                                return (
+                                                    <tr key={entry.team.id} className={`hover:bg-slate-50 transition-colors ${isUCL ? 'bg-blue-50/20' : ''} ${isRelegation ? 'bg-red-50/20' : ''}`}>
+                                                        <td className="py-2 md:py-2.5 px-1 md:px-2 relative text-center font-bold text-slate-500">
+                                                            {isUCL && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-r-sm"></div>}
+                                                            {isRelegation && <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r-sm"></div>}
+                                                            {entry.position}
                                                     </td>
                                                     
                                                     <td className="py-2 md:py-2.5 px-1 md:px-2 font-black text-slate-800">
@@ -299,19 +298,24 @@ export default async function StandingsPage({ searchParams }: { searchParams: { 
                         </div>
                     )}
                 </div>
-                
-                {standings.length > 0 && validLeague !== 'Champions League' && (
-                    <div className="flex justify-center gap-3 md:gap-4 mt-3 md:mt-4 text-[8px] md:text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-8">
-                        <div className="flex items-center gap-1 md:gap-1.5"><span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-blue-500"></span> Champions League</div>
-                        <div className="flex items-center gap-1 md:gap-1.5"><span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-red-500"></span> Relegation</div>
-                    </div>
-                )}
 
-                {standings.length > 0 && (
-                    <LeagueLeaders leagueName={validLeague} />
-                )}
+                <div className="w-full lg:w-1/3 flex flex-col gap-4">
+                    {standings.length > 0 && validLeague !== 'Champions League' && (
+                        <div className="flex justify-center gap-3 md:gap-4 text-[8px] md:text-[9px] font-bold uppercase tracking-widest text-slate-500 bg-white p-3 rounded-xl border border-slate-200">
+                            <div className="flex items-center gap-1 md:gap-1.5"><span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-blue-500"></span> Champions League</div>
+                            <div className="flex items-center gap-1 md:gap-1.5"><span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-red-500"></span> Relegation</div>
+                        </div>
+                    )}
 
-                <AdsterraStandardBanner />
+                    {standings.length > 0 && (
+                        <LeagueLeaders leagueName={validLeague} />
+                    )}
+                </div>
+                </div>
+
+                <div className="mt-8">
+                    <AdsterraStandardBanner />
+                </div>
             </div>
         </div>
     );

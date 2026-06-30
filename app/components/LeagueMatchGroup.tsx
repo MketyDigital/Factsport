@@ -41,7 +41,26 @@ export default function LeagueMatchGroup({ leagueName, matches }: LeagueMatchGro
     
     const normalizeStage = (stage: string) => {
         if (!stage) return '';
-        return stage.toUpperCase().replace(/-/g, '_').replace(/ /g, '_');
+        let norm = String(stage).toUpperCase().replace(/-/g, '_').replace(/ /g, '_');
+        
+        // Map API variations to our standard keys
+        if (norm.includes('16TH') || norm.includes('1/16') || norm.includes('LAST_32') || norm.includes('ROUND_OF_32')) {
+            return 'ROUND_OF_32';
+        }
+        if (norm.includes('8TH') || norm.includes('1/8') || norm.includes('LAST_16') || norm.includes('ROUND_OF_16')) {
+            return 'ROUND_OF_16';
+        }
+        if (norm.includes('QUARTER') || norm.includes('1/4') || norm.includes('LAST_8') || norm === 'QF') {
+            return 'QUARTER_FINALS';
+        }
+        if (norm.includes('SEMI') || norm.includes('1/2') || norm.includes('LAST_4') || norm === 'SF') {
+            return 'SEMI_FINALS';
+        }
+        if (norm === 'FINAL' || norm === 'FINALS' || norm === 'F' || norm === 'CHAMPIONSHIP' || norm === 'FINAL_STAGE') {
+            return 'FINAL';
+        }
+        
+        return norm;
     };
 
     const hasRoundOf32 = cleanLeagueName === 'World Cup' || matches.some(m => normalizeStage(m.stage || '') === 'ROUND_OF_32');

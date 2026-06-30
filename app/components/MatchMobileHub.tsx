@@ -11,7 +11,7 @@ import MOTMVoteWidget from '@/app/components/MOTMVoteWidget';
 import { useMatchLive } from '@/app/providers/MatchLiveProvider';
 
 export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
-    const [activeTab, setActiveTab] = useState<'chat' | 'stats' | 'pro' | 'table'>('chat');
+    const [activeTab, setActiveTab] = useState<'chat' | 'stats' | 'pro' | 'table'>('stats');
     const liveData = useMatchLive();
 
     const currentStatus = (liveData?.status || '').toUpperCase();
@@ -90,7 +90,7 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
                     </div>
                 )}
                 
-                {!isUniversallyFinished && activeTab === 'pro' && <div className="p-3 md:p-6 bg-slate-900"><ProBettingSlipLock homeTeam={dbData.home_team} awayTeam={dbData.away_team} status={dbData.status} proAnalysis={dbData.pro_analysis} /></div>}
+                {activeTab === 'pro' && <div className="p-3 md:p-6 bg-slate-900"><ProBettingSlipLock homeTeam={dbData.home_team} awayTeam={dbData.away_team} status={dbData.status} proAnalysis={dbData.pro_analysis} /></div>}
             </div>
         </div>
     );
