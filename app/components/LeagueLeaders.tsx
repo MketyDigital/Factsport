@@ -1,8 +1,21 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Goal, Star, TrendingUp, Activity } from 'lucide-react';
+import { Shield, TrendingUp, Activity } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
+
+const LEAGUE_MAP: Record<string, string> = {
+    'Premier League': 'PL',
+    'La Liga': 'PD',
+    'Bundesliga': 'BL1',
+    'Serie A': 'SA',
+    'Ligue 1': 'FL1',
+    'Champions League': 'CL',
+    'World Cup': 'WC',
+    'Euros': 'EC',
+    'Copa America': 'CLI',
+    'AFCON': 'AFCON'
+};
 
 interface Leader {
     name: string;
@@ -27,18 +40,24 @@ export default function LeagueLeaders({ leagueName }: { leagueName: string }) {
                     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
                 );
                 
-                // Try fetching real player stats if table exists
+                const leagueCode = LEAGUE_MAP[leagueName] || 'PL';
+                
                 const { data, error } = await supabase
-                    .from('player_stats')
+                    .from('tournament_scorers')
                     .select('*')
-                    .eq('league', leagueName)
-                    .eq('stat_type', leadersType)
-                    .order('value', { ascending: false })
+                    .eq('league_code', leagueCode)
+                    .order(leadersType, { ascending: false })
                     .limit(5);
 
                 if (isMounted) {
                     if (data && data.length > 0) {
-                        setActiveList(data as Leader[]);
+                        const mappedData = data.map((d: any) => ({
+                            name: d.player_name,
+                            team: d.team_short_name || d.team_name,
+                            teamCrest: d.team_crest,
+                            value: leadersType === 'goals' ? d.goals : d.assists
+                        })).filter((l: Leader) => l.value > 0);
+                        setActiveList(mappedData);
                     } else {
                         setActiveList([]);
                     }

@@ -54,34 +54,33 @@ const normalizeName = (name: string) => {
         .trim();
 };
 
-// Remove generateMockMatches completely
-
 export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScore, awayScore, status, matchGroup, stage }: any) {
     const [standings, setStandings] = useState<any[]>([]);
     const [matches, setMatches] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedStage, setSelectedStage] = useState<string>('');
 
-    // Handle initial knockout stage selection
-    const updateInitialStage = (currentMatches: any[]) => {
-        const knockoutMatches = currentMatches.filter(m => stageOrder.includes(normalizeStage(m.stage)));
-        if (knockoutMatches.length > 0 && !selectedStage) {
-            const activeOrLive = knockoutMatches.find(m => ['LIVE', '1H', '2H', 'HT', 'ET', 'P', 'IN_PLAY'].includes(m.status));
-            if (activeOrLive && activeOrLive.stage) {
-                setSelectedStage(normalizeStage(activeOrLive.stage));
-            } else {
-                const scheduled = knockoutMatches.find(m => m.status === 'SCHEDULED');
-                if (scheduled && scheduled.stage) {
-                    setSelectedStage(normalizeStage(scheduled.stage));
-                } else {
-                    setSelectedStage(normalizeStage(knockoutMatches[knockoutMatches.length - 1].stage) || 'FINAL');
-                }
-            }
-        }
-    };
-
     useEffect(() => {
         let isMounted = true;
+
+        // Handle initial knockout stage selection
+        const updateInitialStage = (currentMatches: any[]) => {
+            const knockoutMatches = currentMatches.filter(m => stageOrder.includes(normalizeStage(m.stage)));
+            if (knockoutMatches.length > 0 && !selectedStage) {
+                const activeOrLive = knockoutMatches.find(m => ['LIVE', '1H', '2H', 'HT', 'ET', 'P', 'IN_PLAY'].includes(m.status));
+                if (activeOrLive && activeOrLive.stage) {
+                    setSelectedStage(normalizeStage(activeOrLive.stage));
+                } else {
+                    const scheduled = knockoutMatches.find(m => m.status === 'SCHEDULED');
+                    if (scheduled && scheduled.stage) {
+                        setSelectedStage(normalizeStage(scheduled.stage));
+                    } else {
+                        setSelectedStage(normalizeStage(knockoutMatches[knockoutMatches.length - 1].stage) || 'FINAL');
+                    }
+                }
+            }
+        };
+
         const fetchStandingsAndMatches = async () => {
             const cleanLeague = leagueName.replace(' Matches', '');
             const leagueCode = LEAGUE_MAP[cleanLeague];

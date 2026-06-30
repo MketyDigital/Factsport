@@ -195,14 +195,17 @@ export async function GET(request: Request) {
         const currentMinutes = today.getUTCMinutes();
         const isHalfHourInterval = (currentMinutes >= 0 && currentMinutes < 5) || (currentMinutes >= 30 && currentMinutes < 35);
         
+        let statsUpdated = 0;
+
         if (isHalfHourInterval || forceSync) {
             TARGET_LEAGUES.forEach(league => leaguesNeedingStandingsUpdate.add(league));
-            logs.push(`⏱️ Background Clock Audit: Syncing tables.`);
+            logs.push(`⏱️ Background Clock Audit: Syncing tables and stats.`);
         }
 
         const targetStandingsLeagues = Array.from(leaguesNeedingStandingsUpdate);
 
         if (targetStandingsLeagues.length > 0) {
+            // First fetch and update Standings
             const standingsFetches = targetStandingsLeagues.map(async (leagueId) => {
                 let res = await fetch(`https://api.football-data.org/v4/competitions/${leagueId}/standings`, { 
                     headers: { 'X-Auth-Token': API_KEY } 
@@ -280,12 +283,57 @@ export async function GET(request: Request) {
                     logs.push(`Standings Insert Error: ${stdErr.message}`);
                 }
             }
+
+            // Next fetch and update Top Scorers/Stats for the same target leagues
+            const scorersFetches = targetStandingsLeagues.map(async (leagueId) => {
+                let res = await fetch(`https://api.football-data.org/v4/competitions/${leagueId}/scorers`, { 
+                    headers: { 'X-Auth-Token': API_KEY } 
+                }).then(r => r.ok ? r.json() : null).catch(() => null);
+                return { leagueId, data: res };
+            });
+
+            const scorersResults = await Promise.all(scorersFetches);
+            let allScorersToInsert: any[] = [];
+            const successfulStatsLeagues: string[] = [];
+
+            scorersResults.forEach(({ leagueId, data }) => {
+                if (data && data.scorers && data.scorers.length > 0) {
+                    const mappedScorers = data.scorers.map((entry: any) => ({
+                        league_code: leagueId,
+                        player_id: entry.player.id,
+                        player_name: entry.player.name,
+                        team_name: entry.team.name,
+                        team_short_name: entry.team.shortName || entry.team.name,
+                        team_crest: entry.team.crest,
+                        played_matches: entry.playedMatches || 0,
+                        goals: entry.goals || 0,
+                        assists: entry.assists || 0,
+                        penalties: entry.penalties || 0,
+                        updated_at: new Date().toISOString()
+                    }));
+                    allScorersToInsert = allScorersToInsert.concat(mappedScorers);
+                    successfulStatsLeagues.push(leagueId);
+                    logs.push(`Scorers Prepared: ${leagueId}`);
+                }
+            });
+
+            if (allScorersToInsert.length > 0 && successfulStatsLeagues.length > 0) {
+                await supabase.from('tournament_scorers').delete().in('league_code', successfulStatsLeagues);
+                const { error: statErr } = await supabase.from('tournament_scorers').insert(allScorersToInsert);
+                
+                if (!statErr) {
+                    statsUpdated += allScorersToInsert.length;
+                } else {
+                    logs.push(`Scorers Insert Error: ${statErr.message}`);
+                }
+            }
         }
 
         return NextResponse.json({ 
             success: true, 
             matchesVerified: matchesFinalized, 
             standingsUpdated, 
+            statsUpdated,
             leaguesTriggered: targetStandingsLeagues,
             logs 
         });

@@ -58,7 +58,8 @@ async function runLiveUpdate(request: Request) {
                      const isTrackedByFD = !!dbMatch.api_id;
 
                      if (richData) {
-                         payload.match_events = richData.events || richData.match_events; 
+                         // Fixed TypeScript Error by casting to 'any' for the fallback property
+                         payload.match_events = richData.events || (richData as any).match_events; 
                          payload.stats = richData.stats || {}; 
                          payload.lineups = richData.lineups;
                          
