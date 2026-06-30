@@ -110,10 +110,8 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
 
     const previousImages = (await parent).openGraph?.images || [];
     const activeVideoUrl = sanitizeUrl(isFinished ? match.video_url : match.livestream_url);
-    
-    const isPlayerShare = resolvedSearchParams?.embed === 'true' || resolvedSearchParams?.play === 'true';
 
-    if (isPlayerShare && activeVideoUrl) {
+    if (activeVideoUrl) {
         return { 
             title, 
             description, 
@@ -170,14 +168,19 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
   data.home_form = await getTeamForm(dbData.home_team);
   data.away_form = await getTeamForm(dbData.away_team);
   
+  // EDIT HERE: Configuration for player lock/unlock and visibility
+  const UNLOCK_MINUTES_BEFORE_KICKOFF = 15; 
+
   const currentStatus = (dbData.status || '').toUpperCase();
-  const isFinished = FINISHED_STATUSES.includes(currentStatus);
-  const isLive = !SCHEDULED_STATUSES.includes(currentStatus) && !isFinished;
+  const isFinishedApi = FINISHED_STATUSES.includes(currentStatus);
+  const isLive = !SCHEDULED_STATUSES.includes(currentStatus) && !isFinishedApi;
   
   const matchDateMs = new Date(dbData.match_date).getTime();
   const minutesToKick = (matchDateMs - Date.now()) / 60000;
   
-  const isUniversallyFinished = isFinished || minutesToKick < -240;
+  // Universally finished means we should display highlights and hide the stream
+  // We rely purely on the API status (FT, AET, PEN, etc.) to handle extra time and delays properly.
+  const isUniversallyFinished = isFinishedApi;
 
   const activeVideoUrl = sanitizeUrl(isUniversallyFinished ? dbData.video_url : dbData.livestream_url);
   const activeAudioUrl = sanitizeUrl(isUniversallyFinished ? null : dbData.audio_url);
@@ -188,7 +191,7 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
   } else if (isLive) {
       isServerLocked = false;
   } else {
-      if (minutesToKick <= 5 && minutesToKick > -240) {
+      if (minutesToKick <= UNLOCK_MINUTES_BEFORE_KICKOFF) {
           isServerLocked = false; 
       }
   }
@@ -254,9 +257,34 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
                   {(activeVideoUrl || activeAudioUrl) && (
                       <div className="w-full bg-black">
                           {activeVideoUrl ? (
-                              <FactSportPlayer mediaUrl={activeVideoUrl} matchId={dbData.id} mode="video" isLocked={isServerLocked} matchDate={dbData.match_date} isFinished={isUniversallyFinished} announcement={announcement} />
+                              <FactSportPlayer 
+                                  mediaUrl={activeVideoUrl} 
+                                  audioUrl={activeAudioUrl}
+                                  matchId={dbData.id} 
+                                  mode="video" 
+                                  isLocked={isServerLocked} 
+                                  matchDate={dbData.match_date} 
+                                  isFinished={isUniversallyFinished} 
+                                  homeTeam={dbData.home_team}
+                                  awayTeam={dbData.away_team}
+                                  homeLogo={dbData.home_logo}
+                                  awayLogo={dbData.away_logo}
+                                  announcement={announcement} 
+                              />
                           ) : (
-                              <FactSportPlayer mediaUrl={activeAudioUrl!} matchId={dbData.id} mode="audio" isLocked={isServerLocked} matchDate={dbData.match_date} isFinished={isUniversallyFinished} announcement={announcement} />
+                              <FactSportPlayer 
+                                  mediaUrl={activeAudioUrl!} 
+                                  matchId={dbData.id} 
+                                  mode="audio" 
+                                  isLocked={isServerLocked} 
+                                  matchDate={dbData.match_date} 
+                                  isFinished={isUniversallyFinished} 
+                                  homeTeam={dbData.home_team}
+                                  awayTeam={dbData.away_team}
+                                  homeLogo={dbData.home_logo}
+                                  awayLogo={dbData.away_logo}
+                                  announcement={announcement} 
+                              />
                           )}
                       </div>
                   )}
