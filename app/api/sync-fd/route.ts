@@ -23,7 +23,57 @@ export async function GET(request: Request) {
     const API_KEY = process.env.FOOTBALL_DATA_KEY;
     if (!API_KEY) return NextResponse.json({ error: 'Missing API Key' }, { status: 500 });
 
-    const TARGET_LEAGUES = ['PL', 'PD', 'BL1', 'SA', 'FL1', 'CL', 'EC', 'WC'];
+    // 🟢 ADDED TOURNAMENT CODES
+    const TARGET_LEAGUES = ['PL', 'PD', 'BL1', 'SA', 'FL1', 'CL', 'EC', 'WC', 'CLI', 'AFCON'];
+    
+    const ESPN_LEAGUES: Record<string, string> = {
+        'PL': 'eng.1', 'PD': 'esp.1', 'BL1': 'ger.1', 'SA': 'ita.1', 'FL1': 'fra.1',
+        'CL': 'uefa.champions', 'EC': 'uefa.euro', 'WC': 'fifa.world',
+        'CLI': 'conmebol.america', 'AFCON': 'caf.nations'
+    };
+
+    const parseEspnStandings = (espnRes: any, leagueId: string) => {
+        if (!espnRes) return null;
+        const parsedStandings: any[] = [];
+        const processEntries = (entries: any[], groupName: string | null) => {
+            const table = entries.map((entry: any, index: number) => {
+                const getStat = (name: string) => {
+                    const stat = entry.stats?.find((s: any) => s.name === name || s.abbreviation === name);
+                    return stat ? parseInt(stat.value || stat.displayValue || '0') : 0;
+                };
+                return {
+                    league_code: leagueId,
+                    match_group: groupName,
+                    position: getStat('rank') || (index + 1),
+                    team_id: entry.team?.id,
+                    team_name: entry.team?.displayName || entry.team?.name,
+                    team_short_name: entry.team?.shortDisplayName || entry.team?.name,
+                    team_crest: entry.team?.logos?.[0]?.href,
+                    played_games: getStat('gamesPlayed') || getStat('GP') || 0,
+                    won: getStat('wins') || getStat('W') || 0,
+                    draw: getStat('ties') || getStat('D') || 0,
+                    lost: getStat('losses') || getStat('L') || 0,
+                    goal_difference: getStat('pointDifferential') || getStat('GD') || 0,
+                    points: getStat('points') || getStat('P') || 0,
+                    updated_at: new Date().toISOString()
+                };
+            });
+            return table;
+        };
+
+        let allTables: any[] = [];
+        if (espnRes.children && espnRes.children.length > 0) {
+            espnRes.children.forEach((child: any) => {
+                const groupName = child.name || child.abbreviation;
+                if (child.standings?.entries) {
+                    allTables = allTables.concat(processEntries(child.standings.entries, groupName));
+                }
+            });
+        } else if (espnRes.standings && espnRes.standings.entries) {
+            allTables = allTables.concat(processEntries(espnRes.standings.entries, null));
+        }
+        return allTables.length > 0 ? allTables : null;
+    };
 
     try {
         const today = new Date();
@@ -50,7 +100,7 @@ export async function GET(request: Request) {
                 const apiIds = fdMatches.map((m: any) => m.id);
                 const { data: dbMatches } = await supabase
                     .from('matches')
-                    .select('*') // Grabs the full structural row footprint for social forwarding
+                    .select('*') 
                     .in('api_id', apiIds);
 
                 const dbMap = new Map(dbMatches?.map(m => [m.api_id, m]) || []);
@@ -90,7 +140,6 @@ export async function GET(request: Request) {
                             shouldUpdateMatch = true;
                             leaguesNeedingStandingsUpdate.add(compCode); 
                             
-                            // 🟢 FIX 2: TRIGGER FALLBACK SOCIAL DELIVERY FOR LATE RESULTS
                             const internalOrigin = new URL(request.url).origin;
                             const targetRecord = { ...dbMatch, home_score: fdHomeScore, away_score: fdAwayScore, status: 'FT' };
                             
@@ -137,7 +186,7 @@ export async function GET(request: Request) {
         const presentLeagues = new Set(existingStandings?.map(s => s.league_code) || []);
         
         TARGET_LEAGUES.forEach(league => {
-            if (!presentLeagues.has(league) && league !== 'EC' && league !== 'WC') {
+            if (!presentLeagues.has(league)) {
                 leaguesNeedingStandingsUpdate.add(league);
                 logs.push(`🛡️ Self-Healing Triggered: ${league} table fetched.`);
             }
@@ -151,14 +200,25 @@ export async function GET(request: Request) {
             logs.push(`⏱️ Background Clock Audit: Syncing tables.`);
         }
 
-        const targetStandingsLeagues = Array.from(leaguesNeedingStandingsUpdate).filter(l => l !== 'EC' && l !== 'WC');
+        const targetStandingsLeagues = Array.from(leaguesNeedingStandingsUpdate);
 
         if (targetStandingsLeagues.length > 0) {
-            const standingsFetches = targetStandingsLeagues.map(leagueId => 
-                fetch(`https://api.football-data.org/v4/competitions/${leagueId}/standings`, { 
+            const standingsFetches = targetStandingsLeagues.map(async (leagueId) => {
+                let res = await fetch(`https://api.football-data.org/v4/competitions/${leagueId}/standings`, { 
                     headers: { 'X-Auth-Token': API_KEY } 
-                }).then(r => r.ok ? r.json() : null).catch(() => null)
-            );
+                }).then(r => r.ok ? r.json() : null).catch(() => null);
+                
+                // ESPN FALLBACK for Cup rich standings if Football Data fails or is empty
+                if (!res || !res.standings || res.standings.length === 0) {
+                    const espnCode = ESPN_LEAGUES[leagueId];
+                    if (espnCode) {
+                        const espnRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnCode}/standings`).then(r => r.ok ? r.json() : null).catch(() => null);
+                        const parsed = parseEspnStandings(espnRes, leagueId);
+                        if (parsed) return { isEspn: true, table: parsed };
+                    }
+                }
+                return res;
+            });
 
             const standingsResults = await Promise.all(standingsFetches);
             let allStandingsToInsert: any[] = [];
@@ -167,26 +227,44 @@ export async function GET(request: Request) {
             standingsResults.forEach((standData, index) => {
                 if (!standData) return;
                 const leagueId = targetStandingsLeagues[index];
-                const table = standData?.standings?.find((s: any) => s.type === 'TOTAL')?.table || [];
+                
+                if (standData.isEspn) {
+                    allStandingsToInsert = allStandingsToInsert.concat(standData.table);
+                    successfulLeagues.push(leagueId);
+                    logs.push(`Standings Prepared (ESPN Fallback): ${leagueId}`);
+                    return;
+                }
 
-                if (table.length > 0) {
-                    const mappedTable = table.map((entry: any) => ({
-                        league_code: leagueId,
-                        position: entry.position,
-                        team_id: entry.team.id,
-                        team_name: entry.team.name,
-                        team_short_name: entry.team.shortName || entry.team.name,
-                        team_crest: entry.team.crest,
-                        played_games: entry.playedGames,
-                        won: entry.won,
-                        draw: entry.draw,
-                        lost: entry.lost,
-                        goal_difference: entry.goalDifference,
-                        points: entry.points,
-                        updated_at: new Date().toISOString()
-                    }));
-                    
-                    allStandingsToInsert = allStandingsToInsert.concat(mappedTable);
+                // 🟢 GROUP STANDINGS LOGIC APPLIED HERE (FD format)
+                const allTables = standData?.standings?.filter((s: any) => s.type === 'TOTAL') || [];
+
+                allTables.forEach((groupData: any) => {
+                    const table = groupData.table || [];
+                    const groupName = groupData.group || null;
+
+                    if (table.length > 0) {
+                        const mappedTable = table.map((entry: any) => ({
+                            league_code: leagueId,
+                            match_group: groupName ? groupName.replace(/_/g, ' ') : null, // Mapped Group A, B, C...
+                            position: entry.position,
+                            team_id: entry.team.id,
+                            team_name: entry.team.name,
+                            team_short_name: entry.team.shortName || entry.team.name,
+                            team_crest: entry.team.crest,
+                            played_games: entry.playedGames,
+                            won: entry.won,
+                            draw: entry.draw,
+                            lost: entry.lost,
+                            goal_difference: entry.goalDifference,
+                            points: entry.points,
+                            updated_at: new Date().toISOString()
+                        }));
+                        
+                        allStandingsToInsert = allStandingsToInsert.concat(mappedTable);
+                    }
+                });
+
+                if (allTables.length > 0) {
                     successfulLeagues.push(leagueId);
                     logs.push(`Standings Prepared: ${leagueId}`);
                 }

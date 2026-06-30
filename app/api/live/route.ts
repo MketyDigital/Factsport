@@ -24,8 +24,13 @@ async function runLiveUpdate(request: Request) {
 
       const activeMatches = windowMatches.filter(m => {
           const isLiveOrUpcoming = ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE'].includes(m.status);
+          
+          const kickMs = Date.parse(m.match_date);
+          const hoursSinceKick = (Date.now() - kickMs) / (1000 * 60 * 60);
+          const isRecentlyFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(m.status) && hoursSinceKick < 5;
+          
           const isFinishedButBroken = ['FT', 'FINISHED'].includes(m.status) && (!m.match_events || m.match_events.length === 0);
-          return isLiveOrUpcoming || isFinishedButBroken;
+          return isLiveOrUpcoming || isRecentlyFinished || isFinishedButBroken;
       });
 
       if (activeMatches.length === 0) return NextResponse.json({ message: "No active matches." });
@@ -44,7 +49,7 @@ async function runLiveUpdate(request: Request) {
              const espnGame = espnMatches.find((e: any) => String(e.espn_id) === dbMatch.espn_id);
              const isFinishedButBroken = terminalStatuses.includes(dbMatch.status);
              
-             if (espnGame || isFinishedButBroken) {
+             if (espnGame || isFinishedButBroken || terminalStatuses.includes(dbMatch.status)) {
                  const updateTask = (async () => {
                      const richData = await fetchEspnDetails(dbMatch.espn_id);
                      let newStatus = dbMatch.status;
@@ -53,6 +58,7 @@ async function runLiveUpdate(request: Request) {
                      if (espnGame) {
                          if (espnGame.status === 'in') newStatus = 'LIVE';
                          else if (espnGame.status === 'post') newStatus = 'FT'; 
+                         else if (espnGame.status === 'pre') newStatus = 'PRE_MATCH';
                          else if (espnGame.clock === 'HT') newStatus = 'HT';
                          
                          payload.status = newStatus;
@@ -63,6 +69,9 @@ async function runLiveUpdate(request: Request) {
                              payload.away_score = espnGame.away_score;
                              payload.displayClock = espnGame.clock;
                          }
+                     } else if (richData && richData.stats?.home_score !== undefined) {
+                         payload.home_score = richData.stats.home_score;
+                         payload.away_score = richData.stats.away_score;
                      }
 
                      if (richData) {
@@ -80,21 +89,20 @@ async function runLiveUpdate(request: Request) {
 
                      await supabase.from('matches').update(payload).eq('id', dbMatch.id);
                      
-                     // 🟢 THE INTERNAL DISPATCH TRIGGER
-                     // Instantly forwards any critical status changes to the socials engine. No Webhook needed.
                      const statusChangedToFT = newStatus === 'FT' && dbMatch.status !== 'FT';
                      const scoresChanged = payload.home_score !== dbMatch.home_score || payload.away_score !== dbMatch.away_score;
-                     const lineupsAnnounced = dbMatch.status === 'SCHEDULED' && newStatus === 'LIVE';
+                     
+                     const lineupsAnnounced = payload.lineups && payload.lineups.home?.length >= 11 && (!dbMatch.lineups?.home || dbMatch.lineups.home.length < 11);
 
                      if (statusChangedToFT || scoresChanged || lineupsAnnounced) {
                          const internalOrigin = new URL(request.url).origin;
                          const targetRecord = { ...dbMatch, ...payload };
                          
-                         fetch(`${internalOrigin}/api/socials`, {
+                         fetch(`${internalOrigin}/api/social`, {
                              method: 'POST',
                              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
                              body: JSON.stringify({ record: targetRecord, old_record: dbMatch })
-                         }).catch(e => console.error(" Late FT Broadcast Intercept Failed:", e.message));
+                         }).catch(e => console.error("Social Broadcast Intercept Failed:", e.message));
                      }
 
                      return true;
