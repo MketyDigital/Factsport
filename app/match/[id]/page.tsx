@@ -111,7 +111,6 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
     const previousImages = (await parent).openGraph?.images || [];
     const activeVideoUrl = sanitizeUrl(isFinished ? match.video_url : match.livestream_url);
 
-    // If there is an active media stream, automatically inject Twitter Player Cards for all shares
     if (activeVideoUrl) {
         return { 
             title, 
@@ -169,7 +168,7 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
   data.home_form = await getTeamForm(dbData.home_team);
   data.away_form = await getTeamForm(dbData.away_team);
   
-  // Configuration for player lock/unlock and visibility
+  // EDIT HERE: Configuration for player lock/unlock and visibility
   const UNLOCK_MINUTES_BEFORE_KICKOFF = 15; 
 
   const currentStatus = (dbData.status || '').toUpperCase();
@@ -249,9 +248,15 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
                           <div className="w-6"></div>
                       </div>
                       <MatchHeaderClient dbData={dbData} />
-                      
-                      {activeVideoUrl && (
-                          <div className="w-full max-w-4xl mx-auto bg-black border-y border-white/10 shadow-2xl relative z-10 lg:rounded-b-2xl lg:border-x lg:overflow-hidden lg:mb-4">
+                  </div>
+
+                  <div className="w-full bg-white border-b border-slate-200">
+                      <HeadToHeadStats dbData={data} />
+                  </div>
+
+                  {(activeVideoUrl || activeAudioUrl) && (
+                      <div className="w-full bg-black">
+                          {activeVideoUrl ? (
                               <FactSportPlayer 
                                   mediaUrl={activeVideoUrl} 
                                   audioUrl={activeAudioUrl}
@@ -259,112 +264,58 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
                                   mode="video" 
                                   isLocked={isServerLocked} 
                                   matchDate={dbData.match_date} 
-                                  isFinished={isUniversallyFinished}
+                                  isFinished={isUniversallyFinished} 
                                   homeTeam={dbData.home_team}
                                   awayTeam={dbData.away_team}
                                   homeLogo={dbData.home_logo}
                                   awayLogo={dbData.away_logo}
+                                  announcement={announcement} 
                               />
-                          </div>
-                      )}
-                  </div>
-              </div>
-          ) : (
-              <div className="w-full">
-                  {announcement.enabled && announcement.text && (
-                      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 text-center text-xs font-medium tracking-wide">
-                          {announcement.link ? (
-                              <a href={announcement.link} className="hover:underline flex items-center justify-center gap-2">
-                                  <Zap size={14} className="text-yellow-400" />
-                                  {announcement.text}
-                              </a>
                           ) : (
-                              <span className="flex items-center justify-center gap-2">
-                                  <Zap size={14} className="text-yellow-400" />
-                                  {announcement.text}
-                              </span>
+                              <FactSportPlayer 
+                                  mediaUrl={activeAudioUrl!} 
+                                  matchId={dbData.id} 
+                                  mode="audio" 
+                                  isLocked={isServerLocked} 
+                                  matchDate={dbData.match_date} 
+                                  isFinished={isUniversallyFinished} 
+                                  homeTeam={dbData.home_team}
+                                  awayTeam={dbData.away_team}
+                                  homeLogo={dbData.home_logo}
+                                  awayLogo={dbData.away_logo}
+                                  announcement={announcement} 
+                              />
                           )}
                       </div>
                   )}
-
-                  {activeVideoUrl && (
-                      <div className="w-full bg-black border-b border-white/10 shadow-xl relative z-10 sticky top-0 md:relative">
-                          <div className="max-w-4xl mx-auto">
-                              <FactSportPlayer 
-                                  mediaUrl={activeVideoUrl} 
-                                  audioUrl={activeAudioUrl}
-                                  matchId={dbData.id} 
-                                  mode="video" 
-                                  isLocked={isServerLocked} 
-                                  matchDate={dbData.match_date} 
-                                  isFinished={isUniversallyFinished}
-                                  homeTeam={dbData.home_team}
-                                  awayTeam={dbData.away_team}
-                                  homeLogo={dbData.home_logo}
-                                  awayLogo={dbData.away_logo}
-                              />
-                          </div>
-                      </div>
-                  )}
+              </div>
+          ) : (
+              <div className="bg-[#0a1428] text-white p-3 shadow-md flex items-center justify-between sticky top-0 z-40">
+                  <Link href="/matches" className="p-1.5 bg-white/10 rounded-full"><ChevronLeft size={16} /></Link>
+                  <span className="text-[10px] font-bold tracking-widest uppercase">{dbData.league}</span>
+                  <div className="w-8"></div>
               </div>
           )}
 
-          <div className="max-w-4xl mx-auto px-0 md:px-4 mt-2 mb-8">
-              <div className="bg-white md:rounded-xl shadow-sm border border-slate-200/60 overflow-hidden">
-                  <MatchMobileHub 
-                      dbData={dbData} 
-                      externalData={data} 
-                      hasWidget={hasWidget} 
-                      isFinished={isUniversallyFinished} 
-                  />
-                  
-                  {hasWidget && (
-                      <div className="border-t border-slate-100 bg-slate-50">
-                          <div className="w-full min-h-[600px] md:min-h-[800px]">
-                              <iframe 
-                                  src={`https://widgets.scorebat.com/match/?id=${dbData.widget_id}`}
-                                  frameBorder="0" 
-                                  width="100%" 
-                                  height="800" 
-                                  allowFullScreen 
-                                  allow="autoplay; fullscreen" 
-                                  className="w-full h-[800px]"
-                              ></iframe>
-                          </div>
-                      </div>
-                  )}
-              </div>
+          <div className="max-w-4xl mx-auto mt-3 px-2">
+              {!hasWidget ? (
+                  <MatchMobileHub matchId={dbData.id} espnId={dbData.espn_id} dbData={dbData} />
+              ) : (
+                  <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={sanitizeUrl(dbData.affiliate_link) || undefined} />
+              )}
 
               {!hasWidget && (
-                  <div className="mt-4 px-3 md:px-0 space-y-4">
-                      {isLive && (
-                          <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 overflow-hidden">
-                              <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                                      <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                                      Live Match Tracker
-                                  </h3>
-                              </div>
-                              <div className="p-4">
-                                  <ScoreAxisWidget espnId={dbData.espn_id} />
-                              </div>
-                          </div>
-                      )}
-
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                          <div className="lg:col-span-2 space-y-4">
-                              <PredictionBoard dbData={dbData} externalData={data} />
-                              <HeadToHeadStats dbData={dbData} externalData={data} />
-                          </div>
-                          <div className="space-y-4">
-                              <div className="sticky top-4 space-y-4">
-                                  <FreeTipsBanner />
-                                  <BettingPromo />
-                              </div>
-                          </div>
+                  <div className="mt-4 space-y-4">
+                      <div id="predictions" className="bg-white rounded-lg shadow-sm p-3 border border-slate-200 scroll-mt-20">
+                          <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 flex items-center gap-1 mb-2">
+                              <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" /> Predict & Win
+                          </h3>
+                          <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
                       </div>
                   </div>
               )}
+
+              <div className="mt-4"><FreeTipsBanner /></div>
           </div>
       </MatchLiveProvider>
     </div>

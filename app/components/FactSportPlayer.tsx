@@ -17,7 +17,8 @@ export default function FactSportPlayer({
   homeLogo,
   awayLogo,
   isEmbed = false,
-  announcement
+  announcement,
+  audioUrl
 }: { 
   mediaUrl: string, 
   matchId: string, 
@@ -30,7 +31,8 @@ export default function FactSportPlayer({
   homeLogo?: string,
   awayLogo?: string,
   isEmbed?: boolean,
-  announcement?: { text: string; link?: string | null; enabled: boolean }
+  announcement?: { text: string; link?: string | null; enabled: boolean },
+  audioUrl?: string | null
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -63,8 +65,11 @@ export default function FactSportPlayer({
   useEffect(() => {
       if (!isTimeLocked || isFinished || !matchDate) return;
 
+      // EDIT HERE: Minutes before kickoff to unlock the player client-side
+      const UNLOCK_MINUTES_BEFORE_KICKOFF = 15;
+
       const kickoffTime = new Date(matchDate).getTime();
-      const unlockTime = kickoffTime - (5 * 60 * 1000);
+      const unlockTime = kickoffTime - (UNLOCK_MINUTES_BEFORE_KICKOFF * 60 * 1000);
       const timeUntilUnlock = unlockTime - Date.now();
 
       if (timeUntilUnlock > 0) {
@@ -115,7 +120,7 @@ export default function FactSportPlayer({
           setUiBlocker(true);
           // HOW TO EDIT UI BLOCKER TIMEOUT:
           // Change the '4000' below (in milliseconds) to adjust how long the top/bottom bars hide the YouTube UI
-          setTimeout(() => setUiBlocker(false), 4250);
+          setTimeout(() => setUiBlocker(false), 4000);
       } else if (mediaRef.current) {
           mediaRef.current.play();
       }
@@ -132,7 +137,7 @@ export default function FactSportPlayer({
             setUiBlocker(true);
             // HOW TO EDIT UI BLOCKER TIMEOUT:
             // Change the '4000' below (in milliseconds) to adjust how long the top/bottom bars hide the YouTube UI
-            setTimeout(() => setUiBlocker(false), 4250);
+            setTimeout(() => setUiBlocker(false), 4000);
         }
         setIsPlaying(!isPlaying);
     } else if (mediaRef.current) {

@@ -60,14 +60,17 @@ export default async function EmbedPage({ params }: { params: Promise<{ id: stri
   if (!dbData) return (<div className="w-full h-full bg-black"></div>);
 
   const siteSettings = await getSiteSettings();
-
+  
   const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
   const currentStatus = (dbData.status || '').toUpperCase();
-  const isFinished = FINISHED_STATUSES.includes(currentStatus);
+  const isFinishedApi = FINISHED_STATUSES.includes(currentStatus);
   
   const matchDateMs = new Date(dbData.match_date).getTime();
   const minutesToKick = (matchDateMs - Date.now()) / 60000;
-  const isUniversallyFinished = isFinished || minutesToKick < -240;
+  
+  // Universally finished means we should display highlights and hide the stream
+  // We rely purely on the API status to handle extra time, penalties, or delays properly.
+  const isUniversallyFinished = isFinishedApi;
 
   // The active URL for the embed
   const activeVideoUrl = isUniversallyFinished ? dbData.video_url : dbData.livestream_url;

@@ -65,15 +65,37 @@ export default function EmbedPlayerClient({
         }
     }, [timeLeft]);
 
+    // EDIT HERE: Configuration for player lock/unlock and visibility
+    const UNLOCK_MINUTES_BEFORE_KICKOFF = 15; 
+
+    const timeUntilStart = match.match_date ? new Date(match.match_date).getTime() - Date.now() : 0;
+    const minutesToKick = timeUntilStart / 60000;
+    const currentStatus = (match.status || '').toUpperCase();
+    const isFinishedApi = ['FT', 'AET', 'PEN', 'FINISHED'].includes(currentStatus);
+    const isLive = !['NS', 'TBD', 'POSTPONED', 'CANCELED'].includes(currentStatus) && !isFinishedApi;
+    // Rely purely on the API status to determine if the match is finished (handles extra time/penalties)
+    const isUniversallyFinished = isFinishedApi;
+    
+    let isEmbedLocked = true;
+    if (isUniversallyFinished) {
+        isEmbedLocked = false;
+    } else if (isLive) {
+        isEmbedLocked = false;
+    } else {
+        if (minutesToKick <= UNLOCK_MINUTES_BEFORE_KICKOFF) {
+            isEmbedLocked = false;
+        }
+    }
+
     return (
         <div className="w-screen h-screen bg-black overflow-hidden flex flex-col relative">
             <FactSportPlayer 
                 mediaUrl={activeVideoUrl || ''} 
                 matchId={match.id} 
                 mode="video" 
-                isLocked={false} 
+                isLocked={isEmbedLocked} 
                 matchDate={match.match_date} 
-                isFinished={false}
+                isFinished={isUniversallyFinished}
                 homeTeam={match.home_team}
                 awayTeam={match.away_team}
                 homeLogo={match.home_logo}
