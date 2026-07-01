@@ -23,7 +23,6 @@ export async function GET(request: Request) {
     const API_KEY = process.env.FOOTBALL_DATA_KEY;
     if (!API_KEY) return NextResponse.json({ error: 'Missing API Key' }, { status: 500 });
 
-    // 🟢 ADDED TOURNAMENT CODES
     const TARGET_LEAGUES = ['PL', 'PD', 'BL1', 'SA', 'FL1', 'CL', 'EC', 'WC', 'CLI', 'AFCON'];
     
     const ESPN_LEAGUES: Record<string, string> = {
@@ -118,39 +117,33 @@ export async function GET(request: Request) {
                     } else if (['POSTPONED', 'CANCELLED', 'SUSPENDED'].includes(m.status)) {
                         fdStatusMapped = 'POSTPONED';
                     } else {
-                        fdStatusMapped = m.status;
+                        fdStatusMapped = 'SCHEDULED';
                     }
                     
                     const dbMatch = dbMap.get(m.id);
                     if (!dbMatch) continue;
 
-                    const isDbLive = ['LIVE', 'HT', '1H', '2H', 'ET', 'P'].includes(dbMatch.status);
                     const hasEspnId = !!dbMatch.espn_id;
-                    
                     const fdHomeScore = m.score?.fullTime?.home ?? 0;
                     const fdAwayScore = m.score?.fullTime?.away ?? 0;
                     let shouldUpdateMatch = false;
 
-                    if (['LIVE', 'HT', 'FT', 'FINISHED', 'AWARDED'].includes(fdStatusMapped) || isDbLive) {
+                    if (['LIVE', 'HT', 'FT'].includes(fdStatusMapped) || ['LIVE', 'HT'].includes(dbMatch.status)) {
                         leaguesNeedingStandingsUpdate.add(compCode);
                     }
 
-                    if (fdStatusMapped === 'FT') {
-                        if (dbMatch.status !== 'FT' || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
-                            shouldUpdateMatch = true;
-                            leaguesNeedingStandingsUpdate.add(compCode); 
+                    if (hasEspnId) {
+                        // ESPN match: we only enforce FD's FT score/status if FD is FT,
+                        // this acts as a confirmation in case ESPN missed the FT event.
+                        // We DO NOT update LIVE, HT, SCHEDULED for ESPN matches here.
+                        if (fdStatusMapped === 'FT') {
+                            if (dbMatch.status !== 'FT' || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
+                                shouldUpdateMatch = true;
+                            }
                         }
-                    } 
-                    else if (hasEspnId && (fdStatusMapped === 'LIVE' || fdStatusMapped === 'HT' || isDbLive)) {
-                        continue; 
-                    } 
-                    else if (!hasEspnId && ['LIVE', 'HT'].includes(fdStatusMapped)) {
+                    } else {
+                        // No ESPN ID: Football Data entirely owns this match
                         if (dbMatch.status !== fdStatusMapped || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
-                            shouldUpdateMatch = true;
-                        }
-                    }
-                    else if (['POSTPONED', 'SCHEDULED'].includes(fdStatusMapped)) {
-                        if (dbMatch.status !== fdStatusMapped && !isDbLive) {
                             shouldUpdateMatch = true;
                         }
                     }

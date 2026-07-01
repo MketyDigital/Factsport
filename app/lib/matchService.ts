@@ -9,18 +9,18 @@ const LEAGUE_MAP: Record<string, string> = {
   'Premier League': 'PL', 'La Liga': 'PD', 'Bundesliga': 'BL1',
   'Serie A': 'SA', 'Ligue 1': 'FL1', 'Champions League': 'CL',
   'Euros': 'EC', 'World Cup': 'WC', 'Europa League': 'EL', 
-  'Copa America': 'CLI', 'AFCON': 'AFCON' // 🟢 ADDED TOURNAMENTS
+  'Copa America': 'CLI', 'AFCON': 'AFCON' 
 };
 
 const normalizeStatus = (rawStatus: string) => {
-  if (!rawStatus) return '';
+  if (!rawStatus) return 'SCHEDULED';
   const status = rawStatus.toUpperCase();
   
   const map: Record<string, string> = {
     'IN_PLAY': 'LIVE', 'PAUSED': 'HT', 'HALFTIME': 'HT',
     'FINISHED': 'FT', 'AWARDED': 'FT', 'TIMED': 'SCHEDULED',
     'SCHEDULED': 'SCHEDULED', 'POSTPONED': 'POSTPONED',
-    'POST': 'FT' 
+    'POST': 'FT', 'PRE': 'SCHEDULED', 'PRE_MATCH': 'SCHEDULED'
   };
   return map[status] || status;
 };
@@ -126,7 +126,7 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
   }
   
   const rawStatus = (dbData.status || '').toUpperCase();
-  const safeStatus = rawStatus === 'SCHEDULED' ? 'PRE' : rawStatus;
+  const safeStatus = normalizeStatus(rawStatus);
 
   return {
     ...dbData, 
