@@ -16,27 +16,30 @@ async function runLiveUpdate(request: Request) {
 
   try {
       const now = Date.now();
-      const lookForward = new Date(now + (2 * 60 * 60 * 1000)).toISOString();
+      // Expanded window to 24 hours to ensure upcoming/yesterday matches are caught regardless of timezone
+      const lookForward = new Date(now + (24 * 60 * 60 * 1000)).toISOString();
       const lookBack = new Date(now - (24 * 60 * 60 * 1000)).toISOString(); 
 
       const { data: windowMatches } = await supabase.from('matches').select('*').not('espn_id', 'is', null).gt('match_date', lookBack).lt('match_date', lookForward);
       if (!windowMatches || windowMatches.length === 0) return NextResponse.json({ message: "No matches in window." });
 
+      const terminalStatuses = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'];
+
       const activeMatches = windowMatches.filter(m => {
-          const isLiveOrUpcoming = ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE'].includes(m.status);
+          // Standardized statuses
+          const isLiveOrUpcoming = ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE', 'PRE_MATCH'].includes(m.status);
           
           const kickMs = Date.parse(m.match_date);
           const hoursSinceKick = (Date.now() - kickMs) / (1000 * 60 * 60);
-          const isRecentlyFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(m.status) && hoursSinceKick < 5;
+          const isRecentlyFinished = terminalStatuses.includes(m.status) && hoursSinceKick < 5;
           
-          const isFinishedButBroken = ['FT', 'FINISHED'].includes(m.status) && (!m.match_events || m.match_events.length === 0);
+          const isFinishedButBroken = terminalStatuses.includes(m.status) && (!m.match_events || m.match_events.length === 0);
           return isLiveOrUpcoming || isRecentlyFinished || isFinishedButBroken;
       });
 
       if (activeMatches.length === 0) return NextResponse.json({ message: "No active matches." });
 
       const activeLeagues = Array.from(new Set(activeMatches.map(m => m.league)));
-      const terminalStatuses = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
       for (const leagueName of activeLeagues) {
         const espnCode = ESPN_LEAGUES[leagueName as string];
@@ -47,31 +50,47 @@ async function runLiveUpdate(request: Request) {
 
         for (const dbMatch of leagueDbMatches) {
              const espnGame = espnMatches.find((e: any) => String(e.espn_id) === dbMatch.espn_id);
-             const isFinishedButBroken = terminalStatuses.includes(dbMatch.status);
              
-             if (espnGame || isFinishedButBroken || terminalStatuses.includes(dbMatch.status)) {
+             const isLiveInDb = ['LIVE', 'HT', 'IN_PLAY'].includes(dbMatch.status);
+             const kickMs = Date.parse(dbMatch.match_date);
+             const hoursToKick = (kickMs - Date.now()) / (1000 * 60 * 60);
+             
+             // Check if match is starting soon or recently started (even if missing from ESPN live scoreboard)
+             const isSoon = hoursToKick >= -5 && hoursToKick < 2; 
+             const isRecentlyFinished = terminalStatuses.includes(dbMatch.status);
+             const isFinishedButBroken = terminalStatuses.includes(dbMatch.status) && (!dbMatch.match_events || dbMatch.match_events.length === 0);
+             
+             // Proceed if it's on the scoreboard, OR if we know it should be live/soon/broken
+             if (espnGame || isLiveInDb || isSoon || isRecentlyFinished || isFinishedButBroken) {
                  const updateTask = (async () => {
                      const richData = await fetchEspnDetails(dbMatch.espn_id);
                      let newStatus = dbMatch.status;
                      const payload: any = { updated_at: new Date().toISOString() };
 
-                     if (espnGame) {
-                         if (espnGame.status === 'in') newStatus = 'LIVE';
-                         else if (espnGame.status === 'post') newStatus = 'FT'; 
-                         else if (espnGame.status === 'pre') newStatus = 'PRE_MATCH';
-                         else if (espnGame.clock === 'HT') newStatus = 'HT';
+                     // Prioritize scoreboard status if available, fallback to richData status direct from match summary
+                     let currentEspnStatus = espnGame?.status || richData?.status;
+                     let currentEspnClock = espnGame?.clock || richData?.clock;
+                     let currentHomeScore = espnGame ? espnGame.home_score : richData?.home_score;
+                     let currentAwayScore = espnGame ? espnGame.away_score : richData?.away_score;
+
+                     if (currentEspnStatus) {
+                         if (currentEspnStatus === 'in') newStatus = 'LIVE';
+                         else if (currentEspnStatus === 'post') newStatus = 'FT'; 
+                         else if (currentEspnStatus === 'pre') newStatus = 'SCHEDULED';
+                         else if (currentEspnStatus === 'postponed') newStatus = 'POSTPONED';
+                         else if (currentEspnStatus === 'canceled') newStatus = 'CANCELLED';
+                         
+                         if (currentEspnClock === 'HT' || currentEspnClock === 'Halftime') newStatus = 'HT';
                          
                          payload.status = newStatus;
                          
                          const isTrackedByFD = !!dbMatch.api_id;
+                         // Update scores if not FT, OR if it's strictly an ESPN match (not tracked by FD)
                          if (!terminalStatuses.includes(dbMatch.status) || !isTrackedByFD) {
-                             payload.home_score = espnGame.home_score;
-                             payload.away_score = espnGame.away_score;
-                             payload.displayClock = espnGame.clock;
+                             if (currentHomeScore !== undefined) payload.home_score = currentHomeScore;
+                             if (currentAwayScore !== undefined) payload.away_score = currentAwayScore;
+                             if (currentEspnClock !== undefined) payload.displayClock = currentEspnClock;
                          }
-                     } else if (richData && richData.stats?.home_score !== undefined) {
-                         payload.home_score = richData.stats.home_score;
-                         payload.away_score = richData.stats.away_score;
                      }
 
                      if (richData) {
@@ -91,7 +110,7 @@ async function runLiveUpdate(request: Request) {
                      
                      return true;
                  })();
-                 syncTasks.push(updateTask); updates++; logs.push(`⚡ ESPN Synced: ${dbMatch.home_team}`);
+                 syncTasks.push(updateTask); updates++; logs.push(`⚡ ESPN Synced: ${dbMatch.home_team} (${dbMatch.status})`);
              }
         }
       }
