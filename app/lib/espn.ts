@@ -5,7 +5,7 @@ export const ESPN_LEAGUES: Record<string, string> = {
   'Premier League': 'eng.1', 'La Liga': 'esp.1', 'Bundesliga': 'ger.1',
   'Serie A': 'ita.1', 'Ligue 1': 'fra.1', 'Champions League': 'uefa.champions',
   'Euros': 'uefa.euro', 'World Cup': 'fifa.world', 
-  'Copa America': 'conmebol.america', 'AFCON': 'caf.nations',
+  'Copa America': 'conmebol.america', 'AFCON': 'caf.nations', 
   
   'Europa League': 'uefa.europa', 'Europa Conference League': 'uefa.conference',
   'FA Cup': 'eng.fa', 'Carabao Cup': 'eng.league_cup', 'Copa del Rey': 'esp.copa_del_rey',
@@ -65,19 +65,17 @@ export async function fetchEspnDetails(gameId: string) {
     if (!data || !data.header) return null;
 
     const comps = data.header.competitions?.[0];
-    
-    // Extract status directly from summary header so we don't rely only on scoreboard
-    const statusState = comps?.status?.type?.state || data.header.competitions?.[0]?.status?.type?.state || 'pre';
-    const clock = comps?.status?.displayClock || data.header.competitions?.[0]?.status?.displayClock || "0'";
-    
     const homeCompetitor = comps?.competitors?.find((c:any)=>c.homeAway==='home');
     const awayCompetitor = comps?.competitors?.find((c:any)=>c.homeAway==='away');
     const homeId = String(homeCompetitor?.team?.id || '');
     const homeTeamName = homeCompetitor?.team?.displayName || '';
     const awayTeamName = awayCompetitor?.team?.displayName || '';
 
-    const homeScore = parseInt(homeCompetitor?.score || '0');
-    const awayScore = parseInt(awayCompetitor?.score || '0');
+    // EXTRACT LIVE STATUS BACKUPS IF SCOREBOARD MISSES MATCH
+    const statusState = comps?.status?.type?.state || 'pre';
+    const clock = comps?.status?.type?.description === 'Halftime' ? 'HT' : (comps?.status?.displayClock || "0'");
+    const live_home_score = parseInt(homeCompetitor?.score || '0');
+    const live_away_score = parseInt(awayCompetitor?.score || '0');
 
     let stageName = comps?.type?.abbreviation || comps?.type?.text || data.header.season?.type?.text || null;
     let groupName = null;
@@ -271,10 +269,6 @@ export async function fetchEspnDetails(gameId: string) {
     events.reverse();
 
     return { 
-        status: statusState,
-        clock: clock,
-        home_score: homeScore,
-        away_score: awayScore,
         events, 
         stats, 
         lineups, 
@@ -282,7 +276,11 @@ export async function fetchEspnDetails(gameId: string) {
         referees,     
         predictor,
         stage: stageName,     
-        match_group: groupName 
+        match_group: groupName,
+        live_status: statusState,
+        clock,
+        live_home_score,
+        live_away_score
     };
 
   } catch (err) { 

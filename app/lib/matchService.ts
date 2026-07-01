@@ -13,14 +13,14 @@ const LEAGUE_MAP: Record<string, string> = {
 };
 
 const normalizeStatus = (rawStatus: string) => {
-  if (!rawStatus) return 'SCHEDULED';
+  if (!rawStatus) return '';
   const status = rawStatus.toUpperCase();
   
   const map: Record<string, string> = {
     'IN_PLAY': 'LIVE', 'PAUSED': 'HT', 'HALFTIME': 'HT',
     'FINISHED': 'FT', 'AWARDED': 'FT', 'TIMED': 'SCHEDULED',
     'SCHEDULED': 'SCHEDULED', 'POSTPONED': 'POSTPONED',
-    'POST': 'FT', 'PRE': 'SCHEDULED', 'PRE_MATCH': 'SCHEDULED'
+    'POST': 'FT', 'PRE_MATCH': 'PRE_MATCH'
   };
   return map[status] || status;
 };
@@ -126,7 +126,7 @@ export async function getExternalData(dbData: any): Promise<UnifiedMatchData> {
   }
   
   const rawStatus = (dbData.status || '').toUpperCase();
-  const safeStatus = normalizeStatus(rawStatus);
+  const safeStatus = (rawStatus === 'SCHEDULED' || rawStatus === 'PRE_MATCH') ? 'PRE_MATCH' : rawStatus;
 
   return {
     ...dbData, 
