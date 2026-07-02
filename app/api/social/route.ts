@@ -3,8 +3,9 @@ export const runtime = 'edge';
 
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { fetchEspnDetails } from '@/app/lib/espn';
 
-// Global cache for Edge isolate to prevent immediate concurrent duplicate processing
+// Extended to 120 seconds to confidently deduplicate DB Webhooks vs Direct API triggers
 const edgeRecentPosts = new Set<string>();
 
 const SAFETY_MAP: Record<string, any> = {
@@ -132,20 +133,30 @@ const secureStaticImage = async (internalFetchUrl: string, publicFallbackUrl: st
   try {
     const imgResponse = await fetch(internalFetchUrl, { headers: { Accept: 'image/png' } });
     let arrayBuffer;
-    if (imgResponse.ok) {
+    
+    // Strict Image Content Validation
+    const contentType = imgResponse.headers.get('content-type');
+    const isValidPng = imgResponse.ok && contentType && contentType.includes('image/png');
+
+    if (isValidPng) {
       arrayBuffer = await imgResponse.arrayBuffer();
     } else {
       const fallbackRes = await fetch(publicFallbackUrl);
-      if (!fallbackRes.ok) return '';
+      const fallbackContentType = fallbackRes.headers.get('content-type');
+      if (!fallbackRes.ok || !fallbackContentType || !fallbackContentType.includes('image/png')) return '';
       arrayBuffer = await fallbackRes.arrayBuffer();
     }
+
+    // Safety check against generating broken HTML/Text masked as an image or an empty buffer
+    if (!arrayBuffer || arrayBuffer.byteLength < 5000) return ''; 
+
     const { error } = await supabaseClient.storage.from('socials').upload(`${fileName}.png`, arrayBuffer, {
       contentType: 'image/png', upsert: true
     });
-    if (error) return publicFallbackUrl;
+    if (error) return '';
     const { data } = supabaseClient.storage.from('socials').getPublicUrl(`${fileName}.png`);
     return `${data.publicUrl}?v=${Date.now()}`;
-  } catch { return publicFallbackUrl; }
+  } catch { return ''; }
 };
 
 const isLineupsEvent = (eventKey: string | null) => eventKey === 'lineups';
@@ -158,8 +169,12 @@ const normalizeLineupsEventConfig = (eventKey: string | null, evtConfig: any) =>
 const fetchImageArrayBuffer = async (url: string) => {
   try {
     const imgResponse = await fetch(url, { headers: { Accept: 'image/png' } });
-    if (!imgResponse.ok) return null;
-    return await imgResponse.arrayBuffer();
+    const contentType = imgResponse.headers.get('content-type');
+    if (!imgResponse.ok || !contentType || !contentType.includes('image/png')) return null;
+    
+    const buffer = await imgResponse.arrayBuffer();
+    if (buffer.byteLength < 5000) return null; // Reject corrupted tiny images
+    return buffer;
   } catch { return null; }
 };
 
@@ -396,13 +411,21 @@ export async function POST(request: Request) {
     
     let latestGoal = getLatestChangedGoal(oldGoalsList, newGoalsList);
     
+    // DELAY AND DIRECT FETCH: Ensure we wait for human commentary, independent of DB updates!
     if (newGoalsList.length < newTotal || !latestGoal) {
-      // 8-second delay allows the DB to catch up via another webhook while this function waits
-      await new Promise(resolve => setTimeout(resolve, 8000));
-      const { data: freshMatch } = await supabase.from('matches').select('match_events').eq('id', newState.id).single();
-      if (freshMatch) {
-          newGoalsList = getValidGoals(freshMatch.match_events || []);
-          latestGoal = getLatestChangedGoal(oldGoalsList, newGoalsList);
+      // 12-second delay gives ESPN time to process the textual commentary natively
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      
+      try {
+          if (newState.espn_id) {
+              const richData = await fetchEspnDetails(newState.espn_id);
+              if (richData && richData.events) {
+                  newGoalsList = getValidGoals(richData.events);
+                  latestGoal = getLatestChangedGoal(oldGoalsList, newGoalsList);
+              }
+          }
+      } catch (e) {
+          console.error("Failed to fetch fresh commentary from ESPN for social route:", e);
       }
     }
     
@@ -471,7 +494,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Event already processing/processed concurrently (caught by Edge cache).' });
   }
   edgeRecentPosts.add(uniqueEventIdentifier);
-  setTimeout(() => edgeRecentPosts.delete(uniqueEventIdentifier), 90000);
+  setTimeout(() => edgeRecentPosts.delete(uniqueEventIdentifier), 120000); // 120s guarantees Webhooks don't double-fire
 
   const baseEventKey = eventKey.replace(/_\d+$/, '');
   const baseSafetyConfig = SAFETY_MAP[baseEventKey] || {};
