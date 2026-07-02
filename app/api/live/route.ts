@@ -7,6 +7,11 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { fetchEspnLive, fetchEspnDetails, ESPN_LEAGUES } from '@/app/lib/espn';
 
+// Option 2 KV Cache Implementation: In-memory Edge Cache.
+// This allows the route to know if it already processed a score change 
+// even if the database fails to save the update.
+const kvCache = new Map<string, string>();
+
 async function runLiveUpdate(request: Request) {
   const url = new URL(request.url);
   if (url.searchParams.get('key') !== process.env.CRON_KEY) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -23,7 +28,6 @@ async function runLiveUpdate(request: Request) {
       if (!windowMatches || windowMatches.length === 0) return NextResponse.json({ message: "No matches in window." });
 
       const activeMatches = windowMatches.filter(m => {
-          // Explicitly Added PRE_MATCH to ensure pending games are picked up properly
           const isLiveOrUpcoming = ['LIVE', 'HT', 'IN_PLAY', 'SCHEDULED', 'TIMED', 'PRE', 'PRE_MATCH'].includes(m.status);
           
           const kickMs = Date.parse(m.match_date);
@@ -39,7 +43,6 @@ async function runLiveUpdate(request: Request) {
       const activeLeagues = Array.from(new Set(activeMatches.map(m => m.league)));
       const terminalStatuses = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
-      // Running sequentially prevents overloading memory on Cloudflare Edge Runtime
       for (const leagueName of activeLeagues) {
         const espnCode = ESPN_LEAGUES[leagueName as string];
         if (!espnCode) continue;
@@ -49,8 +52,6 @@ async function runLiveUpdate(request: Request) {
 
         for (const dbMatch of leagueDbMatches) {
              const espnGame = espnMatches.find((e: any) => String(e.espn_id) === dbMatch.espn_id);
-             
-             // Fetch details for all active matches ensuring updates even if missing from ESPN live scoreboard array
              const richData = await fetchEspnDetails(dbMatch.espn_id);
              
              let newStatus = dbMatch.status;
@@ -71,7 +72,6 @@ async function runLiveUpdate(request: Request) {
                      payload.displayClock = espnGame.clock;
                  }
              } else if (richData) {
-                 // Solid fallback: Update statuses strictly from the detailed endpoint data
                  if (richData.live_status === 'in') newStatus = 'LIVE';
                  else if (richData.live_status === 'post') newStatus = 'FT';
                  else if (richData.live_status === 'pre') newStatus = 'PRE_MATCH';
@@ -98,6 +98,29 @@ async function runLiveUpdate(request: Request) {
                  
                  if (richData.referees && richData.referees.length > 0) payload.referees = richData.referees;
                  if (richData.predictor) payload.predictor = richData.predictor;
+             }
+
+             // DATABASE INDEPENDENCE LOGIC: Compare ESPN State vs DB/KV Cache and fire social directly
+             const dbStateStr = `${dbMatch.status}_${dbMatch.home_score}_${dbMatch.away_score}_${dbMatch.match_events?.length || 0}`;
+             const espnStateStr = `${newStatus}_${payload.home_score}_${payload.away_score}_${payload.match_events?.length || 0}`;
+             
+             const cacheKey = String(dbMatch.id);
+             const cachedState = kvCache.get(cacheKey);
+
+             if (espnStateStr !== dbStateStr && espnStateStr !== cachedState) {
+                 // Instantly cache the new state to prevent duplicates if DB update fails below
+                 kvCache.set(cacheKey, espnStateStr); 
+
+                 const oldState = { ...dbMatch };
+                 const newState = { ...dbMatch, ...payload, espn_id: dbMatch.espn_id }; 
+                 
+                 // Fire directly to social route, completely bypassing the DB webhooks
+                 const origin = request.headers.get('origin') || new URL(request.url).origin;
+                 fetch(`${origin}/api/social`, {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_KEY}` },
+                     body: JSON.stringify({ record: newState, old_record: oldState })
+                 }).catch(err => console.error("Social direct trigger failed:", err));
              }
 
              await supabase.from('matches').update(payload).eq('id', dbMatch.id);
