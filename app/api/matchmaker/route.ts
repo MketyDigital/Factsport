@@ -43,9 +43,9 @@ const getCanonicalName = (rawName: string) => {
         'st pauli': 'sankt pauli', 'fc st pauli': 'sankt pauli',
         'juve': 'juventus', 'inter': 'inter milan', 'internazionale': 'inter milan',
         'milan': 'ac milan', 'roma': 'as roma', 'lazio': 'ss lazio',
-        'napoli': 'ssc napoli', 'hellas verona': 'verona', 'cagliari': 'cagliari calcio',
+        'napoli': 'ssc napoli', 'hellas verona': 'verona', 'cagliari': 'cagliari',
         'genoa': 'genoa', 'genoa cfc': 'genoa', 'torino': 'torino', 'torino fc': 'torino',
-        'lecce': 'us lecce', 'us lecce': 'lecce', 'como 1907': 'como', 'atalanta bc': 'atalanta',
+        'lecce': 'lecce', 'us lecce': 'lecce', 'como 1907': 'como', 'atalanta bc': 'atalanta',
         'ac monza': 'monza', 'us sassuolo': 'sassuolo', 'frosinone calcio': 'frosinone', 'us salernitana 1919': 'salernitana',
         'fiorentina': 'acf fiorentina', 'empoli fc': 'empoli', 'bologna fc': 'bologna', 'udinese calcio': 'udinese',
         'psg': 'paris saint germain', 'paris sg': 'paris saint germain', 'om': 'marseille',
@@ -91,15 +91,27 @@ const similarity = (s1: string, s2: string) => {
     return (longer.length - costs[longer.length]) / longer.length;
 };
 
-const isStrongSubstring = (s1: string, s2: string) => {
-    if (s1.length < 4 || s2.length < 4) return false; 
-    return s1.includes(s2) || s2.includes(s1);
-};
-
-const isTokenMatch = (s1: string, s2: string) => {
-    const tokens1 = s1.split(' ').filter(w => w.length > 4); 
-    const tokens2 = s2.split(' ').filter(w => w.length > 4);
-    return tokens1.some(t1 => tokens2.includes(t1));
+const isStrongMatch = (s1: string, s2: string, score: number) => {
+    if ((s1.includes(s2) && s2.length >= 5) || (s2.includes(s1) && s1.length >= 5)) return true;
+    if (score > 0.8) return true;
+    
+    // Explicit exclusions to prevent derby/city mixups
+    const bothContain = (word: string) => s1.includes(word) && s2.includes(word);
+    if (bothContain("manchester") && score < 0.8) return false;
+    if (bothContain("madrid") && score < 0.8) return false;
+    if (bothContain("milan") && score < 0.8) return false;
+    if (bothContain("london") && score < 0.8) return false;
+    
+    const tokens1 = s1.split(' ').filter(w => w.length >= 4); 
+    const tokens2 = s2.split(' ').filter(w => w.length >= 4);
+    if (tokens1.length > 0 && tokens2.length > 0) {
+        let matchCount = 0;
+        for (const t1 of tokens1) {
+            if (tokens2.includes(t1)) matchCount++;
+        }
+        if (matchCount === Math.max(tokens1.length, tokens2.length)) return true;
+    }
+    return false;
 };
 
 // HELPER: DATE FORMATTER FOR ESPN API
@@ -108,14 +120,15 @@ const formatEspnDate = (date: Date) => {
 };
 
 // HELPER: FETCH ESPN DATA
-async function fetchEspnLive(espnCode: string) {
+async function fetchEspnLive(espnCode: string, daysPast: number, daysFuture: number) {
     const now = new Date();
-    // Fetch 24h before and 24h after to ensure complete coverage of 48h window
-    const startDate = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-    const endDate = new Date(now.getTime() + (24 * 60 * 60 * 1000));
+    // Fetch a wider window: -2 to +5 days
+    const startDate = new Date(now.getTime() - (daysPast * 24 * 60 * 60 * 1000));
+    const endDate = new Date(now.getTime() + (daysFuture * 24 * 60 * 60 * 1000));
     const dateRange = `${formatEspnDate(startDate)}-${formatEspnDate(endDate)}`;
     
-    const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${espnCode}/scoreboard?dates=${dateRange}&limit=100`;
+    // Increased limit to 300 to capture heavy windows without cutoff
+    const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${espnCode}/scoreboard?dates=${dateRange}&limit=300`;
     const response = await fetch(url, {
         headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36" }
     });
@@ -138,22 +151,24 @@ async function runMatchmaker(request: Request) {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
   let logs: string[] = [];
   let mappedCount = 0;
-  const syncTasks: Promise<any>[] = [];
-  const assignedEspnIds = new Set<string>();
+  let remappedCount = 0;
+  const syncTasks: (() => Promise<boolean>)[] = [];
+  const newlyAssignedEspnIds = new Set<string>();
 
   try {
       const now = Date.now();
-      const lookBack = new Date(now - (48 * 60 * 60 * 1000)).toISOString(); 
-      const todayEnd = new Date(now + (48 * 60 * 60 * 1000)).toISOString(); 
+      // Expanded mapping window: -2 days to +5 days to cover wide range of matches
+      const lookBack = new Date(now - (2 * 24 * 60 * 60 * 1000)).toISOString(); 
+      const lookForward = new Date(now + (5 * 24 * 60 * 60 * 1000)).toISOString(); 
 
-      const { data: existingIds } = await supabase.from('matches').select('espn_id').not('espn_id', 'is', null).gt('match_date', lookBack).lt('match_date', todayEnd);
-      if (existingIds) {
-          existingIds.forEach(row => { if (row.espn_id) assignedEspnIds.add(String(row.espn_id)); });
-      }
+      // Select ALL matches in the window so we can catch ESPN ID changes before the match starts
+      const { data: dbMatches, error: dbError } = await supabase.from('matches')
+          .select('id, home_team, away_team, match_date, league, espn_id')
+          .gt('match_date', lookBack)
+          .lt('match_date', lookForward);
 
-      const { data: dbMatches, error: dbError } = await supabase.from('matches').select('id, home_team, away_team, match_date, league').is('espn_id', null).gt('match_date', lookBack).lt('match_date', todayEnd);
       if (dbError) throw new Error(`[SUPABASE_SELECT_ERROR] ${dbError.message}`);
-      if (!dbMatches || dbMatches.length === 0) return NextResponse.json({ message: "No unmatched games." });
+      if (!dbMatches || dbMatches.length === 0) return NextResponse.json({ message: "No matches in window." });
 
       const activeLeagues = Array.from(new Set(dbMatches.map(m => m.league)));
 
@@ -163,7 +178,8 @@ async function runMatchmaker(request: Request) {
 
         let espnMatches: any[] = [];
         try {
-            espnMatches = await fetchEspnLive(espnCode);
+            // Fetch using our -2 to +5 day window constraint
+            espnMatches = await fetchEspnLive(espnCode, 2, 5);
         } catch (apiErr: any) {
             logs.push(`❌ ESPN API ERROR ${leagueName}: ${apiErr.message}`);
             continue;
@@ -175,49 +191,93 @@ async function runMatchmaker(request: Request) {
              const dbHome = getCanonicalName(dbMatch.home_team);
              const dbAway = getCanonicalName(dbMatch.away_team);
              
-             const espnGame = espnMatches.find((e: any) => {
-                 if (!e) return false;
+             let bestMatch = null;
+             let bestScore = 0;
+
+             for (const e of espnMatches) {
+                 if (!e) continue;
                  const currentEspnId = String(e.id || e.espn_id); 
-                 if (!currentEspnId || currentEspnId === 'undefined' || assignedEspnIds.has(currentEspnId)) return false;
+                 if (!currentEspnId || currentEspnId === 'undefined') continue;
+                 
+                 // Skip if we already used this ESPN game for a DIFFERENT DB match in this exact run
+                 if (newlyAssignedEspnIds.has(currentEspnId) && dbMatch.espn_id !== currentEspnId) continue;
 
                  const espnTimeString = e.date || e.startTime;
                  const espnTime = espnTimeString ? new Date(espnTimeString).getTime() : 0;
-                 if (espnTime && !isNaN(espnTime) && Math.abs(dbTime - espnTime) > (48 * 60 * 60 * 1000)) return false;
+                 
+                 // Relaxed time constraint to 48 hours to account for API timezone/date drifts
+                 if (espnTime && !isNaN(espnTime) && Math.abs(dbTime - espnTime) > (48 * 60 * 60 * 1000)) continue;
 
                  const rawEspnHome = e.home_team || e.homeTeam || "";
                  const rawEspnAway = e.away_team || e.awayTeam || "";
-                 const espnHome = getCanonicalName(rawEspnHome);
-                 const espnAway = getCanonicalName(rawEspnAway);
                  
-                 const homeScore = similarity(dbHome, espnHome);
-                 const awayScore = similarity(dbAway, espnAway);
-                 const homeMatch = isStrongSubstring(dbHome, espnHome) || isTokenMatch(dbHome, espnHome) || homeScore > 0.75;
-                 const awayMatch = isStrongSubstring(dbAway, espnAway) || isTokenMatch(dbAway, espnAway) || awayScore > 0.75;
+                 let espnHomeName = rawEspnHome;
+                 let espnAwayName = rawEspnAway;
+                 if (!espnHomeName && e.competitions && e.competitions[0] && e.competitions[0].competitors) {
+                     const competitors = e.competitions[0].competitors;
+                     const homeComp = competitors.find((c: any) => c.homeAway === 'home');
+                     const awayComp = competitors.find((c: any) => c.homeAway === 'away');
+                     if (homeComp) espnHomeName = homeComp.team.name || homeComp.team.displayName;
+                     if (awayComp) espnAwayName = awayComp.team.name || awayComp.team.displayName;
+                 }
 
-                 return homeMatch && awayMatch;
-             });
+                 const espnHome = getCanonicalName(espnHomeName);
+                 const espnAway = getCanonicalName(espnAwayName);
+                 
+                 const homeSim = similarity(dbHome, espnHome);
+                 const awaySim = similarity(dbAway, espnAway);
+                 
+                 const isHomeMatch = isStrongMatch(dbHome, espnHome, homeSim);
+                 const isAwayMatch = isStrongMatch(dbAway, espnAway, awaySim);
 
-             if (espnGame) {
-                 const targetEspnId = String(espnGame.id || espnGame.espn_id);
-                 assignedEspnIds.add(targetEspnId);
-                 syncTasks.push(
-                    (async () => {
-                        const { error } = await supabase.from('matches').update({ espn_id: targetEspnId }).eq('id', dbMatch.id);
-                        if (error) {
-                            logs.push(`❌ UPDATE CRASH: ${error.message}`);
-                            return false;
-                        }
-                        return true;
-                    })()
-                 );
-                 mappedCount++;
-                 logs.push(`🔗 MAPPED: ${dbMatch.home_team} vs ${dbMatch.away_team}`);
+                 if (isHomeMatch && isAwayMatch) {
+                     const totalScore = homeSim + awaySim;
+                     if (totalScore > bestScore) {
+                         bestScore = totalScore;
+                         bestMatch = e;
+                     }
+                 }
+             }
+
+             if (bestMatch) {
+                 const targetEspnId = String(bestMatch.id || bestMatch.espn_id);
+                 
+                 // If the ID hasn't changed, just mark it used and move on
+                 if (dbMatch.espn_id === targetEspnId) {
+                     newlyAssignedEspnIds.add(targetEspnId);
+                     continue;
+                 }
+
+                 // ID has changed (or was null), prep for batch execution
+                 newlyAssignedEspnIds.add(targetEspnId);
+                 syncTasks.push(async () => {
+                     const { error } = await supabase.from('matches').update({ espn_id: targetEspnId }).eq('id', dbMatch.id);
+                     if (error) {
+                         logs.push(`❌ UPDATE CRASH: ${error.message}`);
+                         return false;
+                     }
+                     return true;
+                 });
+
+                 if (dbMatch.espn_id) {
+                     remappedCount++;
+                     logs.push(`🔄 REMAPPED: ${dbMatch.home_team} vs ${dbMatch.away_team} (${dbMatch.espn_id} -> ${targetEspnId})`);
+                 } else {
+                     mappedCount++;
+                     logs.push(`🔗 MAPPED: ${dbMatch.home_team} vs ${dbMatch.away_team} -> ${targetEspnId}`);
+                 }
              }
         }
       }
       
-      await Promise.all(syncTasks);
-      return NextResponse.json({ success: true, mappedCount, logs });
+      // Batch execute promises (15 at a time) to prevent Cloudflare/Supabase connection saturation
+      const batchSize = 15;
+      for (let i = 0; i < syncTasks.length; i += batchSize) {
+          const batch = syncTasks.slice(i, i + batchSize).map(task => task());
+          await Promise.all(batch);
+      }
+
+      return NextResponse.json({ success: true, mappedCount, remappedCount, logs });
 
   } catch (error: any) {
       return NextResponse.json({ success: false, error: `[RUNTIME_ERROR] ${error.message}` }, { status: 500 });
