@@ -103,8 +103,8 @@ export async function GET(request: Request) {
                     .in('api_id', apiIds);
 
                 const dbMap = new Map(dbMatches?.map(m => [m.api_id, m]) || []);
-                const matchUpdates: any[] = []; 
 
+                // Execute sequentially to prevent edge 1102 Limit violations 
                 for (const m of fdMatches) {
                     const compCode = m.competition?.code;
                     if (!TARGET_LEAGUES.includes(compCode)) continue;
@@ -117,52 +117,50 @@ export async function GET(request: Request) {
                     } else if (['POSTPONED', 'CANCELLED', 'SUSPENDED'].includes(m.status)) {
                         fdStatusMapped = 'POSTPONED';
                     } else {
-                        fdStatusMapped = 'SCHEDULED';
+                        fdStatusMapped = m.status;
                     }
                     
                     const dbMatch = dbMap.get(m.id);
                     if (!dbMatch) continue;
 
+                    const isDbLive = ['LIVE', 'HT', '1H', '2H', 'ET', 'P'].includes(dbMatch.status);
                     const hasEspnId = !!dbMatch.espn_id;
+                    
                     const fdHomeScore = m.score?.fullTime?.home ?? 0;
                     const fdAwayScore = m.score?.fullTime?.away ?? 0;
                     let shouldUpdateMatch = false;
 
-                    if (['LIVE', 'HT', 'FT'].includes(fdStatusMapped) || ['LIVE', 'HT'].includes(dbMatch.status)) {
+                    if (['LIVE', 'HT', 'FT', 'FINISHED', 'AWARDED'].includes(fdStatusMapped) || isDbLive) {
                         leaguesNeedingStandingsUpdate.add(compCode);
                     }
 
                     if (hasEspnId) {
-                        // ESPN match: we only enforce FD's FT score/status if FD is FT,
-                        // this acts as a confirmation in case ESPN missed the FT event.
-                        // We DO NOT update LIVE, HT, SCHEDULED for ESPN matches here.
+                        // Strict limitation: Only act if enforcing missing FT records. No touching of active/scheduled match states.
                         if (fdStatusMapped === 'FT') {
                             if (dbMatch.status !== 'FT' || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
                                 shouldUpdateMatch = true;
+                                leaguesNeedingStandingsUpdate.add(compCode); 
                             }
                         }
                     } else {
-                        // No ESPN ID: Football Data entirely owns this match
+                        // Standard logic strictly for records not tracked by ESPN ID
                         if (dbMatch.status !== fdStatusMapped || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
                             shouldUpdateMatch = true;
                         }
                     }
 
                     if (shouldUpdateMatch) {
-                        matchUpdates.push(
-                            supabase.from('matches').update({ 
-                                home_score: fdHomeScore, 
-                                away_score: fdAwayScore, 
-                                status: fdStatusMapped, 
-                                updated_at: new Date().toISOString() 
-                            }).eq('api_id', m.id).then()
-                        );
+                        await supabase.from('matches').update({ 
+                            home_score: fdHomeScore, 
+                            away_score: fdAwayScore, 
+                            status: fdStatusMapped, 
+                            updated_at: new Date().toISOString() 
+                        }).eq('api_id', m.id);
+                        
                         matchesFinalized++; 
                         logs.push(`Cron Sync: ${m.id} (${compCode}) -> ${fdStatusMapped} ${fdHomeScore}-${fdAwayScore}`);
                     }
                 }
-
-                if (matchUpdates.length > 0) await Promise.all(matchUpdates);
             }
         }
 
@@ -187,81 +185,68 @@ export async function GET(request: Request) {
         const targetStandingsLeagues = Array.from(leaguesNeedingStandingsUpdate);
 
         if (targetStandingsLeagues.length > 0) {
-            const standingsFetches = targetStandingsLeagues.map(async (leagueId) => {
-                let res = await fetch(`https://api.football-data.org/v4/competitions/${leagueId}/standings`, { 
-                    headers: { 'X-Auth-Token': API_KEY } 
-                }).then(r => r.ok ? r.json() : null).catch(() => null);
-                
-                // ESPN FALLBACK for Cup rich standings if Football Data fails or is empty
-                if (!res || !res.standings || res.standings.length === 0) {
-                    const espnCode = ESPN_LEAGUES[leagueId];
-                    if (espnCode) {
-                        const espnRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnCode}/standings`).then(r => r.ok ? r.json() : null).catch(() => null);
-                        const parsed = parseEspnStandings(espnRes, leagueId);
-                        if (parsed) return { isEspn: true, table: parsed };
+            // Process incrementally to strictly bypass Cloudflare V8 memory crashes (1102)
+            for (const leagueId of targetStandingsLeagues) {
+                try {
+                    let res = await fetch(`https://api.football-data.org/v4/competitions/${leagueId}/standings`, { 
+                        headers: { 'X-Auth-Token': API_KEY } 
+                    }).then(r => r.ok ? r.json() : null).catch(() => null);
+                    
+                    let tableToInsert: any[] = [];
+                    
+                    if (!res || !res.standings || res.standings.length === 0) {
+                        const espnCode = ESPN_LEAGUES[leagueId];
+                        if (espnCode) {
+                            const espnRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${espnCode}/standings`).then(r => r.ok ? r.json() : null).catch(() => null);
+                            const parsed = parseEspnStandings(espnRes, leagueId);
+                            if (parsed) {
+                                tableToInsert = parsed;
+                                logs.push(`Standings Prepared (ESPN Fallback): ${leagueId}`);
+                            }
+                        }
+                    } else {
+                        const allTables = res.standings?.filter((s: any) => s.type === 'TOTAL') || [];
+                        allTables.forEach((groupData: any) => {
+                            const table = groupData.table || [];
+                            const groupName = groupData.group || null;
+
+                            if (table.length > 0) {
+                                const mappedTable = table.map((entry: any) => ({
+                                    league_code: leagueId,
+                                    match_group: groupName ? groupName.replace(/_/g, ' ') : null,
+                                    position: entry.position,
+                                    team_id: entry.team.id,
+                                    team_name: entry.team.name,
+                                    team_short_name: entry.team.shortName || entry.team.name,
+                                    team_crest: entry.team.crest,
+                                    played_games: entry.playedGames,
+                                    won: entry.won,
+                                    draw: entry.draw,
+                                    lost: entry.lost,
+                                    goal_difference: entry.goalDifference,
+                                    points: entry.points,
+                                    updated_at: new Date().toISOString()
+                                }));
+                                tableToInsert = tableToInsert.concat(mappedTable);
+                            }
+                        });
+                        if (tableToInsert.length > 0) {
+                            logs.push(`Standings Prepared: ${leagueId}`);
+                        }
                     }
-                }
-                return res;
-            });
 
-            const standingsResults = await Promise.all(standingsFetches);
-            let allStandingsToInsert: any[] = [];
-            const successfulLeagues: string[] = [];
-
-            standingsResults.forEach((standData, index) => {
-                if (!standData) return;
-                const leagueId = targetStandingsLeagues[index];
-                
-                if (standData.isEspn) {
-                    allStandingsToInsert = allStandingsToInsert.concat(standData.table);
-                    successfulLeagues.push(leagueId);
-                    logs.push(`Standings Prepared (ESPN Fallback): ${leagueId}`);
-                    return;
-                }
-
-                // 🟢 GROUP STANDINGS LOGIC APPLIED HERE (FD format)
-                const allTables = standData?.standings?.filter((s: any) => s.type === 'TOTAL') || [];
-
-                allTables.forEach((groupData: any) => {
-                    const table = groupData.table || [];
-                    const groupName = groupData.group || null;
-
-                    if (table.length > 0) {
-                        const mappedTable = table.map((entry: any) => ({
-                            league_code: leagueId,
-                            match_group: groupName ? groupName.replace(/_/g, ' ') : null, // Mapped Group A, B, C...
-                            position: entry.position,
-                            team_id: entry.team.id,
-                            team_name: entry.team.name,
-                            team_short_name: entry.team.shortName || entry.team.name,
-                            team_crest: entry.team.crest,
-                            played_games: entry.playedGames,
-                            won: entry.won,
-                            draw: entry.draw,
-                            lost: entry.lost,
-                            goal_difference: entry.goalDifference,
-                            points: entry.points,
-                            updated_at: new Date().toISOString()
-                        }));
+                    if (tableToInsert.length > 0) {
+                        await supabase.from('standings').delete().eq('league_code', leagueId);
+                        const { error: stdErr } = await supabase.from('standings').insert(tableToInsert);
                         
-                        allStandingsToInsert = allStandingsToInsert.concat(mappedTable);
+                        if (!stdErr) {
+                            standingsUpdated += tableToInsert.length;
+                        } else {
+                            logs.push(`Standings Insert Error for ${leagueId}: ${stdErr.message}`);
+                        }
                     }
-                });
-
-                if (allTables.length > 0) {
-                    successfulLeagues.push(leagueId);
-                    logs.push(`Standings Prepared: ${leagueId}`);
-                }
-            });
-
-            if (allStandingsToInsert.length > 0 && successfulLeagues.length > 0) {
-                await supabase.from('standings').delete().in('league_code', successfulLeagues);
-                const { error: stdErr } = await supabase.from('standings').insert(allStandingsToInsert);
-                
-                if (!stdErr) {
-                    standingsUpdated += allStandingsToInsert.length;
-                } else {
-                    logs.push(`Standings Insert Error: ${stdErr.message}`);
+                } catch (err: any) {
+                    logs.push(`Error processing standings for ${leagueId}: ${err.message}`);
                 }
             }
         }
