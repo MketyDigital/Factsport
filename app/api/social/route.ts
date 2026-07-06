@@ -522,6 +522,13 @@ export async function POST(request: Request) {
       }
     }
 
+    // --- TEMPORARY: images disabled for all outgoing posts (per request) ---
+    // Nothing above this line was changed; image generation still runs as before,
+    // it's just discarded here so every post goes out text-only.
+    finalStaticImage = '';
+    imageGenerationOk = false;
+    // --- END TEMPORARY IMAGE DISABLE ---
+
     const makePayload1: any = { fb2_text: fb1Text, x_text: make1Text, buf_x_text: bufX1Text, buf_fb_text: bufFb1Text };
     if (finalStaticImage) makePayload1.x_image_url = finalStaticImage;
 
