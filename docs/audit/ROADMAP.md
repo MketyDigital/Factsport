@@ -12,6 +12,13 @@ Updated: 2026-10-30
 - GitHub Actions hosted runner allowance and shared Mkety development runners are separate concerns; production is on Cloudflare.
 - AdSense readiness means genuine policy-compliant content, navigation and monetization, not disguising prize or wagering mechanics.
 
+
+## Clean-data reset decision (2026-10-30)
+- **Fresh operational data, full system retained:** do not import old matches/events/scores, predictions, rankings, accumulated points, generated stats or operational logs. Recreate their database structures and re-enable all the systems that generate them so new data starts from zero.
+- Recreate schema, constraints, functions, triggers, permissions, engines, providers, cron jobs, news tooling and integrations. Bootstrap new fixtures from ESPN/football-data.org safely; no mass social blast.
+- Independently decide retention/migration of accounts, paid VIP entitlements, authored news/media and legal obligations; do not accidentally delete or invalidate them. Never delete old Supabase data during audit.
+- See `docs/audit/DB-002-clean-reset-policy.md` for class-by-class rules, risks and acceptance gate.
+
 ## Evidence labels
 - VERIFIED SOURCE: read implementation and record file paths, function names and behavioral evidence.
 - INVENTORIED: path exists but implementation not fully reviewed.
