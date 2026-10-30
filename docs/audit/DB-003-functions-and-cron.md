@@ -103,3 +103,41 @@ FROM cron.job
 ORDER BY jobid;
 ```
 This is a heuristic only; cannot prove actual job behavior. To understand semantics fully, human owner should review command locally and share redacted command text, with secrets removed.
+
+## SQL 16 / 17 verified (2026-10-30)
+User provided actual function definitions for four functions and cron command characteristics. No database modification performed.
+
+### CRITICAL: `reset_monthly_leaderboard()`
+- SECURITY DEFINER; body consists solely of `UPDATE public.profiles SET monthly_points=0, monthly_correct_scores=0`, with no authorization, period boundary, audit or transactional snapshot logic.
+- SQL 15 confirms both anon and authenticated EXECUTE granted. If callable via exposed API/RPC, untrusted callers could potentially reset all monthly scores. Do NOT claim direct internet exploit tested.
+- Does not clear eligible_monthly_points or eligible_monthly_correct_scores; inconsistent state possible, depending on other reset pathways.
+- Target: least-privilege scheduled server task, period-keyed idempotent rollover, finalization of winners, archive/audit, and atomic counter transition. Preserve historical winner obligations by separate owner-approved retention policy.
+
+### HIGH: `secure_prediction_insert()`
+- SECURITY DEFINER trigger function: NEW.status='PENDING', blocks matches whose kickoff is <=now; fetches `site_settings.daily_limit` (defaults 5); counts user_predictions created on CURRENT_DATE; sets is_eligible_for_prize true when count below d_limit, false otherwise.
+- Crucial **wiring unverified**: earlier user-supplied non-internal public trigger list showed `user_predictions` enforcement trigger calling `secure_predictions()`, NOT `secure_prediction_insert()`. If no trigger attaches this function, it will not run during writes. Check pg_trigger for all trigger schemas/disabled states and trigger names.
+- Function's kickoff guard checks `IF EXISTS` for match kickoff<=now but does not reject a missing referenced match by itself. Need FK verification.
+- COUNT + insert not concurrency serialized, so simultaneous submissions may both be marked eligible; daily boundaries use database `CURRENT_DATE` and `DATE(created_at)`, potentially diverging from user-facing timezone; need explicit published competition timezone and atomic allocation.
+- d_limit <= 0, NULL settings, multiple settings rows, identity spoofing and manual eligibility flags require validated schema, grants, trigger behavior and server checks.
+- It marks beyond-limit entries ineligible for prizes; doesn't inherently block submission. Preserve confirmed intended rule and compare UI and code.
+
+### HIGH: `delete_old_matches(months_to_keep integer DEFAULT 12)`
+- SECURITY DEFINER and granted EXECUTE anon/auth, but body queries `auth.users` for current `auth.uid()` email and rejects callers outside a hardcoded two-email allowlist. This materially reduces direct risk vs reset_monthly_leaderboard; no conclusion of unauthorized deletion without testing auth context.
+- No bounds check on months_to_keep. A negative value can produce future cutoff, expanding deletion scope. Deletes `user_predictions` for old matches, then `matches`. Cleanup must be privileged, range-validated, dry-run preview, idempotent and explicitly audited.
+- Uses unqualified table names in SECURITY DEFINER function, with no visible SET search_path; review safe search_path/schema qualification.
+
+### `is_admin()`
+- SECURITY DEFINER SQL function returns existence of `public.profiles` row where `id=auth.uid()` and `role='admin'`. It is not directly a write operation; trust depends on whether role can be controlled through other paths. Unlike global_studio's user_metadata claim, this function reads server profile role.
+- No declared search_path; establish safe configuration, caller authorization, and role-write protections. Public EXECUTE on role-check function is not independently proof of privilege escalation.
+
+### SQL 17 cron characteristics
+- Job 1 delete-unconfirmed-users: command length 124, delete keyword true, network false.
+- Job 2 cleanup-old-cron-logs: command length 70, delete keyword true, network false.
+- Job 3 daily-socials-cleanup: command length 554, delete keyword false, network true.
+- No command bodies shared; actual retention, network targets, credential usage and side effects NOT verified. No assumption of benign delete-free behavior just because regex false.
+
+### Highest priority next step
+1. Check **effective trigger attachments** to determine whether `secure_prediction_insert` ever runs. A function existing in public schema is not enough.
+2. Check controlled function RPC exposure and restrict monthly reset execution urgently with authorized production change process (do not provide blind modifications to live production).
+3. Request remaining definitions for monthly winner audit, account signup/verification, standings refresh, and monthly reset interactions.
+4. Inspect pg_cron commands locally with secrets redacted before sharing. Do not paste raw commands containing service keys.
