@@ -58,3 +58,38 @@ ORDER BY table_name, ordinal_position;
 - Provider credentials: Cloudflare secret bindings, NEVER public site_settings or env NEXT_PUBLIC_*.
 - Payment/entitlement changes: privileged server commands only.
 - Tests must prove anonymous and regular user cannot modify/read private VIP/payment info or other players' selections.
+
+## SQL 09 — Effective table privilege results (2026-10-30)
+User executed `has_table_privilege` on eight tables, crossed with anon/authenticated and SELECT/INSERT/UPDATE/DELETE. **All 64 effective privilege checks returned true** (8 tables × 2 roles × 4 operations): `global_studio`, `matches`, `news`, `predictions`, `profiles`, `site_settings`, `subscriptions`, `user_predictions`.
+
+**Confirmed effective table-level privileges, not effective row-level access.** An RLS policy must still permit an operation and the role must access the API schema. The results strengthen the following policy-level findings:
+- `site_settings`: public SELECT true plus anon/authenticated SELECT privilege means the table's rows are accessible under RLS to either role through a suitably exposed API. Its `social_config` includes credential material used by `app/api/social/route.ts`. **Potential critical exposure of credentials, contingent on endpoint/schema access and column-specific grants.** Do not output credential contents; verify column privileges and rotate tokens.
+- `subscriptions`: authenticated ALL policy true + authenticated DML privileges means **any authenticated session is authorized at both table and RLS layers to read/write any subscription row**, unless another separate control prevents API access. Treat as CRITICAL entitlement-integrity risk.
+- `user_predictions`: public SELECT true and anon/auth SELECT privilege means match prediction rows could be readable by anonymous/public clients if API exposure is enabled; potential advance prediction disclosure.
+- `predictions`: public owner-check INSERT policies with anon/auth INSERT privilege undermine stricter kickoff check for authenticated users. `auth.uid()` condition still applies; this is not anonymous arbitrary insert permission.
+- `profiles`: public SELECT true plus both roles' SELECT privileges means unrestricted row-level visibility to all profile columns that are granted (column-level privilege rules also need inspection). For authenticated UPDATE, ownership via RLS and trigger field protection still apply.
+- `global_studio`: authenticated UPDATE privileges plus policy allowing `user_metadata.is_admin` true warrants urgent verification of user-editable claims and any editability restrictions.
+- `matches` and `news`: broad table-level DML grants DO NOT mean anonymous writes; relevant RLS admin checks still apply.
+
+### Priority and containment
+P0: Restrict service credentials stored in public-readable site_settings; confirm whether `social_config` column is directly readable via exposed Supabase API without requesting or printing its values. Plan secret rotation.
+P0: Block non-admin modification of subscriptions with restrictive RLS / server-only service mutation (after reviewing app dependencies and authorizing a safe patch).
+P1: Review public prediction read and legacy `predictions` submit enforcement.
+P1: Consolidate auth and admin RBAC, audit public profiles, and enforce column-level response projection.
+**No write/privilege modification executed.** User's SQL 10 pasted SQL text but no returned column rows, so column inventory remains open.
+
+### Safe next read-only query: column privilege summary (no values)
+```sql
+SELECT
+  c.table_name, c.column_name,
+  has_column_privilege('anon', format('public.%I', c.table_name), c.column_name, 'SELECT') AS anon_can_select,
+  has_column_privilege('authenticated', format('public.%I', c.table_name), c.column_name, 'SELECT') AS authenticated_can_select
+FROM information_schema.columns c
+WHERE c.table_schema = 'public'
+  AND c.table_name IN ('site_settings', 'subscriptions', 'profiles', 'user_predictions')
+ORDER BY c.table_name, c.ordinal_position;
+```
+This is metadata only. Do not query or paste the actual values of `social_config`, `credentials`, passwords, tokens or auth records.
+
+### SQL 10 still outstanding
+The user's message included the SQL 10 query itself without the resulting column listing. Ask for returned columns after running it, not for a re-run of privilege checks.
