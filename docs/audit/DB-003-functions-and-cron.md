@@ -203,3 +203,9 @@ SELECT to_regclass('public.group_standings')::text AS group_standings_relation,
        to_regclass('public.user_predictions')::text AS user_predictions_relation;
 ```
 Do not run privileged RPCs or try to repair production until approved and tests are in place.
+
+## SQL 20 relation check CONFIRMED (2026-10-30)
+- User ran `SELECT to_regclass('public.group_standings'), to_regclass('public.user_predictions')`: results were `NULL` and `user_predictions`, respectively.
+- This **DB VERIFIES** public.group_standings is missing. Current `refresh_group_standings_from_matches()` references the missing table in DELETE and INSERT, so it cannot successfully execute as defined in this schema; any callers would fail unless a table is recreated. Preserve the *feature*, not this broken dependency. The next implementation needs a proper schema, indexes and standings reconciliation/tournament-rules tests, with provider-first handling.
+- User also attempted to execute the earlier JavaScript/TypeScript `const payload = {` illustration in Supabase SQL Editor; PostgreSQL returned 42601 syntax error at `const`. This is a harmless language mismatch and did not change data. Do not direct user to run TypeScript in SQL Editor.
+- No production mutation or deployment performed by assistant.
