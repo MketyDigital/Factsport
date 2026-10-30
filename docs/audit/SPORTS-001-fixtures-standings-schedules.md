@@ -72,3 +72,34 @@ Inspect results for any unexpected private names before sharing; returns definit
 - Live status, postponed/abandoned/no-score semantics documented.
 - Safe fresh bootstrap and zero-history verification on staging.
 - No work on main or old production schema.
+
+## Authoritative user correction — ESPN LIVE FIRST (2026-10-30)
+User explicitly corrected audit emphasis: **ESPN powers live updates; football-data.org supports matches that could not be matched/synced via ESPN and final-time score checking.** Provider ID overlap is a *possible migration risk*, not verified current collision. Preserve existing priority and fallback behavior above all generic dual-provider arbitration suggestions.
+
+Source corroboration:
+- `app/api/live/route.ts`: selects DB matches with `espn_id`, fetches ESPN scoreboard/details, derives LIVE/HT/FT status, scores, clock and match events. The `isTrackedByFD=!!dbMatch.api_id` name is misleading because ESPN cup script also assigns api_id; don't derive source identity from mere api_id presence.
+- `app/api/sync-fd/route.ts` lines ~125-158: when espn_id present, skips football-data.org LIVE/SCHEDULED updates and only uses FD FT to reconcile final status/scores; when no ESPN ID, can update missing LIVE/HT/FT status. This is direct source confirmation of user intent.
+- `app/api/matchmaker/route.ts`: ESPN fuzzy name/time matching assigns `espn_id` to existing matches; preserves primary `id`. ESPN cup script may create direct ESPN ID fixtures.
+- `app/lib/matchService.ts`: match detail favors ESPN rich match data when `espn_id` exists; DB fallback.
+- `scripts/sync-gh.js`: football-data.org scheduled fixture bootstrap/refresh; status safeguards skip some near-live windows, and separate cup ESPN bootstrap script. These are secondary fixture ingestion paths and **must not displace ESPN live authority**.
+Target provider policy: (1) ESPN for live score, status, clock, events, lineups, stats whenever matched; (2) FD for unable-to-match/unsynced fixture updates or missing live linkage; (3) FD FT result verification/reconciliation, recording discrepancy and finalization state; (4) never let an inferior/stale update regress a verified match. The exact FT disagreement resolution requires tests/published policy and cannot be inferred beyond current code.
+Target identity: preserve `matches.id` stable as canonical public/prediction FK; add provider mapping `provider, external_id, match_id, mapping_confidence, mapped_at` with unique(provider,external_id). Do NOT assert collisions have occurred. Matchmaker needs collision tests, aliases, kickoff changes, ESPN cup direct imports and linked game predictions.
+
+### SQL 21 uploaded column metadata, SQL 22 constraints pasted by user
+- `matches.id` is TEXT primary key with `gen_random_uuid()` default coercion; provider fields `api_id text` (unique twice) and `espn_id text` (no unique constraint in supplied SQL 22), `points_distributed boolean DEFAULT false`, `status`, `match_date timestamptz`, rich ESPN events/lineups/stats fields, group_summary, stage, match_group, knockout/final, campaign FK. Source SQL21 ordinal positions have gaps (19, 23-31, 37-40); don't assume those columns are absent or known.
+- `standings`: PK id uuid, UNIQUE(league_code,team_id), fields position, team_id integer, points, game stats, match_group, but no season in supplied column list. Migration requires season and group isolation for multiple editions.
+- `teams`: uuid PK, unique name, logo/stadium/fanart/jersey. `team_logos`: bigint PK, unique team_name; legacy logo assets require source/rights decisions.
+- `tournament_scorers`: uuid PK, unique (league_code, player_id); no season uniqueness, player_id nullable. Preserve derived stats while avoiding duplicate/nullable ID collisions.
+- `campaigns`: uuid PK, title,type,start/end,active, target_leagues jsonb, rules jsonb, VIP flag. `campaign_leaderboards`: composite PK (campaign_id,user_id), FKs to campaigns/profiles ON DELETE CASCADE.
+- `matches.campaign_id` FK to campaigns ON DELETE SET NULL.
+- `user_predictions`: FK to matches ON DELETE CASCADE, auth.users ON DELETE CASCADE, campaigns ON DELETE SET NULL; CHECK no_negative_scores; duplicate-equivalent UNIQUE(user_id,match_id) and UNIQUE(match_id,user_id). These must be reviewed before simplifying.
+- `predictions` legacy references profiles and matches without cascade; separate from user_predictions.
+- `profiles.id` FK auth.users ON DELETE CASCADE; `subscriptions.user_id` FK to profiles with no cascade.
+- `news.slug` UNIQUE, essential to preserve authored article URLs.
+- `cron_logs.run_date` UNIQUE; other tables have PKs. No CHECK constraints for status/score beyond user_predictions nonnegative score in supplied export. The complete default/index inventory remains distinct.
+- Correct index/unique inference: two duplicate `matches.api_id` unique constraints and two redundant `user_predictions` pair-order unique constraints. Do not drop in current DB.
+- User supplied SQL21 file had 95 data rows with details; document only schema, no rows or private values.
+- **Versioned design**, not immediate write: stable ID, explicit source provenance and final result checks, schema with season, index/unique constraints, cleanup of duplicate constraints after tests. No Supabase mutations.
+
+### Documentation availability
+The repository recursive tree (refactor/factsport-v2) contains no original README or other notes/info markdown beyond newly created docs/audit; source comments, workflows and scripts are reviewed. If other documentation is stored outside tracked repository or in another branch/connected Drive, it has not been inspected and must not be claimed reviewed.
