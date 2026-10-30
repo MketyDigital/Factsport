@@ -182,3 +182,24 @@ Next: inspect public table defaults/constraints and insertion route before concl
 
 ### Operational target
 A single authoritative competition period, explicit time zone, transactional selection of first N eligible predictions, immutable prediction timestamp and outcome, idempotent scoring and corrected counters, verified prize qualification and safe reset. A fresh zero-data launch is not a reason to skip these fixes.
+
+## SQL 20 trigger attachments + direct prediction UI verification (2026-10-30)
+- SQL 20 trigger result: `auth.users.on_auth_user_created` -> `handle_new_user` enabled 'O'; `auth.users.on_auth_user_updated` -> `handle_verification_update` enabled 'O'; `public.user_predictions.enforce_prediction_security` -> `secure_predictions` enabled 'O'. All are active in normal origin/local trigger mode.
+- Thus Supabase signup and verification trigger wiring is **DB VERIFIED**, unlike earlier uncertainty. New auth migration must replicate both events and protect historical identity/entitlement obligations.
+- `secure_prediction_insert` is absent from trigger attachments for any schema; its eligibility calculation is dormant as a trigger. **SOURCE VERIFIED:** `app/components/PredictionBoard.tsx` lines 96-106 sets `is_eligible_for_prize: false` explicitly on normal predictions. On this inspected insertion path, with no other trigger rewriting the flag, predictions remain ineligible for prizes. Check any other producer or RPC before generalizing across all pathways.
+- **SOURCE VERIFIED:** `app/api/admin/run-audit/route.ts` filters `is_eligible_for_prize=true` and `points_awarded===10` (lines 45-56), so normal predictions submitted through the audited UI path would be excluded, and correct exact scores typically award 13, not 10. Multiple competition audit paths conflict.
+- Earlier `app/admin/actions.ts` uses >=10 and a different candidate-count and period logic. All winner audits need a single explicit engine and regression suite.
+- User supplied second SELECT (relation existence for `public.group_standings`) not present, so schema-drift concern is still UNVERIFIED.
+
+## SQL 19 remaining body inspections
+- `handle_new_user()` initializes profile from auth.users, with user role and zeros; now trigger attachment confirmed.
+- `handle_verification_update()` promotes is_verified after email_confirmed_at transition; attachment confirmed.
+- `audit_monthly_winners()` has exact-score `points_awarded=10` mismatch with 13-point combined outcome+score settlement, and diverges from TypeScript audit paths.
+- `refresh_group_standings_from_matches()` writes to public.group_standings, absent initial inventory; verify relation exists before treating as operational. It counts ABD matches as finished and projects top-two rankings, requiring source/rules validation.
+
+### Safe next data-free check
+```sql
+SELECT to_regclass('public.group_standings')::text AS group_standings_relation,
+       to_regclass('public.user_predictions')::text AS user_predictions_relation;
+```
+Do not run privileged RPCs or try to repair production until approved and tests are in place.
