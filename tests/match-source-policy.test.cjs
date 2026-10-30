@@ -27,7 +27,7 @@ test('cannot pretend an unlinked match is ESPN matched', () => {
 test('unmatched fixture can receive football-data fallback', () => {
   assert.deepEqual(decideScoreUpdate({ ...base, espnId: null },
     { status: 'LIVE', homeScore: 2, awayScore: 1 }, 'football-data'),
-    { action: 'apply', reason: 'unmatched-football-data-fallback' });
+    { action: 'apply', reason: 'football-data-unmatched-live-fallback' });
 });
 test('football-data may verify ESPN-linked FT when status was live', () => {
   assert.deepEqual(decideScoreUpdate(base,
@@ -58,4 +58,25 @@ test('identical verified FT result does not trigger repeated write', () => {
   assert.deepEqual(decideScoreUpdate({ ...base, status: 'FT' },
     { status: 'FINISHED', homeScore: 1, awayScore: 0 }, 'football-data'),
     { action: 'ignore', reason: 'final-already-verified' });
+});
+
+test('football-data sourced fixture with apiId still accepts delayed live data when ESPN is unmatched', () => {
+  const fixture = { status: 'SCHEDULED', homeScore: null, awayScore: null, apiId: 'fd-711', espnId: null };
+  assert.deepEqual(decideScoreUpdate(fixture,
+    { status: 'IN_PLAY', homeScore: 0, awayScore: 1 }, 'football-data'),
+    { action: 'apply', reason: 'football-data-unmatched-live-fallback' });
+});
+test('ESPN gap-fill cup fixture receives ESPN live feed even when it has no FD provider id', () => {
+  const fixture = { status: 'SCHEDULED', homeScore: null, awayScore: null, apiId: null, espnId: 'espn-cup-113' };
+  assert.deepEqual(decideScoreUpdate(fixture,
+    { status: 'IN_PLAY', homeScore: 1, awayScore: 0 }, 'espn'),
+    { action: 'apply', reason: 'espn-primary' });
+});
+test('football-data primary fixture matched to ESPN uses ESPN for faster live updates', () => {
+  const fixture = { status: 'LIVE', homeScore: 0, awayScore: 0, apiId: 'fd-711', espnId: 'espn-113' };
+  assert.equal(decideScoreUpdate(fixture,
+    { status: 'LIVE', homeScore: 1, awayScore: 0 }, 'espn').action, 'apply');
+  assert.equal(decideScoreUpdate(fixture,
+    { status: 'IN_PLAY', homeScore: 0, awayScore: 0 }, 'football-data').reason,
+    'espn-live-authority');
 });
