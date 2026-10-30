@@ -103,3 +103,11 @@ Target identity: preserve `matches.id` stable as canonical public/prediction FK;
 
 ### Documentation availability
 The repository recursive tree (refactor/factsport-v2) contains no original README or other notes/info markdown beyond newly created docs/audit; source comments, workflows and scripts are reviewed. If other documentation is stored outside tracked repository or in another branch/connected Drive, it has not been inspected and must not be claimed reviewed.
+
+## M4 isolated ESPN-first decision contract — committed 2026-10-30
+- `lib/match-source-policy.cjs` added: pure `decideScoreUpdate(match, update, provider)`, `canonicalStatus`, `hasFinalScore`; does not fetch, mutate DB, schedule, or send social posts. Explicit actions: `apply`, `ignore`, `review`.
+- `tests/match-source-policy.test.cjs` added 11 node:test cases covering ESPN live priority, unmatched football-data fallback, ESPN-linked FT verification, repeated FT avoidance, missing FT scores, terminal status regression, abandoned match manual review, provider normalization.
+- `package.json` now exposes `npm run test:engine` with `node --test tests/*.test.cjs`. No new dependencies, no framework upgrades or production route changes.
+- **RUNTIME STATUS: NOT VERIFIED**. Attempt to fetch branch files into isolated local runtime for Node execution failed due environment DNS/network restriction. Tests are committed but not claimed passing; CI/runner or local checkout must execute them.
+- This test-oriented policy is a *proposed* stricter decision boundary, not a statement that the current live route enforces all cases. Current live route can update terminal statuses based on ESPN state, uses `!!api_id` as inaccurate FD-tracking proxy, module-local Map for social dedupe, and sends unawaited asynchronous social fetch. FD `sync-fd` updates ESPN-linked FT scores immediately (proposed policy holds discrepancies for review); **must validate product-approved correction behavior before connecting the module**.
+- Next implementation gate: run isolated tests; add contract tests driven by snapshot/sanitized feed fixtures; decide if FD FT disagreements auto-correct or require review; wire policy behind flag only after functional and staging parity.
