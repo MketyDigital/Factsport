@@ -33,3 +33,33 @@ First verify available columns from information_schema. Then classify known auto
 - AI workflows, prompts, schedule, publication gates, indexing, social distribution and source-fact-checking reconstructed.
 - Post-relaunch, generated news records explicitly marked as such; editors may override with audited review.
 - No accidental removal of manually authored posts during clean database reset.
+
+## SQL 05 + 06 — Database-confirmed news inventory (2026-10-30)
+User-provided read-only aggregates (exact `COUNT(*)`, not estimated): 366 total articles.
+- 167 rows with `daily-briefing-YYYY-MM-DD` slugs (2026-02-22 through 2026-10-29).
+- 120 rows with `matchday-roundup-YYYY-MM-DD` slugs (2026-03-10 through 2026-10-26).
+- 79 rows with neither known slug pattern (2026-01-29 through 2026-07-19). **UNKNOWN origin, not automatically manual.**
+- 287/366 rows (78.4%) match known automation slug patterns; 79/366 (21.6%) require further provenance review.
+- DB schema confirmed: `id uuid DEFAULT gen_random_uuid()`, `title text NOT NULL`, `slug text NOT NULL`, `image_url text`, `content text`, `is_breaking boolean DEFAULT false`, `created_at timestamptz DEFAULT now()`, `body text`, `author text DEFAULT 'FactSport Admin'`, `is_headline boolean DEFAULT false`, `team_1_logo text`, `team_2_logo text`, `original_source_id text`, `category text DEFAULT 'Football'`.
+- There is NO origin/provenance discriminator in these 14 columns. `author` default does not indicate human authorship, and `original_source_id` may help investigate but is not an authorship guarantee.
+- The renderer uses `body || content` fallback, but admin edit form populates `body` only. Preserve both columns and avoid losing legacy `content` on export or editor migration.
+- Existing article structured metadata hardcodes `FactSport Desk` as author even though the schema contains `author`. New CMS should preserve actual attribution where verified and avoid inventing it.
+- Export plan: prepare all 79 unknown-origin rows for editorial review, with metadata first. Preserve original manual articles and modified AI-assisted originals based on verification; keep temporary protected export of all 366 until signoff (outside public Git).
+- No public GitHub commit of raw article bodies, data dumps, private metadata, or credentials.
+
+### Next read-only classification SQL
+```sql
+SELECT
+  id, slug, left(title, 140) AS title,
+  author, category, created_at,
+  original_source_id,
+  (NULLIF(BTRIM(body), '') IS NOT NULL) AS has_body,
+  (NULLIF(BTRIM(content), '') IS NOT NULL) AS has_content,
+  (NULLIF(BTRIM(image_url), '') IS NOT NULL) AS has_image,
+  is_headline, is_breaking
+FROM public.news
+WHERE slug !~ '^daily-briefing-[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+  AND slug !~ '^matchday-roundup-[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+ORDER BY created_at, slug;
+```
+Review `original_source_id` for unexpected private values before sharing. This query reads metadata only, not bodies; titles/slugs are still editorial content and should be kept in the chat or a private audit location, not published automatically to public GitHub.
