@@ -63,3 +63,43 @@ Function configuration values can theoretically include secrets; review before s
 
 ## Next safe function source retrieval
 Fetch individual `pg_get_functiondef` for P0 functions and redact passwords, webhook tokens, email addresses, secrets or other sensitive constants before sharing. Do not commit raw definitions to public repository.
+
+## SQL 14 / SQL 15 verified user output — 2026-10-30
+**Cron:** 3 active `cron.job` entries, database `postgres`, role `postgres`:
+- job 1 `delete-unconfirmed-users` at `0 3 * * *`
+- job 2 `cleanup-old-cron-logs` at `0 3 * * *`
+- job 3 `daily-socials-cleanup` at `59 23 * * *`.
+These are scheduling metadata, NOT inspected command bodies. Their names imply intent only. Do not assume UTC or actual retention logic without inspecting scheduler settings/commands. Treat account cleanup and social asset removal as potentially destructive. For migration, implement/retire each deliberately after confirming behavior, data retention and Cloudflare scheduled event integration.
+
+**Function EXECUTE:** All 11 `public` functions report `has_function_privilege('anon',oid,'EXECUTE')=true` and the same for `authenticated`. This is a confirmed dangerous grant posture, but not blanket proof of API reachability/exploitation: trigger functions typically cannot be invoked as ordinary RPC; schema exposure, function checks and effective identities matter. In particular:
+- `reset_monthly_leaderboard()` SECURITY DEFINER + publicly granted EXECUTE: P0 body/authorization inspection; possible destructive reset if exposed.
+- `delete_old_matches(months_to_keep integer)` SECURITY DEFINER + publicly granted EXECUTE: P0 body/authorization inspection; parameter bounds, caller checks and search_path needed.
+- `is_admin()` SECURITY DEFINER + publicly granted EXECUTE: ensure secure identity derivation and search_path.
+- `settle_match_points(target_match_id text)` invoker (not definer) + publicly granted EXECUTE: test privileges and safeguards; separately documented non-idempotent point increments.
+- `refresh_group_standings_from_matches` invoker + publicly granted EXECUTE: determine SQL writes/impact and callers.
+- `handle_new_user`, `handle_verification_update`, `secure_prediction_insert`, `secure_predictions`, `protect_profile_stats` return trigger and cannot normally execute as standalone database RPC; still inspect trigger attachments and security contexts.
+
+**Plan:** target PostgreSQL default REVOKE EXECUTE from PUBLIC on privileged functions, grant to explicit narrowly scoped roles, require server-side identity and idempotency, test with separate credentials. Do not deploy SQL grants without owner-approved plan and rollback.
+
+### Next safe query — Extract privileged function bodies locally for human review
+```sql
+SELECT p.proname AS function_name,
+       pg_get_functiondef(p.oid) AS function_definition
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid=p.pronamespace
+WHERE n.nspname='public'
+AND p.proname IN ('reset_monthly_leaderboard','delete_old_matches','is_admin','secure_prediction_insert')
+ORDER BY p.proname;
+```
+**Redact** tokens, hardcoded passwords, personally identifying data, direct credentials and privileged endpoints before sharing results. No functions are executed by this read-only query.
+
+### Next safe query — cron command safety characteristics without returning commands
+```sql
+SELECT jobid, jobname, schedule, active,
+       length(command) AS command_length,
+       command ~* '(delete|truncate|drop)' AS contains_delete_keyword,
+       command ~* '(http|net\\.|fetch|webhook)' AS contains_network_keyword
+FROM cron.job
+ORDER BY jobid;
+```
+This is a heuristic only; cannot prove actual job behavior. To understand semantics fully, human owner should review command locally and share redacted command text, with secrets removed.
