@@ -120,3 +120,26 @@ Server-only integration settings: gateway credentials, webhook URLs/tokens, soci
 Subscription lifecycle: request/receipt/approval/payment verification on server only, with explicit state transitions and durable audit.
 Separate gameplay tracking from personal profile data; never let user update score, eligibility, VIP status or verified flag directly.
 Target DB still starts with zero game data, but user/entitlement migration remains a separate reviewed decision.
+
+## SQL 11 — Column SELECT grants VERIFIED (2026-10-30)
+User supplied read-only effective column SELECT privilege results for four sensitive public tables: profiles (16 cols), site_settings (18), subscriptions (9), user_predictions (14) = **57 columns**; ALL reported `anon_can_select=true` and `authenticated_can_select=true`, yielding 114 true SELECT permission checks. No actual record values examined.
+
+Combined with SQL 08 policy and SQL 09 table grants:
+- **CRITICAL CONFIRMED DB-AUTHORIZATION EXPOSURE**: `public.profiles` RLS SELECT true; anon/auth SELECT on all 16 columns (including email, phone, VIP, roles, counters). This permits public row/column access at database authorization layers. Whether externally reachable is determined by API schema exposure, networking and any gateway restrictions; do not overstate observed network exploitation.
+- **CRITICAL CONFIRMED DB-AUTHORIZATION EXPOSURE**: `public.site_settings` RLS SELECT true; anon/auth SELECT on `social_config` and every setting column. Application social handler reads credentials from social_config, but actual stored secret contents were NOT inspected. Assume any existing keys there might have been exposed through public DB APIs; rotate as a priority.
+- **CRITICAL SUBSCRIPTION INTEGRITY AND CONFIDENTIALITY**: authenticated ALL true RLS + authenticated SELECT/INSERT/UPDATE/DELETE table rights and all 9 SELECT column grants, including amount, transaction_ref and proof_url. Anonymous SELECT column grants alone are NOT sufficient for anonymous row access, because RLS SELECT for subscriptions is owner-only. An authenticated role can pass ALL true policy for rows, including rows owned by others, subject to gateway/API access.
+- **HIGH PRE-KICKOFF PREDICTION DISCLOSURE**: `public.user_predictions` public SELECT true plus anon/auth SELECT on all 14 columns including guessed score, custom predictions, score allocation and eligibility. Protect user privacy and competition fairness.
+- Note: `has_column_privilege` pertains to SQL role privileges, not proof that the Supabase Data API itself was called. No access or exploit test performed.
+
+### Immediate security priorities
+1. Before placing production online, verify Supabase exposed API schemas and any external access path through authorized config inspection (no secrets or real record retrieval). Treat these as serious even when production UI paused.
+2. Rotate any social/webhook credentials stored in `site_settings.social_config`; remove credentials from publicly readable data entirely. Rotate the previously pasted social webhook bearer token.
+3. Restrict public profile reads to an allowlisted **public profile/leaderboard view**, with email/phone/payment information private.
+4. Restrict `site_settings` public reads to a safe projection of announcements/rules; keep secrets in server bindings.
+5. Remove broad subscriptions ALL true policy, enforce per-user read and service-only verified payment/entitlement writes, with full approval/audit process. Do not run mutating SQL until owner approves a reviewed migration with rollback.
+6. Shield pre-match `user_predictions` except the owner and authorized services.
+7. Separate any publicly legitimate affiliate/advertising configuration from private gateway/payment controls; assess regulatory and AdSense suitability.
+8. Add RLS/role boundary integration tests with anon/authenticated identities and adversarial cross-account cases.
+
+### Documentation status
+This records only metadata supplied by user, with no user rows, credentials, access tokens or sensitive endpoint values in public GitHub. SQL 11 is complete. Remaining: schema exposure, full migrations/defaults/constraints, procedures, grants of other tables, cron/storage, tested runtime authorization.
