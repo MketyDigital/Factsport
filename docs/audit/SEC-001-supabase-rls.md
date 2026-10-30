@@ -93,3 +93,30 @@ This is metadata only. Do not query or paste the actual values of `social_config
 
 ### SQL 10 still outstanding
 The user's message included the SQL 10 query itself without the resulting column listing. Ask for returned columns after running it, not for a re-run of privilege checks.
+
+## SQL 10 — Sensitive column inventory VERIFIED (2026-10-30)
+User supplied exact metadata for six tables:
+- `global_studio` (5): id, title, audio_url, video_url, is_active.
+- `predictions` (8): id, user_id, match_id, home_guess, away_guess, status, user_ip, created_at. **Contains IP address data**; do not expose to public.
+- `profiles` (16): id, email, full_name, phone, is_vip, vip_expiry, points, prediction_count, role, created_at, vip_expires_at, monthly_points, monthly_correct_scores, is_verified, eligible_monthly_points, eligible_monthly_correct_scores. **Email and phone are personal information; privilege/visibility must be restricted**. Two VIP expiry columns exist: `vip_expiry` and `vip_expires_at`; inspect live reads and migration semantics before consolidating.
+- `site_settings` (18): includes affiliate data, gateway_link, crypto_network, crypto_address, telegram_support, daily_limit, target_exact_scores, min_points_floor, youtube_link, announcement fields, and **social_config jsonb**. Treat credentials embedded in social_config as secrets; never copy actual data into public docs.
+- `subscriptions` (9): id, user_id, plan, amount, payment_method, transaction_ref, proof_url, status, created_at. **Contains financial and payment evidence metadata**; authenticated ALL true RLS is CRITICAL.
+- `user_predictions` (14): match_id, user_id, outcome and exact-score guesses, points, status, timestamps, is_eligible_for_prize, campaign_id, custom_predictions, campaign_points_awarded. Privileged calculation fields must be server-write only.
+
+SQL 10 shows **column existence/types, not effective column SELECT permissions**; SQL 11 remains outstanding.
+
+### Code linkage from source review (2026-10-30)
+- `app/vip/upgrade/page.tsx`: browser client `site_settings.select('*')` for payment/config rendering; reads current user's VIP and pending subscription; writes new `subscriptions` request. This is a critical use path for separating public presentation configuration from private credentials and for moving subscription mutations into reviewed, authenticated server actions. Data may already be reachable through direct Supabase API even if UI is selective.
+- `app/dashboard/page.tsx`: server gets user's profile with `select('*')`, reads `site_settings` rule thresholds and user's prediction history; target must return minimal user-only shape.
+- `app/leaderboard/page.tsx`: public-facing profile fields deliberately selected for leaderboard; use separate public profile projection to avoid exposing email and phone.
+- `app/admin/users/page.tsx`: service-role profile `select('*')` after app-layer admin gate.
+- `app/api/admin/users/route.ts`: app-layer privileged update to `profiles.is_vip` via service-role client; maintain audit trail and strong server-side authorization.
+- `app/dashboard/settings/page.tsx`: self-edit `profiles.full_name`; normal user's editable fields should be strictly allowlisted.
+
+### Recommended target data boundary (not yet implemented)
+Public media/leaderboard views: only display name, public ranking and appropriately delayed or anonymized predictions. 
+Private account storage: email, phone, verification, VIP entitlements and payment references unavailable to anonymous access or other players.
+Server-only integration settings: gateway credentials, webhook URLs/tokens, social_config credentials, internal administration config. Separately publish safe announcement and rules configuration.
+Subscription lifecycle: request/receipt/approval/payment verification on server only, with explicit state transitions and durable audit.
+Separate gameplay tracking from personal profile data; never let user update score, eligibility, VIP status or verified flag directly.
+Target DB still starts with zero game data, but user/entitlement migration remains a separate reviewed decision.
