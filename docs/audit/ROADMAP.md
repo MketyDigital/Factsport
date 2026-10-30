@@ -124,3 +124,9 @@ Write `docs/audit/handoffs/MXX.md` with:
 - `app/how-to-play/page.tsx`: daily first-five limit, outcome=3, exact score=10, monthly VIP qualification, campaign rules; requires comparison with actual SQL settlement engine.
 - `.github/workflows/allInOne.yml`: GitHub scheduled generation for AI pro slips, morning preview, matchday roundups; review runtime/credentials and potential duplicated schedule at 08:00 UTC.
 These are verified file reads but NOT yet a complete file-by-file code audit.
+
+## Provider precedence — user-confirmed on 2026-10-30
+- **ESPN is authoritative for LIVE scores, match status/clock and rich events when successfully matched.**
+- **football-data.org is used when ESPN matchmaker cannot match/synchronize the fixture, and to verify final-time (FT) scores.** Preserve existing scheduled fixture/bootstrap and standings workflows; they must not override ESPN's in-progress coverage.
+- Do not reinterpret multi-provider support as equal-priority parallel live providers, or claim present ID collisions without evidence.
+- M1/M2 acceptance: source provenance, stable internal `matches.id`, ESPN ID linkage/matchmaker, unmatched fallback, final-score reconciliation, ESPN cup import, retries, conflicts, anti-regression, and DB tests. See `docs/audit/SPORTS-001-fixtures-standings-schedules.md`.
