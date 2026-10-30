@@ -63,3 +63,17 @@ WHERE slug !~ '^daily-briefing-[0-9]{4}-[0-9]{2}-[0-9]{2}$'
 ORDER BY created_at, slug;
 ```
 Review `original_source_id` for unexpected private values before sharing. This query reads metadata only, not bodies; titles/slugs are still editorial content and should be kept in the chat or a private audit location, not published automatically to public GitHub.
+
+## SQL 07 — reviewed 79 metadata rows (2026-10-30)
+User supplied metadata listing for 79 articles not covered by the two original AI slug patterns; analyzed all 79 rows.
+- 37 additional `roundup` / `round-up` slug patterns, for example `bundesliga-roundup-2026-02-22` and `factsport-matchday-round-up-serie-a-2026-02-21`. Classification: **suspected automated / must verify source writer**, not proven AI-generated.
+- Remaining 42 do not have those roundup slug patterns. Classification: **editorial preservation review**, not proven manually written. Includes previews, reporting, transfer pieces and longer-form articles.
+- All 79: `has_body=true`, `has_content=false`, `original_source_id=NULL`, `author=FactSport Admin`. 16 have `has_image=true`; 30 flagged headline, 33 flagged breaking. These flags are editorial presentation data, not reliable provenance.
+- Revised totals: 167 known AI daily-briefing-pattern, 120 known AI daily-roundup-pattern, 37 suspected other roundup-pattern, 42 other editorial = 366. So 324 have known-or-suspected automated briefing/roundup patterns, but only 287 belong to the two verified creator-script naming patterns.
+- Do not migrate metadata without checking article bodies, image URL licensing/availability, author/source verification, and editor approval. News content and user-provided metadata are NOT committed to public GitHub.
+
+### Next investigation
+1. Search remaining repository scripts, API routes and historical workflow code for e.g. `-roundup-`, `news.insert`, `from('news')`, and any AI writers responsible for the 37 alternate slugs.
+2. Verify actual author provenance for 42 editorial candidates with editorial review. Do not infer originality from title, image presence, or default author.
+3. Independently preserve backup of all 366 articles until migration decisions signed off; keep source DB intact.
+4. Request aggregate counts by slug group + image host if needed, but no automatic publication to GitHub.
