@@ -141,3 +141,44 @@ User provided actual function definitions for four functions and cron command ch
 2. Check controlled function RPC exposure and restrict monthly reset execution urgently with authorized production change process (do not provide blind modifications to live production).
 3. Request remaining definitions for monthly winner audit, account signup/verification, standings refresh, and monthly reset interactions.
 4. Inspect pg_cron commands locally with secrets redacted before sharing. Do not paste raw commands containing service keys.
+
+## SQL 18/19 — Trigger wiring and remaining function bodies (2026-10-30)
+Evidence: user-supplied trigger result and full function definitions; no function executed or DB writes performed.
+
+### P0 CONFIRMED — missing eligibility trigger
+SQL 18 lists one non-internal trigger invoking either prediction function: `public.user_predictions.enforce_prediction_security` (enabled O), calling `secure_predictions()` BEFORE INSERT OR UPDATE. There is **no trigger attachment for `secure_prediction_insert()`** in the supplied result. Thus the function that sets status PENDING and computes `is_eligible_for_prize` using `site_settings.daily_limit` (default 5) **does not execute through a currently attached trigger**. Verify whether application insert path sets eligibility itself; if not, daily prize eligibility is not assigned reliably. Do not attach it blindly; design one atomic authoritative insert path with matching identity/clock/start-time checks.
+
+### P0 / HIGH — monthly audit inconsistent with settlement
+`audit_monthly_winners()` uses `p.points_awarded = 10` to select 'exact scores'. But `settle_match_points()` awards 3 points for correct outcome PLUS 10 for exact score. Under consistent outcome/score predictions, exact scores yield **13**, so `=10` excludes them. Function selects top 3 VIP accounts by `monthly_points` and `monthly_correct_scores`, while app-level `app/admin/actions.ts` winner audit selects top 5 ordered by `eligible_monthly_points`. DB audit also uses `EXTRACT(MONTH FROM created_at)` without year and takes active weeks from prediction creation dates rather than match settlement dates. It uses total monthly counters, not prize-eligible counters, for floor/exact score checks. DB SQL may return NULL audits if LEFT JOIN data absent. These are significant divergence and correctness risks.
+`app/admin/actions.ts` uses `.gte('points_awarded',10)` for presumed exact score, which includes 13 but depends on rules; needs explicit exact_score boolean or actual result check and current-month / is_eligible_for_prize constraints. App action ranks up to five and writes `monthly_winners` with hard-coded prizes, requires server-side authorization review. SQL audit and app action must be reconciled to one published, testable ruleset.
+
+### Account lifecycle
+`handle_new_user()` SECURITY DEFINER initializes profile on auth user creation (email, full_name, phone, points/monthly_points/eligible_monthly_points=0, is_vip=false, role=user). Does not explicitly initialize every counter/flag: rely on defaults only after schema confirmed.
+`handle_verification_update()` SECURITY DEFINER sets `profiles.is_verified=true` upon `auth.users.email_confirmed_at` transition NULL -> non-NULL. Need verify triggers on auth.users (not listed in public-only trigger audit) and new authentication provider event equivalents.
+
+### Group standings function — unresolved broken dependency
+`refresh_group_standings_from_matches(p_league_name,p_season)` deletes/rebuilds `public.group_standings` from `matches`. However initial user-supplied public relations inventory listed no `group_standings` table/view. This is a strong **schema drift / missing relation** concern; verify `to_regclass('public.group_standings')` before assuming callable. SQL aggregates completed group matches; contains `ABD` in final status list, so abandoned matches may count as played. Qualification statuses are explicitly projections, not official tournament qualification. It inserts team_id NULL but ON CONFLICT references (league_code, season, group_name, team_id); null uniqueness and missing table issues require careful design. New media platform must preserve group standings *capability* with reliable provider-first and validated calculation fallback, not blindly reuse broken SQL.
+
+### Monthly reset source cross-check
+`app/api/admin/reset-monthly/route.ts` directly sets `monthly_points` and `monthly_correct_scores` to zero after admin token or cron key validation; it also leaves `eligible_monthly_*` counters unchanged. Thus both SQL reset function and app reset route share inconsistent rollover. No proof of schedule or active invocation; search all workflows.
+ 
+### Next safe read-only SQL 20 (schema existence and triggers)
+```sql
+SELECT
+ to_regclass('public.group_standings')::text AS group_standings_relation,
+ to_regclass('public.user_predictions')::text AS user_predictions_relation;
+SELECT n.nspname AS table_schema,c.relname AS table_name,t.tgname AS trigger_name,
+ p.proname AS function_name,t.tgenabled AS enabled_state
+FROM pg_trigger t
+JOIN pg_class c ON c.oid=t.tgrelid
+JOIN pg_namespace n ON n.oid=c.relnamespace
+JOIN pg_proc p ON p.oid=t.tgfoid
+WHERE NOT t.tgisinternal
+ AND (p.proname IN ('handle_new_user','handle_verification_update')
+      OR c.relname='user_predictions')
+ORDER BY n.nspname,c.relname,t.tgname;
+```
+Next: inspect public table defaults/constraints and insertion route before concluding whether eligibility field always null. Avoid selecting user records, personally identifying information or auth secrets.
+
+### Operational target
+A single authoritative competition period, explicit time zone, transactional selection of first N eligible predictions, immutable prediction timestamp and outcome, idempotent scoring and corrected counters, verified prize qualification and safe reset. A fresh zero-data launch is not a reason to skip these fixes.
