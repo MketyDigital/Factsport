@@ -102,3 +102,11 @@ Browser -> Factsport HTTP routes (vinext Workers, stable URLs and response shape
 - Hyperdrive with Azure PG: https://developers.cloudflare.com/hyperdrive/examples/connect-to-postgres/postgres-database-providers/azure/
 - Hyperdrive firewall: https://developers.cloudflare.com/hyperdrive/configuration/firewall-and-networking-configuration/
 - Built-in PgBouncer tier restrictions: https://learn.microsoft.com/en-us/azure/postgresql/connectivity/concepts-pgbouncer
+
+## Owner refinements — 2026-10-31 (supersede earlier defaults)
+- Direct Facebook Graph API and Telegram Bot API remain first-party direct SocialPublisher implementations; ONLY third-party automation (Buffer/Make et al.) uses Logic Apps adapters, with Cloudflare Workflows alternative **disabled** until owner-controlled cutover.
+- R2 is the selected MediaStore implementation, with no Azure Blob account now.
+- Mkety AI and Mkety Mail source-backed API contracts verified in MketyDigital/mksaas main; passive server-only adapters `lib/adapters/mkety-ai.ts` and `lib/adapters/mkety-mail.ts` committed. See `docs/audit/CLOUD-002-mkety-integrations-auth-and-cost.md`.
+- Preserve 3s frontend Cloudflare Worker polling and ~3s caching unless measured cheaper AND equally reliable alternative; don't route through Azure PG/Logic Apps.
+- Azure PG B1ms is target **~$16-$20/month database only**, quote region/subscription; prioritize more budget for Azure Logic Apps. Production after staging validation; owner already has Azure subscription, no resources provisioned.
+- Prefer shared Mkety Auth + existing ZITADEL OIDC adapter subject to real tenant/production readiness and per-DAU costs; internal Factsport identity remains stable. Mkety Mail provides verification/recovery.
