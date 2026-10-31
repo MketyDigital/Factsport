@@ -28,3 +28,19 @@ B. **Assist standalone Worker** at `customer-apps/assist/src/index.ts` and `src/
 3. Add interchangeable enterprise/assist AI adapter test fixtures, rate-limit and idempotency failure semantics, no duplicate publishing, always editorial review.
 4. Auth portability tests across OIDC providers using issuer+subject mappings, password recovery, Mkety Mail, VIP role transitions.
 5. No Azure provisioning, production auth changes or billable resources authorized in this evidence gathering step.
+
+## Clerk Hobby free verified 2026-10-31; ZITADEL on same Azure PostgreSQL (not deployed)
+Official current Clerk pricing: https://clerk.com/pricing ; https://clerk.com/changelog/2026-02-05-new-plans-more-value
+- Hobby $0, **50,000 Monthly Retained Users per app**, unlimited applications, 3 dashboard seats, fixed 7-day session lifetime, 1-day application logs; email/password, email codes, social auth and user management included. "MRU" means returned >=24 hours after signup in the billing month, not MAU or DAU.
+- Production MFA and passkeys require paid tier: https://clerk.com/docs/guides/configure/auth-strategies/sign-up-sign-in-options. Therefore enforce administrator protections separately or budget for Pro; do not claim free MFA.
+- >50k MRU requires Pro, Clerk documents 1-month grace; published Pro $25/mo monthly or $20/mo annual, plus overages. Verify on exact billing account before adoption.
+- Clerk backend SDK supports Workers edge auth; use stable internal Factsport UUID and mapping (issuer, subject); keep VIP and permissions in Factsport DB. Clerk supports CSV/password-hash export: https://clerk.com/docs/guides/development/migrating/overview . Provider switch still requires session re-login and careful OAuth linking, so "invisible" identity migration is not fully guaranteed.
+- For Factsport: candidate **Clerk Hobby** for low-maintenance user auth initially, assuming free plan restrictions suit admin security. Check vinext app integration with server SDK and real login flows in staging; don't assume Next middleware plugin is vinext compatible.
+
+ZITADEL official docs: https://zitadel.com/docs/self-hosting/manage/database ; https://zitadel.com/docs/self-hosting/manage/requirements ; https://zitadel.com/docs/self-hosting/manage/production .
+- Self-host ZITADEL may use **the SAME Azure PostgreSQL Flexible Server**, but **dedicated `zitadel` database, own role, TLS DSN, no shared table schema** with Factsport. ZITADEL app still needs separate, continuously running container/server/reverse proxy; an Azure PG server alone cannot host the executable.
+- ZITADEL officially supports PG14-18 and documented external managed DB bootstrap `zitadel init schema` (after provisioning appropriate DB/roles). Redis is optional.
+- B1ms = 1vCPU/2GiB RAM is low capacity. ZITADEL DB usage and password hashing may exhaust shared CPU credits/connection/memory pool and cause correlated loss of Factsport and login. Self-host ZITADEL and Factsport DB together ONLY after concurrency tests and backup/restore validation; strongly prefer existing separate Mkety Auth/ZITADEL DB if already provisioned and safely isolated.
+- Lowest cost immediate decision: Clerk Hobby or existing tested shared Mkety Auth, not a new ZITADEL VM + shared B1ms by default. DAU-based ZITADEL Cloud alert threshold not applicable to Clerk MRU; if Clerk adopted alert at 30k/40k/45k MRU, confirm monitoring metric and monthly cutoff. No alerts configured.
+- Maintain portable OIDC/AuthPort; authentication provider switch always needs robust external subject mapping, account merging protections, privilege controls, migration/export, potential reauthentication.
+- Neither Clerk nor ZITADEL configured or deployed; no Azure resources touched.
