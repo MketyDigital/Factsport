@@ -45,13 +45,14 @@ az postgres flexible-server create \
   --sku-name Standard_B1ms --tier Burstable \
   --storage-size 32 --storage-type Premium_LRS \
   --version 16 --backup-retention 7 \
-  --geo-redundant-backup Disabled --high-availability Disabled \
+  --geo-redundant-backup Disabled --zonal-resiliency Disabled \
   --public-access None \
   --admin-user "$PG_ADMIN" --admin-password "$PG_PASSWORD" \
   --tags app=Factsport environment=staging project=factsport-v2 \
   --yes --output table
 unset PG_PASSWORD
-echo "DB is not created until a secure admin client connection is configured."
+az postgres flexible-server db create --resource-group "$RG" --server-name "$PG_SERVER" --database-name "$DB_NAME" --output table
+echo "Created empty factsport_v2 DB; NO application tables/roles/data have been migrated."
 echo "Next: scoped firewall/Hyperdrive networking, then 'CREATE DATABASE factsport_v2' via psql on a trusted client."
 echo "Never allow 0.0.0.0-255.255.255.255, never store connection strings in code."
 az postgres flexible-server show -g "$RG" -n "$PG_SERVER" --query '{name:name,sku:sku.name,storage:storage.storageSizeGb,version:version,state:state,ha:highAvailability.mode}' -o jsonc
