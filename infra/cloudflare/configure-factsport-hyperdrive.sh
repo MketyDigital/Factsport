@@ -4,14 +4,14 @@
 set -euo pipefail
 : "${CLOUDFLARE_ACCOUNT_ID:?}"
 : "${CLOUDFLARE_API_TOKEN:?}"
-HYPERDRIVE_ID="08cee41a81be4c3980450be9563af5e2"
+HYPERDRIVE_ID="895cca4c06104b8ab9f7c1b72a8ba18f"
 URL="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/hyperdrive/configs/${HYPERDRIVE_ID}"
 STATUS="$(curl -sS -o /tmp/factsport-hd-get.json -w '%{http_code}' -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "$URL")"
 if [ "$STATUS" != "200" ]; then
   echo "::warning::Factsport Hyperdrive settings could not be read (HTTP $STATUS); token may lack Hyperdrive Read. Staging bindings remain unchanged."
   exit 0
 fi
-if ! jq -e '.success == true and .result.name == "factsport-v2-postgres" and .result.origin.database == "factsport_v2" and .result.origin.host == "mketypostgres.postgres.database.azure.com"' /tmp/factsport-hd-get.json >/dev/null; then
+if ! jq -e '.success == true and .result.name == "factsport-v2-runtime-postgres" and .result.origin.database == "factsport_v2" and .result.origin.user == "factsport_v2_reader" and .result.origin.host == "mketypostgres.postgres.database.azure.com"' /tmp/factsport-hd-get.json >/dev/null; then
   echo "::error::Refusing Hyperdrive changes: resource identity is not the expected Factsport Azure database."
   exit 1
 fi
