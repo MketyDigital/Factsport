@@ -1,0 +1,115 @@
+name: Factsport v2 staging fixture Cron (restricted writer)
+
+# Deploys only factsport-v2-schedule-sync, never live ESPN or production domains.
+on:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - '.github/workflows/v2-schedule-cron.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factsport-v2-staging-schedule-cron
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/refactor/factsport-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KEY }}
+      FACTSPORT_FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
+      FACTSPORT_WRITER_HD_ID: eb634fef8bb443839fd0847c6c370f85
+    steps:
+      - name: Guard Cloudflare account and restricted writer Hyperdrive
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ] &&
+            [ -n "$FACTSPORT_FOOTBALL_DATA_KEY" ] ||
+            { echo "::error::Existing Cloudflare or football-data credentials unavailable"; exit 1; }
+          STATUS="$(curl -sS -o /tmp/factsport-cron-hd.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/$FACTSPORT_WRITER_HD_ID")"
+          [ "$STATUS" = 200 ] &&
+             jq -e '.success == true and .result.name == "factsport-v2-schedule-postgres" and
+                    .result.origin.database == "factsport_v2" and .result.origin.user == "factsport_v2_schedule_writer"' \
+               /tmp/factsport-cron-hd.json >/dev/null ||
+               { echo "::error::Refusing Cron deployment: unexpected writer Hyperdrive"; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/factsport-v2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check schedule-only code and input normalizer
+        shell: bash
+        run: |
+          node --check workers/factsport-schedule-sync.mjs
+          node --test tests/factsport-schedule.test.mjs
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Deploy staging schedule-only Worker with UTC Cron
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 deploy --config wrangler.factsport-schedule-sync.jsonc
+          TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$TOKEN"
+          printf 'FACTSPORT_SYNC_TOKEN=%s\n' "$TOKEN" >> "$GITHUB_ENV"
+          printf '%s' "$TOKEN" | npx --yes wrangler@4 secret put FACTSPORT_SYNC_TOKEN \
+            --config wrangler.factsport-schedule-sync.jsonc
+          printf '%s' "$FACTSPORT_FOOTBALL_DATA_KEY" | \
+            npx --yes wrangler@4 secret put FACTSPORT_FOOTBALL_DATA_KEY \
+            --config wrangler.factsport-schedule-sync.jsonc
+      - name: Verify Cron trigger installed and protected Worker remains healthy
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl -sS -o /tmp/factsport-cron-list.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/factsport-v2-schedule-sync/schedules")"
+          if [ "$STATUS" != "200" ] ||
+              ! jq -e '.success == true and
+                       ([.result.schedules[].cron] | index("15 3,15 * * *") != null)' \
+                  /tmp/factsport-cron-list.json >/dev/null 2>&1; then
+            echo "::error::Factsport UTC Cron could not be verified (HTTP $STATUS)"
+            exit 1
+          fi
+          DOMAIN_STATUS="$(curl -sS -o /tmp/factsport-cron-domain.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
+          [ "$DOMAIN_STATUS" = 200 ] || { echo "::error::Missing Workers subdomain"; exit 1; }
+          DOMAIN="$(jq -r '.result.subdomain // empty' /tmp/factsport-cron-domain.json)"
+          [ -n "$DOMAIN" ] || exit 1
+          BASE="https://factsport-v2-schedule-sync.$DOMAIN.workers.dev/__internal"
+          ready=false
+          for attempt in 1 2 3 4 5 6 7 8; do
+            STATUS="$(curl -sS --max-time 30 -o /tmp/factsport-cron-probe.json \
+              -w '%{http_code}' -H "Authorization: Bearer $FACTSPORT_SYNC_TOKEN" \
+              "$BASE/schedule-check")"
+            if [ "$STATUS" = 200 ] &&
+                jq -e '.ok == true and .writerRoleVerified == true and .premierLeagueRows > 0' \
+                  /tmp/factsport-cron-probe.json >/dev/null 2>&1; then
+              ready=true
+              break
+            fi
+            echo "Factsport Cron propagation check $attempt: HTTP $STATUS"
+            sleep 3
+          done
+          [ "$ready" = true ] || { echo "::error::Schedule-only Worker unavailable"; exit 1; }
+          UNAUTH="$(curl -sS -o /tmp/factsport-cron-unauthorized -w '%{http_code}' "$BASE/schedule-check")"
+          [ "$UNAUTH" = 404 ] ||
+            { echo "::error::Schedule Worker must reject unauthenticated traffic"; exit 1; }
+          echo "## Factsport v2 staging fixture Cron" >> "$GITHUB_STEP_SUMMARY"
+          echo "Verified Cron: 03:15 and 15:15 UTC daily (twice daily)." >> "$GITHUB_STEP_SUMMARY"
+          echo "Writer: factsport_v2_schedule_writer, Hyperdrive factsport-v2-schedule-postgres." >> "$GITHUB_STEP_SUMMARY"
+          echo "Competitions: PL, PD, BL1, SA, FL1, CL. Only scheduled fixtures, not live scores." >> "$GITHUB_STEP_SUMMARY"
+          echo "Private check passed, unauthenticated check rejected, PL rows present." >> "$GITHUB_STEP_SUMMARY"
+          echo "No production route, ESPN handler or Azure Logic App modified." >> "$GITHUB_STEP_SUMMARY"
