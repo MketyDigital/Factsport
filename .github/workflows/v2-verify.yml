@@ -8,6 +8,11 @@ on:
     paths:
       - 'app/api/matches/**'
       - 'lib/adapters/postgres-matches.ts'
+      - 'lib/adapters/factsport-cloudflare-bindings.ts'
+      - 'types/factsport-cloudflare-workers.d.ts'
+      - 'workers/factsport-schema-bootstrap.ts'
+      - 'workers/generated-factsport-migration.ts'
+      - 'scripts/generate-factsport-bootstrap.cjs'
       - 'db/migrations/**'
       - 'scripts/check-postgres.cjs'
       - 'package.json'
