@@ -1,7 +1,37 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { env } from 'cloudflare:workers'
 
 export async function middleware(request: NextRequest) {
+  // Factsport v2 standalone staging Worker: fail closed on EVERY matched path,
+  // including /api and /admin. Production deploy has no staging env binding.
+  // Never use the legacy dev-domain rule as the only staging protection.
+  if (env.FACTSPORT_ENVIRONMENT === 'staging') {
+    const secret = env.FACTSPORT_STAGING_TOKEN;
+    const provided = request.headers.get('x-factsport-staging-token') || '';
+    if (typeof secret !== 'string' || !secret || !provided ||
+        provided.length > 4096 || secret.length > 4096) {
+      return new NextResponse('Not found', {
+        status: 404,
+        headers: { 'Cache-Control': 'no-store' },
+      });
+    }
+    const encoder = new TextEncoder();
+    const [expectedDigest, providedDigest] = await Promise.all([
+      crypto.subtle.digest('SHA-256', encoder.encode(secret)),
+      crypto.subtle.digest('SHA-256', encoder.encode(provided)),
+    ]);
+    const a = new Uint8Array(expectedDigest);
+    const b = new Uint8Array(providedDigest);
+    let mismatch = 0;
+    for (let i = 0; i < a.length; i++) mismatch |= a[i] ^ b[i];
+    if (mismatch !== 0) {
+      return new NextResponse('Not found', {
+        status: 404,
+        headers: { 'Cache-Control': 'no-store' },
+      });
+    }
+  }
   const hostname = request.headers.get('host') || '';
   const pathname = request.nextUrl.pathname;
   const searchParams = request.nextUrl.search;
