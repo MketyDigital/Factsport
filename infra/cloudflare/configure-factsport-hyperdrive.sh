@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Factsport-specific Hyperdrive safety configuration.
+# Verifies resource identity before attempting changes. Never reads/writes origin passwords.
+set -euo pipefail
+: "${CLOUDFLARE_ACCOUNT_ID:?}"
+: "${CLOUDFLARE_API_TOKEN:?}"
+HYPERDRIVE_ID="08cee41a81be4c3980450be9563af5e2"
+URL="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/hyperdrive/configs/${HYPERDRIVE_ID}"
+STATUS="$(curl -sS -o /tmp/factsport-hd-get.json -w '%{http_code}' -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "$URL")"
+if [ "$STATUS" != "200" ]; then
+  echo "::warning::Factsport Hyperdrive settings could not be read (HTTP $STATUS); token may lack Hyperdrive Read. Staging bindings remain unchanged."
+  exit 0
+fi
+if ! jq -e '.success == true and .result.name == "factsport-v2-postgres" and .result.origin.database == "factsport_v2" and .result.origin.host == "mketypostgres.postgres.database.azure.com"' /tmp/factsport-hd-get.json >/dev/null; then
+  echo "::error::Refusing Hyperdrive changes: resource identity is not the expected Factsport Azure database."
+  exit 1
+fi
+if jq -e '.result.caching.disabled == true and .result.origin_connection_limit == 5' /tmp/factsport-hd-get.json >/dev/null; then
+  echo "Factsport Hyperdrive already has caching disabled and connection limit 5"
+  exit 0
+fi
+STATUS="$(curl -sS -o /tmp/factsport-hd-patch.json -w '%{http_code}' -X PATCH \
+  -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  --data '{"caching":{"disabled":true},"origin_connection_limit":5}' "$URL")"
+if [ "$STATUS" != "200" ]; then
+  echo "::warning::Factsport Hyperdrive settings update was not authorized (HTTP $STATUS). Check Hyperdrive Write scope; existing configuration unchanged."
+  exit 0
+fi
+jq -e '.success == true and .result.caching.disabled == true and .result.origin_connection_limit == 5' /tmp/factsport-hd-patch.json >/dev/null
+echo "Factsport Hyperdrive query caching DISABLED; origin connections LIMITED to 5"
