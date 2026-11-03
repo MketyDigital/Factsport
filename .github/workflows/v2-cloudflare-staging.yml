@@ -124,10 +124,27 @@ jobs:
           FACTSPORT_BOOTSTRAP_TOKEN="$(openssl rand -hex 32)"
           echo "::add-mask::$FACTSPORT_BOOTSTRAP_TOKEN"
           printf '%s' "$FACTSPORT_BOOTSTRAP_TOKEN" | npx --yes wrangler@4 secret put FACTSPORT_BOOTSTRAP_TOKEN --config wrangler.factsport-schema-bootstrap.jsonc
-          RESPONSE="$(curl --silent --show-error --retry 3 --retry-delay 2 --max-time 90 \
-            -X POST -H "Authorization: Bearer $FACTSPORT_BOOTSTRAP_TOKEN" \
-            "${SCHEMA_URL%/}/__internal/factsport-schema-bootstrap")"
-          echo "$RESPONSE" | jq -e '.ok == true and .tablesPresent == 4' >/dev/null
+          # Wrangler secret updates can need a short propagation interval.
+          # Report only HTTP status, content type, and our own safe JSON error code.
+          success=false
+          for attempt in 1 2 3 4 5; do
+            STATUS="$(curl --silent --show-error --max-time 90 -o /tmp/factsport-bootstrap-response \
+              -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer $FACTSPORT_BOOTSTRAP_TOKEN" \
+              "${SCHEMA_URL%/}/__internal/factsport-schema-bootstrap")"
+            if [ "$STATUS" = "200" ] && jq -e '.ok == true and .tablesPresent == 4' /tmp/factsport-bootstrap-response >/dev/null 2>&1; then
+              success=true
+              break
+            fi
+            TYPE="$(file --brief --mime-type /tmp/factsport-bootstrap-response)"
+            CODE="$(jq -r 'if type == "object" then (.error // "unknown") else "non-json" end' /tmp/factsport-bootstrap-response 2>/dev/null || echo non-json)"
+            echo "Factsport schema attempt $attempt: HTTP $STATUS; MIME $TYPE; code $CODE"
+            sleep 3
+          done
+          if [ "$success" != "true" ]; then
+            echo "::error::Factsport core schema was not confirmed. See sanitized status above. Temporary Worker cleanup follows."
+            exit 1
+          fi
           echo "Factsport v2 core schema applied/verified: 4 tables"
       - name: Delete temporary Factsport schema Worker (even after failure)
         if: always() && steps.schema_worker.outcome == 'success'
