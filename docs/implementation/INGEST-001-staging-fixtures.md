@@ -22,7 +22,7 @@
 
 ## Scheduling
 
-`workers/factsport-schedule-sync.mjs` supports a Cloudflare scheduled handler for the six competitions, staggering provider calls seven seconds apart to stay comfortably below free-tier request limits. `wrangler.factsport-schedule-sync.jsonc` declares a **staging-only** cron at 03:15 and 15:15 UTC. Deployment/trigger verification is performed by `.github/workflows/v2-schedule-cron.yml`; consult that workflow's successful run before considering the cron active.
+`workers/factsport-schedule-sync.mjs` supports a Cloudflare scheduled handler for the six competitions, staggering provider calls seven seconds apart to stay comfortably below free-tier request limits. `wrangler.factsport-schedule-sync.jsonc` declares a **staging-only** cron at 03:15 and 15:15 UTC. **VERIFIED ACTIVE:** `.github/workflows/v2-schedule-cron.yml` completed successfully in GitHub Actions run [41696849300](https://github.com/MketyDigital/Factsport/actions/runs/41696849300). Cloudflare's Worker Script Schedules API returned the exact expected Cron expression, and the restricted writer's authorized health check passed while the unauthenticated check returned HTTP 404. This is a staging-only twice-daily schedule; no production ESPN/Logic Apps schedule was changed.
 
 ## Rollback
 
