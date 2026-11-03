@@ -27,8 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.MKETY_CF_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.MKETY_CF_R2_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KEY }}
       R2_BUCKET: factsport-v2-media-staging
     steps:
       - name: Validate required secrets without displaying values
@@ -37,7 +37,7 @@ jobs:
           set -euo pipefail
           for key in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN; do
             if [ -z "${!key:-}" ]; then
-              echo "::error::Required existing GitHub secret is missing or empty: $key (mapped from MKETY_CF_ID / MKETY_CF_R2_TOKEN)"
+              echo "::error::Required existing GitHub secret is missing or empty: $key (mapped from CLOUDFLARE_ID / CLOUDFLARE_KEY)"
               exit 1
             fi
           done
@@ -49,7 +49,7 @@ jobs:
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             https://api.cloudflare.com/client/v4/user/tokens/verify)"
           if [ "$STATUS" != "200" ] || ! jq -e '.success == true and .result.status == "active"' /tmp/factsport-cf-token-check.json >/dev/null; then
-            echo "::error::MKETY_CF_R2_TOKEN is not an active Cloudflare API token usable by Wrangler. An R2 S3 secret cannot be used as a Cloudflare management token."
+            echo "::error::CLOUDFLARE_KEY is not an active Cloudflare API token usable by Wrangler. An R2 S3 secret cannot be used as a Cloudflare management token."
             exit 1
           fi
           echo "Cloudflare API token validated; resource-level permissions will be checked by subsequent steps."
