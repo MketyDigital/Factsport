@@ -7,6 +7,7 @@ import postgres from 'postgres';
 
 interface Env {
   HYPERDRIVE: { connectionString: string };
+  MEDIA_BUCKET: { head(key: string): Promise<unknown | null> };
   FACTSPORT_SMOKE_TOKEN?: string;
 }
 
@@ -27,7 +28,7 @@ async function tokenMatches(expected: string, provided: string): Promise<boolean
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname !== '/__internal/db-smoke' || request.method !== 'GET') {
+    if (!['/__internal/db-smoke', '/__internal/r2-smoke'].includes(url.pathname) || request.method !== 'GET') {
       return new Response('Not found', { status: 404 });
     }
     const authorization = request.headers.get('Authorization') || '';
@@ -35,9 +36,20 @@ export default {
     if (!(await tokenMatches(env.FACTSPORT_SMOKE_TOKEN || '', supplied))) {
       return new Response('Not found', { status: 404 });
     }
+    if (url.pathname === '/__internal/r2-smoke') {
+      try {
+        const found = await env.MEDIA_BUCKET.head('__factsport_v2_probe_absent__');
+        return Response.json({ ok: true, bound: true, probeObjectExists: !!found },
+          { headers: { 'Cache-Control': 'no-store' } });
+      } catch {
+        return Response.json({ ok: false, error: 'r2_binding_failed' },
+          { status: 503, headers: { 'Cache-Control': 'no-store' } });
+      }
+    }
     const sql = postgres(env.HYPERDRIVE.connectionString, {
       max: 1,
-      prepare: false,
+      fetch_types: false,
+      prepare: true,
       connect_timeout: 10,
       idle_timeout: 5,
     });
