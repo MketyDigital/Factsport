@@ -16,6 +16,7 @@ on:
       - 'lib/**'
       - 'types/**'
       - 'next.config.*'
+      - 'postcss.config.*'
 
 permissions:
   contents: read
