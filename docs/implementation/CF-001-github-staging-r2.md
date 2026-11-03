@@ -12,12 +12,12 @@ GitHub Actions *can* authenticate to Cloudflare through repository secrets. GitH
 
 GitHub repository → Settings → Secrets and variables → Actions:
 
-- Existing Cloudflare account ID secret: workflow attempts `CLOUDFLARE_ACCOUNT_ID`, `CF_ACCOUNT_ID`, then `CLOUDFLARE_ACCOUNTID`. Actual names are **not readable** using the connected GitHub app.
-- Existing Cloudflare API token secret: workflow attempts `CLOUDFLARE_API_TOKEN`, `CF_API_TOKEN`, `CLOUDFLARE_TOKEN`, then `CF_TOKEN`; token needs Workers Scripts edit and Workers R2 Storage Write permissions. The actual secret names cannot be retrieved by this GitHub app. An **R2 S3 Access Key ID/Secret Access Key is not interchangeable** with the Cloudflare API token used by Wrangler.
+- Existing Cloudflare account ID secret: **`MKETY_CF_ID`** (name supplied by owner).
+- Existing Cloudflare token candidate: **`MKETY_CF_R2_TOKEN`** (name supplied by owner). This must be an active Cloudflare **management API token** with Workers Scripts Edit and Workers R2 Storage Write permissions. The CI preflight checks token validity using Cloudflare's API and the following steps check actual permissions. If this is an R2-only management token it can create the bucket but cannot deploy the Worker. An **R2 S3 Access Key ID/Secret Access Key is not interchangeable** with the Cloudflare API token used by Wrangler. `MKETY_CF_R2_ACCESS` is intentionally not used for Worker deployment.
 - No persistent GitHub smoke-token secret: Actions generates a random, masked 256-bit `FACTSPORT_SMOKE_TOKEN` per run, uploads it only as the staging Worker's Wrangler secret, and uses it to test the two read-only endpoints. The token rotates on each deployment.
 - No `FACTSPORT_V2_STAGING_DEPLOY` variable: the owner approved staging provisioning explicitly. New pushes matching the workflow's path filters to the **refactor branch** run staging automation.
 
-Once credential secrets are resolved, push or recommit one of the workflow's listed paths on the v2 branch. The CI job is independent of default-branch workflow_dispatch. The workflow will verify the bucket, create it only if it is missing, deploy `factsport-v2-db-smoke` with both bindings, set the worker smoke token, then privately test Hyperdrive and R2 read-only routes. No schema migration, R2 object write, public bucket enablement, production site deployment, social post, or Logic App enablement is performed.
+The owner supplied secret names and authorized staging deployment. A push to the specified v2 branch paths starts the workflow, but the GitHub connector cannot read actual secret contents or poll all workflow runs. The CI job is independent of default-branch workflow_dispatch. The workflow will verify the bucket, create it only if it is missing, deploy `factsport-v2-db-smoke` with both bindings, set the worker smoke token, then privately test Hyperdrive and R2 read-only routes. No schema migration, R2 object write, public bucket enablement, production site deployment, social post, or Logic App enablement is performed.
 
 ## Resources / binding names
 
@@ -46,3 +46,7 @@ The GitHub Actions `DATABASE_URL` secret is not used by this workflow: all Azure
 The first CI run is expected to report any missing secret or permission and should not output the secret value. A successful run prints `db-smoke: OK` and `r2-smoke: OK`; `matchesTableReady: false` is normal until SQL migrations are separately applied.
 
 Stop future deploys by disabling the v2 Cloudflare staging GitHub workflow or removing its trigger from the v2 branch. The R2 bucket and Worker will remain until explicitly deleted; disabling the variable does not delete resources or erase uploaded media. The smoke Worker is safe to delete later after app cutover. The probe token rotates automatically on each deployment. To revoke it immediately, delete/rotate the Worker secret or delete the isolated Worker. Never run destructive R2 delete operations automatically.
+
+## Existing Mkety secret boundary
+
+`MKETY_DATABASE_URL` must **not** be assumed to be the new Azure `factsport_v2` URL: the existing Mkety database may be shared or have an unrelated role/database. This staging pipeline intentionally does not use it, and does not apply SQL migrations. `MKETY_CF_R2_ENDPOINT` and `MKETY_CF_R2_ACCESS` are not used to deploy Workers. No credential value should be added to repository files.
