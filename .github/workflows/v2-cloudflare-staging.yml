@@ -13,6 +13,10 @@ on:
       - 'wrangler.hyperdrive-smoke.jsonc'
       - 'infra/cloudflare/**'
       - 'docs/implementation/CF-001-github-staging-r2.md'
+      - 'db/migrations/0001_factsport_core.sql'
+      - 'scripts/generate-factsport-bootstrap.cjs'
+      - 'workers/factsport-schema-bootstrap.ts'
+      - 'wrangler.factsport-schema-bootstrap.jsonc'
 
 permissions:
   contents: read
@@ -100,6 +104,44 @@ jobs:
           echo "::add-mask::$FACTSPORT_SMOKE_TOKEN"
           printf 'FACTSPORT_SMOKE_TOKEN=%s\n' "$FACTSPORT_SMOKE_TOKEN" >> "$GITHUB_ENV"
           printf '%s' "$FACTSPORT_SMOKE_TOKEN" | npx --yes wrangler@4 secret put FACTSPORT_SMOKE_TOKEN --config wrangler.hyperdrive-smoke.jsonc
+      - name: Validate and generate first Factsport database migration
+        shell: bash
+        run: node scripts/generate-factsport-bootstrap.cjs
+      - name: Deploy temporary Factsport schema bootstrap Worker
+        id: schema_worker
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config wrangler.factsport-schema-bootstrap.jsonc
+      - name: Run reviewed schema migration through Hyperdrive
+        shell: bash
+        env:
+          SCHEMA_URL: ${{ steps.schema_worker.outputs.deployment-url }}
+        run: |
+          set -euo pipefail
+          [ -n "$SCHEMA_URL" ] || { echo "::error::Temporary schema Worker URL missing"; exit 1; }
+          FACTSPORT_BOOTSTRAP_TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$FACTSPORT_BOOTSTRAP_TOKEN"
+          printf '%s' "$FACTSPORT_BOOTSTRAP_TOKEN" | npx --yes wrangler@4 secret put FACTSPORT_BOOTSTRAP_TOKEN --config wrangler.factsport-schema-bootstrap.jsonc
+          RESPONSE="$(curl --silent --show-error --retry 3 --retry-delay 2 --max-time 90 \
+            -X POST -H "Authorization: Bearer $FACTSPORT_BOOTSTRAP_TOKEN" \
+            "${SCHEMA_URL%/}/__internal/factsport-schema-bootstrap")"
+          echo "$RESPONSE" | jq -e '.ok == true and .tablesPresent == 4' >/dev/null
+          echo "Factsport v2 core schema applied/verified: 4 tables"
+      - name: Delete temporary Factsport schema Worker (even after failure)
+        if: always() && steps.schema_worker.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl --silent --show-error -o /tmp/factsport-delete-worker.json -w '%{http_code}' \
+            -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/factsport-v2-schema-bootstrap")"
+          if [ "$STATUS" != "200" ] || ! jq -e '.success == true' /tmp/factsport-delete-worker.json >/dev/null; then
+            echo "::error::Temporary Factsport schema Worker cleanup failed (HTTP $STATUS). Delete ONLY factsport-v2-schema-bootstrap manually in Cloudflare."
+            exit 1
+          fi
+          echo "Temporary Factsport schema Worker deleted."
       - name: Probe Hyperdrive and R2 privately
         shell: bash
         env:
@@ -123,4 +165,4 @@ jobs:
           done
           echo "## Factsport v2 staging" >> "$GITHUB_STEP_SUMMARY"
           echo "Read-only Hyperdrive connection and private R2 binding checks succeeded." >> "$GITHUB_STEP_SUMMARY"
-          echo "No schema migrations, social posts, production deploys or object writes occurred." >> "$GITHUB_STEP_SUMMARY"
+          echo "Core Factsport v2 schema applied/verified; temporary bootstrap Worker deleted. No social posts, production deploys or R2 object writes occurred." >> "$GITHUB_STEP_SUMMARY"
