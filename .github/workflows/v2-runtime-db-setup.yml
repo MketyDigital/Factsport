@@ -1,0 +1,205 @@
+name: Factsport v2 restricted runtime database (one-time)
+
+# Creates a new Hyperdrive named factsport-v2-runtime-postgres.
+# Preserves original admin Hyperdrive; no production app/domain changes.
+on:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - '.github/workflows/v2-runtime-db-setup.yml'
+      - 'workers/factsport-reader-bootstrap.ts'
+      - 'workers/factsport-reader-check.ts'
+      - 'wrangler.factsport-reader-bootstrap.jsonc'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factsport-v2-runtime-db-setup
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    if: github.ref == 'refs/heads/refactor/factsport-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KEY }}
+      FACTSPORT_ADMIN_DB_URL: ${{ secrets.DATABASE_URL }}
+      HD_ORIGINAL_ID: 08cee41a81be4c3980450be9563af5e2
+      HD_RUNTIME_NAME: factsport-v2-runtime-postgres
+    steps:
+      - name: Verify existing credential values target only Factsport v2
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ] &&
+            [ -n "$FACTSPORT_ADMIN_DB_URL" ] ||
+            { echo "::error::Required existing GitHub secret is missing."; exit 1; }
+          node <<'NODE'
+          const raw = process.env.FACTSPORT_ADMIN_DB_URL;
+          let parsed;
+          try { parsed = new URL(raw); } catch {
+            console.error('::error::DATABASE_URL is not a valid connection URL; no changes made.');
+            process.exit(1);
+          }
+          if (!['postgres:', 'postgresql:'].includes(parsed.protocol) ||
+              parsed.hostname !== 'mketypostgres.postgres.database.azure.com' ||
+              parsed.pathname !== '/factsport_v2' ||
+              parsed.username !== 'mketydbadmin' ||
+              !parsed.password) {
+            console.error('::error::DATABASE_URL does not identify Azure factsport_v2 administrator; no role changes made.');
+            process.exit(1);
+          }
+          console.log('DATABASE_URL identity verified for factsport_v2 (value withheld).');
+          NODE
+          STATUS="$(curl -sS -o /tmp/factsport-runtime-origin.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/$HD_ORIGINAL_ID")"
+          [ "$STATUS" = '200' ] && jq -e \
+            '.success == true and .result.name == "factsport-v2-postgres" and .result.origin.database == "factsport_v2" and .result.origin.user == "mketydbadmin"' \
+            /tmp/factsport-runtime-origin.json >/dev/null ||
+            { echo "::error::Original Factsport Hyperdrive is not admin-backed or cannot be inspected."; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/factsport-v2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install minimal dependencies for temporary Workers
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Refuse duplicate runtime Hyperdrive configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl -sS -o /tmp/factsport-existing-hyperdrives.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs")"
+          [ "$STATUS" = "200" ] || { echo "::error::Cannot list existing Hyperdrive configs (HTTP $STATUS)"; exit 1; }
+          if jq -e --arg name "$HD_RUNTIME_NAME" '.result[]? | select(.name == $name)' /tmp/factsport-existing-hyperdrives.json >/dev/null; then
+            echo "::error::A runtime Hyperdrive already exists; refusing to overwrite it or rotate existing credentials blindly."
+            exit 1
+          fi
+      - name: Deploy temporary Factsport reader bootstrap Worker
+        id: bootstrap
+        shell: bash
+        run: |
+          npx --yes wrangler@4 deploy --config wrangler.factsport-reader-bootstrap.jsonc
+      - name: Create restricted Factsport PostgreSQL role and separate runtime Hyperdrive
+        shell: bash
+        run: |
+          set -euo pipefail
+          FACTSPORT_READER_PASSWORD="$(openssl rand -hex 32)"
+          FACTSPORT_BOOTSTRAP_TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$FACTSPORT_READER_PASSWORD"
+          echo "::add-mask::$FACTSPORT_BOOTSTRAP_TOKEN"
+          printf '%s' "$FACTSPORT_READER_PASSWORD" |
+            npx --yes wrangler@4 secret put FACTSPORT_READER_PASSWORD --config wrangler.factsport-reader-bootstrap.jsonc
+          printf '%s' "$FACTSPORT_BOOTSTRAP_TOKEN" |
+            npx --yes wrangler@4 secret put FACTSPORT_BOOTSTRAP_TOKEN --config wrangler.factsport-reader-bootstrap.jsonc
+          DOMAIN_STATUS="$(curl -sS -o /tmp/factsport-cf-domain.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
+          [ "$DOMAIN_STATUS" = "200" ] || { echo "::error::Workers subdomain lookup failed"; exit 1; }
+          DOMAIN="$(jq -r '.result.subdomain // empty' /tmp/factsport-cf-domain.json)"
+          [ -n "$DOMAIN" ] || { echo "::error::Workers subdomain missing"; exit 1; }
+          BOOTSTRAP_URL="https://factsport-v2-reader-bootstrap.$DOMAIN.workers.dev/__internal/create-factsport-reader"
+          success=false
+          for i in 1 2 3 4 5 6 7 8; do
+            STATUS="$(curl -sS --max-time 45 -o /tmp/factsport-reader-response.json -w '%{http_code}' \
+              -X POST -H "Authorization: Bearer $FACTSPORT_BOOTSTRAP_TOKEN" "$BOOTSTRAP_URL")"
+            if [ "$STATUS" = "200" ] && jq -e '.ok == true and .leastPrivilege == true' /tmp/factsport-reader-response.json >/dev/null 2>&1; then
+              success=true; break
+            fi
+            STATE="$(jq -r '.sqlState // "none"' /tmp/factsport-reader-response.json 2>/dev/null || echo none)"
+            echo "Factsport reader bootstrap attempt $i: HTTP $STATUS, PostgreSQL SQLSTATE $STATE"
+            sleep 3
+          done
+          [ "$success" = "true" ] || { echo "::error::Restricted role was not verified; Hyperdrive unchanged."; exit 1; }
+          echo "Factsport reader role created and limited privileges verified."
+          jq -n --arg name "$HD_RUNTIME_NAME" --arg password "$FACTSPORT_READER_PASSWORD" '{
+            name: $name,
+            origin: {
+              scheme: "postgresql",
+              host: "mketypostgres.postgres.database.azure.com",
+              port: 5432,
+              database: "factsport_v2",
+              user: "factsport_v2_reader",
+              password: $password
+            },
+            mtls: { sslmode: "require" },
+            caching: { disabled: true },
+            origin_connection_limit: 5
+          }' > /tmp/factsport-runtime-create.json
+          STATUS="$(curl -sS --max-time 45 -o /tmp/factsport-runtime-created.json -w '%{http_code}' \
+            -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/factsport-runtime-create.json \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs")"
+          rm -f /tmp/factsport-runtime-create.json
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "201" ]; then
+            CODES="$(jq -r '[.errors[]?.code] | join(",")' /tmp/factsport-runtime-created.json 2>/dev/null || true)"
+            echo "::error::Runtime Hyperdrive creation failed (HTTP $STATUS), codes: $CODES"
+            exit 1
+          fi
+          jq -e '.success == true and .result.name == "factsport-v2-runtime-postgres" and .result.origin.user == "factsport_v2_reader"' /tmp/factsport-runtime-created.json >/dev/null ||
+            { echo "::error::Unexpected runtime Hyperdrive result"; exit 1; }
+          ID="$(jq -r '.result.id' /tmp/factsport-runtime-created.json)"
+          [[ "$ID" =~ ^[a-f0-9]{32}$ ]] ||
+            { echo "::error::Invalid runtime Hyperdrive ID returned"; exit 1; }
+          echo "FACTSPORT_RUNTIME_HD_ID=$ID" >> "$GITHUB_ENV"
+          echo "Created runtime Hyperdrive factsport-v2-runtime-postgres ($ID) with restricted database role"
+      - name: Verify restricted connection using separate temporary Worker
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n --arg id "$FACTSPORT_RUNTIME_HD_ID" --arg main "$GITHUB_WORKSPACE/workers/factsport-reader-check.ts" '{
+            name: "factsport-v2-runtime-db-check",
+            main: $main,
+            compatibility_date: "2026-11-03",
+            compatibility_flags: ["nodejs_compat"],
+            workers_dev: true,
+            hyperdrive: [{binding: "FACTSPORT_HYPERDRIVE", id: $id}]
+          }' > wrangler.factsport-runtime-check.generated.json
+          npx --yes wrangler@4 deploy --config wrangler.factsport-runtime-check.generated.json
+          FACTSPORT_PROBE_TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$FACTSPORT_PROBE_TOKEN"
+          printf '%s' "$FACTSPORT_PROBE_TOKEN" |
+            npx --yes wrangler@4 secret put FACTSPORT_PROBE_TOKEN --config wrangler.factsport-runtime-check.generated.json
+          DOMAIN="$(jq -r '.result.subdomain' /tmp/factsport-cf-domain.json)"
+          URL="https://factsport-v2-runtime-db-check.$DOMAIN.workers.dev/__internal/reader-check"
+          verified=false
+          for i in 1 2 3 4 5 6 7 8; do
+            STATUS="$(curl -sS --max-time 45 -o /tmp/factsport-role-check.json -w '%{http_code}' \
+              -H "Authorization: Bearer $FACTSPORT_PROBE_TOKEN" "$URL")"
+            if [ "$STATUS" = "200" ] &&
+                jq -e '.ok == true and .limitedRole == true' /tmp/factsport-role-check.json >/dev/null 2>&1; then
+              verified=true; break
+            fi
+            echo "Restricted Hyperdrive connection check attempt $i: HTTP $STATUS"
+            sleep 3
+          done
+          [ "$verified" = true ] ||
+            { echo "::error::New restricted Hyperdrive did not pass readonly connection test"; exit 1; }
+          echo "## Factsport v2 least-privilege database" >> "$GITHUB_STEP_SUMMARY"
+          echo "Role factsport_v2_reader verified; only SELECT on matches; no INSERT." >> "$GITHUB_STEP_SUMMARY"
+          echo "New Hyperdrive factsport-v2-runtime-postgres ID: $FACTSPORT_RUNTIME_HD_ID" >> "$GITHUB_STEP_SUMMARY"
+          echo "Original admin Hyperdrive unchanged; no production deployment." >> "$GITHUB_STEP_SUMMARY"
+      - name: Clean temporary Factsport bootstrap and probe Workers
+        if: always() && steps.bootstrap.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for worker in factsport-v2-reader-bootstrap factsport-v2-runtime-db-check; do
+            STATUS="$(curl -sS -o /tmp/factsport-delete-response.json -w '%{http_code}' -X DELETE \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$worker")"
+            if [ "$STATUS" = "404" ]; then continue; fi
+            [ "$STATUS" = "200" ] && jq -e '.success == true' /tmp/factsport-delete-response.json >/dev/null ||
+              { echo "::error::Failed to remove temporary Factsport Worker $worker; remove this exact Worker in dashboard."; exit 1; }
+            echo "Removed temporary Factsport Worker: $worker"
+          done
