@@ -1,0 +1,96 @@
+name: Factsport v2 full application staging (protected)
+
+# No production domain, DNS, or main-branch changes. Separate Worker only.
+on:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - '.github/workflows/v2-app-staging.yml'
+      - 'cloudflare.config.ts'
+      - 'vite.config.ts'
+      - 'middleware.ts'
+      - 'package.json'
+      - 'postcss.config.*'
+      - 'app/**'
+      - 'lib/**'
+      - 'types/**'
+      - 'next.config.*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factsport-v2-app-staging
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/refactor/factsport-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: factsport_staging_nonproduction_placeholder
+    steps:
+      - name: Validate Cloudflare credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ] ||
+            { echo "::error::Existing CLOUDFLARE_ID or CLOUDFLARE_KEY repository secret unavailable"; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/factsport-v2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Run Factsport regression suite
+        run: npm run test:engine
+      - name: Check Typescript
+        run: npm run typecheck
+      - name: Build native Factsport Cloudflare Worker
+        run: npm run build:vinext
+      - name: Deploy Factsport staging Worker with temporary access secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          FACTSPORT_STAGING_TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$FACTSPORT_STAGING_TOKEN"
+          printf 'FACTSPORT_STAGING_TOKEN=%s\n' "$FACTSPORT_STAGING_TOKEN" >> "$GITHUB_ENV"
+          printf '{"FACTSPORT_STAGING_TOKEN":"%s"}\n' "$FACTSPORT_STAGING_TOKEN" > /tmp/factsport-staging-secrets.json
+          npx --no-install cf deploy --prebuilt --secrets-file /tmp/factsport-staging-secrets.json
+          rm -f /tmp/factsport-staging-secrets.json
+      - name: Resolve Factsport staging Worker subdomain and test deny-by-default
+        shell: bash
+        run: |
+          set -euo pipefail
+          SUBDOMAIN_STATUS="$(curl --silent --show-error --max-time 20 -o /tmp/factsport-worker-subdomain.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
+          if [ "$SUBDOMAIN_STATUS" != "200" ]; then
+            echo "::error::Unable to locate account Workers subdomain (HTTP $SUBDOMAIN_STATUS)"
+            exit 1
+          fi
+          SUBDOMAIN="$(jq -r '.result.subdomain // empty' /tmp/factsport-worker-subdomain.json)"
+          [ -n "$SUBDOMAIN" ] || { echo "::error::Workers subdomain not present"; exit 1; }
+          BASE="https://factsport-v2-staging.$SUBDOMAIN.workers.dev"
+          for path in / /api/matches /admin; do
+            STATUS="$(curl --silent --show-error --max-time 25 --retry 6 --retry-all-errors --retry-delay 3 \
+              -o /tmp/factsport-staging-unauthenticated -w '%{http_code}' "$BASE$path")"
+            [ "$STATUS" = "404" ] || {
+              echo "::error::Unsafe staging access: unauthenticated $path returned HTTP $STATUS instead of 404"
+              exit 1
+            }
+            echo "Factsport staging $path: unauthorized access blocked"
+          done
+          echo "## Factsport v2 application staging" >> "$GITHUB_STEP_SUMMARY"
+          echo "Deployed separate protected Worker: $BASE" >> "$GITHUB_STEP_SUMMARY"
+          echo "Unauthenticated /, /api/matches and /admin each blocked with HTTP 404." >> "$GITHUB_STEP_SUMMARY"
+          echo "No production routes or domains changed. No production Supabase service role deployed." >> "$GITHUB_STEP_SUMMARY"
