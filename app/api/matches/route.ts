@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { listPostgresMatches } from '@/lib/adapters/postgres-matches';
 
 // 🟢 THE MAGIC SHIELD: Caches this endpoint at the Edge CDN for 60 seconds!
 // If 1,000 users click "Load More" for the Premier League in the same minute, the DB is only queried ONCE.
@@ -15,6 +16,22 @@ export async function GET(request: Request) {
 
     if (!league || !cursor || !type) {
         return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+    }
+
+    // Staging-only read cutover; never switch automatically based on DATABASE_URL presence.
+    if (process.env.FACTSPORT_MATCHES_BACKEND === 'postgres') {
+        if (type !== 'results' && type !== 'fixtures') {
+            return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
+        }
+        if (league.length > 100 || !Number.isFinite(new Date(cursor).valueOf())) {
+            return NextResponse.json({ error: 'Invalid league or cursor' }, { status: 400 });
+        }
+        try {
+            const matches = await listPostgresMatches({ league, cursor, type });
+            return NextResponse.json(matches, { headers: { 'Cache-Control': 'public, s-maxage=60' } });
+        } catch {
+            return NextResponse.json({ error: 'Match data temporarily unavailable' }, { status: 503 });
+        }
     }
 
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
