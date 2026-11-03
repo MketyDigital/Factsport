@@ -48,6 +48,18 @@ jobs:
           echo "Only a disposable GitHub runner checkout was modified. No Cloudflare app was deployed." >> "$GITHUB_STEP_SUMMARY"
           git status --short >> "$GITHUB_STEP_SUMMARY"
           git diff --stat >> "$GITHUB_STEP_SUMMARY"
+      - name: Save safe vinext-generated configuration for integration
+        if: steps.init.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: factsport-v2-vinext-generated-config
+          retention-days: 3
+          if-no-files-found: warn
+          path: |
+            cloudflare.config.ts
+            vite.config.ts
+            package.json
+            tsconfig.json
       - name: Test vinext build without deployment
         if: steps.init.outcome == 'success'
         env:
