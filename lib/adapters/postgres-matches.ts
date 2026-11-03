@@ -35,7 +35,7 @@ export async function listPostgresMatches(input: {
     return sql`
       SELECT * FROM public.matches
       WHERE league = ${input.league}
-        AND status IN ${sql(FINISHED_STATUSES)}
+        AND status = ANY(${FINISHED_STATUSES}::text[])
         AND match_date < ${cursor}
       ORDER BY match_date DESC, id DESC LIMIT 15
     `;
@@ -43,7 +43,7 @@ export async function listPostgresMatches(input: {
   return sql`
     SELECT * FROM public.matches
     WHERE league = ${input.league}
-      AND status NOT IN ${sql(FINISHED_STATUSES)}
+      AND status <> ALL(${FINISHED_STATUSES}::text[])
       AND match_date > ${cursor}
     ORDER BY match_date ASC, id ASC LIMIT 15
   `;
