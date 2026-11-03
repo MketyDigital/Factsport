@@ -1,0 +1,92 @@
+name: Factsport v2 Cloudflare staging (Hyperdrive + R2)
+
+# NEVER runs on main. The repo variable below must be explicitly enabled.
+# Workflow_dispatch on branch-only workflows is not reliable unless on default branch.
+on:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - '.github/workflows/v2-cloudflare-staging.yml'
+      - 'workers/hyperdrive-smoke.ts'
+      - 'wrangler.hyperdrive-smoke.jsonc'
+      - 'infra/cloudflare/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factsport-v2-cloudflare-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy-staging:
+    if: github.ref == 'refs/heads/refactor/factsport-v2' && vars.FACTSPORT_V2_STAGING_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      FACTSPORT_SMOKE_TOKEN: ${{ secrets.FACTSPORT_SMOKE_TOKEN }}
+      R2_BUCKET: factsport-v2-media-staging
+    steps:
+      - name: Validate required secrets without displaying values
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN FACTSPORT_SMOKE_TOKEN; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Required GitHub Actions secret $key is missing"
+              exit 1
+            fi
+          done
+      - name: Check out only v2 branch
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/factsport-v2
+          persist-credentials: false
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies (no install scripts)
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Ensure private R2 staging bucket exists
+        shell: bash
+        run: bash infra/cloudflare/ensure-r2-staging.sh
+      - name: Deploy isolated staging smoke Worker
+        id: deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config wrangler.hyperdrive-smoke.jsonc
+      - name: Install access token into staging Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$FACTSPORT_SMOKE_TOKEN" | npx --yes wrangler@4 secret put FACTSPORT_SMOKE_TOKEN --config wrangler.hyperdrive-smoke.jsonc
+      - name: Probe Hyperdrive and R2 privately
+        shell: bash
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DEPLOYMENT_URL" ]; then
+            echo "::error::No Worker deployment URL returned; check the deployment step"
+            exit 1
+          fi
+          BASE="${DEPLOYMENT_URL%/}"
+          for path in db-smoke r2-smoke; do
+            RESPONSE="$(curl --fail --silent --show-error --retry 4 --retry-delay 3 \
+              -H "Authorization: Bearer $FACTSPORT_SMOKE_TOKEN" \
+              "$BASE/__internal/$path")"
+            echo "$RESPONSE" | jq -e '.ok == true' >/dev/null
+            if [ "$path" = 'r2-smoke' ]; then
+              echo "$RESPONSE" | jq -e '.bound == true' >/dev/null
+            fi
+            echo "$path: OK"
+          done
+          echo "## Factsport v2 staging" >> "$GITHUB_STEP_SUMMARY"
+          echo "Read-only Hyperdrive connection and private R2 binding checks succeeded." >> "$GITHUB_STEP_SUMMARY"
+          echo "No schema migrations, social posts, production deploys or object writes occurred." >> "$GITHUB_STEP_SUMMARY"
