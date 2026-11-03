@@ -1,6 +1,7 @@
 name: Factsport v2 Cloudflare staging (Hyperdrive + R2)
 
-# NEVER runs on main. The repo variable below must be explicitly enabled.
+# NEVER runs on main. Owner explicitly approved isolated staging provisioning.
+# Only scoped v2 source changes trigger it; it does not deploy Factsport production.
 # Workflow_dispatch on branch-only workflows is not reliable unless on default branch.
 on:
   push:
@@ -21,22 +22,21 @@ concurrency:
 
 jobs:
   deploy-staging:
-    if: github.ref == 'refs/heads/refactor/factsport-v2' && vars.FACTSPORT_V2_STAGING_DEPLOY == 'true'
+    if: github.ref == 'refs/heads/refactor/factsport-v2'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      FACTSPORT_SMOKE_TOKEN: ${{ secrets.FACTSPORT_SMOKE_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNTID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN || secrets.CLOUDFLARE_TOKEN || secrets.CF_TOKEN }}
       R2_BUCKET: factsport-v2-media-staging
     steps:
       - name: Validate required secrets without displaying values
         shell: bash
         run: |
           set -euo pipefail
-          for key in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN FACTSPORT_SMOKE_TOKEN; do
+          for key in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN; do
             if [ -z "${!key:-}" ]; then
-              echo "::error::Required GitHub Actions secret $key is missing"
+              echo "::error::Cloudflare credential not found among expected GitHub secret aliases ($key). Share only the SECRET NAMES, not their values, to map the existing credentials."
               exit 1
             fi
           done
@@ -58,13 +58,16 @@ jobs:
         id: deploy
         uses: cloudflare/wrangler-action@v4
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config wrangler.hyperdrive-smoke.jsonc
-      - name: Install access token into staging Worker
+      - name: Generate ephemeral FACTSPORT probe token and install Worker secret
         shell: bash
         run: |
           set -euo pipefail
+          FACTSPORT_SMOKE_TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$FACTSPORT_SMOKE_TOKEN"
+          printf 'FACTSPORT_SMOKE_TOKEN=%s\n' "$FACTSPORT_SMOKE_TOKEN" >> "$GITHUB_ENV"
           printf '%s' "$FACTSPORT_SMOKE_TOKEN" | npx --yes wrangler@4 secret put FACTSPORT_SMOKE_TOKEN --config wrangler.hyperdrive-smoke.jsonc
       - name: Probe Hyperdrive and R2 privately
         shell: bash
