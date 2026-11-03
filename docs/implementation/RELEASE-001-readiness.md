@@ -1,0 +1,30 @@
+# Factsport v2 release gate — evidence and remaining scope
+
+As of 2026-11-03, work is isolated to **refactor/factsport-v2**.
+
+## Verified
+
+- Cloudflare GitHub Actions authentication using existing `CLOUDFLARE_ID` and `CLOUDFLARE_KEY` repository secrets.
+- Azure PostgreSQL 18 database `factsport_v2` has four core tables via verified migration [41669938819](https://github.com/MketyDigital/Factsport/actions/runs/41669938819).
+- Private R2 bucket `factsport-v2-media-staging`, bound as `FACTSPORT_MEDIA_BUCKET`.
+- Restricted `factsport_v2_reader` PostgreSQL role and `factsport-v2-runtime-postgres` Hyperdrive, ID `895cca4c06104b8ab9f7c1b72a8ba18f`. Runtime cannot INSERT into matches, and cannot read app_users. One-time proof: [41675097638](https://github.com/MketyDigital/Factsport/actions/runs/41675097638).
+- Runtime Hyperdrive SQL query cache disabled, origin connections limited to 5, TLS require. Smoke checks: [41675554921](https://github.com/MketyDigital/Factsport/actions/runs/41675554921).
+- Native Cloudflare vinext build, TypeScript and existing engine regression checks passed.
+- Protected full application deployed as `factsport-v2-staging` on workers.dev with a randomly generated Worker-only staging access token.
+- Unauthenticated staging root, match API and admin routes rejected. Authorized native `/api/v2/health` validated PostgreSQL and R2, and authorized `/api/matches` returned a JSON array through restricted Hyperdrive. Run: [41677323001](https://github.com/MketyDigital/Factsport/actions/runs/41677323001).
+- No production route or DNS changes. Existing ESPN, GitHub scheduled tasks, Supabase, Mkety integrations and the disabled Azure Logic App remain untouched.
+
+## Still required before live switch
+
+1. **Fixture ingestion and data parity:** PostgreSQL `matches` starts empty. Introduce separate least-privileged writer and idempotent football-data.org schedule ingestion, H2H/team media handling, ESPN matching and authoritative live-score updates. Verify a complete match round and preserve the ~3s ESPN live refresh.
+2. **Authentication and accounts:** Replace legacy Supabase auth with the planned Entra External ID Basic implementation. Migrate user/identity references safely, protect paid/private routes, test sessions, user roles and privacy.
+3. **Prize system / cron:** Add transactional predictions, points, settlements, retries and job_runs-based idempotency; verify end-to-end before enabling Azure Logic Apps Consumption and retiring legacy GitHub production syncs.
+4. **Media:** Migrate necessary Supabase/Azure/OCI assets to Factsport R2 keys with access policies, correct content types, durable media URLs, rollback and cost controls. The R2 binding is working but no bulk media migration has occurred.
+5. **Third-party services:** Port existing Mkety AI, email, Telegram, Facebook and other integration secrets into restricted Cloudflare Worker secrets only where needed. Do not dump existing GitHub service-role secrets into public staging.
+6. **Release validation:** Automated coverage for live scores, matches, site pages, auth, points, load/rate limits, billing/usage, fallbacks, rollback and production domain setup. No main-branch or DNS cutover until parity is accepted.
+
+The staging app is currently **not an end-user-ready production replacement**. It uses intentionally nonproduction Supabase placeholders to avoid exposing legacy service credentials, so historical pages and account flows do not have production feature parity.
+
+## Namespacing
+
+All new Cloudflare resources are prefixed `factsport-v2-`; all native bindings use `FACTSPORT_`. Original admin Hyperdrive `factsport-v2-postgres` is retained only for controlled migrations, while normal staging reads use `factsport-v2-runtime-postgres`.
