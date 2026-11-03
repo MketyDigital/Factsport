@@ -12,6 +12,7 @@ on:
       - 'workers/hyperdrive-smoke.ts'
       - 'wrangler.hyperdrive-smoke.jsonc'
       - 'infra/cloudflare/**'
+      - 'docs/implementation/CF-001-github-staging-r2.md'
 
 permissions:
   contents: read
