@@ -1,0 +1,118 @@
+name: Factsport v2 multi-league staging fixture import
+
+# On-demand one-time branch-scoped import. NOT a production cron.
+# Existing restricted Hyperdrive only; no database admin and no production jobs.
+on:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - '.github/workflows/v2-schedule-backfill.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factsport-v2-staging-fixture-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    if: github.ref == 'refs/heads/refactor/factsport-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KEY }}
+      FACTSPORT_WRITER_HD_ID: eb634fef8bb443839fd0847c6c370f85
+    steps:
+      - name: Validate Cloudflare settings and writer identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ] ||
+            { echo "::error::Cloudflare credentials missing"; exit 1; }
+          HTTP="$(curl -sS -o /tmp/factsport-writer-info.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/$FACTSPORT_WRITER_HD_ID")"
+          [ "$HTTP" = 200 ] &&
+            jq -e '.success == true and .result.name == "factsport-v2-schedule-postgres" and
+                   .result.origin.user == "factsport_v2_schedule_writer" and
+                   .result.origin.database == "factsport_v2"' \
+              /tmp/factsport-writer-info.json >/dev/null ||
+              { echo "::error::Unexpected writer Hyperdrive or insufficient permissions"; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/factsport-v2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run schedule normalizer regression tests
+        run: node --test tests/factsport-schedule.test.mjs
+      - name: Install Wrangler in disposable runner
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Rotate one-time staging access token
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i "s/FACTSPORT_WRITER_HYPERDRIVE_ID_TO_BE_GENERATED/$FACTSPORT_WRITER_HD_ID/" \
+            wrangler.factsport-schedule-sync.jsonc
+          TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$TOKEN"
+          echo "FACTSPORT_SYNC_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          printf '%s' "$TOKEN" | npx --yes wrangler@4 secret put FACTSPORT_SYNC_TOKEN \
+            --config wrangler.factsport-schedule-sync.jsonc
+      - name: Import scheduled fixtures across eligible competitions
+        shell: bash
+        run: |
+          set -euo pipefail
+          HTTP="$(curl -sS -o /tmp/factsport-subdomain.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
+          [ "$HTTP" = 200 ] || { echo "::error::No Cloudflare subdomain access"; exit 1; }
+          SUB="$(jq -r '.result.subdomain // empty' /tmp/factsport-subdomain.json)"
+          [ -n "$SUB" ] || { echo "::error::Workers subdomain missing"; exit 1; }
+          BASE="https://factsport-v2-schedule-sync.$SUB.workers.dev/__internal"
+          ready=false
+          for attempt in 1 2 3 4 5 6 7 8; do
+            CODE="$(curl -sS --max-time 30 -o /tmp/factsport-schedule-writer-status.json \
+              -w '%{http_code}' -H "Authorization: Bearer $FACTSPORT_SYNC_TOKEN" \
+              "$BASE/schedule-check")"
+            if [ "$CODE" = 200 ] &&
+               jq -e '.ok == true and .writerRoleVerified == true' \
+                /tmp/factsport-schedule-writer-status.json >/dev/null 2>&1; then ready=true; break; fi
+            sleep 3
+          done
+          [ "$ready" = true ] || { echo "::error::Restricted writer check failed"; exit 1; }
+          echo "## Factsport v2 staged fixture import" >> "$GITHUB_STEP_SUMMARY"
+          total=0
+          # Four additional first-division leagues, plus the Champions League.
+          # Intentionally separate requests and no ESPN/live updates.
+          for competition in PD BL1 SA FL1 CL; do
+            HTTP="$(curl -sS --max-time 120 -o /tmp/factsport-import-response.json \
+              -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer $FACTSPORT_SYNC_TOKEN" \
+              "$BASE/schedule-sync?competition=$competition")"
+            if [ "$HTTP" = 200 ] &&
+               jq -e '.ok == true and .competition == "'$competition'" and .skipLiveAndFinished == true' \
+                 /tmp/factsport-import-response.json >/dev/null 2>&1; then
+              ELIGIBLE="$(jq -r '.eligible' /tmp/factsport-import-response.json)"
+              APPLIED="$(jq -r '.applied' /tmp/factsport-import-response.json)"
+              echo "$competition: $ELIGIBLE eligible, $APPLIED inserted/updated" | tee -a "$GITHUB_STEP_SUMMARY"
+              total=$((total + APPLIED))
+            else
+              ERROR="$(jq -r '.error // "non-json"' /tmp/factsport-import-response.json 2>/dev/null || echo non-json)"
+              PROVIDER="$(jq -r '.providerHttpStatus // "none"' /tmp/factsport-import-response.json 2>/dev/null || echo none)"
+              STATE="$(jq -r '.sqlState // "none"' /tmp/factsport-import-response.json 2>/dev/null || echo none)"
+              echo "::warning::Fixtures for $competition were not imported: HTTP $HTTP, error $ERROR, provider $PROVIDER, SQLSTATE $STATE"
+              echo "$competition: unavailable (HTTP $HTTP, provider $PROVIDER)" >> "$GITHUB_STEP_SUMMARY"
+              if [ "$PROVIDER" = 429 ]; then
+                echo "::error::Football-data provider rate limit reached; stopping calls."
+                exit 1
+              fi
+            fi
+            sleep 7
+          done
+          echo "Total additional schedule rows inserted/updated: $total" >> "$GITHUB_STEP_SUMMARY"
+          echo "No live scores, ESPN updates, identity data, or prize records modified." >> "$GITHUB_STEP_SUMMARY"
