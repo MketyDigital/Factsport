@@ -24,6 +24,7 @@ export default defineConfig({
         name: "factsport-v2-media-staging",
       }),
       FACTSPORT_ENVIRONMENT: bindings.text("staging"),
+      FACTSPORT_MATCHES_BACKEND: bindings.text("postgres"),
     },
   }),
 });
