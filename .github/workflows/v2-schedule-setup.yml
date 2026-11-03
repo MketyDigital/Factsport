@@ -2,6 +2,7 @@ name: Factsport v2 staging schedule ingestion (one-time setup)
 
 # Never touches production, DNS, or existing ESPN/Supabase jobs.
 # One-time bootstrap: create restricted writer + independent Hyperdrive, import PL schedules.
+# Column-level PostgreSQL privileges validated by has_column_privilege in bootstrap.
 on:
   push:
     branches:
