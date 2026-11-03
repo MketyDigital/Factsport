@@ -1,7 +1,7 @@
-name: Factsport v2 vinext compatibility (build only)
+name: Factsport v2 native vinext build (no deployment)
 
-# Branch-only, non-deploying compatibility study of legacy Next.js 14.
-# Never points a route/domain to production Factsport.
+# Validates the actual committed Cloudflare configuration, not generated temp files.
+# Do not deploy or attach routes to factsport.com.
 on:
   push:
     branches:
@@ -9,20 +9,26 @@ on:
     paths:
       - '.github/workflows/v2-vinext-compat.yml'
       - 'package.json'
+      - 'cloudflare.config.ts'
+      - 'vite.config.ts'
+      - 'tsconfig.json'
       - 'app/**'
       - 'lib/**'
+      - 'types/**'
       - 'next.config.*'
-      - 'tsconfig.json'
-      - 'vite.config.*'
 
 permissions:
   contents: read
 
 jobs:
-  check-vinext:
+  build:
     if: github.ref == 'refs/heads/refactor/factsport-v2'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # Build-time placeholders only. They are not deployed to users.
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder_for_build_only
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,40 +37,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install current Factsport dependencies
+      - name: Install committed dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
-      - name: Install vinext and Vite locally in disposable checkout
-        run: npm install --no-save --ignore-scripts --no-audit --no-fund vinext@latest vite@latest
-      - name: Initialize vinext Cloudflare staging in disposable checkout
-        id: init
-        shell: bash
+      - name: Existing engine regression tests
+        run: npm run test:engine
+      - name: TypeScript check
+        run: npm run typecheck
+      - name: Cloudflare vinext build
+        run: npm run build:vinext
+      - name: Summarize
+        if: success()
         run: |
-          set -o pipefail
-          npx --no-install vinext init --platform=cloudflare --cdn-cache=none --data-cache=none --image-optimization=none --no-prerender --ignore-wrangler-config --name factsport-v2-staging
-      - name: Inspect initialization diff (no credentials)
-        if: always()
-        run: |
-          echo "## Factsport vinext compatibility" >> "$GITHUB_STEP_SUMMARY"
-          echo "Only a disposable GitHub runner checkout was modified. No Cloudflare app was deployed." >> "$GITHUB_STEP_SUMMARY"
-          git status --short >> "$GITHUB_STEP_SUMMARY"
-          git diff --stat >> "$GITHUB_STEP_SUMMARY"
-      - name: Save safe vinext-generated configuration for integration
-        if: steps.init.outcome == 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: factsport-v2-vinext-generated-config
-          retention-days: 3
-          if-no-files-found: warn
-          path: |
-            cloudflare.config.ts
-            vite.config.ts
-            package.json
-            tsconfig.json
-      - name: Test vinext build without deployment
-        if: steps.init.outcome == 'success'
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder_for_build_only
-          DATABASE_URL: ""
-        shell: bash
-        run: npx --no-install vite build
+          echo "## Factsport v2 vinext" >> "$GITHUB_STEP_SUMMARY"
+          echo "Native Cloudflare build passed using committed cloudflare.config.ts and vite.config.ts." >> "$GITHUB_STEP_SUMMARY"
+          echo "Build only: no Workers deployed, no production route changes." >> "$GITHUB_STEP_SUMMARY"
