@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "factsport-v2-schedule-sync",
+  "main": "workers/factsport-schedule-sync.mjs",
+  "compatibility_date": "2026-11-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "hyperdrive": [
+    { "binding": "FACTSPORT_HYPERDRIVE", "id": "FACTSPORT_WRITER_HYPERDRIVE_ID_TO_BE_GENERATED" }
+  ]
+}
