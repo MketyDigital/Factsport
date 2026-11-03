@@ -41,18 +41,36 @@ jobs:
               exit 1
             fi
           done
-      - name: Verify Cloudflare token without printing it
+      - name: Verify user or account Cloudflare token (no secrets logged)
         shell: bash
         run: |
           set -euo pipefail
-          STATUS="$(curl --silent --show-error -o /tmp/factsport-cf-token-check.json -w '%{http_code}' \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            https://api.cloudflare.com/client/v4/user/tokens/verify)"
-          if [ "$STATUS" != "200" ] || ! jq -e '.success == true and .result.status == "active"' /tmp/factsport-cf-token-check.json >/dev/null; then
-            echo "::error::Cloudflare Bearer-token verification failed (HTTP $STATUS). CLOUDFLARE_KEY may be a Global API Key or an R2/S3 key rather than an account API token; the workflow cannot deploy Workers with it as a Bearer token."
+          # Cloudflare supports distinct user-token and account-token verification URLs.
+          # Only emit sanitized HTTP status and Cloudflare numeric error codes.
+          verified=false
+          for kind in user account; do
+            if [ "$kind" = "user" ]; then
+              URL="https://api.cloudflare.com/client/v4/user/tokens/verify"
+            else
+              URL="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/tokens/verify"
+            fi
+            FILE="$(mktemp)"
+            STATUS="$(curl --silent --show-error --max-time 20 -o "$FILE" -w '%{http_code}' \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$URL")"
+            if [ "$STATUS" = "200" ] && jq -e '.success == true and .result.status == "active"' "$FILE" >/dev/null 2>&1; then
+              echo "Cloudflare $kind API token verified active."
+              verified=true
+              rm -f "$FILE"
+              break
+            fi
+            CODES="$(jq -r 'if (.errors | type) == "array" then [.errors[].code | select(type == "number")] | join(",") else "" end' "$FILE" 2>/dev/null || true)"
+            echo "Cloudflare $kind token verification: HTTP $STATUS; error codes: ${CODES:-none}"
+            rm -f "$FILE"
+          done
+          if [ "$verified" != "true" ]; then
+            echo "::error::Neither Cloudflare user-token nor account-token verification passed. Check token active status, type, account association and Cloudflare numeric error codes above."
             exit 1
           fi
-          echo "Cloudflare API token validated; resource-level permissions will be checked by subsequent steps."
       - name: Check out only v2 branch
         uses: actions/checkout@v4
         with:
