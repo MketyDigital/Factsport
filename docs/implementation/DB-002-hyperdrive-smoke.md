@@ -7,8 +7,8 @@ The user created Cloudflare Hyperdrive configuration `factsport-v2-postgres` (ID
 `wrangler.hyperdrive-smoke.jsonc` creates a **separate staging-only Worker** called `factsport-v2-db-smoke`; it does **not** deploy the Next.js app, replace the production Worker or move the live 3-second ESPN pathway. Cloudflare Hyperdrive credentials are resolved from the binding at runtime.
 
 1. In a local terminal with a Cloudflare account authenticated to Wrangler, run `npm install`.
-2. Configure a long random token using `npx wrangler secret put FACTSPORT_SMOKE_TOKEN --config wrangler.hyperdrive-smoke.jsonc`. Never commit or paste its value into logs/chat.
-3. Deploy **only** the separate staging Worker: `npx wrangler deploy --config wrangler.hyperdrive-smoke.jsonc`. This creates/updates a Cloudflare Worker and can incur usage charges; inspect Cloudflare account settings before running.
+2. Deploy **only** the separate staging Worker: `npx wrangler deploy --config wrangler.hyperdrive-smoke.jsonc`. This creates/updates a Cloudflare Worker and can incur usage charges; inspect Cloudflare account settings before running. The endpoint returns 404 while no token is configured.
+3. Configure a long random token using `npx wrangler secret put FACTSPORT_SMOKE_TOKEN --config wrangler.hyperdrive-smoke.jsonc`. Never commit or paste its value into logs/chat.
 4. Request `GET /__internal/db-smoke` on the returned staging workers.dev URL with `Authorization: Bearer <token>`. A successful response is `{ "ok": true, "database": "factsport_v2", "matchesTableReady": false }` until migration 0001 is applied; afterward `matchesTableReady` should be true. Unauthorized requests return 404. Requesting `/` also returns 404.
 5. If you get 503, verify Azure server Ready, Hyperdrive host/database/role, firewall allowlist and TLS. Do not share credentials or full driver errors.
 
