@@ -37,7 +37,7 @@ The Worker only exposes `/__internal/db-smoke` and `/__internal/r2-smoke`, both 
 
 The 15 existing Azure firewall ranges are shared Cloudflare IP ranges, not proof of exclusive Factsport access. TLS and a dedicated least-privilege Postgres role remain necessary before production traffic.
 
-`wrangler.v2-app.target.jsonc` is a **target staging configuration for the eventual vinext migration**, not a runnable Next14 build today. The existing site is still the legacy Next.js 14 / Supabase / Pages stack. Preserve ESPN live polling and current data provider precedence.
+The **actual vinext application** now has committed `cloudflare.config.ts` and `vite.config.ts` with a separate Worker name `factsport-v2-staging`. The modern Cloudflare `cf/config` setup was built successfully in a disposable runner (run `41670696225`), then committed to the refactor branch. Staging **application deployment** is still held pending runtime auth/service parity and secret mapping; only the read-only database probe Worker is deployed. The deployed production site remains the legacy Next.js/Supabase stack. The refactor branch now also contains vinext/React 19/Vite dependencies. Preserve ESPN live polling and provider precedence during cutover.
 
 The GitHub Actions `DATABASE_URL` secret is not used by this workflow: all Azure database traffic passes through the existing Hyperdrive connection and is performed by the Worker. This avoids opening the Azure firewall to GitHub-hosted runners.
 
@@ -50,3 +50,14 @@ Stop future deploys by disabling the v2 Cloudflare staging GitHub workflow or re
 ## Existing Mkety secret boundary
 
 `MKETY_DATABASE_URL` must **not** be assumed to be the new Azure `factsport_v2` URL: the existing Mkety database may be shared or have an unrelated role/database. This staging pipeline intentionally does not use it, and does not apply SQL migrations. `MKETY_CF_R2_ENDPOINT` and `MKETY_CF_R2_ACCESS` are not used to deploy Workers. No credential value should be added to repository files.
+
+## Cloudflare native application migration status
+
+The first native vinext build succeeded in Actions run `41670696225`. The generated safe files were inspected and adapted, and these files were committed to `refactor/factsport-v2`:
+
+- `cloudflare.config.ts` — Worker `factsport-v2-staging`, with `FACTSPORT_HYPERDRIVE` and `FACTSPORT_MEDIA_BUCKET` bindings; no production route
+- `vite.config.ts` — Cloudflare Vite plugin and vinext App Router SSR/RSC targets
+- `package.json` — vinext/Cloudflare Vite toolchain and isolated `build:vinext` script
+- `.github/workflows/v2-vinext-compat.yml` — actual committed-config build/test with no deployment
+
+The old placeholder `wrangler.v2-app.target.jsonc` was removed. This does **not** mean consumer auth, paid features, Supabase data migrations, Logic Apps, sports ingestion or the existing ESPN 3-second scoring path have been moved; do not promote the Worker or switch DNS yet. The Hyperdrive connection still uses the bootstrap Azure administrator and must be restricted before serving production application traffic.
