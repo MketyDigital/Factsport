@@ -36,6 +36,12 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const searchParams = request.nextUrl.search;
 
+  // Health is a staging-only, read-only dependency probe. The mandatory
+  // access-token gate above has already run, so skip legacy Supabase auth.
+  if (env.FACTSPORT_ENVIRONMENT === 'staging' && pathname === '/api/v2/health') {
+    return NextResponse.next();
+  }
+
   // -----------------------------------------------------------------
   // 🛡️ PART 0: MALICIOUS PAYLOAD & THREAT FILTER
   // -----------------------------------------------------------------
