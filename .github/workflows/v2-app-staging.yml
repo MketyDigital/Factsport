@@ -100,16 +100,26 @@ jobs:
             exit 1
           fi
           echo "Factsport native vinext app: authorized Hyperdrive and R2 dependency check passed"
-          MATCH_STATUS="$(curl --silent --show-error --max-time 25 --retry-all-errors --retry 6 --retry-delay 3 \
-            -o /tmp/factsport-staging-matches -w '%{http_code}' \
-            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
-            "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=2026-11-01T00%3A00%3A00Z")"
-          if [ "$MATCH_STATUS" != "200" ] || ! jq -e 'type == "array"' /tmp/factsport-staging-matches >/dev/null 2>&1; then
+          matches_ok=false
+          for attempt in 1 2 3 4 5 6 7 8; do
+            MATCH_STATUS="$(curl --silent --show-error --max-time 25 \
+              -o /tmp/factsport-staging-matches -w '%{http_code}' \
+              -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+              "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=2026-11-01")"
+            if [ "$MATCH_STATUS" = "200" ] && jq -e 'type == "array"' /tmp/factsport-staging-matches >/dev/null 2>&1; then
+              matches_ok=true
+              break
+            fi
             CODE="$(jq -r '.error // "non-json"' /tmp/factsport-staging-matches 2>/dev/null || echo non-json)"
             DETAILS="$(jq -r 'if type == "object" then "sqlState=" + (.sqlState // "none") + " class=" + (.errorClass // "none") else "" end' /tmp/factsport-staging-matches 2>/dev/null || true)"
-            echo "::error::Authorized Factsport matches API failed: HTTP $MATCH_STATUS; code $CODE; $DETAILS"
+            GATE="$(grep -qFx 'Not found' /tmp/factsport-staging-matches && echo gate-or-404 || echo other)"
+            echo "Factsport match probe attempt $attempt: HTTP $MATCH_STATUS; code $CODE; bodyClass=$GATE $DETAILS"
+            sleep 3
+          done
+          [ "$matches_ok" = true ] || {
+            echo "::error::Authorized Factsport matches API did not return a JSON array. See sanitized diagnostics."
             exit 1
-          fi
+          }
           echo "Factsport native vinext app: protected PostgreSQL matches API returned a valid JSON array"
 
           echo "## Factsport v2 application staging" >> "$GITHUB_STEP_SUMMARY"
