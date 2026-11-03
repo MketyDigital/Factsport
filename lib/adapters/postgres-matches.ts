@@ -7,8 +7,6 @@ import 'server-only';
 import postgres from 'postgres';
 import { env } from 'cloudflare:workers';
 
-const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
-
 let client: ReturnType<typeof postgres> | undefined;
 
 function db() {
@@ -49,7 +47,7 @@ export async function listPostgresMatches(input: {
     return sql`
       SELECT * FROM public.matches
       WHERE league = ${input.league}
-        AND status = ANY(${FINISHED_STATUSES}::text[])
+        AND status IN ('FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD')
         AND match_date < ${cursor}
       ORDER BY match_date DESC, id DESC LIMIT 15
     `;
@@ -57,7 +55,7 @@ export async function listPostgresMatches(input: {
   return sql`
     SELECT * FROM public.matches
     WHERE league = ${input.league}
-      AND status <> ALL(${FINISHED_STATUSES}::text[])
+      AND status NOT IN ('FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD')
       AND match_date > ${cursor}
     ORDER BY match_date ASC, id ASC LIMIT 15
   `;
