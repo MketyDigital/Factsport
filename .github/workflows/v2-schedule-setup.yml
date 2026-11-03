@@ -1,0 +1,207 @@
+name: Factsport v2 staging schedule ingestion (one-time setup)
+
+# Never touches production, DNS, or existing ESPN/Supabase jobs.
+# One-time bootstrap: create restricted writer + independent Hyperdrive, import PL schedules.
+on:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - '.github/workflows/v2-schedule-setup.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factsport-v2-schedule-setup
+  cancel-in-progress: false
+
+jobs:
+  stage-schedules:
+    if: github.ref == 'refs/heads/refactor/factsport-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KEY }}
+      FACTSPORT_ADMIN_DB_URL: ${{ secrets.DATABASE_URL }}
+      FACTSPORT_FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
+      HD_ADMIN_ID: 08cee41a81be4c3980450be9563af5e2
+      HD_WRITER_NAME: factsport-v2-schedule-postgres
+    steps:
+      - name: Verify existing secrets and exact Factsport Azure database
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN FACTSPORT_ADMIN_DB_URL FACTSPORT_FOOTBALL_DATA_KEY; do
+            [ -n "${!key:-}" ] || { echo "::error::Required existing GitHub credential not available: $key"; exit 1; }
+          done
+          node <<'NODE'
+          let url;
+          try { url = new URL(process.env.FACTSPORT_ADMIN_DB_URL); } catch { process.exit(1); }
+          if (!['postgres:', 'postgresql:'].includes(url.protocol) ||
+              url.hostname !== 'mketypostgres.postgres.database.azure.com' ||
+              url.pathname !== '/factsport_v2' || url.username !== 'mketydbadmin' || !url.password) {
+            console.error('::error::Refusing non-Factsport or non-admin Azure DATABASE_URL');
+            process.exit(1);
+          }
+          console.log('Factsport-specific Azure database identity verified (URL withheld).');
+          NODE
+          STATUS="$(curl -sS -o /tmp/factsport-admin-hd.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/$HD_ADMIN_ID")"
+          [ "$STATUS" = "200" ] &&
+            jq -e '.success == true and .result.name == "factsport-v2-postgres" and
+                   .result.origin.database == "factsport_v2" and .result.origin.user == "mketydbadmin"' \
+               /tmp/factsport-admin-hd.json >/dev/null ||
+            { echo "::error::Incorrect administrator Hyperdrive or insufficient permission"; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/factsport-v2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run safe football-data schedule normalization tests
+        run: node --test tests/factsport-schedule.test.mjs
+      - name: Install Worker dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Require no existing schedule writer Hyperdrive
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl -sS -o /tmp/factsport-hd-list.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs")"
+          [ "$STATUS" = "200" ] || { echo "::error::Unable to list Hyperdrive configs (HTTP $STATUS)"; exit 1; }
+          if jq -e '.result[]? | select(.name == "factsport-v2-schedule-postgres")' /tmp/factsport-hd-list.json >/dev/null; then
+            echo "::error::Schedule writer Hyperdrive already exists. Refusing credential reset or duplicate."
+            exit 1
+          fi
+      - name: Deploy temporary Factsport writer bootstrap Worker
+        id: bootstrap
+        run: npx --yes wrangler@4 deploy --config wrangler.factsport-writer-bootstrap.jsonc
+      - name: Provision writer role and independent Factsport Hyperdrive
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          FACTSPORT_WRITER_PASSWORD="$(openssl rand -hex 32)"
+          FACTSPORT_BOOTSTRAP_TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$FACTSPORT_WRITER_PASSWORD"
+          echo "::add-mask::$FACTSPORT_BOOTSTRAP_TOKEN"
+          printf '%s' "$FACTSPORT_WRITER_PASSWORD" |
+            npx --yes wrangler@4 secret put FACTSPORT_WRITER_PASSWORD --config wrangler.factsport-writer-bootstrap.jsonc
+          printf '%s' "$FACTSPORT_BOOTSTRAP_TOKEN" |
+            npx --yes wrangler@4 secret put FACTSPORT_BOOTSTRAP_TOKEN --config wrangler.factsport-writer-bootstrap.jsonc
+          DOMAIN_HTTP="$(curl -sS -o /tmp/factsport-domain.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
+          [ "$DOMAIN_HTTP" = 200 ] || { echo "::error::Workers subdomain lookup failed"; exit 1; }
+          DOMAIN="$(jq -r '.result.subdomain // empty' /tmp/factsport-domain.json)"
+          [ -n "$DOMAIN" ] || { echo "::error::Workers subdomain not configured"; exit 1; }
+          URL="https://factsport-v2-schedule-writer-bootstrap.$DOMAIN.workers.dev/__internal/create-factsport-schedule-writer"
+          verified=false
+          for attempt in 1 2 3 4 5 6 7 8; do
+            HTTP="$(curl -sS --max-time 45 -o /tmp/factsport-writer-result.json -w '%{http_code}' \
+              -X POST -H "Authorization: Bearer $FACTSPORT_BOOTSTRAP_TOKEN" "$URL")"
+            if [ "$HTTP" = 200 ] &&
+              jq -e '.ok == true and .canWriteFixtures and (.canDelete | not) and (.canChangeScores | not)' \
+                /tmp/factsport-writer-result.json >/dev/null 2>&1; then verified=true; break; fi
+            STATE="$(jq -r '.sqlState // "none"' /tmp/factsport-writer-result.json 2>/dev/null || echo none)"
+            echo "Factsport schedule writer bootstrap: HTTP $HTTP, SQLSTATE $STATE, attempt $attempt"
+            sleep 3
+          done
+          [ "$verified" = true ] || { echo "::error::No verified writer role. No new Hyperdrive created."; exit 1; }
+          echo "Factsport schedule-only restricted role created."
+          jq -n --arg name "$HD_WRITER_NAME" --arg password "$FACTSPORT_WRITER_PASSWORD" '{
+            name: $name,
+            origin: {
+              scheme: "postgresql",
+              host: "mketypostgres.postgres.database.azure.com",
+              port: 5432, database: "factsport_v2",
+              user: "factsport_v2_schedule_writer", password: $password
+            },
+            mtls: {sslmode: "require"},
+            caching: {disabled: true},
+            origin_connection_limit: 5
+          }' > /tmp/factsport-writer-hd-create.json
+          HTTP="$(curl -sS --max-time 50 -o /tmp/factsport-writer-hd-created.json -w '%{http_code}' \
+            -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/factsport-writer-hd-create.json \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs")"
+          rm -f /tmp/factsport-writer-hd-create.json
+          if [ "$HTTP" != 200 ] && [ "$HTTP" != 201 ]; then
+            CODES="$(jq -r '[.errors[]?.code] | join(",")' /tmp/factsport-writer-hd-created.json 2>/dev/null || true)"
+            echo "::error::Schedule Hyperdrive creation failed HTTP $HTTP, codes $CODES"
+            exit 1
+          fi
+          jq -e '.success == true and .result.name == "factsport-v2-schedule-postgres" and
+                 .result.origin.user == "factsport_v2_schedule_writer"' \
+             /tmp/factsport-writer-hd-created.json >/dev/null ||
+             { echo "::error::Wrong writer Hyperdrive identity returned"; exit 1; }
+          ID="$(jq -r '.result.id // empty' /tmp/factsport-writer-hd-created.json)"
+          [[ "$ID" =~ ^[a-f0-9]{32}$ ]] || { echo "::error::Invalid Hyperdrive ID"; exit 1; }
+          echo "FACTSPORT_WRITER_HD_ID=$ID" >> "$GITHUB_ENV"
+          echo "FACTSPORT_WORKERS_DOMAIN=$DOMAIN" >> "$GITHUB_ENV"
+          echo "Created isolated Factsport schedule Hyperdrive: $ID"
+      - name: Deploy separate schedule-only Factsport Worker
+        id: sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i "s/FACTSPORT_WRITER_HYPERDRIVE_ID_TO_BE_GENERATED/$FACTSPORT_WRITER_HD_ID/g" \
+            wrangler.factsport-schedule-sync.jsonc
+          npx --yes wrangler@4 deploy --config wrangler.factsport-schedule-sync.jsonc
+          FACTSPORT_SYNC_TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$FACTSPORT_SYNC_TOKEN"
+          echo "FACTSPORT_SYNC_TOKEN=$FACTSPORT_SYNC_TOKEN" >> "$GITHUB_ENV"
+          printf '%s' "$FACTSPORT_SYNC_TOKEN" |
+            npx --yes wrangler@4 secret put FACTSPORT_SYNC_TOKEN --config wrangler.factsport-schedule-sync.jsonc
+          printf '%s' "$FACTSPORT_FOOTBALL_DATA_KEY" |
+            npx --yes wrangler@4 secret put FACTSPORT_FOOTBALL_DATA_KEY --config wrangler.factsport-schedule-sync.jsonc
+      - name: Import Premier League scheduled fixtures once, without live updates
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://factsport-v2-schedule-sync.$FACTSPORT_WORKERS_DOMAIN.workers.dev/__internal"
+          ready=false
+          for i in 1 2 3 4 5 6 7 8; do
+            STATUS="$(curl -sS --max-time 30 -o /tmp/factsport-schedule-check.json -w '%{http_code}' \
+              -H "Authorization: Bearer $FACTSPORT_SYNC_TOKEN" "$BASE/schedule-check")"
+            if [ "$STATUS" = 200 ] && jq -e '.ok == true and .writerRoleVerified == true' /tmp/factsport-schedule-check.json >/dev/null 2>&1; then
+              ready=true; break
+            fi
+            echo "Schedule writer connection check $i: HTTP $STATUS"
+            sleep 3
+          done
+          [ "$ready" = true ] || { echo "::error::Writer role check failed; refusing ingestion"; exit 1; }
+          STATUS="$(curl -sS --max-time 120 -o /tmp/factsport-schedule-import.json -w '%{http_code}' \
+            -X POST -H "Authorization: Bearer $FACTSPORT_SYNC_TOKEN" \
+            "$BASE/schedule-sync?competition=PL")"
+          if [ "$STATUS" != 200 ] ||
+             ! jq -e '.ok == true and .competition == "PL" and .skipLiveAndFinished == true' \
+               /tmp/factsport-schedule-import.json >/dev/null 2>&1; then
+            CODE="$(jq -r '.error // "non-json"' /tmp/factsport-schedule-import.json 2>/dev/null || echo non-json)"
+            STATE="$(jq -r '.sqlState // "none"' /tmp/factsport-schedule-import.json 2>/dev/null || echo none)"
+            PROVIDER="$(jq -r '.providerHttpStatus // "none"' /tmp/factsport-schedule-import.json 2>/dev/null || echo none)"
+            echo "::error::Factsport scheduled-fixture import failed HTTP $STATUS, error $CODE, SQLSTATE $STATE, provider HTTP $PROVIDER"
+            exit 1
+          fi
+          echo "## Factsport v2 schedule-only import" >> "$GITHUB_STEP_SUMMARY"
+          echo "Provider: football-data.org; league: Premier League; staging database only." >> "$GITHUB_STEP_SUMMARY"
+          jq -r '"Fixtures received: \(.fetched); eligible schedule rows: \(.eligible); inserted/updated: \(.applied)"' \
+            /tmp/factsport-schedule-import.json | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "ESPN live, finished scores, prizes, Supabase and production jobs untouched." >> "$GITHUB_STEP_SUMMARY"
+      - name: Delete temporary administrator-backed writer bootstrap Worker
+        if: always() && steps.bootstrap.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl -sS -o /tmp/factsport-bootstrap-delete.json -w '%{http_code}' \
+            -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/factsport-v2-schedule-writer-bootstrap")"
+          [ "$STATUS" = 200 ] && jq -e '.success == true' /tmp/factsport-bootstrap-delete.json >/dev/null ||
+            { echo "::error::Delete only temporary factsport-v2-schedule-writer-bootstrap Worker in Cloudflare"; exit 1; }
+          echo "Temporary administrator-backed Factsport schedule bootstrap Worker removed."
