@@ -5,6 +5,7 @@
  */
 import 'server-only';
 import postgres from 'postgres';
+import { env } from 'cloudflare:workers';
 
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
@@ -12,10 +13,23 @@ let client: ReturnType<typeof postgres> | undefined;
 
 function db() {
   if (!client) {
-    const url = process.env.DATABASE_URL;
-    if (!url) throw new Error('DATABASE_URL is not configured');
-    // Azure Flexible Server requires TLS. Do not log URLs or errors containing credentials.
-    client = postgres(url, { ssl: 'require', max: 3, idle_timeout: 20, connect_timeout: 10 });
+    // vinext/Workers resolves credentials from the secure, server-only Hyperdrive
+    // binding. Do not copy or expose its connection string.
+    const cloudflareUrl = env?.FACTSPORT_HYPERDRIVE?.connectionString;
+    const directUrl = process.env.DATABASE_URL;
+    if (cloudflareUrl) {
+      client = postgres(cloudflareUrl, {
+        max: 3, fetch_types: false, prepare: true,
+        idle_timeout: 10, connect_timeout: 10,
+      });
+    } else if (directUrl) {
+      // Azure direct TLS fallback for approved non-Worker verification only.
+      client = postgres(directUrl, {
+        ssl: 'require', max: 3, idle_timeout: 20, connect_timeout: 10,
+      });
+    } else {
+      throw new Error('Factsport PostgreSQL connection is not configured');
+    }
   }
   return client;
 }
