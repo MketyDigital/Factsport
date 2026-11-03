@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "factsport-v2-db-smoke",
+  "main": "workers/hyperdrive-smoke.ts",
+  "compatibility_date": "2026-11-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "08cee41a81be4c3980450be9563af5e2"
+    }
+  ]
+}
