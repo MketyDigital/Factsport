@@ -18,7 +18,7 @@ export default defineConfig({
     env: {
       ASSETS: bindings.assets(),
       FACTSPORT_HYPERDRIVE: bindings.hyperdrive({
-        id: "08cee41a81be4c3980450be9563af5e2",
+        id: "895cca4c06104b8ab9f7c1b72a8ba18f",
       }),
       FACTSPORT_MEDIA_BUCKET: bindings.r2({
         name: "factsport-v2-media-staging",
