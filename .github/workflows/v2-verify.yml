@@ -1,0 +1,41 @@
+name: Factsport v2 isolated verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - 'app/api/matches/**'
+      - 'lib/adapters/postgres-matches.ts'
+      - 'db/migrations/**'
+      - 'scripts/check-postgres.cjs'
+      - 'package.json'
+      - '.github/workflows/v2-verify.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verification:
+    if: github.ref == 'refs/heads/refactor/factsport-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package.json
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Run existing engine regression suite
+        run: npm run test:engine
+      - name: TypeScript static check
+        run: npm run typecheck
+      - name: PostgreSQL migration syntax inventory
+        run: |
+          test -s db/migrations/0001_factsport_core.sql
+          grep -q "CREATE TABLE IF NOT EXISTS public.matches" db/migrations/0001_factsport_core.sql
+          echo "Schema file present; live migration NOT executed"
