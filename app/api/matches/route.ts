@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { env } from 'cloudflare:workers';
 import { createClient } from '@supabase/supabase-js';
 import { listPostgresMatches } from '@/lib/adapters/postgres-matches';
 
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
     }
 
     // Staging-only read cutover; never switch automatically based on DATABASE_URL presence.
-    if (process.env.FACTSPORT_MATCHES_BACKEND === 'postgres') {
+    if ((env.FACTSPORT_MATCHES_BACKEND ?? process.env.FACTSPORT_MATCHES_BACKEND) === 'postgres') {
         if (type !== 'results' && type !== 'fixtures') {
             return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
         }
