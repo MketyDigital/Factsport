@@ -138,7 +138,8 @@ jobs:
             fi
             TYPE="$(file --brief --mime-type /tmp/factsport-bootstrap-response)"
             CODE="$(jq -r 'if type == "object" then (.error // "unknown") else "non-json" end' /tmp/factsport-bootstrap-response 2>/dev/null || echo non-json)"
-            echo "Factsport schema attempt $attempt: HTTP $STATUS; MIME $TYPE; code $CODE"
+            DETAILS="$(jq -r 'if type == "object" then "sqlState=" + (.sqlState // "none") + " statement=" + ((.statementNumber // -99) | tostring) + " class=" + (.errorClass // "none") else "" end' /tmp/factsport-bootstrap-response 2>/dev/null || true)"
+            echo "Factsport schema attempt $attempt: HTTP $STATUS; MIME $TYPE; code $CODE $DETAILS"
             sleep 3
           done
           if [ "$success" != "true" ]; then
