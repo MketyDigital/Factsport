@@ -30,7 +30,19 @@ export async function GET(request: Request) {
         try {
             const matches = await listPostgresMatches({ league, cursor, type });
             return NextResponse.json(matches, { headers: { 'Cache-Control': 'public, s-maxage=60' } });
-        } catch {
+        } catch (error: unknown) {
+            // Only the separate token-protected staging Worker receives
+            // sanitized error diagnostics; do not expose SQL or connection info.
+            if (env.FACTSPORT_ENVIRONMENT === 'staging') {
+                const raw = (error && typeof error === 'object' && 'code' in error)
+                    ? String((error as { code?: unknown }).code || '') : '';
+                const sqlState = /^[A-Z0-9]{5}$/.test(raw) ? raw : 'none';
+                const errorClass = error instanceof Error ? error.name : 'Unknown';
+                return NextResponse.json({
+                    error: 'Match data temporarily unavailable',
+                    sqlState, errorClass,
+                }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+            }
             return NextResponse.json({ error: 'Match data temporarily unavailable' }, { status: 503 });
         }
     }
