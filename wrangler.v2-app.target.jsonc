@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "factsport-v2-staging",
+  "main": "vinext/server/fetch-handler",
+  "compatibility_date": "2026-11-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "assets": { "not_found_handling": "none" },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "08cee41a81be4c3980450be9563af5e2"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA_BUCKET",
+      "bucket_name": "factsport-v2-media-staging"
+    }
+  ]
+}
