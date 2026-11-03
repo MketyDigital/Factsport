@@ -26,8 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNTID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN || secrets.CLOUDFLARE_TOKEN || secrets.CF_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.MKETY_CF_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.MKETY_CF_R2_TOKEN }}
       R2_BUCKET: factsport-v2-media-staging
     steps:
       - name: Validate required secrets without displaying values
@@ -36,10 +36,22 @@ jobs:
           set -euo pipefail
           for key in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN; do
             if [ -z "${!key:-}" ]; then
-              echo "::error::Cloudflare credential not found among expected GitHub secret aliases ($key). Share only the SECRET NAMES, not their values, to map the existing credentials."
+              echo "::error::Required existing GitHub secret is missing or empty: $key (mapped from MKETY_CF_ID / MKETY_CF_R2_TOKEN)"
               exit 1
             fi
           done
+      - name: Verify Cloudflare token without printing it
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl --silent --show-error -o /tmp/factsport-cf-token-check.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            https://api.cloudflare.com/client/v4/user/tokens/verify)"
+          if [ "$STATUS" != "200" ] || ! jq -e '.success == true and .result.status == "active"' /tmp/factsport-cf-token-check.json >/dev/null; then
+            echo "::error::MKETY_CF_R2_TOKEN is not an active Cloudflare API token usable by Wrangler. An R2 S3 secret cannot be used as a Cloudflare management token."
+            exit 1
+          fi
+          echo "Cloudflare API token validated; resource-level permissions will be checked by subsequent steps."
       - name: Check out only v2 branch
         uses: actions/checkout@v4
         with:
