@@ -49,7 +49,7 @@ jobs:
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             https://api.cloudflare.com/client/v4/user/tokens/verify)"
           if [ "$STATUS" != "200" ] || ! jq -e '.success == true and .result.status == "active"' /tmp/factsport-cf-token-check.json >/dev/null; then
-            echo "::error::CLOUDFLARE_KEY is not an active Cloudflare API token usable by Wrangler. An R2 S3 secret cannot be used as a Cloudflare management token."
+            echo "::error::Cloudflare Bearer-token verification failed (HTTP $STATUS). CLOUDFLARE_KEY may be a Global API Key or an R2/S3 key rather than an account API token; the workflow cannot deploy Workers with it as a Bearer token."
             exit 1
           fi
           echo "Cloudflare API token validated; resource-level permissions will be checked by subsequent steps."
