@@ -115,7 +115,7 @@ jobs:
           fi
           BASE="${DEPLOYMENT_URL%/}"
           for path in db-smoke r2-smoke; do
-            RESPONSE="$(curl --fail --silent --show-error --retry 4 --retry-delay 3 \
+            RESPONSE="$(curl --fail --silent --show-error --retry-all-errors --retry 8 --retry-delay 3 \
               -H "Authorization: Bearer $FACTSPORT_SMOKE_TOKEN" \
               "$BASE/__internal/$path")"
             echo "$RESPONSE" | jq -e '.ok == true' >/dev/null
