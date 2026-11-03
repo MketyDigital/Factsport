@@ -100,7 +100,18 @@ jobs:
             exit 1
           fi
           echo "Factsport native vinext app: authorized Hyperdrive and R2 dependency check passed"
+          MATCH_STATUS="$(curl --silent --show-error --max-time 25 --retry-all-errors --retry 6 --retry-delay 3 \
+            -o /tmp/factsport-staging-matches -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+            "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=2026-11-01T00%3A00%3A00Z")"
+          if [ "$MATCH_STATUS" != "200" ] || ! jq -e 'type == "array"' /tmp/factsport-staging-matches >/dev/null 2>&1; then
+            CODE="$(jq -r '.error // "non-json"' /tmp/factsport-staging-matches 2>/dev/null || echo non-json)"
+            echo "::error::Authorized Factsport matches API failed: HTTP $MATCH_STATUS; code $CODE"
+            exit 1
+          fi
+          echo "Factsport native vinext app: protected PostgreSQL matches API returned a valid JSON array"
+
           echo "## Factsport v2 application staging" >> "$GITHUB_STEP_SUMMARY"
           echo "Deployed separate protected Worker: $BASE" >> "$GITHUB_STEP_SUMMARY"
-          echo "Unauthenticated /, /api/matches and /admin blocked; authorized /api/v2/health passed Hyperdrive + R2." >> "$GITHUB_STEP_SUMMARY"
+          echo "Unauthenticated /, /api/matches and /admin blocked; authorized /api/v2/health and /api/matches passed native Hyperdrive + R2 integration." >> "$GITHUB_STEP_SUMMARY"
           echo "No production routes or domains changed. No production Supabase service role deployed." >> "$GITHUB_STEP_SUMMARY"
