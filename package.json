@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "pages:build": "npx @cloudflare/next-on-pages",
-    "test:engine": "node --test tests/*.test.cjs"
+    "test:engine": "node --test tests/*.test.cjs",
+    "db:check": "node scripts/check-postgres.cjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
@@ -27,7 +29,9 @@
     "browser-image-compression": "^2.0.2",
     "tailwind-merge": "^2.5.2",
     "@stream-io/video-react-sdk": "1.15.0",
-    "hls.js": "^1.5.8"
+    "hls.js": "^1.5.8",
+    "postgres": "^3.4.7",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.16",
