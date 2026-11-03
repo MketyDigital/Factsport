@@ -9,13 +9,13 @@
   "assets": { "not_found_handling": "none" },
   "hyperdrive": [
     {
-      "binding": "HYPERDRIVE",
+      "binding": "FACTSPORT_HYPERDRIVE",
       "id": "08cee41a81be4c3980450be9563af5e2"
     }
   ],
   "r2_buckets": [
     {
-      "binding": "MEDIA_BUCKET",
+      "binding": "FACTSPORT_MEDIA_BUCKET",
       "bucket_name": "factsport-v2-media-staging"
     }
   ]
