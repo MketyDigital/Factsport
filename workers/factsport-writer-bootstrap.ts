@@ -73,8 +73,8 @@ export default {
         await tx`REVOKE ALL ON TABLE public.external_identities FROM factsport_v2_schedule_writer`;
         await tx`REVOKE ALL ON TABLE public.job_runs FROM factsport_v2_schedule_writer`;
         const [priv] = await tx`
-          SELECT has_table_privilege('factsport_v2_schedule_writer',
-                    'public.matches','INSERT') AS can_insert,
+          SELECT has_column_privilege('factsport_v2_schedule_writer',
+                    'public.matches','api_id','INSERT') AS can_insert,
                  has_table_privilege('factsport_v2_schedule_writer',
                     'public.matches','DELETE') AS can_delete,
                  has_column_privilege('factsport_v2_schedule_writer',
