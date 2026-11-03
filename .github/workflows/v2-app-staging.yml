@@ -106,7 +106,7 @@ jobs:
               -o /tmp/factsport-staging-matches -w '%{http_code}' \
               -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
               "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=2026-11-01")"
-            if [ "$MATCH_STATUS" = "200" ] && jq -e 'type == "array"' /tmp/factsport-staging-matches >/dev/null 2>&1; then
+            if [ "$MATCH_STATUS" = "200" ] && jq -e 'type == "array" and length > 0' /tmp/factsport-staging-matches >/dev/null 2>&1; then
               matches_ok=true
               break
             fi
@@ -120,7 +120,7 @@ jobs:
             echo "::error::Authorized Factsport matches API did not return a JSON array. See sanitized diagnostics."
             exit 1
           }
-          echo "Factsport native vinext app: protected PostgreSQL matches API returned a valid JSON array"
+          echo "Factsport native vinext app: protected PostgreSQL matches API returned populated fixtures"
 
           echo "## Factsport v2 application staging" >> "$GITHUB_STEP_SUMMARY"
           echo "Deployed separate protected Worker: $BASE" >> "$GITHUB_STEP_SUMMARY"
