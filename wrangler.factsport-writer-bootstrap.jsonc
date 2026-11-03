@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "factsport-v2-schedule-writer-bootstrap",
+  "main": "workers/factsport-writer-bootstrap.ts",
+  "compatibility_date": "2026-11-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "hyperdrive": [
+    { "binding": "FACTSPORT_HYPERDRIVE", "id": "08cee41a81be4c3980450be9563af5e2" }
+  ]
+}
