@@ -1,13 +1,14 @@
 /**
  * Dedicated, read-only, authenticated staging connectivity check.
  * Does not replace the Factsport Next.js/vinext application entrypoint.
- * Set FACTSPORT_SMOKE_TOKEN using Wrangler secret; do not store it in git.
+ * FACTSPORT_SMOKE_TOKEN is generated per GitHub Actions deployment and securely
+ * uploaded to Wrangler; no extra GitHub secret is required.
  */
 import postgres from 'postgres';
 
 interface Env {
-  HYPERDRIVE: { connectionString: string };
-  MEDIA_BUCKET: { head(key: string): Promise<unknown | null> };
+  FACTSPORT_HYPERDRIVE: { connectionString: string };
+  FACTSPORT_MEDIA_BUCKET: { head(key: string): Promise<unknown | null> };
   FACTSPORT_SMOKE_TOKEN?: string;
 }
 
@@ -38,7 +39,7 @@ export default {
     }
     if (url.pathname === '/__internal/r2-smoke') {
       try {
-        const found = await env.MEDIA_BUCKET.head('__factsport_v2_probe_absent__');
+        const found = await env.FACTSPORT_MEDIA_BUCKET.head('__factsport_v2_probe_absent__');
         return Response.json({ ok: true, bound: true, probeObjectExists: !!found },
           { headers: { 'Cache-Control': 'no-store' } });
       } catch {
@@ -46,7 +47,7 @@ export default {
           { status: 503, headers: { 'Cache-Control': 'no-store' } });
       }
     }
-    const sql = postgres(env.HYPERDRIVE.connectionString, {
+    const sql = postgres(env.FACTSPORT_HYPERDRIVE.connectionString, {
       max: 1,
       fetch_types: false,
       prepare: true,
