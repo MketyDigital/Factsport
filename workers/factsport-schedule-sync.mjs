@@ -29,7 +29,43 @@ function database(env) {
   });
 }
 
-export default {
+const worker = {
+  /**
+   * Cloudflare Cron: staging-only fixture refresh, twice daily, UTC.
+   * No ESPN/live score updates; provider requests spaced to respect free-tier limits.
+   */
+  async scheduled(controller, env) {
+    if (controller.cron !== '15 3,15 * * *') {
+      throw new Error('Unexpected Factsport staging schedule');
+    }
+    if (!env.FACTSPORT_SYNC_TOKEN || !env.FACTSPORT_FOOTBALL_DATA_KEY) {
+      throw new Error('Factsport schedule Worker secrets missing');
+    }
+    const competitions = ['PL', 'PD', 'BL1', 'SA', 'FL1', 'CL'];
+    for (let i = 0; i < competitions.length; i++) {
+      const code = competitions[i];
+      const request = new Request(
+        'https://factsport.internal/__internal/schedule-sync?competition=' + code,
+        { method: 'POST', headers: { Authorization: 'Bearer ' + env.FACTSPORT_SYNC_TOKEN } },
+      );
+      const result = await worker.fetch(request, env);
+      if (!result.ok) {
+        let reason = 'unknown';
+        try {
+          const payload = await result.json();
+          reason = typeof payload.error === 'string' ? payload.error : reason;
+        } catch { /* do not log body */ }
+        console.error('Factsport staging schedule refresh failed', code, result.status, reason);
+        throw new Error('Factsport schedule refresh aborted for ' + code);
+      }
+      const summary = await result.json();
+      console.log('Factsport staged scheduled fixtures refreshed',
+        code, Number(summary.eligible) || 0, Number(summary.applied) || 0);
+      if (i < competitions.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 7000));
+      }
+    }
+  },
   async fetch(request, env) {
     const route = new URL(request.url);
     if (!['/__internal/schedule-sync', '/__internal/schedule-check'].includes(route.pathname) ||
@@ -132,3 +168,4 @@ export default {
     } finally { await sql.end(); }
   },
 };
+export default worker;
