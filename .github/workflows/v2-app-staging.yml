@@ -106,7 +106,8 @@ jobs:
             "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=2026-11-01T00%3A00%3A00Z")"
           if [ "$MATCH_STATUS" != "200" ] || ! jq -e 'type == "array"' /tmp/factsport-staging-matches >/dev/null 2>&1; then
             CODE="$(jq -r '.error // "non-json"' /tmp/factsport-staging-matches 2>/dev/null || echo non-json)"
-            echo "::error::Authorized Factsport matches API failed: HTTP $MATCH_STATUS; code $CODE"
+            DETAILS="$(jq -r 'if type == "object" then "sqlState=" + (.sqlState // "none") + " class=" + (.errorClass // "none") else "" end' /tmp/factsport-staging-matches 2>/dev/null || true)"
+            echo "::error::Authorized Factsport matches API failed: HTTP $MATCH_STATUS; code $CODE; $DETAILS"
             exit 1
           fi
           echo "Factsport native vinext app: protected PostgreSQL matches API returned a valid JSON array"
