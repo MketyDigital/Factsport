@@ -90,7 +90,17 @@ jobs:
             }
             echo "Factsport staging $path: unauthorized access blocked"
           done
+          HEALTH_STATUS="$(curl --silent --show-error --max-time 30 --retry-all-errors --retry 6 --retry-delay 3 \
+            -o /tmp/factsport-staging-authorized-health -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+            "$BASE/api/v2/health")"
+          if [ "$HEALTH_STATUS" != "200" ] || ! jq -e '.ok == true and .databaseReady == true and .mediaBucketReady == true' /tmp/factsport-staging-authorized-health >/dev/null 2>&1; then
+            CODE="$(jq -r '.error // "non-json"' /tmp/factsport-staging-authorized-health 2>/dev/null || echo non-json)"
+            echo "::error::Authorized staging health check failed: HTTP $HEALTH_STATUS; code $CODE"
+            exit 1
+          fi
+          echo "Factsport native vinext app: authorized Hyperdrive and R2 dependency check passed"
           echo "## Factsport v2 application staging" >> "$GITHUB_STEP_SUMMARY"
           echo "Deployed separate protected Worker: $BASE" >> "$GITHUB_STEP_SUMMARY"
-          echo "Unauthenticated /, /api/matches and /admin each blocked with HTTP 404." >> "$GITHUB_STEP_SUMMARY"
+          echo "Unauthenticated /, /api/matches and /admin blocked; authorized /api/v2/health passed Hyperdrive + R2." >> "$GITHUB_STEP_SUMMARY"
           echo "No production routes or domains changed. No production Supabase service role deployed." >> "$GITHUB_STEP_SUMMARY"
