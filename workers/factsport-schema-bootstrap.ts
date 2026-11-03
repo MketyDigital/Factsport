@@ -38,13 +38,17 @@ export default {
     const sql = postgres(env.FACTSPORT_HYPERDRIVE.connectionString, {
       max: 1, fetch_types: false, prepare: true, connect_timeout: 10, idle_timeout: 5,
     });
+    let statementNumber = 0;
     try {
       const result = await sql.begin(async (tx) => {
+        statementNumber = -1;
         const [database] = await tx`SELECT current_database() AS name`;
         if (database.name !== 'factsport_v2') throw new Error('Wrong database');
+        statementNumber = 0;
         await tx`SELECT pg_advisory_xact_lock(720061, 2)`;
-        for (const statement of factsportMigrationStatements) {
-          await tx.unsafe(statement);
+        for (let i = 0; i < factsportMigrationStatements.length; i++) {
+          statementNumber = i + 1;
+          await tx.unsafe(factsportMigrationStatements[i]);
         }
         const [count] = await tx`
           SELECT count(*)::integer AS present
@@ -56,8 +60,19 @@ export default {
       });
       return Response.json({ ok: result === 4, tablesPresent: result },
         { status: result === 4 ? 200 : 503, headers: { 'Cache-Control': 'no-store' } });
-    } catch {
-      return Response.json({ ok: false, error: 'factsport_schema_bootstrap_failed' },
+    } catch (error: unknown) {
+      const pgCode = (error && typeof error === 'object' && 'code' in error)
+        ? String((error as { code?: unknown }).code || '') : '';
+      const sqlState = /^[A-Z0-9]{5}$/.test(pgCode) ? pgCode : 'none';
+      const errorClass = error instanceof Error
+        ? (error.name === 'PostgresError' ? 'PostgresError' : 'OtherError') : 'Unknown';
+      return Response.json({
+        ok: false,
+        error: 'factsport_schema_bootstrap_failed',
+        sqlState,
+        statementNumber,
+        errorClass,
+      },
         { status: 503, headers: { 'Cache-Control': 'no-store' } });
     } finally {
       await sql.end();
