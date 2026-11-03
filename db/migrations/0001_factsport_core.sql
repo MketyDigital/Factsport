@@ -1,7 +1,7 @@
 -- Factsport v2 clean-start operational schema. Run only against factsport_v2.
 -- No old Supabase rows are imported; no DROP statements.
 BEGIN;
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- PostgreSQL 18 provides gen_random_uuid() natively; no pgcrypto extension required.
 CREATE TABLE IF NOT EXISTS public.matches (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   api_id text UNIQUE,
