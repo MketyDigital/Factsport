@@ -12,6 +12,7 @@ As of 2026-11-03, work is isolated to **refactor/factsport-v2**.
 - Native Cloudflare vinext build, TypeScript and existing engine regression checks passed.
 - Protected full application deployed as `factsport-v2-staging` on workers.dev with a randomly generated Worker-only staging access token.
 - Unauthenticated staging root, match API and admin routes rejected. Authorized native `/api/v2/health` validated PostgreSQL and R2, and authorized `/api/matches` returned a JSON array through restricted Hyperdrive. Run: [41677323001](https://github.com/MketyDigital/Factsport/actions/runs/41677323001).
+- Cloudflare schedule-only staging Cron activated and verified at 03:15 and 15:15 UTC daily: [41696849300](https://github.com/MketyDigital/Factsport/actions/runs/41696849300). It invokes only the restricted writer and never changes scores or prize columns.
 - Football-data.org staging schedule sync and restricted writer verified: [setup 41695514082](https://github.com/MketyDigital/Factsport/actions/runs/41695514082), [five extra leagues 41696052184](https://github.com/MketyDigital/Factsport/actions/runs/41696052184), [nonempty native app matches 41695925330](https://github.com/MketyDigital/Factsport/actions/runs/41695925330). All imports avoid live/finished scores.
 - No production route or DNS changes. Existing ESPN, GitHub scheduled tasks, Supabase, Mkety integrations and the disabled Azure Logic App remain untouched.
 
