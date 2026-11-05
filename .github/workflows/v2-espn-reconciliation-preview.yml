@@ -77,7 +77,7 @@ jobs:
               /tmp/factsport-espn-preview.json >/dev/null 2>&1; then ready=true; break; fi
             echo "Read-only ESPN preview attempt $attempt: HTTP $HTTP"
             if [ -s /tmp/factsport-espn-preview.json ]; then
-              jq '{ok, error, providerErrors, fixtureRowsScanned, scoreboardGroupsChecked}' /tmp/factsport-espn-preview.json 2>/dev/null || true
+              jq '{ok, error, stage, errorName, sqlState, providerErrors, fixtureRowsScanned, scoreboardGroupsChecked}' /tmp/factsport-espn-preview.json 2>/dev/null || true
             fi
             sleep 4
           done
