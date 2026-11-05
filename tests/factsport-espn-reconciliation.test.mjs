@@ -10,13 +10,14 @@ const raw = {
       { homeAway: 'home', team: { displayName: 'Arsenal FC' }, score: '2' },
       { homeAway: 'away', team: { displayName: 'Chelsea' }, score: '1' },
     ],
-    status: { type: { state: 'in' }, displayClock: '67:12' },
   }],
+  status: { type: { state: 'in' }, displayClock: '67:12' },
 };
 const fixture = {
   id: 'fixture-1', league: 'Premier League',
   home_team: 'Arsenal', away_team: 'Chelsea FC',
   match_date: '2026-11-07T15:00:00Z', espn_id: null,
+  source: 'football-data', status: 'SCHEDULED', points_distributed: false,
 };
 
 test('normalizes ESPN scoreboard event without inventing score values', () => {
@@ -54,12 +55,15 @@ test('finds a unique exact team and kickoff candidate without mutating either ob
   assert.equal(fixture.espn_id, null);
 });
 
-test('does not auto-link ambiguous, pre-linked, wrong-league or distant fixtures', () => {
+test('does not auto-link ambiguous, pre-linked, wrong-league, distant or unsafe fixtures', () => {
   const event = normalizeEspnScoreboardEvent(raw, 'Premier League');
   assert.equal(findUniqueEspnFixtureCandidate(event, [fixture, { ...fixture, id: 'fixture-2' }]).outcome, 'ambiguous');
   assert.equal(findUniqueEspnFixtureCandidate(event, [{ ...fixture, espn_id: 'already-linked' }]).outcome, 'no_match');
   assert.equal(findUniqueEspnFixtureCandidate(event, [{ ...fixture, league: 'La Liga' }]).outcome, 'no_match');
-  assert.equal(findUniqueEspnFixtureCandidate(event, [{ ...fixture, match_date: '2026-11-08T03:00:01Z' }]).outcome, 'no_match');
+  assert.equal(findUniqueEspnFixtureCandidate(event, [{ ...fixture, match_date: '2026-11-07T18:00:01Z' }]).outcome, 'no_match');
+  assert.equal(findUniqueEspnFixtureCandidate(event, [{ ...fixture, points_distributed: true }]).outcome, 'no_match');
+  assert.equal(findUniqueEspnFixtureCandidate(event, [{ ...fixture, status: 'FT' }]).outcome, 'no_match');
+  assert.equal(findUniqueEspnFixtureCandidate(event, [{ ...fixture, source: 'manual' }]).outcome, 'no_match');
 });
 
 test('never links a reversed home/away pairing', () => {
