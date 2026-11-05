@@ -16,10 +16,11 @@
 1. The ESPN event ID, date and home/away competitors are valid.
 2. League and home/away order match.
 3. Team names match after conservative Unicode/punctuation normalization and removal of standalone FC/CF tokens.
-4. Kickoff differs by no more than six hours.
-5. Exactly one unlinked fixture qualifies.
+4. Kickoff differs by no more than three hours.
+5. The fixture is a football-data-owned, unsettled schedule row in an allowed pre-match/schedule status.
+6. Exactly one unlinked fixture qualifies.
 
-Zero candidates return `no_match`; multiple candidates return `ambiguous`. The helper never mutates records or writes an ESPN ID. Scores remain nullable rather than defaulting missing provider values to zero. Unit tests cover ambiguity, reversed teams, wrong league, stale kickoff and malformed payloads.
+Zero candidates return `no_match`; multiple candidates return `ambiguous`. The helper never mutates records or writes an ESPN ID. It reads scoreboard status from the ESPN event-level `status` object, and rejects non-football-data rows, already-linked rows, settled rows, and disallowed statuses. Scores remain nullable rather than defaulting missing provider values to zero. Unit tests cover ambiguity, reversed teams, wrong league, stale kickoff and malformed payloads.
 
 ## Why this is not yet live-score parity
 
