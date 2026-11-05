@@ -1,0 +1,165 @@
+name: Factsport v2 staging ESPN writer provisioning
+
+# Provision a dedicated, least-privilege database role and Hyperdrive only.
+# This does NOT deploy a score ingestion worker, schedule, or production change.
+on:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - '.github/workflows/v2-espn-writer-setup.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factsport-v2-espn-writer-setup
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    if: github.ref == 'refs/heads/refactor/factsport-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ID }}
+      CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_KEY }}
+      FACTSPORT_ADMIN_DB_URL: \${{ secrets.DATABASE_URL }}
+      HD_ADMIN_ID: 08cee41a81be4c3980450be9563af5e2
+      HD_ESPN_NAME: factsport-v2-espn-postgres
+    steps:
+      - name: Verify exact Factsport administrator database and Hyperdrive
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN FACTSPORT_ADMIN_DB_URL; do
+            [ -n "\${!key:-}" ] || { echo "::error::Required existing credential unavailable: $key"; exit 1; }
+          done
+          node <<'NODE'
+          let url;
+          try { url = new URL(process.env.FACTSPORT_ADMIN_DB_URL); } catch { process.exit(1); }
+          if (!['postgres:', 'postgresql:'].includes(url.protocol) ||
+              url.hostname !== 'mketypostgres.postgres.database.azure.com' ||
+              url.pathname !== '/factsport_v2' || url.username !== 'mketydbadmin' || !url.password) {
+            console.error('::error::Refusing non-Factsport administrator database');
+            process.exit(1);
+          }
+          console.log('Factsport administrator database identity verified; URL withheld.');
+          NODE
+          STATUS="$(curl -sS -o /tmp/factsport-admin-hd.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/$HD_ADMIN_ID")"
+          [ "$STATUS" = 200 ] &&
+            jq -e '.success == true and .result.name == "factsport-v2-postgres" and
+                   .result.origin.database == "factsport_v2" and .result.origin.user == "mketydbadmin"' \
+              /tmp/factsport-admin-hd.json >/dev/null ||
+            { echo "::error::Unexpected Factsport administrator Hyperdrive"; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/factsport-v2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate bootstrap Worker syntax and dependencies
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          npx tsc --noEmit
+      - name: Refuse existing ESPN role Hyperdrive name
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl -sS -o /tmp/factsport-hd-list.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs")"
+          [ "$STATUS" = 200 ] || exit 1
+          if jq -e '.result[]? | select(.name == "factsport-v2-espn-postgres")' /tmp/factsport-hd-list.json >/dev/null; then
+            echo "::error::ESPN Hyperdrive already exists; refusing credential reset or duplicate."
+            exit 1
+          fi
+      - name: Deploy temporary administrator-backed bootstrap Worker
+        id: bootstrap
+        run: npx --yes wrangler@4 deploy --config wrangler.factsport-espn-writer-bootstrap.jsonc
+      - name: Create and verify ESPN-only PostgreSQL role and Hyperdrive
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          FACTSPORT_ESPN_PASSWORD="$(openssl rand -hex 32)"
+          FACTSPORT_BOOTSTRAP_TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$FACTSPORT_ESPN_PASSWORD"
+          echo "::add-mask::$FACTSPORT_BOOTSTRAP_TOKEN"
+          printf '%s' "$FACTSPORT_ESPN_PASSWORD" |
+            npx --yes wrangler@4 secret put FACTSPORT_ESPN_PASSWORD --config wrangler.factsport-espn-writer-bootstrap.jsonc
+          printf '%s' "$FACTSPORT_BOOTSTRAP_TOKEN" |
+            npx --yes wrangler@4 secret put FACTSPORT_BOOTSTRAP_TOKEN --config wrangler.factsport-espn-writer-bootstrap.jsonc
+          DOMAIN_HTTP="$(curl -sS -o /tmp/factsport-domain.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
+          [ "$DOMAIN_HTTP" = 200 ] || exit 1
+          DOMAIN="$(jq -r '.result.subdomain // empty' /tmp/factsport-domain.json)"
+          [ -n "$DOMAIN" ] || exit 1
+          URL="https://factsport-v2-espn-writer-bootstrap.$DOMAIN.workers.dev/__internal/create-factsport-espn-writer"
+          verified=false
+          for attempt in 1 2 3 4 5 6 7 8; do
+            HTTP="$(curl -sS --max-time 45 -o /tmp/factsport-espn-role.json -w '%{http_code}' \
+              -X POST -H "Authorization: Bearer $FACTSPORT_BOOTSTRAP_TOKEN" "$URL")"
+            if [ "$HTTP" = 200 ] &&
+              jq -e '.ok == true and .canReadMatches == true and
+                .canUpdateEspnLiveFields == true and .canUpdateSettlement == false and
+                .canUpdateScheduleIdentity == false and .canInsert == false and
+                .canDelete == false and .canReadPrivateTables == false' \
+                /tmp/factsport-espn-role.json >/dev/null 2>&1; then
+              verified=true; break
+            fi
+            STATE="$(jq -r '.sqlState // "none"' /tmp/factsport-espn-role.json 2>/dev/null || echo none)"
+            echo "ESPN role permission verification: HTTP $HTTP, SQLSTATE $STATE, attempt $attempt"
+            sleep 3
+          done
+          [ "$verified" = true ] || { echo "::error::ESPN role not verified; refusing Hyperdrive"; exit 1; }
+          jq -n --arg name "$HD_ESPN_NAME" --arg password "$FACTSPORT_ESPN_PASSWORD" '{
+            name: $name,
+            origin: {
+              scheme: "postgresql",
+              host: "mketypostgres.postgres.database.azure.com",
+              port: 5432, database: "factsport_v2",
+              user: "factsport_v2_espn_writer", password: $password
+            },
+            mtls: {sslmode: "require"},
+            caching: {disabled: true},
+            origin_connection_limit: 5
+          }' > /tmp/factsport-espn-hd-create.json
+          HTTP="$(curl -sS --max-time 50 -o /tmp/factsport-espn-hd-created.json -w '%{http_code}' \
+            -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/factsport-espn-hd-create.json \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs")"
+          rm -f /tmp/factsport-espn-hd-create.json
+          if [ "$HTTP" != 200 ] && [ "$HTTP" != 201 ]; then
+            CODES="$(jq -r '[.errors[]?.code] | join(",")' /tmp/factsport-espn-hd-created.json 2>/dev/null || true)"
+            echo "::error::ESPN Hyperdrive creation failed HTTP $HTTP, codes $CODES"
+            exit 1
+          fi
+          jq -e '.success == true and .result.name == "factsport-v2-espn-postgres" and
+                 .result.origin.user == "factsport_v2_espn_writer"' \
+            /tmp/factsport-espn-hd-created.json >/dev/null || exit 1
+          ID="$(jq -r '.result.id // empty' /tmp/factsport-espn-hd-created.json)"
+          [[ "$ID" =~ ^[a-f0-9]{32}$ ]] || exit 1
+          echo "Created verified Factsport ESPN Hyperdrive: $ID"
+          echo "FACTSPORT_ESPN_HYPERDRIVE_ID=$ID" >> "$GITHUB_ENV"
+          echo "## Factsport v2 ESPN database writer" >> "$GITHUB_STEP_SUMMARY"
+          echo "Dedicated role factsport_v2_espn_writer and Hyperdrive factsport-v2-espn-postgres created." >> "$GITHUB_STEP_SUMMARY"
+          echo "May update only ESPN ID, live scores/status, events/stats and operational timestamps/version." >> "$GITHUB_STEP_SUMMARY"
+          echo "Cannot change teams/kickoff, settlement flags, insert/delete rows, or read account/job tables." >> "$GITHUB_STEP_SUMMARY"
+          echo "No score ingestion Worker, Cron, production route or DNS change was deployed." >> "$GITHUB_STEP_SUMMARY"
+      - name: Delete temporary administrator-backed bootstrap Worker
+        if: always() && steps.bootstrap.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl -sS -o /tmp/factsport-espn-bootstrap-delete.json -w '%{http_code}' \
+            -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/factsport-v2-espn-writer-bootstrap")"
+          [ "$STATUS" = 200 ] && jq -e '.success == true' /tmp/factsport-espn-bootstrap-delete.json >/dev/null ||
+            { echo "::error::Delete only temporary Factsport ESPN bootstrap Worker"; exit 1; }
+          echo "Temporary administrator-backed Factsport ESPN bootstrap Worker removed."
