@@ -61,11 +61,13 @@ export default {
     const sql = postgres(env.FACTSPORT_HYPERDRIVE.connectionString, {
       max: 1, fetch_types: false, prepare: true, connect_timeout: 10, idle_timeout: 5,
     });
+    let stage = 'database_identity';
     try {
       const [identity] = await sql`SELECT current_database() AS database, current_user AS role`;
       if (identity.database !== 'factsport_v2' || identity.role !== 'factsport_v2_espn_writer') {
         return Response.json({ ok: false, error: 'unexpected_database_identity' }, { status: 503 });
       }
+      stage = 'fixture_query';
       const fixtures = await sql`
         SELECT id::text, league, home_team, away_team, match_date,
           espn_id, source, status, points_distributed
@@ -89,6 +91,7 @@ export default {
         fixtureGroups.get(key).fixtures.push(fixture);
       }
       const groups = [...fixtureGroups.values()];
+      stage = 'espn_scoreboards';
       const providerResults = await mapLimit(groups, 3, async group => {
         const code = COMPETITIONS[group.league];
         const api = new URL(`https://site.api.espn.com/apis/site/v2/sports/soccer/${code}/scoreboard`);
@@ -107,6 +110,7 @@ export default {
           return { group, error: 'espn_fetch_failed', events: [] };
         }
       });
+      stage = 'candidate_matching';
       const proposals = [];
       let normalizedEvents = 0, noMatch = 0, ambiguous = 0;
       const providerErrors = [];
@@ -143,6 +147,7 @@ export default {
       }
       const unique = proposals.filter(p => fixtureCounts.get(p.fixture_id) === 1 && eventCounts.get(p.espn_id) === 1);
       ambiguous += proposals.length - unique.length;
+      stage = 'response';
       return Response.json({
         ok: providerErrors.length === 0,
         dryRun: true,
@@ -161,7 +166,9 @@ export default {
       }, { status: providerErrors.length ? 503 : 200, headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
       const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
-      return Response.json({ ok: false, error: 'reconciliation_preview_failed',
+      const errorName = error && typeof error === 'object' && 'name' in error ? String(error.name) : 'unknown';
+      return Response.json({ ok: false, error: 'reconciliation_preview_failed', stage,
+        errorName: /^[A-Za-z0-9_]{1,40}$/.test(errorName) ? errorName : 'unknown',
         sqlState: /^[A-Z0-9]{5}$/.test(code) ? code : 'none' },
         { status: 503, headers: { 'Cache-Control': 'no-store' } });
     } finally { await sql.end(); }
