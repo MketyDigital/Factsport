@@ -44,6 +44,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Check reconciliation Worker syntax
+        run: node --check workers/factsport-espn-reconciliation-preview.mjs
       - name: Install Worker dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Deploy temporary protected reconciliation preview
