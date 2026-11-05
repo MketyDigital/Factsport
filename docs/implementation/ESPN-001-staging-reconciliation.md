@@ -38,3 +38,10 @@ Before activating that worker:
 ## Explicit non-actions
 
 No production Supabase writes, production ESPN endpoint or GitHub schedule changes, production DNS, main-branch commits, prize settlement changes, or Azure Logic App activation. This document does not authorize any of them.
+
+
+## Staging preview evidence — 2026-11-05
+
+The protected, ephemeral, read-only preview workflow [run 42050234345](https://github.com/MketyDigital/Factsport/actions/runs/42050234345) completed successfully against the dedicated ESPN Hyperdrive. For the prior one day through the next three days it scanned **43** eligible schedule fixtures and normalized **57** ESPN scoreboard events. It returned **18 unique candidate links**, **0 ambiguous candidates**, and **39 no-match events**. The candidate list is in the GitHub Actions run summary.
+
+This was strictly a dry run: `writesPerformed=0`; no ESPN IDs or scores were saved. The temporary preview Worker was removed after the run. The 18 candidates still require review/approval before a separate linking operation.
