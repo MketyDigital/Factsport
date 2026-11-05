@@ -29,6 +29,20 @@ function dayKey(value) {
   return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10).replaceAll('-', '') : null;
 }
 
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const index = next++;
+      if (index >= items.length) return;
+      out[index] = await fn(items[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -74,33 +88,32 @@ export default {
       }
       const proposals = [], providerErrors = [];
       let normalizedEvents = 0, inSyncCount = 0, unsupportedCount = 0;
-      for (const group of groups.values()) {
+      const providerResults = await mapLimit([...groups.values()], 3, async group => {
         const code = COMPETITIONS[group.league];
         const api = new URL(`https://site.api.espn.com/apis/site/v2/sports/soccer/${code}/scoreboard`);
         api.searchParams.set('dates', group.day);
         api.searchParams.set('limit', '1000');
-        let events;
         try {
           const response = await fetch(api.toString(), {
             headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
             signal: AbortSignal.timeout(15000),
           });
-          if (!response.ok) {
-            providerErrors.push({ league: group.league, date: group.day, error: 'espn_http_' + response.status });
-            continue;
-          }
+          if (!response.ok) return { group, error: 'espn_http_' + response.status, events: [] };
           const body = await response.json();
-          if (!Array.isArray(body.events)) {
-            providerErrors.push({ league: group.league, date: group.day, error: 'invalid_scoreboard_payload' });
-            continue;
-          }
-          events = body.events;
+          if (!Array.isArray(body.events)) return { group, error: 'invalid_scoreboard_payload', events: [] };
+          return { group, events: body.events };
         } catch {
-          providerErrors.push({ league: group.league, date: group.day, error: 'espn_fetch_failed' });
+          return { group, error: 'espn_fetch_failed', events: [] };
+        }
+      });
+      for (const result of providerResults) {
+        const group = result.group;
+        if (result.error) {
+          providerErrors.push({ league: group.league, date: group.day, error: result.error });
           continue;
         }
         const byId = new Map();
-        for (const raw of events) {
+        for (const raw of result.events) {
           const event = normalizeEspnScoreboardEvent(raw, group.league);
           if (event) { normalizedEvents++; byId.set(event.espn_id, event); }
         }
