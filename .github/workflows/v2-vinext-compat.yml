@@ -15,6 +15,7 @@ on:
       - 'app/**'
       - 'lib/**'
       - 'types/**'
+      - 'tests/**'
       - 'next.config.*'
       - 'postcss.config.*'
 
@@ -43,7 +44,9 @@ jobs:
       - name: Existing engine regression tests
         run: npm run test:engine
       - name: Isolated ingestion regression tests
-        run: node --test tests/factsport-schedule.test.mjs tests/factsport-espn-reconciliation.test.mjs
+        run: node --test tests/factsport-schedule.test.mjs tests/factsport-espn-reconciliation.test.mjs tests/factsport-espn-score-preview.test.mjs
+      - name: Validate read-only score preview Worker syntax
+        run: node --check workers/factsport-espn-score-preview.mjs
       - name: TypeScript check
         run: npm run typecheck
       - name: Cloudflare vinext build
