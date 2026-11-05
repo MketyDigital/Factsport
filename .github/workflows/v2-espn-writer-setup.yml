@@ -22,9 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ID }}
-      CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_KEY }}
-      FACTSPORT_ADMIN_DB_URL: \${{ secrets.DATABASE_URL }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KEY }}
+      FACTSPORT_ADMIN_DB_URL: ${{ secrets.DATABASE_URL }}
       HD_ADMIN_ID: 08cee41a81be4c3980450be9563af5e2
       HD_ESPN_NAME: factsport-v2-espn-postgres
     steps:
@@ -33,7 +33,7 @@ jobs:
         run: |
           set -euo pipefail
           for key in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN FACTSPORT_ADMIN_DB_URL; do
-            [ -n "\${!key:-}" ] || { echo "::error::Required existing credential unavailable: $key"; exit 1; }
+            [ -n "${!key:-}" ] || { echo "::error::Required existing credential unavailable: $key"; exit 1; }
           done
           node <<'NODE'
           let url;
