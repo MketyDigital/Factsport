@@ -159,8 +159,10 @@ export default {
         candidates: unique.slice(0, 100),
         candidatesTruncated: unique.length > 100,
       }, { status: providerErrors.length ? 503 : 200, headers: { 'Cache-Control': 'no-store' } });
-    } catch {
-      return Response.json({ ok: false, error: 'reconciliation_preview_failed' },
+    } catch (error) {
+      const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+      return Response.json({ ok: false, error: 'reconciliation_preview_failed',
+        sqlState: /^[A-Z0-9]{5}$/.test(code) ? code : 'none' },
         { status: 503, headers: { 'Cache-Control': 'no-store' } });
     } finally { await sql.end(); }
   },
