@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "factsport-v2-espn-reconciliation-preview",
+  "main": "workers/factsport-espn-reconciliation-preview.mjs",
+  "compatibility_date": "2026-11-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "hyperdrive": [
+    { "binding": "FACTSPORT_HYPERDRIVE", "id": "c5166b8496624a80a0a77c750585c271" }
+  ]
+}
