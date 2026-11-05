@@ -72,13 +72,13 @@ export default {
         SELECT id::text, league, home_team, away_team, match_date,
           espn_id, source, status, points_distributed
         FROM public.matches
-        WHERE league = ANY(${Object.keys(COMPETITIONS)})
+        WHERE league = ANY(${sql.array(Object.keys(COMPETITIONS))})
           AND match_date >= now() - interval '1 day'
           AND match_date < now() + interval '7 days'
           AND espn_id IS NULL
           AND source = 'football-data'
           AND points_distributed = false
-          AND status = ANY(${SCHEDULE_STATUSES})
+          AND status = ANY(${sql.array(SCHEDULE_STATUSES)})
         ORDER BY match_date ASC
         LIMIT 500
       `;
