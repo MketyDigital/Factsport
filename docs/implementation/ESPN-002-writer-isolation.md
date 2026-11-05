@@ -16,7 +16,7 @@ The role can SELECT `public.matches` and UPDATE only `espn_id`, `home_score`, `a
 
 It cannot update team names, kickoff, source, points-distributed or other settlement fields. It cannot INSERT or DELETE matches and cannot read `app_users`, `external_identities` or `job_runs`. It is distinct from the read-only runtime role and schedule-only writer.
 
-The provisioning workflow generated a random password and created the dedicated TLS-required Hyperdrive. A separate temporary verifier Worker connects as this role and checks actual database identity plus positive and negative privileges. That verifier is removed after the check.
+The provisioning workflow generated a random password and created the dedicated TLS-required Hyperdrive. A separate temporary verifier Worker connects as this role and checks actual database identity plus positive and negative privileges. That verifier is removed after the check. Verification passed in [run 42047371419](https://github.com/MketyDigital/Factsport/actions/runs/42047371419). The read-only reconciliation preview also connected successfully through this Hyperdrive in [run 42050234345](https://github.com/MketyDigital/Factsport/actions/runs/42050234345).
 
 ## Deliberate non-actions
 
