@@ -39,32 +39,32 @@ export default {
     });
     try {
       await sql.begin(async tx => {
-        const [identity] = await tx\`SELECT current_database() AS database, current_user AS role\`;
+        const [identity] = await tx`SELECT current_database() AS database, current_user AS role`;
         if (identity.database !== 'factsport_v2' || identity.role !== 'mketydbadmin') {
           throw new Error('Wrong database or administrator');
         }
-        await tx\`SELECT pg_advisory_xact_lock(720061, 5)\`;
-        await tx.unsafe(\`DO $role$
+        await tx`SELECT pg_advisory_xact_lock(720061, 5)`;
+        await tx.unsafe(`DO $role$
         BEGIN
           IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'factsport_v2_espn_writer') THEN
-            CREATE ROLE factsport_v2_espn_writer LOGIN PASSWORD '\${password}';
+            CREATE ROLE factsport_v2_espn_writer LOGIN PASSWORD '${password}';
           ELSE
-            ALTER ROLE factsport_v2_espn_writer LOGIN PASSWORD '\${password}';
+            ALTER ROLE factsport_v2_espn_writer LOGIN PASSWORD '${password}';
           END IF;
         END
-        $role$\`);
-        await tx\`GRANT CONNECT ON DATABASE factsport_v2 TO factsport_v2_espn_writer\`;
-        await tx\`GRANT USAGE ON SCHEMA public TO factsport_v2_espn_writer\`;
-        await tx\`REVOKE ALL ON TABLE public.matches FROM factsport_v2_espn_writer\`;
-        await tx\`GRANT SELECT ON TABLE public.matches TO factsport_v2_espn_writer\`;
-        await tx\`GRANT UPDATE (
+        $role$`);
+        await tx`GRANT CONNECT ON DATABASE factsport_v2 TO factsport_v2_espn_writer`;
+        await tx`GRANT USAGE ON SCHEMA public TO factsport_v2_espn_writer`;
+        await tx`REVOKE ALL ON TABLE public.matches FROM factsport_v2_espn_writer`;
+        await tx`GRANT SELECT ON TABLE public.matches TO factsport_v2_espn_writer`;
+        await tx`GRANT UPDATE (
           espn_id, home_score, away_score, status, match_events, stats,
           source_updated_at, updated_at, version
-        ) ON TABLE public.matches TO factsport_v2_espn_writer\`;
-        await tx\`REVOKE ALL ON TABLE public.app_users FROM factsport_v2_espn_writer\`;
-        await tx\`REVOKE ALL ON TABLE public.external_identities FROM factsport_v2_espn_writer\`;
-        await tx\`REVOKE ALL ON TABLE public.job_runs FROM factsport_v2_espn_writer\`;
-        const [p] = await tx\`
+        ) ON TABLE public.matches TO factsport_v2_espn_writer`;
+        await tx`REVOKE ALL ON TABLE public.app_users FROM factsport_v2_espn_writer`;
+        await tx`REVOKE ALL ON TABLE public.external_identities FROM factsport_v2_espn_writer`;
+        await tx`REVOKE ALL ON TABLE public.job_runs FROM factsport_v2_espn_writer`;
+        const [p] = await tx`
           SELECT
             has_table_privilege('factsport_v2_espn_writer','public.matches','SELECT') AS can_read_matches,
             has_column_privilege('factsport_v2_espn_writer','public.matches','espn_id','UPDATE') AS can_link_espn,
@@ -81,7 +81,7 @@ export default {
             has_table_privilege('factsport_v2_espn_writer','public.app_users','SELECT') AS can_read_users,
             has_table_privilege('factsport_v2_espn_writer','public.external_identities','SELECT') AS can_read_identities,
             has_table_privilege('factsport_v2_espn_writer','public.job_runs','SELECT') AS can_read_job_runs
-        \`;
+        `;
         if (!p.can_read_matches || !p.can_link_espn || !p.can_update_home_score ||
             !p.can_update_away_score || !p.can_update_status || !p.can_update_events ||
             !p.can_update_stats || p.can_update_points_flag || p.can_update_team_names ||
