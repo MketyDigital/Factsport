@@ -1,0 +1,104 @@
+name: Factsport v2 verify ESPN writer Hyperdrive permissions
+
+on:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - '.github/workflows/v2-espn-writer-check.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factsport-v2-espn-writer-check
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/refactor/factsport-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KEY }}
+      FACTSPORT_ESPN_HD_ID: c5166b8496624a80a0a77c750585c271
+    steps:
+      - name: Verify exact dedicated Hyperdrive identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ] || exit 1
+          STATUS="$(curl -sS -o /tmp/factsport-espn-hd.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/$FACTSPORT_ESPN_HD_ID")"
+          [ "$STATUS" = 200 ] &&
+            jq -e '.success == true and .result.name == "factsport-v2-espn-postgres" and
+              .result.origin.database == "factsport_v2" and
+              .result.origin.user == "factsport_v2_espn_writer" and
+              .result.mtls.sslmode == "require" and .result.caching.disabled == true' \
+              /tmp/factsport-espn-hd.json >/dev/null ||
+            { echo "::error::Unexpected ESPN Hyperdrive identity or TLS/cache configuration"; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/factsport-v2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Worker dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Deploy temporary private connection verifier
+        id: deploy
+        run: npx --yes wrangler@4 deploy --config wrangler.factsport-espn-writer-check.jsonc
+      - name: Install ephemeral verifier token
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$TOKEN"
+          printf '%s' "$TOKEN" | npx --yes wrangler@4 secret put FACTSPORT_CHECK_TOKEN \
+            --config wrangler.factsport-espn-writer-check.jsonc
+          echo "FACTSPORT_CHECK_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+      - name: Verify connected database role and negative privileges
+        shell: bash
+        run: |
+          set -euo pipefail
+          DOMAIN_HTTP="$(curl -sS -o /tmp/factsport-domain.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
+          [ "$DOMAIN_HTTP" = 200 ] || exit 1
+          DOMAIN="$(jq -r '.result.subdomain // empty' /tmp/factsport-domain.json)"
+          [ -n "$DOMAIN" ] || exit 1
+          BASE="https://factsport-v2-espn-writer-check.$DOMAIN.workers.dev/__internal/espn-writer-check"
+          ready=false
+          for attempt in 1 2 3 4 5 6 7 8; do
+            HTTP="$(curl -sS --max-time 30 -o /tmp/factsport-espn-check.json -w '%{http_code}' \
+              -H "Authorization: Bearer $FACTSPORT_CHECK_TOKEN" "$BASE")"
+            if [ "$HTTP" = 200 ] &&
+              jq -e '.ok == true and .role == "factsport_v2_espn_writer" and
+                .canUpdateEspnLiveFields == true and
+                .cannotUpdateSettlementOrSchedule == true and
+                .cannotInsertOrDelete == true and .cannotReadPrivateTables == true' \
+                /tmp/factsport-espn-check.json >/dev/null 2>&1; then
+              ready=true; break
+            fi
+            echo "ESPN Hyperdrive verification attempt $attempt: HTTP $HTTP"
+            sleep 3
+          done
+          [ "$ready" = true ] || { echo "::error::ESPN Hyperdrive connection or privilege check failed"; exit 1; }
+          UNAUTH="$(curl -sS -o /tmp/factsport-espn-unauth -w '%{http_code}' "$BASE")"
+          [ "$UNAUTH" = 404 ] || { echo "::error::Verifier must reject unauthenticated requests"; exit 1; }
+          echo "ESPN role connected over its dedicated Hyperdrive; all positive and negative privilege checks passed." >> "$GITHUB_STEP_SUMMARY"
+          echo "Temporary verifier is removed in the following cleanup step; no score rows were changed." >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove temporary connection verifier Worker
+        if: always() && steps.deploy.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl -sS -o /tmp/factsport-espn-check-delete.json -w '%{http_code}' \
+            -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/factsport-v2-espn-writer-check")"
+          [ "$STATUS" = 200 ] && jq -e '.success == true' /tmp/factsport-espn-check-delete.json >/dev/null ||
+            { echo "::error::Delete only temporary Factsport ESPN connection verifier"; exit 1; }
+          echo "Temporary ESPN connection verifier removed."
