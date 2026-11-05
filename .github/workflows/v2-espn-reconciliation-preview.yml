@@ -88,7 +88,7 @@ jobs:
           [ "$UNAUTH" = 404 ] || { echo "::error::Preview must reject unauthenticated requests"; exit 1; }
           jq -r '"Fixtures scanned: (.fixtureRowsScanned); ESPN events: (.normalizedEspnEvents); unique candidates: (.uniqueCandidateCount); ambiguous: (.ambiguousCount); no match: (.noMatchCount)"' \
             /tmp/factsport-espn-preview.json | tee -a "$GITHUB_STEP_SUMMARY"
-          echo "Dry-run only: no match rows or score fields were changed." >> "$GITHUB_STEP_SUMMARY"
+          echo "Preview scope: prior 1 day through next 3 days; dry-run only, no match rows or score fields were changed." >> "$GITHUB_STEP_SUMMARY"
           jq -r '.candidates[] | "- (.league): (.home_team) vs (.away_team), ESPN ID (.espn_id), kickoff delta (.kickoff_delta_minutes) min"' \
             /tmp/factsport-espn-preview.json >> "$GITHUB_STEP_SUMMARY"
       - name: Delete temporary reconciliation preview Worker
