@@ -2,18 +2,22 @@
 
 **Branch:** `refactor/factsport-v2` only. **Scope:** provision and verify a separate staging PostgreSQL role and Hyperdrive. No score ingestion worker or Cron is deployed by this step.
 
+## Provisioned resources
+
+- PostgreSQL role: `factsport_v2_espn_writer`
+- Cloudflare Hyperdrive: `factsport-v2-espn-postgres`
+- Hyperdrive ID: `c5166b8496624a80a0a77c750585c271`
+- Azure database: `factsport_v2`; TLS required, SQL query cache disabled, origin pool limit five.
+- The temporary administrator-backed bootstrap Worker was deleted after provisioning.
+
 ## Intended privilege boundary
 
-The role `factsport_v2_espn_writer` can SELECT `public.matches` and UPDATE only:
-- `espn_id` (for later reviewed unique reconciliation)
-- `home_score`, `away_score`, `status`
-- `match_events`, `stats`
-- `source_updated_at`, `updated_at`, `version`
+The role can SELECT `public.matches` and UPDATE only `espn_id`, `home_score`, `away_score`, `status`, `match_events`, `stats`, `source_updated_at`, `updated_at` and `version`.
 
-It cannot update team names, kickoff, source, points-distributed or other settlement fields. It cannot INSERT or DELETE matches and cannot read `app_users`, `external_identities` or `job_runs`. It is distinct from both the read-only runtime role and schedule-only writer.
+It cannot update team names, kickoff, source, points-distributed or other settlement fields. It cannot INSERT or DELETE matches and cannot read `app_users`, `external_identities` or `job_runs`. It is distinct from the read-only runtime role and schedule-only writer.
 
-The one-time workflow uses the existing administrator Hyperdrive only through a token-protected temporary bootstrap Worker, generates a random role password, creates a TLS-required Hyperdrive with SQL caching disabled and origin pool limit five, and removes the temporary bootstrap Worker. The workflow refuses to reset an existing Hyperdrive of the same name.
+The provisioning workflow generated a random password and created the dedicated TLS-required Hyperdrive. A separate temporary verifier Worker connects as this role and checks actual database identity plus positive and negative privileges. That verifier is removed after the check.
 
 ## Deliberate non-actions
 
-This provisioning does not deploy score polling, change match rows, create a Cron, reconcile/link any ESPN IDs, write scores, alter legacy ESPN/Supabase jobs, activate Azure Logic Apps, change production DNS, or touch `main`. A separate reviewed ingestion implementation and staging canary remain required.
+No score ingestion worker, match-row update, Cron, ESPN ID reconciliation, production route, legacy ESPN/Supabase change, Azure Logic App activation, production DNS change or `main` branch commit. A separate reviewed ingestion implementation and staging canary remain required.
