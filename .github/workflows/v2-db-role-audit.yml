@@ -95,7 +95,9 @@ jobs:
               READY=true
               break
             fi
-            echo "Read-only role audit attempt $attempt: HTTP $HTTP"
+            STATE="$(jq -r '.sqlState // "none"' /tmp/factsport-db-role-audit.json 2>/dev/null || echo none)"
+            PHASE="$(jq -r '.auditPhase // "unknown"' /tmp/factsport-db-role-audit.json 2>/dev/null || echo unknown)"
+            echo "Read-only role audit attempt $attempt: HTTP $HTTP, SQLSTATE $STATE, phase $PHASE"
             sleep 3
           done
           [ "$READY" = "true" ] || {
