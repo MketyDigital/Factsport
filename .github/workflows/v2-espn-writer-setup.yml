@@ -7,7 +7,7 @@ on:
     branches:
       - refactor/factsport-v2
     paths:
-      - '.github/workflows/v2-espn-writer-setup.yml'
+      - 'ops/provision-espn-writer.trigger'
 
 permissions:
   contents: read
