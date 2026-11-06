@@ -50,3 +50,8 @@ This was strictly a dry run: `writesPerformed=0`; no ESPN IDs or scores were sav
 ## 2026-11-06 privilege correction
 
 The reconciliation preview is a SELECT-only operation and now binds the existing read-only `factsport_v2_reader` Hyperdrive (`factsport-v2-runtime-postgres`, ID `895cca...`) rather than the ESPN score-writer Hyperdrive. The score-writer identity remains reserved for a future reviewed live-field updater. The workflow verifies the exact read-only runtime resource and database role before deploying the temporary preview. This avoids giving a dry-run report write-capable credentials.
+
+
+### Read-only preview rerun — 2026-11-06
+
+After switching the preview to the read-only runtime Hyperdrive, workflow [42260972600](https://github.com/MketyDigital/Factsport/actions/runs/42260972600) passed. It scanned 48 staging fixtures, normalized 48 ESPN events, returned 20 unique candidates, zero ambiguous candidates and 28 no-match events. The preview was protected by an ephemeral token and deleted after completion. It performed zero database writes. These 20 candidate links still require review before any linking operation.
