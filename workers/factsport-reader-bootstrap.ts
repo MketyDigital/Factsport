@@ -48,14 +48,15 @@ export default {
         await tx.unsafe(`DO $body$
           BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'factsport_v2_reader') THEN
-              CREATE ROLE factsport_v2_reader LOGIN PASSWORD '${password}';
+              CREATE ROLE factsport_v2_reader LOGIN PASSWORD '${password}' NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 5;
             ELSE
-              ALTER ROLE factsport_v2_reader LOGIN PASSWORD '${password}';
+              ALTER ROLE factsport_v2_reader LOGIN PASSWORD '${password}' NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 5;
             END IF;
           END
         $body$`);
         await tx`GRANT CONNECT ON DATABASE factsport_v2 TO factsport_v2_reader`;
         await tx`GRANT USAGE ON SCHEMA public TO factsport_v2_reader`;
+        await tx`REVOKE ALL ON TABLE public.matches FROM factsport_v2_reader`;
         await tx`GRANT SELECT ON TABLE public.matches TO factsport_v2_reader`;
         await tx`REVOKE ALL ON TABLE public.app_users FROM factsport_v2_reader`;
         await tx`REVOKE ALL ON TABLE public.external_identities FROM factsport_v2_reader`;
@@ -64,9 +65,15 @@ export default {
           SELECT
             has_table_privilege('factsport_v2_reader','public.matches','SELECT') AS can_read_matches,
             has_table_privilege('factsport_v2_reader','public.matches','INSERT') AS can_insert_matches,
+            has_table_privilege('factsport_v2_reader','public.matches','UPDATE') AS can_update_matches,
+            has_table_privilege('factsport_v2_reader','public.matches','DELETE') AS can_delete_matches,
+            (SELECT rolinherit FROM pg_roles WHERE rolname='factsport_v2_reader') AS inherits_roles,
+            (SELECT rolconnlimit FROM pg_roles WHERE rolname='factsport_v2_reader') AS connection_limit,
             has_table_privilege('factsport_v2_reader','public.app_users','SELECT') AS can_read_users
         `;
-        if (!check.can_read_matches || check.can_insert_matches || check.can_read_users) {
+        if (!check.can_read_matches || check.can_insert_matches || check.can_update_matches ||
+            check.can_delete_matches || check.inherits_roles || Number(check.connection_limit) !== 5 ||
+            check.can_read_users) {
           throw new Error('Unexpected role privileges');
         }
         return true;
