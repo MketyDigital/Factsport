@@ -12,7 +12,7 @@ export function factsportPostgres() {
     throw new Error('FACTSPORT_HYPERDRIVE binding missing');
   }
   return postgres(hyperdrive.connectionString, {
-    max: 3,
+    max: 1,
     fetch_types: false,
     prepare: true,
     connect_timeout: 10,
