@@ -45,3 +45,8 @@ No production Supabase writes, production ESPN endpoint or GitHub schedule chang
 The protected, ephemeral, read-only preview workflow [run 42050234345](https://github.com/MketyDigital/Factsport/actions/runs/42050234345) completed successfully against the dedicated ESPN Hyperdrive. For the prior one day through the next three days it scanned **43** eligible schedule fixtures and normalized **57** ESPN scoreboard events. It returned **18 unique candidate links**, **0 ambiguous candidates**, and **39 no-match events**. The candidate list is in the GitHub Actions run summary.
 
 This was strictly a dry run: `writesPerformed=0`; no ESPN IDs or scores were saved. The temporary preview Worker was removed after the run. The 18 candidates still require review/approval before a separate linking operation.
+
+
+## 2026-11-06 privilege correction
+
+The reconciliation preview is a SELECT-only operation and now binds the existing read-only `factsport_v2_reader` Hyperdrive (`factsport-v2-runtime-postgres`, ID `895cca...`) rather than the ESPN score-writer Hyperdrive. The score-writer identity remains reserved for a future reviewed live-field updater. The workflow verifies the exact read-only runtime resource and database role before deploying the temporary preview. This avoids giving a dry-run report write-capable credentials.
