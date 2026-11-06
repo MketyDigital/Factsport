@@ -11,7 +11,7 @@ This was a source/configuration and GitHub Actions audit. It is not a live Cloud
 
 - The legacy `main` application and its scheduled workflows are still active. The 2026-11-06 scheduled match-sync and daily matrix runs both completed successfully.
 - The v2 native vinext build and protected Cloudflare staging deployment passed on commit `9ccbdc745179304a829d43c95038478258e75ca8`. That staging run checked unauthenticated denial, the staging health endpoint, Hyperdrive and R2, and a populated matches API.
-- The current v2 branch has moved on since that successful run. Cloudflare-only reference cleanup has been committed after it; the latest commit still needs a fresh CI and staging pass.
+- After the Cloudflare-only source cleanup, the latest code commit `8c54a9060e6e011fa887f12b5cf546cc2c55c71b` passed the native vinext build and protected Cloudflare staging deployment on 2026-11-06: [build 42172478877](https://github.com/MketyDigital/Factsport/actions/runs/42172478877), [staging 42172478876](https://github.com/MketyDigital/Factsport/actions/runs/42172478876). The later branch commits only update audit documentation.
 - No open pull request was found. The repository's `Protect main` ruleset is **disabled**, and the branch endpoint reports `main` is not protected. This removes an important release safeguard.
 - The v2 schema is a first slice, not a complete replacement for the legacy product. Most account, prediction, prize, content, social and admin paths still rely on legacy Supabase code.
 - The legacy database security audit remains unresolved; see `docs/audit/SEC-001-supabase-rls.md`.
