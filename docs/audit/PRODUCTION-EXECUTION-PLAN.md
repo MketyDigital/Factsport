@@ -223,3 +223,8 @@ Cloudflare staging workflow [42261414894](https://github.com/MketyDigital/Factsp
 
 
 The stricter TLS-required Hyperdrive gate passed in run [42261593655](https://github.com/MketyDigital/Factsport/actions/runs/42261593655), including the private R2 and database smoke checks. This supersedes the earlier note that the TLS guard rerun was pending.
+
+
+## Route-by-route implementation register
+
+Use [ROUTE-MIGRATION-MATRIX.md](./ROUTE-MIGRATION-MATRIX.md) as the route-level register for every legacy API, its current Supabase/provider dependencies, target v2 service and acceptance requirements. Keep that matrix updated as each route is ported and tested.
