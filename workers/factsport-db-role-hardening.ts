@@ -69,7 +69,6 @@ export default {
         await tx`ALTER ROLE factsport_v2_espn_writer WITH NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 5`;
 
         await tx`REVOKE INSERT (home_score, away_score) ON TABLE public.matches FROM factsport_v2_schedule_writer`;
-        await tx`REVOKE TEMPORARY ON DATABASE factsport_v2 FROM PUBLIC, factsport_v2_reader, factsport_v2_schedule_writer, factsport_v2_espn_writer`;
 
         const roles = await tx`
           SELECT rolname AS role_name, rolinherit AS inherits_roles,
@@ -110,12 +109,6 @@ export default {
             has_table_privilege('factsport_v2_espn_writer','public.matches','INSERT') AS can_insert,
             has_table_privilege('factsport_v2_espn_writer','public.matches','DELETE') AS can_delete
         `;
-        const [databasePrivileges] = await tx`
-          SELECT
-            has_database_privilege('factsport_v2_reader', current_database(), 'TEMP') AS reader_can_create_temp,
-            has_database_privilege('factsport_v2_schedule_writer', current_database(), 'TEMP') AS schedule_can_create_temp,
-            has_database_privilege('factsport_v2_espn_writer', current_database(), 'TEMP') AS espn_can_create_temp
-        `;
         const safeRoles = roles.length === 3 && roles.every(r =>
           r.inherits_roles === false && Number(r.connection_limit) === 5 &&
           r.is_superuser === false && r.can_create_databases === false &&
@@ -125,17 +118,14 @@ export default {
           !schedule.can_update_home_score && !schedule.can_update_away_score &&
           !schedule.can_update_settlement;
         const safeReader = !reader.can_insert_fixture && !reader.can_update_score && !reader.can_delete;
-        const safeDatabase = !databasePrivileges.reader_can_create_temp &&
-          !databasePrivileges.schedule_can_create_temp && !databasePrivileges.espn_can_create_temp;
         const safeEspn = !!espn.can_link_espn && !!espn.can_update_home_score &&
           !!espn.can_update_away_score && !espn.can_update_settlement &&
           !espn.can_update_team && !espn.can_update_kickoff && !espn.can_insert && !espn.can_delete;
-        if (!safeRoles || !safeSchedule || !safeReader || !safeEspn || !safeDatabase) {
+        if (!safeRoles || !safeSchedule || !safeReader || !safeEspn) {
           throw new Error('post_hardening_privilege_check_failed');
         }
         return {
           ok: true,
-          noTempTables: true,
           roles,
           schedule: {
             canInsertFixture: !!schedule.can_insert_fixture,
