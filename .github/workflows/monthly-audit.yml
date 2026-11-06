@@ -15,4 +15,8 @@ jobs:
         env:
           CRON_KEY: ${{ secrets.CRON_KEY }}
         run: |
-          curl -X GET "https://factsport.com/api/admin/run-audit?key=${CRON_KEY}"
+          set -euo pipefail
+          [ -n "$CRON_KEY" ] || { echo "::error::CRON_KEY is missing"; exit 1; }
+          curl --silent --show-error --fail-with-body -X POST \
+            -H "Authorization: Bearer $CRON_KEY" \
+            "https://factsport.com/api/admin/run-audit"

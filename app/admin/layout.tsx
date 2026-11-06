@@ -1,52 +1,16 @@
 export const runtime = 'edge';
 
-import { createClient } from '@/app/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { cookies } from 'next/headers'; // 🟢 Added to check the vault cookie
-// 🔥 Added "Users" and "Radio" to the lucide-react imports for the new menu items
 import { LayoutDashboard, Newspaper, LogOut, Ticket, Users, Radio } from 'lucide-react';
-import VaultLock from './VaultLock'; // 🟢 Import the new Lock Screen
-
-// 🔴 THE MASTER LIST (Lowercased for strict matching)
-const ADMIN_EMAILS = [
-    'mkposcosunday@gmail.com', 
-    'factsportlive@gmail.com', 
-    'fact@factsport.com'
-];
+import VaultLock from './VaultLock';
+import { getAuthenticatedAdmin, isAdminVaultUnlocked } from '@/app/lib/admin/authorization';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // 1. Check if logged in at all
-  if (!user || !user.email) redirect('/login');
-
-  // 2. 🔴 THE MASTER LOCK: Check if their email is exactly on the VIP Admin List
-  if (!ADMIN_EMAILS.includes(user.email.toLowerCase())) {
-      console.warn(`SECURITY ALERT: Blocked access to Admin UI by ${user.email}`);
-      redirect('/'); // Kick them back to the homepage
-  }
-
-  // 3. Database Role Check (Double Security)
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (profile?.role !== 'admin') {
-    return redirect('/dashboard');
-  }
-
-  // 🟢 4. THE VAULT CHECK: Check if the secure server cookie exists
-  const cookieStore = cookies();
-  const isVaultUnlocked = cookieStore.get('admin_vault_unlocked')?.value === 'true';
-
-  // If they don't have the cookie, RENDER THE LOCK SCREEN INSTEAD OF THE DASHBOARD!
-  if (!isVaultUnlocked) {
-      return <VaultLock />;
-  }
+  const admin = await getAuthenticatedAdmin();
+  if (!admin) redirect('/login');
+  const isVaultUnlocked = await isAdminVaultUnlocked(admin.id);
+  if (!isVaultUnlocked) return <VaultLock />;
 
   // 🟢 5. If everything is clear, render the normal Admin UI!
   return (

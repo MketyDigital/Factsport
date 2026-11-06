@@ -175,9 +175,9 @@ export async function middleware(request: NextRequest) {
 
     // 2. If logged in but WRONG EMAIL -> Kick them out
     const userEmail = user.email;
-    const adminEmails = ['mkposcosunday@gmail.com', 'factsportlive@gmail.com'];
+    const adminEmails = ['mkposcosunday@gmail.com', 'factsportlive@gmail.com', 'fact@factsport.com'];
 
-    if (!userEmail || !adminEmails.includes(userEmail)) {
+    if (!userEmail || !adminEmails.includes(userEmail.toLowerCase())) {
       // Redirect unauthorized users to the dashboard
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }

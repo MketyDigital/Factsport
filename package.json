@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "pages:build": "npx @cloudflare/next-on-pages",
-    "test:engine": "node --test tests/*.test.cjs",
+    "test:engine": "node --test tests/*.test.cjs tests/*.test.mjs",
     "db:check": "node scripts/check-postgres.cjs",
     "typecheck": "tsc --noEmit",
     "dev:vinext": "vite dev --port 3001",

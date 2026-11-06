@@ -1,21 +1,17 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/app/lib/supabase/admin';
+import { isCronRequest } from '@/app/lib/admin/authorization';
 import { NextResponse } from 'next/server';
 
-export async function GET(request: Request) {
-    const { searchParams } = new URL(request.url);
-    
-    // 1. SECURITY: Must match your .env CRON_KEY
-    if (searchParams.get('key') !== process.env.CRON_KEY) {
+export async function POST(request: Request) {
+    // Scheduler authentication is accepted only through a bearer header, never a URL query string.
+    if (!(await isCronRequest(request))) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabase = getSupabaseAdmin();
 
     try {
         // 2. DATE LOGIC: Calculate the Previous Month (e.g., run on March 1, audits February)
