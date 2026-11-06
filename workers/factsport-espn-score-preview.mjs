@@ -62,7 +62,7 @@ export default {
     });
     try {
       const [identity] = await sql`SELECT current_database() AS database, current_user AS role`;
-      if (identity.database !== 'factsport_v2' || identity.role !== 'factsport_v2_espn_writer') {
+      if (identity.database !== 'factsport_v2' || identity.role !== 'factsport_v2_reader') {
         return Response.json({ ok: false, error: 'unexpected_database_identity' }, { status: 503 });
       }
       const fixtures = await sql`
@@ -138,7 +138,7 @@ export default {
       }
       return Response.json({
         ok: providerErrors.length === 0, dryRun: true, writesPerformed: 0,
-        database: 'factsport_v2', role: 'factsport_v2_espn_writer',
+        database: 'factsport_v2', role: 'factsport_v2_reader',
         linkedFixturesScanned: fixtures.length, scoreboardGroupsChecked: groups.size,
         normalizedEspnEvents: normalizedEvents, inSyncCount, unsupportedCount,
         proposedUpdateCount: proposals.length, providerErrors, proposals: proposals.slice(0, 100),
