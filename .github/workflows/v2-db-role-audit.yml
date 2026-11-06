@@ -108,7 +108,7 @@ jobs:
           {
             echo "## Factsport v2 staging PostgreSQL role audit"
             echo "Read-only catalog inspection against factsport_v2; no database mutation performed."
-            jq -S '{roleCount,tablePrivilegeCount,roles,tablePrivileges}' \
+            jq -S '{roleCount,tablePrivilegeCount,roles,tablePrivileges,matchColumnPrivileges}' \
               /tmp/factsport-db-role-audit.json
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Delete temporary role audit Worker
