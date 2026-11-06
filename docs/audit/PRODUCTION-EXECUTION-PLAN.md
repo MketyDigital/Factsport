@@ -215,3 +215,8 @@ The staging app's `/api/matches` response previously used `Cache-Control: public
 - No new product capability is declared complete because a health endpoint returns 200.
 - A feature is complete only when its data model, authorization, user journey, error/retry behavior, observability, tests, and rollback are all complete.
 - Preserve old production and backups until the new system has passed the full match lifecycle, account lifecycle, paid entitlement and editorial acceptance gates.
+
+
+### Latest staging infrastructure verification
+
+Cloudflare staging workflow [42261414894](https://github.com/MketyDigital/Factsport/actions/runs/42261414894) verified the runtime Hyperdrive's exact Factsport database identity, disabled query caching, five-connection origin limit, and successful DB probe. The same workflow checked Cloudflare R2 managed `r2.dev` access is disabled and no custom domain is enabled, then passed private R2 binding smoke. The follow-up config now also requires TLS mode `require`; its rerun is pending at the time of this update.
