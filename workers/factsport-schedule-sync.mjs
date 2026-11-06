@@ -79,10 +79,18 @@ const worker = {
         SELECT current_database() = 'factsport_v2' AS correct_database,
           current_user = 'factsport_v2_schedule_writer' AS correct_role,
           has_table_privilege(current_user, 'public.matches', 'DELETE') AS can_delete,
-          has_column_privilege(current_user, 'public.matches', 'home_score', 'UPDATE') AS can_update_scores
+          has_column_privilege(current_user, 'public.matches', 'home_score', 'INSERT') AS can_insert_home_score,
+          has_column_privilege(current_user, 'public.matches', 'away_score', 'INSERT') AS can_insert_away_score,
+          has_column_privilege(current_user, 'public.matches', 'home_score', 'UPDATE') AS can_update_home_score,
+          has_column_privilege(current_user, 'public.matches', 'away_score', 'UPDATE') AS can_update_away_score,
+          has_column_privilege(current_user, 'public.matches', 'points_distributed', 'UPDATE') AS can_update_settlement,
+          (SELECT rolinherit FROM pg_roles WHERE rolname = current_user) AS inherits_roles,
+          (SELECT rolconnlimit FROM pg_roles WHERE rolname = current_user) AS connection_limit
       `;
       if (!identity.correct_database || !identity.correct_role ||
-          identity.can_delete || identity.can_update_scores) {
+          identity.can_delete || identity.can_insert_home_score || identity.can_insert_away_score ||
+          identity.can_update_home_score || identity.can_update_away_score || identity.can_update_settlement ||
+          identity.inherits_roles || Number(identity.connection_limit) !== 5) {
         return Response.json({ ok: false, error: 'unsafe_database_role' },
           { status: 503, headers: { 'Cache-Control': 'no-store' } });
       }
@@ -91,7 +99,8 @@ const worker = {
           SELECT count(*)::integer AS total FROM public.matches
           WHERE source = 'football-data' AND league = 'Premier League'
         `;
-        return Response.json({ ok: true, writerRoleVerified: true,
+        return Response.json({ ok: true, writerRoleVerified: true, writerRoleNoInherit: true,
+          writerConnectionLimit: 5, cannotInsertOrUpdateScores: true, cannotUpdateSettlement: true,
           premierLeagueRows: Number(count.total) },
           { headers: { 'Cache-Control': 'no-store' } });
       }
