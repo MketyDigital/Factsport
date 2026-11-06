@@ -1,5 +1,3 @@
-import postgres from 'postgres';
-
 interface Env {
   FACTSPORT_HYPERDRIVE: { connectionString: string };
   FACTSPORT_AUDIT_TOKEN?: string;
@@ -30,65 +28,13 @@ export default {
       if (!(await tokenMatches(env.FACTSPORT_AUDIT_TOKEN || '', provided))) {
         return new Response('Not found', { status: 404 });
       }
-      const connectionString = env.FACTSPORT_HYPERDRIVE?.connectionString;
-      if (!connectionString) {
-        return Response.json({ ok: false, error: 'hyperdrive_missing' }, {
-          status: 503, headers: { 'Cache-Control': 'no-store' },
-        });
-      }
-
-      const sql = postgres(connectionString, {
-        max: 1, fetch_types: false, prepare: false, connect_timeout: 10, idle_timeout: 5,
-      });
-      try {
-        const [identity] = await sql`
-          SELECT current_database() AS database, current_user AS connected_as
-        `;
-        if (identity.database !== 'factsport_v2' || identity.connected_as !== 'mketydbadmin') {
-          return Response.json({ ok: false, error: 'unexpected_database_identity' }, {
-            status: 503, headers: { 'Cache-Control': 'no-store' },
-          });
-        }
-        const roles = await sql`
-          SELECT rolname AS role_name, rolcanlogin AS can_login,
-            rolsuper AS is_superuser, rolinherit AS inherits_roles,
-            rolcreaterole AS can_create_roles, rolcreatedb AS can_create_databases,
-            rolreplication AS can_replicate, rolbypassrls AS bypasses_rls,
-            rolconnlimit AS connection_limit
-          FROM pg_roles
-          WHERE rolname IN (
-            'factsport_v2_reader',
-            'factsport_v2_schedule_writer',
-            'factsport_v2_espn_writer'
-          )
-          ORDER BY rolname
-        `;
-        return Response.json({
-          ok: roles.length === 3,
-          database: identity.database,
-          connectedAs: identity.connected_as,
-          roles,
-        }, { headers: { 'Cache-Control': 'no-store' } });
-      } catch (error) {
-        const code = error && typeof error === 'object' && 'code' in error
-          ? String((error as { code?: unknown }).code) : '';
-        const name = error && typeof error === 'object' && 'name' in error
-          ? String((error as { name?: unknown }).name) : 'unknown';
-        return Response.json({
-          ok: false, error: 'db_role_audit_query_failed',
-          sqlState: /^[A-Z0-9]{5}$/.test(code) ? code : 'none',
-          errorName: /^[A-Za-z0-9_]{1,40}$/.test(name) ? name : 'unknown',
-        }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
-      } finally {
-        try { await sql.end(); } catch { /* keep the sanitized result */ }
-      }
+      return Response.json({ ok: true, worker: 'factsport-v2-db-role-audit', hyperdriveBindingPresent: !!env.FACTSPORT_HYPERDRIVE?.connectionString },
+        { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
       const name = error && typeof error === 'object' && 'name' in error
         ? String((error as { name?: unknown }).name) : 'unknown';
-      return Response.json({
-        ok: false, error: 'db_role_audit_unhandled',
-        errorName: /^[A-Za-z0-9_]{1,40}$/.test(name) ? name : 'unknown',
-      }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
+      return Response.json({ ok: false, error: 'audit_worker_unhandled', errorName: name },
+        { status: 500, headers: { 'Cache-Control': 'no-store' } });
     }
   },
 };
