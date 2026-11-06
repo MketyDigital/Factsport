@@ -81,7 +81,7 @@ jobs:
           SUBDOMAIN="$(jq -r '.result.subdomain // empty' /tmp/factsport-worker-subdomain.json)"
           [ -n "$SUBDOMAIN" ] || { echo "::error::Workers subdomain not present"; exit 1; }
           BASE="https://factsport-v2-staging.$SUBDOMAIN.workers.dev"
-          for path in / /api/matches /admin; do
+          for path in / /api/matches /admin /matches; do
             STATUS="$(curl --silent --show-error --max-time 25 --retry 6 --retry-all-errors --retry-delay 3 \
               -o /tmp/factsport-staging-unauthenticated -w '%{http_code}' "$BASE$path")"
             [ "$STATUS" = "404" ] || {
@@ -100,6 +100,15 @@ jobs:
             exit 1
           fi
           echo "Factsport native vinext app: authorized Hyperdrive and R2 dependency check passed"
+
+          MATCH_PAGE_STATUS="$(curl --silent --show-error --max-time 30 \
+            -o /tmp/factsport-staging-match-page.html -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" "$BASE/matches")"
+          [ "$MATCH_PAGE_STATUS" = "200" ] && grep -q "Match Center" /tmp/factsport-staging-match-page.html || {
+            echo "::error::Protected /matches page did not render from the v2 PostgreSQL reader (HTTP $MATCH_PAGE_STATUS)."
+            exit 1
+          }
+          echo "Factsport staging /matches page: PostgreSQL-backed initial render passed"
           matches_ok=false
           for attempt in 1 2 3 4 5 6 7 8; do
             MATCH_STATUS="$(curl --silent --show-error --max-time 25 \
