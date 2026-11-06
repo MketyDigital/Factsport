@@ -6,6 +6,8 @@ on:
       - refactor/factsport-v2
     paths:
       - '.github/workflows/v2-espn-writer-check.yml'
+      - 'workers/factsport-espn-writer-check.ts'
+      - 'wrangler.factsport-espn-writer-check.jsonc'
 
 permissions:
   contents: read
@@ -81,7 +83,8 @@ jobs:
               jq -e '.ok == true and .role == "factsport_v2_espn_writer" and
                 .canUpdateEspnLiveFields == true and
                 .cannotUpdateSettlementOrSchedule == true and
-                .cannotInsertOrDelete == true and .cannotReadPrivateTables == true' \
+                .cannotInsertOrDelete == true and .cannotReadPrivateTables == true and
+      .noRoleInheritance == true and .connectionLimit == 5' \
                 /tmp/factsport-espn-check.json >/dev/null 2>&1; then
               ready=true; break
             fi
