@@ -166,7 +166,6 @@ export default {
         ok: roles.length === 3,
         roleCount: roles.length,
         tablePrivilegeCount: tablePrivileges.length,
-        matchColumnPrivileges,
         database: identity.database,
         connectedAs: identity.connected_as,
         databaseOwner: databaseOwner.database_owner,
