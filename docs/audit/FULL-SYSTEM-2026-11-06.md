@@ -170,3 +170,8 @@ A prior v2 addendum said no standalone roadmap/release documentation was found i
 The Cloudflare Hyperdrive ID discrepancy is also resolved by historical workflow evidence: the one-time runtime DB setup created `factsport-v2-runtime-postgres` ID `895cca...` from the original admin Hyperdrive `08cee4...`, then verified the restricted reader connection. The schedule and ESPN Hyperdrives are separate purpose-specific writer connections. See the new production execution plan for exact identities and run links.
 
 The app-staging matches endpoint was also found to return a public cache header while staging required a token header. The v2 route now returns private/no-store for staging, and the app-staging workflow now checks cache headers plus authorized/unauthorized request ordering. The updated workflow run must pass before this correction is marked runtime verified.
+
+
+## ESPN preview privilege correction — 2026-11-06
+
+The earlier audit finding that the ESPN preview used `factsport_v2_espn_writer` is superseded by the latest v2 branch changes. Both the reconciliation preview and score-parity preview now verify and use the existing read-only `factsport_v2_reader` runtime Hyperdrive (`895cca...`). The dedicated ESPN writer Hyperdrive remains reserved for a future score updater. The preview workflow now checks the exact runtime resource and reader identity before deployment. A fresh preview run is required to mark this runtime correction verified.
