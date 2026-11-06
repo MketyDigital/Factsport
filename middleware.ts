@@ -19,9 +19,9 @@ export async function middleware(request: NextRequest) {
   // 🔒 PART 1: ENVIRONMENT LOCK (Staging & Dev)
   // -----------------------------------------------------------------
   // We lock the site ONLY if:
-  // 1. It is a Vercel OR Cloudflare Pages dev URL
+  // 1. It is a Cloudflare Pages dev URL
   // 2. AND it is NOT an API route (Cron Jobs need access to /api)
-  const isDevDomain = hostname.includes('vercel.app') || hostname.includes('factsport.pages.dev');
+  const isDevDomain = hostname === 'factsport.pages.dev' || hostname.endsWith('.factsport.pages.dev');
   const isApiRoute = pathname.startsWith('/api');
 
   if (isDevDomain && !isApiRoute) {
