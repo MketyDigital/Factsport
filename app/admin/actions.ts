@@ -39,7 +39,7 @@ export async function triggerAuditAction() {
         return Math.ceil((days + firstDay.getDay() + 1) / 7);
       }));
       const isActivePlayer = hasPredictions && weeksPlayed.size >= 3;
-      const uniqueLeagues = new Set(exactScores.map(p => (p.matches)?.league));
+      const uniqueLeagues = new Set(exactScores.map(p => (p.matches as any)?.league));
       const fourLeagues = hasPredictions && uniqueLeagues.size >= targetCS;
       const perfectMix = hasPredictions &&
         exactScores.some(p => p.predicted_home_score > p.predicted_away_score) &&
