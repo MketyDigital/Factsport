@@ -64,7 +64,7 @@ export default {
     let stage = 'database_identity';
     try {
       const [identity] = await sql`SELECT current_database() AS database, current_user AS role`;
-      if (identity.database !== 'factsport_v2' || identity.role !== 'factsport_v2_espn_writer') {
+      if (identity.database !== 'factsport_v2' || identity.role !== 'factsport_v2_reader') {
         return Response.json({ ok: false, error: 'unexpected_database_identity' }, { status: 503 });
       }
       stage = 'fixture_query';
@@ -153,7 +153,7 @@ export default {
         dryRun: true,
         writesPerformed: 0,
         database: 'factsport_v2',
-        role: 'factsport_v2_espn_writer',
+        role: 'factsport_v2_reader',
         fixtureRowsScanned: fixtures.length,
         scoreboardGroupsChecked: groups.length,
         normalizedEspnEvents: normalizedEvents,
