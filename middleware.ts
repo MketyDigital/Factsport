@@ -3,10 +3,24 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { env } from 'cloudflare:workers'
 
 export async function middleware(request: NextRequest) {
-  // Factsport v2 standalone staging Worker: fail closed on EVERY matched path,
-  // including /api and /admin. Production deploy has no staging env binding.
-  // Never use the legacy dev-domain rule as the only staging protection.
-  if (env.FACTSPORT_ENVIRONMENT === 'staging') {
+  const hostname = request.headers.get('host') || '';
+  const isFactsportStagingWorkerHost =
+    /^factsport-v2-staging\.[a-z0-9-]+\.workers\.dev(?::\d+)?$/i.test(hostname);
+
+  // The staging hostname itself is a security boundary. If its environment
+  // binding is missing or misconfigured, fail closed instead of falling through
+  // to the legacy Supabase application paths.
+  if (isFactsportStagingWorkerHost && env.FACTSPORT_ENVIRONMENT !== 'staging') {
+    return new NextResponse('Not found', {
+      status: 404,
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  }
+
+  // Factsport v2 staging Worker: fail closed on EVERY matched path, including
+  // /api and /admin. The hostname guard above also protects against a missing
+  // staging environment binding.
+  if (env.FACTSPORT_ENVIRONMENT === 'staging' || isFactsportStagingWorkerHost) {
     const secret = env.FACTSPORT_STAGING_TOKEN;
     const provided = request.headers.get('x-factsport-staging-token') || '';
     if (typeof secret !== 'string' || !secret || !provided ||
@@ -32,7 +46,6 @@ export async function middleware(request: NextRequest) {
       });
     }
   }
-  const hostname = request.headers.get('host') || '';
   const pathname = request.nextUrl.pathname;
   const searchParams = request.nextUrl.search;
 
