@@ -61,3 +61,49 @@ The first native vinext build succeeded in Actions run `41670696225`. The genera
 - `.github/workflows/v2-vinext-compat.yml` — actual committed-config build/test with no deployment
 
 The old placeholder `wrangler.v2-app.target.jsonc` was removed. This does **not** mean consumer auth, paid features, Supabase data migrations, Logic Apps, sports ingestion or the existing ESPN 3-second scoring path have been moved; do not promote the Worker or switch DNS yet. The Hyperdrive connection still uses the bootstrap Azure administrator and must be restricted before serving production application traffic.
+
+
+---
+
+## 2026-11-06 status correction — supersedes earlier deployment-status statements above
+
+This addendum reflects the current checked-in branch configuration and the successful Actions run recorded below. Where earlier sections say the vinext app is not deployed or only the smoke Worker is deployed, those statements are historical and no longer current.
+
+### Current Cloudflare staging topology in source
+
+| Purpose | Worker/config | Hyperdrive ID | Intended DB identity |
+|---|---|---|---|
+| Full vinext app staging | `factsport-v2-staging` via `cloudflare.config.ts` | `895cca4c06104b8ab9f7c1b72a8ba18f` | App reader; the Hyperdrive verification script expects `factsport_v2_reader` |
+| Read-only DB/R2 smoke | `factsport-v2-db-smoke` via `wrangler.hyperdrive-smoke.jsonc` | `895cca4c06104b8ab9f7c1b72a8ba18f` | Read-only probe; workflow tests database name and R2 binding |
+| Schedule fixture sync | `factsport-v2-schedule-sync` via `wrangler.factsport-schedule-sync.jsonc` | `eb634fef8bb443839fd0847c6c370f85` | `factsport_v2_schedule_writer` |
+| ESPN score parity preview | Worker source exists; no matching deployment config/workflow was found in the inspected paths | Not established | Source expects `factsport_v2_espn_writer`; this is not a DB-enforced read-only identity |
+
+The older Hyperdrive ID `08cee41a81be4c3980450be9563af5e2` listed earlier in this document is not referenced by the current app, smoke, or schedule-sync config files inspected on this branch. Treat it as historical/unverified until a read-only Cloudflare account inventory establishes its purpose. Do not delete it based only on this note.
+
+### Latest full application staging evidence
+
+- Native vinext build and regression run: [42172478877](https://github.com/MketyDigital/Factsport/actions/runs/42172478877) — passed engine tests, ingestion tests, preview Worker syntax check, TypeScript, and Cloudflare build.
+- Full app staging deployment: [42172478876](https://github.com/MketyDigital/Factsport/actions/runs/42172478876) — passed Cloudflare credential presence, regression tests, TypeScript, native Worker build, isolated staging deploy, unauthenticated denial on `/`, `/api/matches`, and `/admin`, protected health check, Hyperdrive/R2 dependency checks, and populated PostgreSQL matches API.
+- These are staging-only Workers; no production domain, DNS, production route, or production data migration was changed by these runs.
+
+This does **not** prove feature parity. The app-staging workflow supplies placeholder Supabase build variables, and the smoke tests only exercise the staging gate, health endpoint, and matches API. Do not interpret a passing smoke test as proof that login, account lifecycle, VIP/payment, predictions, settlement, editorial, social, media migration, or admin workflows are ready.
+
+### Network and database identity controls
+
+The database endpoint is publicly addressed but, per the owner's stated setup and the earlier implementation note, inbound firewall access is intended to be restricted to Cloudflare IP ranges. The implementation note records 15 shared Cloudflare ranges. These are shared Cloudflare egress ranges, not a Factsport-exclusive network identity. A Cloudflare IP allowlist is only one layer; production readiness also requires TLS, strong rotated credentials, and dedicated least-privilege database roles.
+
+The checked-in `infra/cloudflare/configure-factsport-hyperdrive.sh` reads Hyperdrive ID `895cca...` and verifies the expected resource name, database `factsport_v2`, origin user `factsport_v2_reader`, and host before optionally disabling Hyperdrive caching and setting the origin connection limit to 5. This is a source-level check performed by Actions when the smoke workflow runs; it does not inspect Azure firewall rules or prove effective PostgreSQL table/column privileges. The schedule Worker uses a separate Hyperdrive ID and role and must be audited independently.
+
+No checked-in migration among the inspected v2 files provisions the app-reader, schedule-writer, or ESPN-preview roles and their exact grants. Record the role/grant SQL or an approved infrastructure-as-code source before production cutover. The schedule Worker checks that its role cannot DELETE from matches or UPDATE score columns, but the full allowed-column privilege set still needs database-side verification. The ESPN preview Worker must use a database-enforced SELECT-only identity.
+
+### Cron and staging lifecycle
+
+The schedule-sync config declares Cron `15 3,15 * * *` (UTC) and the Worker code refuses unexpected cron values. The config/source alone does not prove that the Worker is deployed, that the trigger is active in Cloudflare, or that scheduled executions are succeeding. Verify the live Worker script, trigger, latest invocations, and logs through the Cloudflare account before treating automated ingestion as operational.
+
+The full app staging workflow creates a new random access token per deployment and installs it as a Worker secret. The workflow does not implement a time-based expiry or automatic Worker deletion. Staging access therefore remains protected but needs an explicit cleanup/rotation policy.
+
+### Remaining account-level checks
+
+The repository workflows use the masked GitHub secrets `CLOUDFLARE_ID` and `CLOUDFLARE_KEY`; their values must never be printed or copied into files. The GitHub connector cannot read secret contents or inspect Azure firewall configuration. Use a Cloudflare-authenticated staging audit workflow to inspect Worker scripts/settings, routes, Cron triggers, Hyperdrive resources, and R2 public/custom-domain settings. Verify Azure firewall rules and PostgreSQL effective grants separately through authorized read-only administration.
+
+A `Vercel` status context was observed on a v2 commit even though the inspected v2 workflow files deploy only to Cloudflare. Treat it as stale GitHub integration/status metadata unless a live account inspection proves otherwise; remove the obsolete status integration from repository settings if it is no longer used. It is not evidence that the current Cloudflare staging workflows use Vercel.
