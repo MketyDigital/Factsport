@@ -41,9 +41,9 @@ const MATCH_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9
 
 function teamPatterns(teamName: string) {
   if (!teamName || teamName.length > 100) throw new Error('Invalid team filter');
-  return [...new Set(getTeamSearchVariations(teamName)
+  return Array.from(new Set(getTeamSearchVariations(teamName)
     .map(value => value.replace(/[%_\\\\]/g, '').trim().toLowerCase())
-    .filter(Boolean).map(value => `%${value}%`))];
+    .filter(Boolean).map(value => `%${value}%`)));
 }
 
 export async function listPostgresMatchesWindow(input: {
@@ -59,8 +59,8 @@ export async function listPostgresMatchesWindow(input: {
     return sql`
       SELECT ${sql.unsafe(MATCH_SELECT)} FROM public.matches
       WHERE match_date >= ${from.toISOString()} AND match_date <= ${to.toISOString()}
-        AND (home_team ILIKE ANY(${sql.array(patterns, 'text')})
-          OR away_team ILIKE ANY(${sql.array(patterns, 'text')}))
+        AND (home_team ILIKE ANY(${sql.array(patterns)})
+          OR away_team ILIKE ANY(${sql.array(patterns)}))
       ORDER BY match_date ASC, id ASC LIMIT 100
     `;
   }
@@ -79,8 +79,8 @@ export async function getPostgresTeamForm(teamName: string) {
     SELECT home_team, away_team, home_score, away_score
     FROM public.matches
     WHERE status IN ('FT','FINISHED','AET','PEN','AWARDED','ABD') AND match_date < now()
-      AND (home_team ILIKE ANY(${sql.array(patterns, 'text')})
-        OR away_team ILIKE ANY(${sql.array(patterns, 'text')}))
+      AND (home_team ILIKE ANY(${sql.array(patterns)})
+        OR away_team ILIKE ANY(${sql.array(patterns)}))
     ORDER BY match_date DESC LIMIT 30
   `;
   const form: string[] = [];
