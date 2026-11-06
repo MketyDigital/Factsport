@@ -24,11 +24,25 @@ export default {
         SELECT current_user = 'factsport_v2_reader' AS restricted_role,
           current_database() = 'factsport_v2' AS correct_database,
           has_table_privilege(current_user,'public.matches','SELECT') AS matches_readable,
-          has_table_privilege(current_user,'public.matches','INSERT') AS matches_not_readonly
+          has_table_privilege(current_user,'public.matches','INSERT') AS can_insert_matches,
+          has_table_privilege(current_user,'public.matches','UPDATE') AS can_update_matches,
+          has_table_privilege(current_user,'public.matches','DELETE') AS can_delete_matches,
+          has_column_privilege(current_user,'public.matches','home_score','INSERT') AS can_insert_score,
+          has_column_privilege(current_user,'public.matches','home_score','UPDATE') AS can_update_score,
+          has_table_privilege(current_user,'public.app_users','SELECT') AS can_read_users,
+          has_table_privilege(current_user,'public.external_identities','SELECT') AS can_read_identities,
+          has_table_privilege(current_user,'public.job_runs','SELECT') AS can_read_jobs,
+          (SELECT rolinherit FROM pg_roles WHERE rolname = current_user) AS inherits_roles,
+          (SELECT rolconnlimit FROM pg_roles WHERE rolname = current_user) AS connection_limit
       `;
-      const ok = data.restricted_role && data.correct_database &&
-        data.matches_readable && !data.matches_not_readonly;
-      return Response.json({ ok: !!ok, limitedRole: !!ok },
+      const ok = data.restricted_role && data.correct_database && data.matches_readable &&
+        !data.can_insert_matches && !data.can_update_matches && !data.can_delete_matches &&
+        !data.can_insert_score && !data.can_update_score && !data.can_read_users &&
+        !data.can_read_identities && !data.can_read_jobs && !data.inherits_roles &&
+        Number(data.connection_limit) === 5;
+      return Response.json({ ok: !!ok, limitedRole: !!ok, noRoleInheritance: !data.inherits_roles,
+        connectionLimit: Number(data.connection_limit), cannotWriteMatches: !data.can_insert_matches &&
+          !data.can_update_matches && !data.can_delete_matches && !data.can_insert_score && !data.can_update_score },
         { status: ok ? 200 : 503, headers: { 'Cache-Control': 'no-store' } });
     } catch {
       return Response.json({ ok: false, error: 'reader_connection_failed' },
