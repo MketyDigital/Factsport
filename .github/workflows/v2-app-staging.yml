@@ -134,6 +134,26 @@ jobs:
             echo "::error::Token-protected staging match response must not be publicly cacheable."
             exit 1
           fi
+          CURSOR_DATE="$(jq -r '.[0].match_date // empty' /tmp/factsport-staging-matches)"
+          CURSOR_ID="$(jq -r '.[0].id // empty' /tmp/factsport-staging-matches)"
+          [ -n "$CURSOR_DATE" ] && [ -n "$CURSOR_ID" ] || {
+            echo "::error::Staging match response did not include a date and UUID cursor."
+            exit 1
+          }
+          CURSOR_DATE_ENCODED="$(jq -nr --arg value "$CURSOR_DATE" '$value | @uri')"
+          CURSOR_ID_ENCODED="$(jq -nr --arg value "$CURSOR_ID" '$value | @uri')"
+          PAGINATION_STATUS="$(curl --silent --show-error --max-time 25 \
+            -o /tmp/factsport-staging-pagination -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+            "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=$CURSOR_DATE_ENCODED&cursorId=$CURSOR_ID_ENCODED")"
+          [ "$PAGINATION_STATUS" = "200" ] && \
+            jq -e --arg cursorId "$CURSOR_ID" 'type == "array" and all(.[]; .id != $cursorId)' \
+              /tmp/factsport-staging-pagination >/dev/null || {
+              echo "::error::Stable timestamp+UUID keyset pagination failed (HTTP $PAGINATION_STATUS)."
+              exit 1
+            }
+          echo "Factsport staging pagination: timestamp+UUID cursor accepted and did not repeat the cursor row."
+
           UNAUTH_MATCH_STATUS="$(curl --silent --show-error --max-time 25 \
             -o /tmp/factsport-staging-after-auth-unauthorized -w '%{http_code}' \
             "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=2026-11-01")"
