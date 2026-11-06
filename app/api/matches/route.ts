@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { env } from 'cloudflare:workers';
-import { createClient } from '@supabase/supabase-js';
 import { listPostgresMatches } from '@/lib/adapters/postgres-matches';
 
 // 🟢 THE MAGIC SHIELD: Caches this endpoint at the Edge CDN for 60 seconds!
@@ -52,6 +51,7 @@ export async function GET(request: Request) {
         }
     }
 
+    const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     
     let query = supabase.from('matches')
