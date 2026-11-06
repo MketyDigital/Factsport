@@ -175,3 +175,40 @@ The app-staging matches endpoint was also found to return a public cache header 
 ## ESPN preview privilege correction — 2026-11-06
 
 The earlier audit finding that the ESPN preview used `factsport_v2_espn_writer` is superseded by the latest v2 branch changes. Both the reconciliation preview and score-parity preview now verify and use the existing read-only `factsport_v2_reader` runtime Hyperdrive (`895cca...`). The dedicated ESPN writer Hyperdrive remains reserved for a future score updater. The preview workflow now checks the exact runtime resource and reader identity before deployment. A fresh preview run is required to mark this runtime correction verified.
+
+
+## Staging infrastructure and PostgreSQL role audit — 2026-11-06
+
+### Cloudflare staging controls verified
+
+- App matches cache isolation passed: [42259985117](https://github.com/MketyDigital/Factsport/actions/runs/42259985117) tested authenticated request → unauthenticated request to the same URL → authenticated request; staging responses remain `private, no-store`.
+- Runtime Hyperdrive and R2 privacy/TLS gate passed: [42262051142](https://github.com/MketyDigital/Factsport/actions/runs/42262051142). The runtime Hyperdrive identity matched `factsport_v2` / `factsport_v2_reader`, TLS mode was `require`, query cache was disabled, origin connection limit was five, DB probe passed, R2 managed `r2.dev` access was disabled, no custom domain was enabled, and R2 probe passed.
+- Schedule Worker strict-role/Cron deployment passed: [42264186975](https://github.com/MketyDigital/Factsport/actions/runs/42264186975). It verified the schedule role cannot insert/update scores or change settlement state and has no role inheritance with a five-connection limit. Cron is registered at 03:15 and 15:15 UTC; actual scheduled invocation history still needs observation.
+- ESPN writer strict-role verifier passed: [42264640003](https://github.com/MketyDigital/Factsport/actions/runs/42264640003). It confirmed the writer's limited live-field permissions, no private-table access, no role inheritance and five-connection limit.
+- ESPN reconciliation preview uses the read-only runtime reader and passed: [42260972600](https://github.com/MketyDigital/Factsport/actions/runs/42260972600), with 20 unique candidates and zero writes.
+
+### Effective PostgreSQL staging privileges
+
+A read-only catalog audit through a temporary Cloudflare Worker completed successfully. It connected as `mketydbadmin` to `factsport_v2`; the database owner is `mketydbadmin`. No credentials or private row data were retrieved.
+
+- All three runtime roles (`factsport_v2_reader`, `factsport_v2_schedule_writer`, `factsport_v2_espn_writer`) are LOGIN roles, non-superuser, cannot create databases/roles, cannot replicate, cannot bypass RLS, have `NOINHERIT`, and have connection limit 5.
+- No role memberships exist for these runtime roles.
+- Table-level rights are SELECT on `public.matches` only; no table-level INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER, and no rights on `app_users`, `external_identities` or `job_runs`.
+- Reader has no match-column INSERT or UPDATE privileges.
+- Schedule writer can insert/update fixture schedule fields only; it no longer has score INSERT or UPDATE, cannot update `points_distributed`, and cannot update `espn_id`.
+- ESPN writer can update only `away_score`, `espn_id`, `home_score`, `match_events`, `source_updated_at`, `stats`, `status`, `updated_at` and `version`; it cannot alter team names, kickoff, settlement, insert rows or delete rows.
+- All three roles have CONNECT and schema USAGE, but no database CREATE or schema CREATE.
+- No executable functions or usable sequences in the public schema are granted to these roles.
+
+The audit observed the default database TEMP privilege inherited from PUBLIC. The database owner is confirmed as `mketydbadmin`; a separate idempotent hardening run is currently verifying removal of this unnecessary TEMP privilege. Until that rerun passes, record TEMP as a residual default privilege; runtime Workers do not use temporary tables.
+
+The staging-only hardening SQL is recorded in `db/migrations/0002_factsport_v2_runtime_role_hardening.sql`. The successful first hardening run [42263796103](https://github.com/MketyDigital/Factsport/actions/runs/42263796103) applied NOINHERIT, five-connection limits and removed the schedule writer's score INSERT grants. A follow-up is testing the database TEMP revocation. No production DB role or grant was changed.
+
+### Route and UI migration inventories
+
+Added:
+- [ROUTE-MIGRATION-MATRIX.md](./ROUTE-MIGRATION-MATRIX.md) — 25 API routes and privileged server actions.
+- [PAGE-MIGRATION-MATRIX.md](./PAGE-MIGRATION-MATRIX.md) — public, auth, dashboard, VIP, admin, editorial, sports and legal pages plus required user journeys.
+- [COMPONENT-MIGRATION-MATRIX.md](./COMPONENT-MIGRATION-MATRIX.md) — direct Supabase dependencies found in 54 shared component files, including 14 direct Supabase consumers.
+
+These inventories make clear that only the matches API and protected health endpoint are proven on the v2 runtime. The rest of the application is not feature-complete.
