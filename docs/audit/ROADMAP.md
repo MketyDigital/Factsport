@@ -206,3 +206,8 @@ The governing roadmap remains this document. The detailed delivery sequence and 
 - The runtime reader role's initial bootstrap checks only selected negative permissions. Strengthen effective-grant verification (PUBLIC privileges, table/column rights, schema/database rights, role attributes/memberships, functions and sequences) before production sign-off.
 - Complete the remaining roadmap milestones in dependency order; preserve the clean operational reset policy and all owner-confirmed provider precedence/adapter decisions.
 - No production DNS, production Worker routes, legacy Supabase data, production database permissions or live scheduled jobs were modified by this update.
+
+
+## Route-level migration register (2026-11-06)
+
+The route-by-route inventory is now recorded in [ROUTE-MIGRATION-MATRIX.md](./ROUTE-MIGRATION-MATRIX.md). It records the 25 tracked API routes plus privileged server actions, current dependencies, v2 destination and completion criteria. Use it alongside this roadmap and the production execution plan; route compilation alone is not feature parity.
