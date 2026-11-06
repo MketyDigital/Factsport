@@ -46,6 +46,7 @@ export default {
     const sql = postgres(env.FACTSPORT_HYPERDRIVE.connectionString, {
       max: 1, fetch_types: false, prepare: true, connect_timeout: 10, idle_timeout: 5,
     });
+    let auditPhase = 'identity';
     try {
       const [identity] = await sql`
         SELECT current_database() AS database, current_user AS role
@@ -56,7 +57,7 @@ export default {
         });
       }
 
-      let auditPhase = 'roles';
+      auditPhase = 'roles';
       const roles = await sql`
         SELECT rolname AS role_name, rolcanlogin AS can_login,
           rolsuper AS is_superuser, rolinherit AS inherits_roles,
