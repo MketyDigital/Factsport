@@ -97,7 +97,8 @@ jobs:
             fi
             STATE="$(jq -r '.sqlState // "none"' /tmp/factsport-db-role-audit.json 2>/dev/null || echo none)"
             PHASE="$(jq -r '.auditPhase // "unknown"' /tmp/factsport-db-role-audit.json 2>/dev/null || echo unknown)"
-            echo "Read-only role audit attempt $attempt: HTTP $HTTP, SQLSTATE $STATE, phase $PHASE"
+            BODY="$(head -c 220 /tmp/factsport-db-role-audit.json 2>/dev/null | tr '\\n' ' ' | tr -cd '[:print:]' || true)"
+            echo "Read-only role audit attempt $attempt: HTTP $HTTP, SQLSTATE $STATE, phase $PHASE, response=$BODY"
             sleep 3
           done
           [ "$READY" = "true" ] || {
