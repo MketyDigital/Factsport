@@ -24,7 +24,7 @@ const getImageKitProxyUrl = (rawUrl: string) => {
     return `${endpoint}/tr:f-png/${encodeURIComponent(rawUrl)}`;
 };
 
-// 🟢 TS TYPES ADDED SO VERCEL BUILDS CORRECTLY
+// Type annotations for the Cloudflare-compatible TypeScript build.
 function parseArticleTemplate(templateText: string, generatedContent: string, link: string) {
     if (!templateText) return null;
     return templateText.replace(/\[AI_TEXT\]/g, generatedContent).replace(/\[LINK\]/g, link);
