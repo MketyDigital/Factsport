@@ -6,9 +6,10 @@
 
 ## Current state
 
-The current v2 Cloudflare Worker has two database-backed paths deliberately enabled for staging:
+The current v2 Cloudflare Worker has these database-backed paths deliberately enabled for staging:
 - `GET /api/v2/health`: protected staging dependency probe (Hyperdrive + R2).
-- `GET /api/matches`: staging PostgreSQL read path behind the staging token gate.
+- `GET /matches`: server-rendered initial match list and optional team form through the read-only PostgreSQL adapter when `FACTSPORT_MATCHES_BACKEND=postgres`.
+- `GET /api/matches`: read-only PostgreSQL load-more API with stable `(match_date,id)` keyset pagination, explicit public match projection and private/no-store staging responses.
 
 All other routes listed below still import or depend on legacy Supabase, old secrets, or external services and must not be treated as production-ready in the vinext Worker. The staging build currently supplies placeholder Supabase build variables; passing the app health/matches tests does not prove the remaining routes.
 
@@ -32,7 +33,7 @@ All other routes listed below still import or depend on legacy Supabase, old sec
 | `GET /api/match/[id]` | Supabase match + external matchService data | Canonical match center service | Stable UUID, provider joins, full details/events/lineups/stats, not-found/error semantics |
 | `GET /api/match/pin` | Supabase session + matches | User match-follow service | Authenticated user identity, uniqueness, user-scoped row policy, notification preferences |
 | `GET /api/matches/highlights/sync` | Supabase matches; Google/YouTube search | Highlights ingestion + media metadata | Search quota, match identity, rights/provenance, idempotent association, reviewed media display |
-| `GET /api/matches` | Supabase legacy path or v2 Postgres when `FACTSPORT_MATCHES_BACKEND=postgres`; 15-row cursor pagination | Public match-list read API | Staging token gate; private/no-store in staging; stable compound cursor; bounded league/status filters; public cache only for production projection |
+| `GET /api/matches` | Legacy Supabase fallback or v2 Postgres when `FACTSPORT_MATCHES_BACKEND=postgres`; 15-row keyset pagination | Public match-list read API | Staging token gate; private/no-store; timestamp+UUID cursor; explicit public DTO projection; bounded league/status filters; production caching only on a safe public projection |
 | `GET/POST /api/matchmaker` | Supabase matches + ESPN scoreboard matching | Provider identity reconciliation service | Exact team/kickoff matching, candidate review, unique provider IDs, no score/settlement writes |
 | `GET /api/og` | Dynamic Open Graph image | Cloudflare image response/static generation | Stable metadata, bounded input, cache and SEO tests |
 | `GET /api/settings` | Supabase site_settings/matches | Public configuration read model | Explicit safe fields only; never expose social/provider secrets; caching and schema validation |
