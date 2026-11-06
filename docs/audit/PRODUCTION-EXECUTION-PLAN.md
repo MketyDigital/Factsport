@@ -250,3 +250,8 @@ The read-only PostgreSQL catalog audit found all three runtime roles non-superus
 ## Hyperdrive and role identity register
 
 Use [ROLE-PRIVILEGE-MATRIX.md](./ROLE-PRIVILEGE-MATRIX.md) as the canonical map of all four Hyperdrive IDs, their database identities and exact grants. The runtime reader, schedule writer and ESPN writer are separate; the admin Hyperdrive is restricted to bootstrap/audit/hardening workflows. Do not bind the admin credential to application or sports Workers.
+
+
+## Database and data reset register
+
+Use [DATA-MIGRATION-MATRIX.md](./DATA-MIGRATION-MATRIX.md) as the authority for the approved “fresh data; full product” reset. It maps all 18 legacy public tables to v2 domains, distinguishes reset/reseed/preserve decisions, and lists required migration gates. Do not bulk-copy transactional history or destroy the source database.
