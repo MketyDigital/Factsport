@@ -108,7 +108,7 @@ export default {
         matchColumnPrivileges,
         database: identity.database,
         connectedAs: identity.connected_as,
-        roles, tablePrivileges, matchColumnPrivileges,
+        roles, tablePrivileges,
       }, { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
       const code = error && typeof error === 'object' && 'code' in error
