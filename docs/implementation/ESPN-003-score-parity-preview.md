@@ -22,3 +22,8 @@
 ## Verification
 
 The v2 native vinext CI now runs the score parity helper tests and validates the Worker module syntax. The next operational step is a protected staging preview against already-linked rows; no score-writing worker or scheduled refresh is authorized by this implementation.
+
+
+## 2026-11-06 least-privilege correction
+
+The score-parity preview worker now verifies `factsport_v2_reader` and is configured to use the read-only runtime Hyperdrive (`895cca...`). It no longer connects through the ESPN writer identity. The dedicated ESPN writer remains reserved for a separate score-writing worker after its transaction, idempotency and parity gates pass.
