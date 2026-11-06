@@ -48,13 +48,16 @@ export default {
         has_table_privilege(current_user, 'public.matches', 'DELETE') AS can_delete,
         has_table_privilege(current_user, 'public.app_users', 'SELECT') AS can_read_users,
         has_table_privilege(current_user, 'public.external_identities', 'SELECT') AS can_read_identities,
-        has_table_privilege(current_user, 'public.job_runs', 'SELECT') AS can_read_jobs`;
+        has_table_privilege(current_user, 'public.job_runs', 'SELECT') AS can_read_jobs,
+        (SELECT rolinherit FROM pg_roles WHERE rolname = current_user) AS inherits_roles,
+        (SELECT rolconnlimit FROM pg_roles WHERE rolname = current_user) AS connection_limit`;
       const ok = p.database === 'factsport_v2' && p.role === 'factsport_v2_espn_writer' &&
         p.can_read_matches && p.can_link_espn && p.can_update_home_score &&
         p.can_update_away_score && p.can_update_status && p.can_update_events &&
         p.can_update_stats && !p.can_update_points && !p.can_update_teams &&
         !p.can_update_kickoff && !p.can_insert && !p.can_delete &&
-        !p.can_read_users && !p.can_read_identities && !p.can_read_jobs;
+        !p.can_read_users && !p.can_read_identities && !p.can_read_jobs &&
+        !p.inherits_roles && Number(p.connection_limit) === 5;
       return Response.json({
         ok, database: p.database === 'factsport_v2' ? p.database : 'unexpected',
         role: p.role === 'factsport_v2_espn_writer' ? p.role : 'unexpected',
@@ -63,6 +66,8 @@ export default {
         cannotUpdateSettlementOrSchedule: !p.can_update_points && !p.can_update_teams && !p.can_update_kickoff,
         cannotInsertOrDelete: !p.can_insert && !p.can_delete,
         cannotReadPrivateTables: !p.can_read_users && !p.can_read_identities && !p.can_read_jobs,
+        noRoleInheritance: !p.inherits_roles,
+        connectionLimit: Number(p.connection_limit),
       }, { status: ok ? 200 : 503, headers: { 'Cache-Control': 'no-store' } });
     } catch {
       return Response.json({ ok: false, error: 'espn_writer_connection_failed' },
