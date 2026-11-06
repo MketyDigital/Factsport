@@ -1,5 +1,5 @@
 # Factsport modernization — master roadmap
-Status: M0 discovery in progress | Repository: MketyDigital/Factsport | Branch: refactor/factsport-v2
+Status: M0 baseline still in progress; M6 Cloudflare staging and M7 PostgreSQL foundation partially verified; production remains paused | Repository: MketyDigital/Factsport | Branch: refactor/factsport-v2
 Updated: 2026-10-30
 
 ## Governing decisions
@@ -231,3 +231,20 @@ The four Hyperdrive resources and the three runtime database roles are mapped in
 ## Database/data migration register (2026-11-06)
 
 [DATA-MIGRATION-MATRIX.md](./DATA-MIGRATION-MATRIX.md) records the 18-table legacy inventory, target v2 domains, clean-reset dispositions, preservation exceptions and migration gates. The target remains a full product with fresh transactional data, not a reduced product or blind data copy.
+
+## Staging progress update — 2026-11-06
+
+- Hyperdrive identities are intentionally distinct, not competing IDs: 895cca… is reader/app, eb634… is schedule writer, c516… is reserved ESPN writer, and 08cee… is administrator/bootstrap. The app binding remains on the read-only reader; admin access is confined to provisioning, audit and hardening Workers.
+- Staging database role hardening passed in [run 42265651629](https://github.com/MketyDigital/Factsport/actions/runs/42265651629); independent catalog audit passed in [run 42265971339](https://github.com/MketyDigital/Factsport/actions/runs/42265971339). The three runtime roles are NOINHERIT, non-superuser, non-privileged, connection-limited to five, have no role memberships, cannot create TEMP tables, cannot execute public functions or use public sequences, and cannot access private account/identity/job tables. Schedule and ESPN column grants are separate and verified.
+- The staging Hyperdrive/R2 smoke passed after the Cloudflare safety script was changed to fail closed when the runtime Hyperdrive identity or safety settings cannot be verified: [run 42281703688](https://github.com/MketyDigital/Factsport/actions/runs/42281703688).
+- The v2 /matches page has been changed to use the read-only PostgreSQL adapter for initial server rendering and team form; load-more now sends timestamp plus match UUID for stable keyset pagination. The public API uses an explicit match DTO and dynamic/private staging responses. Final app staging verification is tracked by the current v2-app-staging run; do not mark full page parity complete until that run passes.
+- The staging worker hostname now fails closed if its FACTSPORT_ENVIRONMENT binding is missing or incorrect. This prevents a staging misconfiguration from silently bypassing the access gate.
+- These are staging-only changes. No production Worker, production domain/DNS, legacy Supabase data, Azure production firewall, paid entitlements, settlement, or production scheduler was changed.
+
+### Next exact actions
+
+1. Confirm the latest v2-verify, native vinext build, and full app staging runs pass on the current branch head; fix any failure before proceeding.
+2. Add PostgreSQL integration coverage for the compound cursor and team alias queries; verify /matches and /api/matches using the real staging Hyperdrive.
+3. Continue M1/M2 route/page/component inventory and port the sports lifecycle in order: fixture import → reviewed ESPN linking → fast live read → FT verification → standings → transactional settlement.
+4. Implement the remaining product domains and roles (identity/session, admin RBAC/step-up, editorial/CMS, predictions, VIP/payments, community/chat/MOTM, social outbox, mail and video entitlement) with tests and real staging journeys.
+5. Do not begin production cutover until all P0/P1 items in PRODUCTION-EXECUTION-PLAN.md, backups/restore, shadow comparison, end-to-end journeys and explicit owner go/no-go are complete.
