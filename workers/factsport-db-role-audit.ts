@@ -56,6 +56,7 @@ export default {
         });
       }
 
+      let auditPhase = 'roles';
       const roles = await sql`
         SELECT rolname AS role_name, rolcanlogin AS can_login,
           rolsuper AS is_superuser, rolinherit AS inherits_roles,
@@ -67,6 +68,7 @@ export default {
         ORDER BY rolname
       `;
 
+      auditPhase = 'table_privileges';
       const tablePrivileges = await sql`
         WITH roles(role_name) AS (
           VALUES ('factsport_v2_reader'), ('factsport_v2_schedule_writer'),
@@ -84,6 +86,7 @@ export default {
         ORDER BY roles.role_name, tables.table_name, privileges.privilege_name
       `;
 
+      auditPhase = 'match_column_privileges';
       const matchColumnPrivileges = await sql`
         WITH roles(role_name) AS (
           VALUES ('factsport_v2_reader'), ('factsport_v2_schedule_writer'),
@@ -106,6 +109,7 @@ export default {
         ORDER BY roles.role_name, columns.column_name
       `;
 
+      auditPhase = 'memberships';
       const memberships = await sql`
         SELECT member.rolname AS role_name, granted.rolname AS member_of
         FROM pg_auth_members membership
@@ -115,6 +119,7 @@ export default {
         ORDER BY member.rolname, granted.rolname
       `;
 
+      auditPhase = 'database_schema_privileges';
       const databaseAndSchemaPrivileges = await sql`
         WITH roles(role_name) AS (
           VALUES ('factsport_v2_reader'), ('factsport_v2_schedule_writer'),
@@ -129,13 +134,14 @@ export default {
         FROM roles ORDER BY role_name
       `;
 
+      auditPhase = 'public_function_access';
       const publicFunctionAccess = await sql`
         WITH roles(role_name) AS (
           VALUES ('factsport_v2_reader'), ('factsport_v2_schedule_writer'),
                  ('factsport_v2_espn_writer')
         )
         SELECT roles.role_name, count(functions.oid)::integer AS executable_public_functions,
-          coalesce(array_agg(functions.proname ORDER BY functions.proname)
+          coalesce(array_agg(functions.proname::text ORDER BY functions.proname::text)
             FILTER (WHERE functions.oid IS NOT NULL), ARRAY[]::text[]) AS function_names
         FROM roles
         LEFT JOIN pg_proc functions
@@ -145,6 +151,7 @@ export default {
         ORDER BY roles.role_name
       `;
 
+      auditPhase = 'public_sequence_access';
       const publicSequenceAccess = await sql`
         WITH roles(role_name) AS (
           VALUES ('factsport_v2_reader'), ('factsport_v2_schedule_writer'),
@@ -162,6 +169,7 @@ export default {
         ORDER BY roles.role_name
       `;
 
+      auditPhase = 'owned_objects';
       const ownedObjects = await sql`
         WITH roles(role_name) AS (
           VALUES ('factsport_v2_reader'), ('factsport_v2_schedule_writer'),
@@ -189,7 +197,7 @@ export default {
       const code = error && typeof error === 'object' && 'code' in error
         ? String((error as { code?: unknown }).code) : '';
       return Response.json({
-        ok: false, error: 'db_role_audit_failed',
+        ok: false, error: 'db_role_audit_failed', auditPhase,
         sqlState: /^[A-Z0-9]{5}$/.test(code) ? code : 'none',
       }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     } finally {
