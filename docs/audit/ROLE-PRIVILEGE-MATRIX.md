@@ -52,6 +52,6 @@ The schedule writer's unnecessary INSERT permission on `home_score` and `away_sc
 
 ## Remaining database-level detail
 
-The audit observed that all three runtime roles could create temporary tables because PostgreSQL's database TEMP privilege was inherited from PUBLIC. No Worker uses temporary tables. A follow-up hardening attempt is testing revocation of that default PUBLIC grant; until it passes, keep this as a low-priority residual privilege and do not claim it has been removed.
+The staging hardening run [42265651629](https://github.com/MketyDigital/Factsport/actions/runs/42265651629) successfully revoked PostgreSQL's default `TEMP` privilege from `PUBLIC`. The subsequent independent read-only catalog audit [42265971339](https://github.com/MketyDigital/Factsport/actions/runs/42265971339) confirmed `can_create_temp=false` for all three runtime roles. It also confirmed zero executable public functions and zero usable public sequences for each role. This residual privilege is closed in staging.
 
 The current role migration is `db/migrations/0002_factsport_v2_runtime_role_hardening.sql`. It is staging-only until the same migration is deliberately approved and validated against the production database. The admin Hyperdrive credential must remain isolated to provisioning/audit workflows.
