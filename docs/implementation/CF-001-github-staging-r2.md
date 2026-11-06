@@ -107,3 +107,10 @@ The full app staging workflow creates a new random access token per deployment a
 The repository workflows use the masked GitHub secrets `CLOUDFLARE_ID` and `CLOUDFLARE_KEY`; their values must never be printed or copied into files. The GitHub connector cannot read secret contents or inspect Azure firewall configuration. Use a Cloudflare-authenticated staging audit workflow to inspect Worker scripts/settings, routes, Cron triggers, Hyperdrive resources, and R2 public/custom-domain settings. Verify Azure firewall rules and PostgreSQL effective grants separately through authorized read-only administration.
 
 A `Vercel` status context was observed on a v2 commit even though the inspected v2 workflow files deploy only to Cloudflare. Treat it as stale GitHub integration/status metadata unless a live account inspection proves otherwise; remove the obsolete status integration from repository settings if it is no longer used. It is not evidence that the current Cloudflare staging workflows use Vercel.
+
+
+## 2026-11-06 account-backed staging safety verification
+
+The staging workflow now fails closed if it cannot inspect the runtime Hyperdrive, and it verifies the exact Azure database, reader identity, TLS-required setting, disabled Hyperdrive query cache and origin connection limit of five. It also checks both R2 public-access mechanisms through Cloudflare's account API: managed `r2.dev` access must be disabled and no custom domain may be enabled.
+
+Workflow [42261414894](https://github.com/MketyDigital/Factsport/actions/runs/42261414894) passed these checks, deployed the isolated smoke Worker, and returned `db-smoke: OK` and `r2-smoke: OK`. The R2 bucket remained private; no object was written. The later source update also adds TLS to the Hyperdrive identity guard, which is being re-run separately.
