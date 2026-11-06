@@ -29,7 +29,10 @@ export async function GET(request: Request) {
         }
         try {
             const matches = await listPostgresMatches({ league, cursor, type });
-            return NextResponse.json(matches, { headers: { 'Cache-Control': 'public, s-maxage=60' } });
+            const cacheControl = env.FACTSPORT_ENVIRONMENT === 'staging'
+                ? 'private, no-store, max-age=0'
+                : 'public, s-maxage=60';
+            return NextResponse.json(matches, { headers: { 'Cache-Control': cacheControl } });
         } catch (error: unknown) {
             // Only the separate token-protected staging Worker receives
             // sanitized error diagnostics; do not expose SQL or connection info.
