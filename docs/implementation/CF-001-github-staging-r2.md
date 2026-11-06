@@ -119,3 +119,8 @@ Workflow [42261414894](https://github.com/MketyDigital/Factsport/actions/runs/42
 ### TLS gate rerun
 
 The follow-up staging run [42261593655](https://github.com/MketyDigital/Factsport/actions/runs/42261593655) passed after the Hyperdrive guard was tightened to require `mtls.sslmode == require` as well as the exact Azure origin identity, disabled caching and connection limit. The isolated smoke Worker again passed both DB and R2 probes. No production route, schema or data changed.
+
+
+## Hyperdrive ID reconciliation — final mapping
+
+The four Hyperdrive IDs have now been accounted for and verified by their dedicated staging workflows. `895cca...` is the runtime reader, `eb634f...` is the schedule writer, `c5166b...` is the reserved ESPN writer, and `08cee4...` is the administrative/bootstrap connection used by the temporary DB audit and role-hardening Workers. The earlier note describing `08cee4...` as historical/unverified is superseded. See [ROLE-PRIVILEGE-MATRIX.md](../audit/ROLE-PRIVILEGE-MATRIX.md) for exact names and bindings.
