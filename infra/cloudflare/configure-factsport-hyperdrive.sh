@@ -11,7 +11,7 @@ if [ "$STATUS" != "200" ]; then
   echo "::error::Cannot verify Factsport Hyperdrive safety settings (HTTP $STATUS); refusing staging release."
   exit 0
 fi
-if ! jq -e '.success == true and .result.name == "factsport-v2-runtime-postgres" and .result.origin.database == "factsport_v2" and .result.origin.user == "factsport_v2_reader" and .result.origin.host == "mketypostgres.postgres.database.azure.com"' /tmp/factsport-hd-get.json >/dev/null; then
+if ! jq -e '.success == true and .result.name == "factsport-v2-runtime-postgres" and .result.origin.database == "factsport_v2" and .result.origin.user == "factsport_v2_reader" and .result.origin.host == "mketypostgres.postgres.database.azure.com" and .result.mtls.sslmode == "require"' /tmp/factsport-hd-get.json >/dev/null; then
   echo "::error::Refusing Hyperdrive changes: resource identity is not the expected Factsport Azure database."
   exit 1
 fi
