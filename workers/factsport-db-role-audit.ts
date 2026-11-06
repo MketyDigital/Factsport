@@ -78,13 +78,37 @@ export default {
         FROM role_names CROSS JOIN table_names CROSS JOIN privilege_names
         ORDER BY role_names.role_name, table_names.table_name, privilege_names.privilege_name
       `;
+      const matchColumnPrivileges = await sql`
+        WITH role_names(role_name) AS (
+          VALUES ('factsport_v2_reader'), ('factsport_v2_schedule_writer'),
+                 ('factsport_v2_espn_writer')
+        ), columns AS (
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'matches'
+        )
+        SELECT role_names.role_name,
+          coalesce(array_agg(columns.column_name ORDER BY columns.column_name)
+            FILTER (WHERE has_column_privilege(role_names.role_name::name,
+              'public.matches', columns.column_name, 'INSERT')), ARRAY[]::text[]) AS insert_columns,
+          coalesce(array_agg(columns.column_name ORDER BY columns.column_name)
+            FILTER (WHERE has_column_privilege(role_names.role_name::name,
+              'public.matches', columns.column_name, 'UPDATE')), ARRAY[]::text[]) AS update_columns,
+          coalesce(array_agg(columns.column_name ORDER BY columns.column_name)
+            FILTER (WHERE has_column_privilege(role_names.role_name::name,
+              'public.matches', columns.column_name, 'REFERENCES')), ARRAY[]::text[]) AS reference_columns
+        FROM role_names CROSS JOIN columns
+        GROUP BY role_names.role_name
+        ORDER BY role_names.role_name
+      `;
       return Response.json({
         ok: roles.length === 3,
         roleCount: roles.length,
         tablePrivilegeCount: tablePrivileges.length,
+        matchColumnPrivileges,
         database: identity.database,
         connectedAs: identity.connected_as,
-        roles, tablePrivileges,
+        roles, tablePrivileges, matchColumnPrivileges,
       }, { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
       const code = error && typeof error === 'object' && 'code' in error
