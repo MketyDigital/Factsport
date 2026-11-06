@@ -228,3 +228,8 @@ The stricter TLS-required Hyperdrive gate passed in run [42261593655](https://gi
 ## Route-by-route implementation register
 
 Use [ROUTE-MIGRATION-MATRIX.md](./ROUTE-MIGRATION-MATRIX.md) as the route-level register for every legacy API, its current Supabase/provider dependencies, target v2 service and acceptance requirements. Keep that matrix updated as each route is ported and tested.
+
+
+## Page and user-journey implementation register
+
+Use [PAGE-MIGRATION-MATRIX.md](./PAGE-MIGRATION-MATRIX.md) with the API route matrix to track public pages, auth, dashboard, VIP, admin, editorial, match center, community and mobile parity. A page only passes when its real v2 adapters and complete user journey work in staging.
