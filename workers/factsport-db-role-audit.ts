@@ -30,19 +30,25 @@ async function tokenMatches(expected: string, provided: string): Promise<boolean
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    let outerPhase = 'request';
+    try {
+    outerPhase = 'request_url';
     const url = new URL(request.url);
     if (request.method !== 'GET' || url.pathname !== '/__internal/db-role-audit') {
       return new Response('Not found', { status: 404 });
     }
+    outerPhase = 'token_validation';
     const auth = request.headers.get('Authorization') || '';
     const provided = auth.startsWith('Bearer ') ? auth.slice(7) : '';
     if (!(await tokenMatches(env.FACTSPORT_AUDIT_TOKEN || '', provided))) {
       return new Response('Not found', { status: 404 });
     }
+    outerPhase = 'binding_check';
     if (!env.FACTSPORT_HYPERDRIVE?.connectionString) {
       return Response.json({ ok: false, error: 'hyperdrive_missing' }, { status: 503 });
     }
 
+    outerPhase = 'database_audit';
     let sql: ReturnType<typeof postgres> | undefined;
     let auditPhase = 'connect';
     try {
@@ -207,6 +213,14 @@ export default {
       if (sql) {
         try { await sql.end(); } catch { /* preserve the sanitized audit result */ }
       }
+    }
+    } catch (error) {
+      const name = error && typeof error === 'object' && 'name' in error
+        ? String((error as { name?: unknown }).name) : 'unknown';
+      return Response.json({
+        ok: false, error: 'db_role_audit_unhandled', auditPhase: outerPhase,
+        errorName: /^[A-Za-z0-9_]{1,40}$/.test(name) ? name : 'unknown',
+      }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
     }
   },
 };
