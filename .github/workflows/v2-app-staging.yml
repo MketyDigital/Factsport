@@ -141,11 +141,23 @@ jobs:
             echo "::error::Unauthenticated match request after authorized request returned HTTP $UNAUTH_MATCH_STATUS; possible cache isolation failure."
             exit 1
           }
-          AUTH_MATCH_STATUS="$(curl --silent --show-error --max-time 25 \
-            -o /tmp/factsport-staging-after-unauth-authorized -w '%{http_code}' \
-            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
-            "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=2026-11-01")"
-          [ "$AUTH_MATCH_STATUS" = "200" ] && jq -e 'type == "array" and length > 0' /tmp/factsport-staging-after-unauth-authorized >/dev/null || {
+          AUTH_MATCH_STATUS=000
+          auth_match_ok=false
+          for attempt in 1 2 3 4 5 6; do
+            AUTH_MATCH_STATUS="$(curl --silent --show-error --max-time 25 \
+              -o /tmp/factsport-staging-after-unauth-authorized -w '%{http_code}' \
+              -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+              "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=2026-11-01")"
+            if [ "$AUTH_MATCH_STATUS" = "200" ] && jq -e 'type == "array" and length > 0' /tmp/factsport-staging-after-unauth-authorized >/dev/null 2>&1; then
+              auth_match_ok=true
+              break
+            fi
+            FINAL_CODE="$(jq -r '.error // "non-json"' /tmp/factsport-staging-after-unauth-authorized 2>/dev/null || echo non-json)"
+            FINAL_DETAILS="$(jq -r 'if type == "object" then "sqlState=" + (.sqlState // "none") + " class=" + (.errorClass // "none") else "" end' /tmp/factsport-staging-after-unauth-authorized 2>/dev/null || true)"
+            echo "Authorized post-cache probe attempt $attempt: HTTP $AUTH_MATCH_STATUS; code $FINAL_CODE; $FINAL_DETAILS"
+            sleep 2
+          done
+          [ "$auth_match_ok" = true ] || {
             echo "::error::Authorized match request failed after cache isolation check (HTTP $AUTH_MATCH_STATUS)."
             exit 1
           }
