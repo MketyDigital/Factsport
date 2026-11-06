@@ -90,7 +90,7 @@ jobs:
             HTTP="$(curl -sS --max-time 30 -o /tmp/factsport-db-role-audit.json -w '%{http_code}' \
               -H "Authorization: Bearer $FACTSPORT_AUDIT_TOKEN" "$URL")"
             if [ "$HTTP" = "200" ] && jq -e \
-              '.ok == true and .worker == "factsport-v2-db-role-audit"' \
+              '.ok == true and .database == "factsport_v2" and .connectedAs == "mketydbadmin" and (.roles | length) == 3 and (.tablePrivileges | length) == 84' \
               /tmp/factsport-db-role-audit.json >/dev/null 2>&1; then
               READY=true
               break
@@ -108,7 +108,7 @@ jobs:
           {
             echo "## Factsport v2 staging PostgreSQL role audit"
             echo "Read-only catalog inspection against factsport_v2; no database mutation performed."
-            jq -S '{ok,worker,hyperdriveBindingPresent}' \
+            jq -S '{roles,tablePrivileges}' \
               /tmp/factsport-db-role-audit.json
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Delete temporary role audit Worker
