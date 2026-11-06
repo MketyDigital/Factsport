@@ -22,21 +22,21 @@ jobs:
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KEY }}
-      FACTSPORT_ESPN_HD_ID: c5166b8496624a80a0a77c750585c271
+      FACTSPORT_RUNTIME_HD_ID: 895cca4c06104b8ab9f7c1b72a8ba18f
     steps:
-      - name: Verify exact ESPN writer Hyperdrive
+      - name: Verify exact read-only runtime Hyperdrive
         shell: bash
         run: |
           set -euo pipefail
           [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ] || exit 1
           STATUS="$(curl -sS -o /tmp/factsport-espn-hd.json -w '%{http_code}' \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/$FACTSPORT_ESPN_HD_ID")"
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/$FACTSPORT_RUNTIME_HD_ID")"
           [ "$STATUS" = 200 ] &&
-            jq -e '.success == true and .result.name == "factsport-v2-espn-postgres" and
+            jq -e '.success == true and .result.name == "factsport-v2-runtime-postgres" and
               .result.origin.database == "factsport_v2" and
-              .result.origin.user == "factsport_v2_espn_writer"' /tmp/factsport-espn-hd.json >/dev/null ||
-            { echo "::error::Refusing unexpected ESPN Hyperdrive"; exit 1; }
+              .result.origin.user == "factsport_v2_reader"' /tmp/factsport-espn-hd.json >/dev/null ||
+            { echo "::error::Refusing unexpected read-only runtime Hyperdrive"; exit 1; }
       - uses: actions/checkout@v4
         with:
           ref: refactor/factsport-v2
