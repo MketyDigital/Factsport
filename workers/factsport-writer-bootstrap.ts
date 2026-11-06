@@ -59,6 +59,7 @@ export default {
         await tx`GRANT CONNECT ON DATABASE factsport_v2 TO factsport_v2_schedule_writer`;
         await tx`GRANT USAGE ON SCHEMA public TO factsport_v2_schedule_writer`;
         // Writer may only touch fixture columns. Never prize/identity tables.
+        await tx`REVOKE ALL ON TABLE public.matches FROM PUBLIC, factsport_v2_schedule_writer`;
         await tx`GRANT SELECT ON TABLE public.matches TO factsport_v2_schedule_writer`;
         await tx`GRANT INSERT (
           api_id, league, home_team, away_team,
@@ -69,9 +70,7 @@ export default {
           league, home_team, away_team, match_date, status,
           home_logo, away_logo, venue, stage, match_group, source_updated_at
         ) ON TABLE public.matches TO factsport_v2_schedule_writer`;
-        await tx`REVOKE ALL ON TABLE public.app_users FROM factsport_v2_schedule_writer`;
-        await tx`REVOKE ALL ON TABLE public.external_identities FROM factsport_v2_schedule_writer`;
-        await tx`REVOKE ALL ON TABLE public.job_runs FROM factsport_v2_schedule_writer`;
+        await tx`REVOKE ALL ON TABLE public.app_users, public.external_identities, public.job_runs FROM PUBLIC, factsport_v2_schedule_writer`;
         const [priv] = await tx`
           SELECT has_column_privilege('factsport_v2_schedule_writer',
                     'public.matches','api_id','INSERT') AS can_insert,
@@ -82,14 +81,21 @@ export default {
                  has_column_privilege('factsport_v2_schedule_writer',
                     'public.matches','away_score','INSERT') AS can_insert_away_score,
                  has_column_privilege('factsport_v2_schedule_writer',
-                    'public.matches','home_score','UPDATE') AS can_change_score,
+                    'public.matches','home_score','UPDATE') AS can_change_home_score,
+                 has_column_privilege('factsport_v2_schedule_writer',
+                    'public.matches','away_score','UPDATE') AS can_change_away_score,
+                 has_column_privilege('factsport_v2_schedule_writer',
+                    'public.matches','points_distributed','UPDATE') AS can_change_settlement,
+                 has_column_privilege('factsport_v2_schedule_writer',
+                    'public.matches','espn_id','UPDATE') AS can_change_espn_link,
                  (SELECT rolinherit FROM pg_roles WHERE rolname='factsport_v2_schedule_writer') AS inherits_roles,
                  (SELECT rolconnlimit FROM pg_roles WHERE rolname='factsport_v2_schedule_writer') AS connection_limit,
                  has_table_privilege('factsport_v2_schedule_writer',
                     'public.app_users','SELECT') AS can_read_users
         `;
         if (!priv.can_insert || priv.can_delete || priv.can_insert_home_score || priv.can_insert_away_score ||
-            priv.can_change_score || priv.inherits_roles || Number(priv.connection_limit) !== 5 || priv.can_read_users) {
+            priv.can_change_home_score || priv.can_change_away_score || priv.can_change_settlement ||
+            priv.can_change_espn_link || priv.inherits_roles || Number(priv.connection_limit) !== 5 || priv.can_read_users) {
           throw new Error('Writer permissions invalid');
         }
       });
