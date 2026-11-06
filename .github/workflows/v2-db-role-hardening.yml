@@ -86,6 +86,10 @@ jobs:
           HTTP="$(curl -sS -o /tmp/factsport-role-hardening.json -w '%{http_code}' \
             -X POST -H "Authorization: Bearer $FACTSPORT_HARDEN_TOKEN" \
             "https://factsport-v2-db-role-hardening.$DOMAIN.workers.dev/__internal/harden-staging-db-roles")"
+          echo "Role hardening HTTP status: $HTTP"
+          if [ "$HTTP" != "200" ]; then
+            echo "Sanitized response: $(head -c 260 /tmp/factsport-role-hardening.json | tr '\\n' ' ' | tr -cd '[:print:]' || true)"
+          fi
           [ "$HTTP" = "200" ] && jq -e \
             '.ok == true and .noTempTables == true and (.roles | length) == 3 and
              (.roles | all(.inherits_roles == false and .connection_limit == 5 and
