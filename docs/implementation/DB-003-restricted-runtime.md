@@ -17,9 +17,13 @@ The native Cloudflare app `factsport-v2-staging` now binds `FACTSPORT_HYPERDRIVE
 
 The routine staging smoke Worker also uses the restricted runtime Hyperdrive. The routine Hyperdrive safeguard targets only that config.
 
-## Current limitation
+## Current role topology and remaining limitation
 
-The runtime role is deliberately **read-only**. Future fixture sync, ESPN result updates, prize settlement and account creation require purpose-specific writer/settlement roles, transactional jobs, schema additions and idempotency tests. Do **not** grant write privileges to the public request role, turn on the Azure Logic App, or cut over the production site before those are completed.
+The public application runtime remains deliberately **read-only** through `factsport_v2_reader` / Hyperdrive `895cca...`. Separate staging-only worker identities now exist: `factsport_v2_schedule_writer` / Hyperdrive `eb634...` for fixture-only ingestion, and `factsport_v2_espn_writer` / Hyperdrive `c516...` reserved for future ESPN live-field writes. The administrative Hyperdrive `08cee...` is used only for guarded provisioning, audit and hardening. These identities must never be merged or substituted.
+
+The staging hardening run [42265651629](https://github.com/MketyDigital/Factsport/actions/runs/42265651629) applied `NOINHERIT`, non-privileged role flags, five-connection limits, removed schedule score INSERT grants, and revoked `TEMP` from `PUBLIC`. The independent read-only audit [42265971339](https://github.com/MketyDigital/Factsport/actions/runs/42265971339) confirmed the database owner is `mketydbadmin`, all three runtime roles have no role memberships, no temporary-table privilege, no executable public functions or usable public sequences, and no access to private account/identity/job tables. The schedule worker is the only deployed writer in this slice; the ESPN writer is still reserved and must not be used for score updates until transaction, reconciliation, source-fencing, idempotency and parity gates pass.
+
+Prize settlement, account creation, prediction/game tables and the rest of the product schema are not yet implemented in v2. Do **not** grant write privileges to the public request role, turn on the Azure Logic App, or cut over the production site before those features are migrated and verified.
 
 The staging app uses non-production Supabase placeholders; it demonstrates native build, deployment, secure gating, the database schema and read-only integration but not full historical data or account/auth parity.
 
