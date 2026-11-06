@@ -79,7 +79,9 @@ export default {
         ORDER BY role_names.role_name, table_names.table_name, privilege_names.privilege_name
       `;
       return Response.json({
-        ok: roles.length === 3 && tablePrivileges.length === 84,
+        ok: roles.length === 3,
+        roleCount: roles.length,
+        tablePrivilegeCount: tablePrivileges.length,
         database: identity.database,
         connectedAs: identity.connected_as,
         roles, tablePrivileges,
