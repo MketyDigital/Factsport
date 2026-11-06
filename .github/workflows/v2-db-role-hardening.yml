@@ -1,6 +1,7 @@
 name: Factsport v2 staging database role hardening
 
 # Mutates only role attributes and column grants in factsport_v2 staging DB.
+# The latest staging hardening is idempotent and re-verifies the exact current role grants.
 # Uses the admin Hyperdrive through a temporary, token-protected Cloudflare Worker.
 on:
   push:
