@@ -1,0 +1,121 @@
+name: Factsport v2 staging database role hardening
+
+# Mutates only role attributes and column grants in factsport_v2 staging DB.
+# Uses the admin Hyperdrive through a temporary, token-protected Cloudflare Worker.
+on:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - '.github/workflows/v2-db-role-hardening.yml'
+      - 'workers/factsport-db-role-hardening.ts'
+      - 'wrangler.factsport-db-role-hardening.jsonc'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factsport-v2-db-role-hardening
+  cancel-in-progress: false
+
+jobs:
+  harden-staging:
+    if: github.ref == 'refs/heads/refactor/factsport-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KEY }}
+    steps:
+      - name: Validate Cloudflare credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ] || {
+            echo "::error::Cloudflare repository credentials are unavailable."
+            exit 1
+          }
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/factsport-v2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Worker dependencies and typecheck
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+      - name: Verify exact staging administrator Hyperdrive
+        shell: bash
+        run: |
+          set -euo pipefail
+          HTTP="$(curl -sS -o /tmp/factsport-role-admin-hd.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/08cee41a81be4c3980450be9563af5e2")"
+          [ "$HTTP" = "200" ] && jq -e \
+            '.success == true and .result.name == "factsport-v2-postgres" and
+             .result.origin.database == "factsport_v2" and
+             .result.origin.user == "mketydbadmin" and
+             .result.mtls.sslmode == "require"' \
+            /tmp/factsport-role-admin-hd.json >/dev/null || {
+              echo "::error::Refusing role changes: staging admin Hyperdrive identity/TLS did not match."
+              exit 1
+            }
+      - name: Deploy temporary role-hardening Worker
+        id: deploy
+        run: npx --yes wrangler@4 deploy --config wrangler.factsport-db-role-hardening.jsonc
+      - name: Install ephemeral hardening token
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$TOKEN"
+          printf 'FACTSPORT_HARDEN_TOKEN=%s\n' "$TOKEN" >> "$GITHUB_ENV"
+          printf '%s' "$TOKEN" | npx --yes wrangler@4 secret put FACTSPORT_HARDEN_TOKEN \
+            --config wrangler.factsport-db-role-hardening.jsonc
+      - name: Apply and verify least-privilege staging roles
+        shell: bash
+        run: |
+          set -euo pipefail
+          HTTP="$(curl -sS -o /tmp/factsport-role-hardening.json -w '%{http_code}' \
+            -X POST -H "Authorization: Bearer $FACTSPORT_HARDEN_TOKEN" \
+            "https://factsport-v2-db-role-hardening.$(jq -r '.result.subdomain' < <(curl -sS \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")).workers.dev/__internal/harden-staging-db-roles")"
+          [ "$HTTP" = "200" ] && jq -e \
+            '.ok == true and (.roles | length) == 3 and
+             (.roles | all(.inherits_roles == false and .connection_limit == 5 and
+               .is_superuser == false and .can_create_databases == false and
+               .can_create_roles == false and .can_replicate == false and .bypasses_rls == false)) and
+             .schedule.canInsertFixture == true and
+             .schedule.cannotInsertOrUpdateScores == true and
+             .schedule.cannotUpdateSettlement == true and
+             .reader.cannotWriteMatches == true and
+             .espn.canUpdateLiveFields == true and
+             .espn.cannotUpdateScheduleOrSettlement == true and
+             .espn.cannotInsertOrDelete == true' \
+            /tmp/factsport-role-hardening.json >/dev/null || {
+              echo "::error::Staging role hardening or its post-change privilege checks failed."
+              jq -c '{ok,error,sqlState,errorName}' /tmp/factsport-role-hardening.json 2>/dev/null || true
+              exit 1
+            }
+          {
+            echo "## Factsport v2 staging database role hardening"
+            echo "Applied NOINHERIT and five-connection limits to reader/schedule/ESPN roles."
+            echo "Revoked unnecessary schedule-writer INSERT privileges on home_score and away_score."
+            jq -S '{roles,schedule,reader,espn}' /tmp/factsport-role-hardening.json
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Delete temporary role-hardening Worker
+        if: always() && steps.deploy.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          HTTP="$(curl -sS -o /tmp/factsport-role-hardening-delete.json -w '%{http_code}' -X DELETE \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/factsport-v2-db-role-hardening")"
+          [ "$HTTP" = "200" ] && jq -e '.success == true' /tmp/factsport-role-hardening-delete.json >/dev/null || {
+            echo "::error::Temporary role-hardening Worker cleanup failed; delete only factsport-v2-db-role-hardening."
+            exit 1
+          }
+          echo "Temporary role-hardening Worker deleted."
