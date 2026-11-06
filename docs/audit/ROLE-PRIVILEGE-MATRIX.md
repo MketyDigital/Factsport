@@ -19,7 +19,7 @@ The earlier audit note that described `08cee...` as historical/unverified is sup
 
 ## Verified runtime role attributes
 
-The read-only catalog audit [42265113422](https://github.com/MketyDigital/Factsport/actions/runs/42265113422) inspected PostgreSQL catalog metadata only.
+The read-only catalog audit [42265971339](https://github.com/MketyDigital/Factsport/actions/runs/42265971339) inspected PostgreSQL catalog metadata only, after the successful role-hardening run [42265651629](https://github.com/MketyDigital/Factsport/actions/runs/42265651629). The database owner is `mketydbadmin`.
 
 | Attribute | Reader | Schedule writer | ESPN writer |
 |---|---:|---:|---:|
