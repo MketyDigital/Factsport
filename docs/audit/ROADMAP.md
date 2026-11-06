@@ -221,3 +221,8 @@ The page and product journey inventory is now recorded in [PAGE-MIGRATION-MATRIX
 ## Shared component migration register (2026-11-06)
 
 A scan of the 54 shared component files identified 14 direct Supabase dependencies. Track them in [COMPONENT-MIGRATION-MATRIX.md](./COMPONENT-MIGRATION-MATRIX.md) alongside page and route parity.
+
+
+## Database role and Hyperdrive register (2026-11-06)
+
+The four Hyperdrive resources and the three runtime database roles are mapped in [ROLE-PRIVILEGE-MATRIX.md](./ROLE-PRIVILEGE-MATRIX.md). Use this as the authority when changing Worker bindings or role grants.
