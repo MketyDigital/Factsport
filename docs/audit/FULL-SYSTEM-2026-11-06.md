@@ -212,3 +212,8 @@ Added:
 - [COMPONENT-MIGRATION-MATRIX.md](./COMPONENT-MIGRATION-MATRIX.md) — direct Supabase dependencies found in 54 shared component files, including 14 direct Supabase consumers.
 
 These inventories make clear that only the matches API and protected health endpoint are proven on the v2 runtime. The rest of the application is not feature-complete.
+
+
+### Hyperdrive identity reconciliation correction
+
+The earlier note that treated `08cee4...` as historical/unverified is superseded. The current four-resource map is now confirmed: `895cca...` = runtime reader, `eb634f...` = schedule writer, `c5166b...` = reserved ESPN writer, and `08cee4...` = administrative/bootstrap identity used only by temporary setup/audit/hardening Workers. The exact names, bindings and privileges are recorded in [ROLE-PRIVILEGE-MATRIX.md](./ROLE-PRIVILEGE-MATRIX.md).
