@@ -103,6 +103,7 @@ jobs:
           matches_ok=false
           for attempt in 1 2 3 4 5 6 7 8; do
             MATCH_STATUS="$(curl --silent --show-error --max-time 25 \
+              -D /tmp/factsport-staging-matches.headers \
               -o /tmp/factsport-staging-matches -w '%{http_code}' \
               -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
               "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=2026-11-01")"
@@ -120,7 +121,26 @@ jobs:
             echo "::error::Authorized Factsport matches API did not return a JSON array. See sanitized diagnostics."
             exit 1
           }
-          echo "Factsport native vinext app: protected PostgreSQL matches API returned populated fixtures"
+          if ! grep -Eiq '^cache-control:[[:space:]]*.*(private|no-store)' /tmp/factsport-staging-matches.headers; then
+            echo "::error::Token-protected staging match response must not be publicly cacheable."
+            exit 1
+          fi
+          UNAUTH_MATCH_STATUS="$(curl --silent --show-error --max-time 25 \
+            -o /tmp/factsport-staging-after-auth-unauthorized -w '%{http_code}' \
+            "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=2026-11-01")"
+          [ "$UNAUTH_MATCH_STATUS" = "404" ] || {
+            echo "::error::Unauthenticated match request after authorized request returned HTTP $UNAUTH_MATCH_STATUS; possible cache isolation failure."
+            exit 1
+          }
+          AUTH_MATCH_STATUS="$(curl --silent --show-error --max-time 25 \
+            -o /tmp/factsport-staging-after-unauth-authorized -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+            "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=2026-11-01")"
+          [ "$AUTH_MATCH_STATUS" = "200" ] && jq -e 'type == "array" and length > 0' /tmp/factsport-staging-after-unauth-authorized >/dev/null || {
+            echo "::error::Authorized match request failed after cache isolation check (HTTP $AUTH_MATCH_STATUS)."
+            exit 1
+          }
+          echo "Factsport native vinext app: protected PostgreSQL matches API returned populated fixtures; staging response is private/no-store and auth isolation passed."
 
           echo "## Factsport v2 application staging" >> "$GITHUB_STEP_SUMMARY"
           echo "Deployed separate protected Worker: $BASE" >> "$GITHUB_STEP_SUMMARY"
