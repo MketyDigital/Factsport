@@ -220,3 +220,6 @@ The staging app's `/api/matches` response previously used `Cache-Control: public
 ### Latest staging infrastructure verification
 
 Cloudflare staging workflow [42261414894](https://github.com/MketyDigital/Factsport/actions/runs/42261414894) verified the runtime Hyperdrive's exact Factsport database identity, disabled query caching, five-connection origin limit, and successful DB probe. The same workflow checked Cloudflare R2 managed `r2.dev` access is disabled and no custom domain is enabled, then passed private R2 binding smoke. The follow-up config now also requires TLS mode `require`; its rerun is pending at the time of this update.
+
+
+The stricter TLS-required Hyperdrive gate passed in run [42261593655](https://github.com/MketyDigital/Factsport/actions/runs/42261593655), including the private R2 and database smoke checks. This supersedes the earlier note that the TLS guard rerun was pending.
