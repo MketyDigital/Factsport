@@ -216,3 +216,8 @@ The route-by-route inventory is now recorded in [ROUTE-MIGRATION-MATRIX.md](./RO
 ## Page-level migration register (2026-11-06)
 
 The page and product journey inventory is now recorded in [PAGE-MIGRATION-MATRIX.md](./PAGE-MIGRATION-MATRIX.md), complementing the [route/API migration matrix](./ROUTE-MIGRATION-MATRIX.md). Use both to track full product parity, not just API compilation.
+
+
+## Shared component migration register (2026-11-06)
+
+A scan of the 54 shared component files identified 14 direct Supabase dependencies. Track them in [COMPONENT-MIGRATION-MATRIX.md](./COMPONENT-MIGRATION-MATRIX.md) alongside page and route parity.
