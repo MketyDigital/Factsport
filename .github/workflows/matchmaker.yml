@@ -8,6 +8,7 @@ on:
 
 jobs:
   map-matches:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Hit the Matchmaker API on Production
