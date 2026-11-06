@@ -50,9 +50,9 @@ export default {
         await tx.unsafe(`DO $role$
         BEGIN
           IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'factsport_v2_schedule_writer') THEN
-            CREATE ROLE factsport_v2_schedule_writer LOGIN PASSWORD '${password}';
+            CREATE ROLE factsport_v2_schedule_writer LOGIN PASSWORD '${password}' NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 5;
           ELSE
-            ALTER ROLE factsport_v2_schedule_writer LOGIN PASSWORD '${password}';
+            ALTER ROLE factsport_v2_schedule_writer LOGIN PASSWORD '${password}' NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 5;
           END IF;
         END
         $role$`);
@@ -61,7 +61,7 @@ export default {
         // Writer may only touch fixture columns. Never prize/identity tables.
         await tx`GRANT SELECT ON TABLE public.matches TO factsport_v2_schedule_writer`;
         await tx`GRANT INSERT (
-          api_id, league, home_team, away_team, home_score, away_score,
+          api_id, league, home_team, away_team,
           match_date, status, home_logo, away_logo, venue, stage, match_group,
           source, source_updated_at
         ) ON TABLE public.matches TO factsport_v2_schedule_writer`;
@@ -78,16 +78,23 @@ export default {
                  has_table_privilege('factsport_v2_schedule_writer',
                     'public.matches','DELETE') AS can_delete,
                  has_column_privilege('factsport_v2_schedule_writer',
+                    'public.matches','home_score','INSERT') AS can_insert_home_score,
+                 has_column_privilege('factsport_v2_schedule_writer',
+                    'public.matches','away_score','INSERT') AS can_insert_away_score,
+                 has_column_privilege('factsport_v2_schedule_writer',
                     'public.matches','home_score','UPDATE') AS can_change_score,
+                 (SELECT rolinherit FROM pg_roles WHERE rolname='factsport_v2_schedule_writer') AS inherits_roles,
+                 (SELECT rolconnlimit FROM pg_roles WHERE rolname='factsport_v2_schedule_writer') AS connection_limit,
                  has_table_privilege('factsport_v2_schedule_writer',
                     'public.app_users','SELECT') AS can_read_users
         `;
-        if (!priv.can_insert || priv.can_delete || priv.can_change_score || priv.can_read_users) {
+        if (!priv.can_insert || priv.can_delete || priv.can_insert_home_score || priv.can_insert_away_score ||
+            priv.can_change_score || priv.inherits_roles || Number(priv.connection_limit) !== 5 || priv.can_read_users) {
           throw new Error('Writer permissions invalid');
         }
       });
       return Response.json({ ok: true, role: 'factsport_v2_schedule_writer',
-        canWriteFixtures: true, canDelete: false, canChangeScores: false },
+        canWriteFixtures: true, canDelete: false, canChangeScores: false, canInsertScores: false, roleConnectionLimit: 5 },
       { headers: { 'Cache-Control': 'no-store' } });
     } catch (err) {
       const c = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
