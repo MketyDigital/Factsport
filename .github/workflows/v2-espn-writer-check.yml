@@ -84,7 +84,7 @@ jobs:
                 .canUpdateEspnLiveFields == true and
                 .cannotUpdateSettlementOrSchedule == true and
                 .cannotInsertOrDelete == true and .cannotReadPrivateTables == true and
-      .noRoleInheritance == true and .connectionLimit == 5' \
+                .noRoleInheritance == true and .connectionLimit == 5' \
                 /tmp/factsport-espn-check.json >/dev/null 2>&1; then
               ready=true; break
             fi
