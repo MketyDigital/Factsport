@@ -126,6 +126,38 @@ export default {
           has_schema_privilege(role_name::name, 'public', 'CREATE') AS can_create_in_public
         FROM role_names ORDER BY role_name
       `;
+      const publicFunctionAccess = await sql`
+        WITH role_names(role_name) AS (
+          VALUES ('factsport_v2_reader'), ('factsport_v2_schedule_writer'),
+                 ('factsport_v2_espn_writer')
+        )
+        SELECT role_names.role_name,
+          count(functions.oid)::integer AS executable_public_function_count,
+          coalesce(array_agg(functions.proname::text ORDER BY functions.proname::text)
+            FILTER (WHERE functions.oid IS NOT NULL), ARRAY[]::text[]) AS executable_public_functions
+        FROM role_names
+        LEFT JOIN pg_proc functions
+          ON functions.pronamespace = 'public'::regnamespace
+          AND has_function_privilege(role_names.role_name::name, functions.oid, 'EXECUTE')
+        GROUP BY role_names.role_name
+        ORDER BY role_names.role_name
+      `;
+      const publicSequenceAccess = await sql`
+        WITH role_names(role_name) AS (
+          VALUES ('factsport_v2_reader'), ('factsport_v2_schedule_writer'),
+                 ('factsport_v2_espn_writer')
+        )
+        SELECT role_names.role_name,
+          coalesce(array_agg(sequences.sequence_name ORDER BY sequences.sequence_name)
+            FILTER (WHERE sequences.sequence_name IS NOT NULL), ARRAY[]::text[]) AS usable_public_sequences
+        FROM role_names
+        LEFT JOIN information_schema.sequences sequences
+          ON sequences.sequence_schema = 'public'
+          AND has_sequence_privilege(role_names.role_name::name,
+            'public.' || sequences.sequence_name, 'USAGE')
+        GROUP BY role_names.role_name
+        ORDER BY role_names.role_name
+      `;
       return Response.json({
         ok: roles.length === 3,
         roleCount: roles.length,
