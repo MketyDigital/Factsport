@@ -7,6 +7,8 @@ on:
       - refactor/factsport-v2
     paths:
       - '.github/workflows/v2-schedule-cron.yml'
+      - 'workers/factsport-schedule-sync.mjs'
+      - 'wrangler.factsport-schedule-sync.jsonc'
 
 permissions:
   contents: read
@@ -98,7 +100,7 @@ jobs:
               -w '%{http_code}' -H "Authorization: Bearer $FACTSPORT_SYNC_TOKEN" \
               "$BASE/schedule-check")"
             if [ "$STATUS" = 200 ] &&
-                jq -e '.ok == true and .writerRoleVerified == true and .premierLeagueRows > 0' \
+                jq -e '.ok == true and .writerRoleVerified == true and .writerRoleNoInherit == true and .writerConnectionLimit == 5 and .cannotInsertOrUpdateScores == true and .cannotUpdateSettlement == true and .premierLeagueRows > 0' \
                   /tmp/factsport-cron-probe.json >/dev/null 2>&1; then
               ready=true
               break
