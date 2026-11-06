@@ -13,6 +13,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const league = searchParams.get('league');
     const cursor = searchParams.get('cursor');
+    const cursorId = searchParams.get('cursorId');
     const type = searchParams.get('type'); // 'results' or 'fixtures'
 
     if (!league || !cursor || !type) {
@@ -24,11 +25,12 @@ export async function GET(request: Request) {
         if (type !== 'results' && type !== 'fixtures') {
             return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
         }
-        if (league.length > 100 || !Number.isFinite(new Date(cursor).valueOf())) {
+        if (league.length > 100 || !Number.isFinite(new Date(cursor).valueOf()) ||
+            (cursorId !== null && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(cursorId))) {
             return NextResponse.json({ error: 'Invalid league or cursor' }, { status: 400 });
         }
         try {
-            const matches = await listPostgresMatches({ league, cursor, type });
+            const matches = await listPostgresMatches({ league, cursor, cursorId, type });
             const cacheControl = env.FACTSPORT_ENVIRONMENT === 'staging'
                 ? 'private, no-store, max-age=0'
                 : 'public, s-maxage=60';
