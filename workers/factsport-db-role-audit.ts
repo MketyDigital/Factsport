@@ -43,11 +43,13 @@ export default {
       return Response.json({ ok: false, error: 'hyperdrive_missing' }, { status: 503 });
     }
 
-    const sql = postgres(env.FACTSPORT_HYPERDRIVE.connectionString, {
-      max: 1, fetch_types: false, prepare: true, connect_timeout: 10, idle_timeout: 5,
-    });
-    let auditPhase = 'identity';
+    let sql: ReturnType<typeof postgres> | undefined;
+    let auditPhase = 'connect';
     try {
+      sql = postgres(env.FACTSPORT_HYPERDRIVE.connectionString, {
+        max: 1, fetch_types: false, prepare: true, connect_timeout: 10, idle_timeout: 5,
+      });
+      auditPhase = 'identity';
       const [identity] = await sql`
         SELECT current_database() AS database, current_user AS role
       `;
@@ -202,7 +204,9 @@ export default {
         sqlState: /^[A-Z0-9]{5}$/.test(code) ? code : 'none',
       }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     } finally {
-      await sql.end();
+      if (sql) {
+        try { await sql.end(); } catch { /* preserve the sanitized audit result */ }
+      }
     }
   },
 };
