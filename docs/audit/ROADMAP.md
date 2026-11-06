@@ -226,3 +226,8 @@ A scan of the 54 shared component files identified 14 direct Supabase dependenci
 ## Database role and Hyperdrive register (2026-11-06)
 
 The four Hyperdrive resources and the three runtime database roles are mapped in [ROLE-PRIVILEGE-MATRIX.md](./ROLE-PRIVILEGE-MATRIX.md). Use this as the authority when changing Worker bindings or role grants.
+
+
+## Database/data migration register (2026-11-06)
+
+[DATA-MIGRATION-MATRIX.md](./DATA-MIGRATION-MATRIX.md) records the 18-table legacy inventory, target v2 domains, clean-reset dispositions, preservation exceptions and migration gates. The target remains a full product with fresh transactional data, not a reduced product or blind data copy.
