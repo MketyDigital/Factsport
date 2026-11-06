@@ -161,3 +161,12 @@ A GitHub commit-status query for v2 commit `8c54a9060e6e011fa887f12b5cf546cc2c55
 9. Remove stale Vercel status integration metadata so required checks reflect Cloudflare-only deployment.
 
 No production DNS, routes, Worker settings, database records, database credentials, or production jobs were changed by this audit.
+
+
+## Documentation inventory correction — 2026-11-06
+
+A prior v2 addendum said no standalone roadmap/release documentation was found in conventional paths. That statement was incomplete: a recursive repository tree inspection located and reviewed the authoritative `docs/audit/ROADMAP.md`, `docs/audit/handoffs/M00.md`, the database/sports/security/media/provider audit notes, and the implementation notes under `docs/implementation/`. The roadmap is the governing modernization plan; it must not be replaced by this audit. A separate `docs/audit/PRODUCTION-EXECUTION-PLAN.md` now translates its milestones into ordered production delivery workstreams and cutover acceptance gates.
+
+The Cloudflare Hyperdrive ID discrepancy is also resolved by historical workflow evidence: the one-time runtime DB setup created `factsport-v2-runtime-postgres` ID `895cca...` from the original admin Hyperdrive `08cee4...`, then verified the restricted reader connection. The schedule and ESPN Hyperdrives are separate purpose-specific writer connections. See the new production execution plan for exact identities and run links.
+
+The app-staging matches endpoint was also found to return a public cache header while staging required a token header. The v2 route now returns private/no-store for staging, and the app-staging workflow now checks cache headers plus authorized/unauthorized request ordering. The updated workflow run must pass before this correction is marked runtime verified.
