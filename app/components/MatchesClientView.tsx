@@ -161,9 +161,10 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
         try {
             const edgeMatch = activeList[activeList.length - 1];
             const cursorDate = edgeMatch ? edgeMatch.match_date : new Date().toISOString();
+            const cursorId = edgeMatch?.id || '';
             
-            // Call the secure, cached API route
-            const res = await fetch(`/api/matches?league=${encodeURIComponent(selectedLeague)}&type=${activeTab}&cursor=${encodeURIComponent(cursorDate)}`);
+            // Stable PostgreSQL keyset pagination uses (match_date,id).
+            const res = await fetch(`/api/matches?league=${encodeURIComponent(selectedLeague)}&type=${activeTab}&cursor=${encodeURIComponent(cursorDate)}&cursorId=${encodeURIComponent(cursorId)}`);
             
             if (res.ok) {
                 const fetchedData = await res.json();
