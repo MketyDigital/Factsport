@@ -105,3 +105,59 @@ The current v2 workflow has passing engine tests, ingestion tests, TypeScript an
 ## Architecture decision to confirm
 
 Current v2 configuration is Cloudflare Workers + Hyperdrive + R2, with PostgreSQL 18 documented as Azure-hosted behind Hyperdrive. Confirm whether the target is **Cloudflare for app/runtime/deployment while keeping PostgreSQL external**, or whether the database itself must also move to a Cloudflare-managed database. Do not silently substitute D1 for PostgreSQL; the schema and adapters are PostgreSQL-specific.
+
+
+---
+
+## v2 deep audit addendum — 2026-11-06
+
+This section supersedes older deployment-status statements above where the branch has since advanced. It is a source/configuration review plus recorded GitHub Actions evidence; it is not yet a live Cloudflare account or Azure firewall inspection.
+
+### Documentation and plan inventory
+
+The inspected v2 documentation includes this full-system audit, `docs/audit/SEC-001-supabase-rls.md`, and `docs/implementation/CF-001-github-staging-r2.md`. Conventional root/docs README, roadmap, plan, v2 plan, and release-runbook paths queried during this pass were absent. No separate, authoritative end-to-end v2 roadmap/cutover checklist was found in those paths. Until a canonical roadmap is added, the implementation note plus this audit are the current recorded constraints; they are not a substitute for a domain-by-domain migration plan.
+
+### Confirmed Cloudflare-only source topology
+
+- The v2 app uses Cloudflare's Vite plugin, vinext, `cloudflare.config.ts`, and Worker `factsport-v2-staging`. It has no production domain/route binding in the checked-in config.
+- The app and DB/R2 smoke configs both reference Hyperdrive ID `895cca4c06104b8ab9f7c1b72a8ba18f`.
+- The schedule fixture Worker config references a separate Hyperdrive ID `eb634fef8bb443839fd0847c6c370f85`, and Cron `15 3,15 * * *` UTC.
+- The ESPN preview Worker source expects identity `factsport_v2_espn_writer`, but no matching deployment config/workflow was found in the inspected paths.
+- The older implementation note lists Hyperdrive ID `08cee41a81be4c3980450be9563af5e2`. This ID is not referenced by the current app, smoke, or schedule config files inspected. It may be historical or an additional resource; do not delete it without account inventory.
+- `infra/cloudflare/configure-factsport-hyperdrive.sh` validates the resource at ID `895cca...` against expected name, database `factsport_v2`, origin user `factsport_v2_reader`, and Azure hostname before it optionally disables caching and sets origin connection limit to five. This is a workflow-side configuration check, not proof of effective PostgreSQL grants or Azure firewall rules.
+- The implementation note's older claim that only the smoke Worker is deployed and the app staging Worker is not deployed is superseded by the later app-staging workflow and run below. The older statement that the Hyperdrive connection uses a bootstrap administrator also conflicts with the current verification script's expected `factsport_v2_reader`; account-side identity must be checked rather than assuming either statement is current.
+
+### Database network and authorization boundary
+
+The owner states the PostgreSQL endpoint is public-addressed but its firewall permits only Cloudflare IP ranges. The implementation note records 15 shared Cloudflare ranges and correctly warns these are not Factsport-exclusive IPs. This audit has not read the live Azure firewall rules. A shared Cloudflare egress allowlist is a network filter, not a per-Worker identity boundary; TLS, unique strong credentials, rotation, and narrow database roles remain mandatory.
+
+The v2 migration `0001_factsport_core.sql` defines only `matches`, `app_users`, `external_identities`, and `job_runs`. It does not define the application role model, database role creation, grants, row/column privileges, or the product tables needed for account, predictions, subscriptions, settlement, content, social, or admin. Those controls must be supplied by reviewed database/infrastructure migrations and verified against effective privileges before cutover.
+
+The app reader, schedule writer, and ESPN preview identities are separate in source/config expectations. The schedule Worker checks that its identity cannot DELETE matches or UPDATE score columns, but it does not prove that all other sensitive columns are protected from UPDATE. Inspect effective table and column grants for every identity. The ESPN preview Worker performs SELECT queries but uses a writer-named identity; move it to a dedicated database-enforced SELECT-only role. Do not treat "no UPDATE statement in this file" as least privilege.
+
+### Staging scope and proof
+
+- Build/test run [42172478877](https://github.com/MketyDigital/Factsport/actions/runs/42172478877) passed the engine regression suite, ingestion/reconciliation/preview tests, preview Worker syntax check, TypeScript, and native Cloudflare vinext build.
+- Full app staging run [42172478876](https://github.com/MketyDigital/Factsport/actions/runs/42172478876) passed credential presence validation, regression tests, TypeScript, native Worker build, isolated staging deployment, unauthenticated denial for `/`, `/api/matches`, and `/admin`, authorized staging health, Hyperdrive/R2 dependency checks, and a populated PostgreSQL matches response.
+- The app-staging workflow supplies placeholder Supabase URL/key values at build time. Middleware's staging token gate protects all matched paths, but only `/api/v2/health` and `/api/matches` bypass legacy Supabase auth after the gate. The recorded tests do not prove that other authorized app routes work. Login, account management, admin, VIP/payment, predictions, settlement, editorial, social, and media flows remain unverified/incomplete.
+- The schedule Worker config contains the twice-daily Cron declaration, but no GitHub deployment workflow for it was found in the inspected paths. The source and Cron expression do not prove the Worker is deployed, the trigger is active, or scheduled runs are succeeding. Verify the live Worker, trigger, last invocations and logs through Cloudflare.
+- The ESPN preview source is a dry-run with `writesPerformed: 0`; prior notes record 18 candidate links and no writes. No score-writer is authorized by this audit.
+- Staging access tokens are generated per deployment and stored as Worker secrets. They are not time-expiring in source, and workflows do not automatically delete staging Workers after tests. Define retention, expiry/rotation and cleanup.
+
+### Cloudflare status residue
+
+A GitHub commit-status query for v2 commit `8c54a9060e6e011fa887f12b5cf546cc2c55c71b` returned a failing status context named `Vercel` with a Vercel target URL. No Vercel workflow/config was found in the inspected v2 workflow files; the current v2 build and deploy workflows use Cloudflare. Treat this as stale external GitHub status integration until repository settings are inspected, and remove that obsolete integration if it is no longer used. It is not proof of the current deployment target.
+
+### Cutover blockers from this v2 pass
+
+1. Reconcile the three Hyperdrive IDs in source/docs/account inventory; verify the actual app and scheduler origin users without exposing connection strings.
+2. Verify live Azure firewall rules match the intended Cloudflare ranges; document how range updates are maintained. Confirm TLS and effective least-privilege grants for reader, schedule writer, and preview identities.
+3. Complete and test the full database schema and role/grant migrations. No production data migration or production schema change is authorized by this audit.
+4. Deploy/verify the schedule Worker only in staging, prove Cron invocations and provider failure/retry behavior, and record job-run observability/idempotency. Keep it away from production data until a cutover plan approves it.
+5. Replace ESPN preview writer identity with a SELECT-only role and test its privileges.
+6. Complete the full product domain/route migration matrix and staging parity tests. Matches read parity alone is not sufficient.
+7. Add deterministic install/CI gates, auth/authorization integration tests, DB replay/concurrency tests, browser/e2e coverage, and load/rate-limit checks.
+8. Add an authoritative v2 roadmap and cutover/rollback runbook, including data freeze/dual-run rules, reconciliation, DNS/route switch, monitoring, and legacy automation retirement.
+9. Remove stale Vercel status integration metadata so required checks reflect Cloudflare-only deployment.
+
+No production DNS, routes, Worker settings, database records, database credentials, or production jobs were changed by this audit.
