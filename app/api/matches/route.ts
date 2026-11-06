@@ -4,7 +4,7 @@ import { listPostgresMatches } from '@/lib/adapters/postgres-matches';
 
 // 🟢 THE MAGIC SHIELD: Caches this endpoint at the Edge CDN for 60 seconds!
 // If 1,000 users click "Load More" for the Premier League in the same minute, the DB is only queried ONCE.
-export const revalidate = 60; 
+export const dynamic = 'force-dynamic'; 
 
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const league = searchParams.get('league');
     const cursor = searchParams.get('cursor');
-    const cursorId = searchParams.get('cursorId');
+    const cursorId = searchParams.get('cursorId') || null;
     const type = searchParams.get('type'); // 'results' or 'fixtures'
 
     if (!league || !cursor || !type) {
