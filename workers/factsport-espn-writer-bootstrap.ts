@@ -47,9 +47,9 @@ export default {
         await tx.unsafe(`DO $role$
         BEGIN
           IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'factsport_v2_espn_writer') THEN
-            CREATE ROLE factsport_v2_espn_writer LOGIN PASSWORD '${password}';
+            CREATE ROLE factsport_v2_espn_writer LOGIN PASSWORD '${password}' NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 5;
           ELSE
-            ALTER ROLE factsport_v2_espn_writer LOGIN PASSWORD '${password}';
+            ALTER ROLE factsport_v2_espn_writer LOGIN PASSWORD '${password}' NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 5;
           END IF;
         END
         $role$`);
@@ -80,13 +80,15 @@ export default {
             has_table_privilege('factsport_v2_espn_writer','public.matches','DELETE') AS can_delete,
             has_table_privilege('factsport_v2_espn_writer','public.app_users','SELECT') AS can_read_users,
             has_table_privilege('factsport_v2_espn_writer','public.external_identities','SELECT') AS can_read_identities,
-            has_table_privilege('factsport_v2_espn_writer','public.job_runs','SELECT') AS can_read_job_runs
+            has_table_privilege('factsport_v2_espn_writer','public.job_runs','SELECT') AS can_read_job_runs,
+            (SELECT rolinherit FROM pg_roles WHERE rolname='factsport_v2_espn_writer') AS inherits_roles,
+            (SELECT rolconnlimit FROM pg_roles WHERE rolname='factsport_v2_espn_writer') AS connection_limit
         `;
         if (!p.can_read_matches || !p.can_link_espn || !p.can_update_home_score ||
             !p.can_update_away_score || !p.can_update_status || !p.can_update_events ||
             !p.can_update_stats || p.can_update_points_flag || p.can_update_team_names ||
             p.can_update_kickoff || p.can_insert || p.can_delete || p.can_read_users ||
-            p.can_read_identities || p.can_read_job_runs) {
+            p.can_read_identities || p.can_read_job_runs || p.inherits_roles || Number(p.connection_limit) !== 5) {
           throw new Error('ESPN writer permissions invalid');
         }
       });
@@ -94,7 +96,7 @@ export default {
         ok: true, role: 'factsport_v2_espn_writer',
         canReadMatches: true, canUpdateEspnLiveFields: true,
         canUpdateSettlement: false, canUpdateScheduleIdentity: false,
-        canInsert: false, canDelete: false, canReadPrivateTables: false,
+        canInsert: false, canDelete: false, canReadPrivateTables: false, roleConnectionLimit: 5,
       }, { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
       const c = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
