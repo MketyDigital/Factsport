@@ -233,3 +233,8 @@ Use [ROUTE-MIGRATION-MATRIX.md](./ROUTE-MIGRATION-MATRIX.md) as the route-level 
 ## Page and user-journey implementation register
 
 Use [PAGE-MIGRATION-MATRIX.md](./PAGE-MIGRATION-MATRIX.md) with the API route matrix to track public pages, auth, dashboard, VIP, admin, editorial, match center, community and mobile parity. A page only passes when its real v2 adapters and complete user journey work in staging.
+
+
+## Shared component implementation register
+
+Use [COMPONENT-MIGRATION-MATRIX.md](./COMPONENT-MIGRATION-MATRIX.md) to remove direct Supabase browser clients and client-side writes from shared components. The route/page matrix is not complete until these direct dependencies are ported too.
