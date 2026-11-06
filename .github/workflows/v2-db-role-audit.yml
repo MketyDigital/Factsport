@@ -9,6 +9,7 @@ on:
     paths:
       - '.github/workflows/v2-db-role-audit.yml'
       - 'workers/factsport-db-role-audit.ts'
+      - 'db/migrations/0002_factsport_v2_runtime_role_hardening.sql'
       - 'wrangler.factsport-db-role-audit.jsonc'
 
 permissions:
