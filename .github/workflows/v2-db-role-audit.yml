@@ -1,0 +1,123 @@
+name: Factsport v2 staging PostgreSQL role audit (read-only)
+
+# Temporary Cloudflare Worker; admin Hyperdrive is used only for SELECT catalog introspection.
+# Does not modify roles, grants, data, migrations, or production resources.
+on:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - '.github/workflows/v2-db-role-audit.yml'
+      - 'workers/factsport-db-role-audit.ts'
+      - 'wrangler.factsport-db-role-audit.jsonc'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factsport-v2-db-role-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    if: github.ref == 'refs/heads/refactor/factsport-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KEY }}
+    steps:
+      - name: Validate Cloudflare credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ] || {
+            echo "::error::Cloudflare repository credentials are unavailable."
+            exit 1
+          }
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/factsport-v2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Worker dependencies and typecheck
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+      - name: Verify the exact administrator Hyperdrive identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          HTTP="$(curl -sS -o /tmp/factsport-admin-hd.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/08cee41a81be4c3980450be9563af5e2")"
+          [ "$HTTP" = "200" ] && jq -e \
+            '.success == true and .result.name == "factsport-v2-postgres" and
+             .result.origin.database == "factsport_v2" and
+             .result.origin.user == "mketydbadmin"' \
+            /tmp/factsport-admin-hd.json >/dev/null || {
+              echo "::error::Refusing role audit: admin Hyperdrive identity did not match."
+              exit 1
+            }
+      - name: Deploy temporary read-only catalog audit Worker
+        id: deploy
+        shell: bash
+        run: npx --yes wrangler@4 deploy --config wrangler.factsport-db-role-audit.jsonc
+      - name: Install ephemeral audit token
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$TOKEN"
+          printf 'FACTSPORT_AUDIT_TOKEN=%s\n' "$TOKEN" >> "$GITHUB_ENV"
+          printf '%s' "$TOKEN" | npx --yes wrangler@4 secret put FACTSPORT_AUDIT_TOKEN \
+            --config wrangler.factsport-db-role-audit.jsonc
+      - name: Collect sanitized effective privilege inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          HTTP="$(curl -sS -o /tmp/factsport-domain.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
+          [ "$HTTP" = "200" ] || { echo "::error::Unable to resolve Cloudflare Worker subdomain"; exit 1; }
+          DOMAIN="$(jq -r '.result.subdomain // empty' /tmp/factsport-domain.json)"
+          [ -n "$DOMAIN" ] || { echo "::error::Workers subdomain is missing"; exit 1; }
+          URL="https://factsport-v2-db-role-audit.$DOMAIN.workers.dev/__internal/db-role-audit"
+          READY=false
+          for attempt in 1 2 3 4 5 6 7 8; do
+            HTTP="$(curl -sS --max-time 30 -o /tmp/factsport-db-role-audit.json -w '%{http_code}' \
+              -H "Authorization: Bearer $FACTSPORT_AUDIT_TOKEN" "$URL")"
+            if [ "$HTTP" = "200" ] && jq -e \
+              '.ok == true and .database == "factsport_v2" and .connectedAs == "mketydbadmin" and (.roles | length) == 3' \
+              /tmp/factsport-db-role-audit.json >/dev/null 2>&1; then
+              READY=true
+              break
+            fi
+            echo "Read-only role audit attempt $attempt: HTTP $HTTP"
+            sleep 3
+          done
+          [ "$READY" = "true" ] || {
+            echo "::error::Read-only PostgreSQL role audit did not return a valid catalog report."
+            exit 1
+          }
+          {
+            echo "## Factsport v2 staging PostgreSQL role audit"
+            echo "Read-only catalog inspection against factsport_v2; no database mutation performed."
+            jq -S '{roles,tablePrivileges,databaseAndSchemaPrivileges,memberships,publicFunctionAccess,publicSequenceAccess,ownedObjects}' \
+              /tmp/factsport-db-role-audit.json
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Delete temporary role audit Worker
+        if: always() && steps.deploy.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          HTTP="$(curl -sS -o /tmp/factsport-audit-delete.json -w '%{http_code}' -X DELETE \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/factsport-v2-db-role-audit")"
+          [ "$HTTP" = "200" ] && jq -e '.success == true' /tmp/factsport-audit-delete.json >/dev/null || {
+            echo "::error::Temporary audit Worker cleanup failed; delete only factsport-v2-db-role-audit."
+            exit 1
+          }
+          echo "Temporary role audit Worker deleted."
