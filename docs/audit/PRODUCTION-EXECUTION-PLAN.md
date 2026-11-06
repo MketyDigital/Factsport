@@ -95,7 +95,7 @@ The staging app's `/api/matches` response previously used `Cache-Control: public
 - [x] Staging schedule writer cannot delete matches or update score columns according to provisioning checks.
 - [x] ESPN candidate generation and dry-run preview; 18 unique candidates were reported, none written.
 - [ ] Review the 18 candidates against actual fixture identity and kickoff evidence; write only approved links with a reversible audit record and unique provider mapping.
-- [ ] Create a dedicated SELECT-only ESPN preview identity; do not use the column-limited ESPN writer role for preview reads.
+- [x] Use the existing SELECT-only `factsport_v2_reader` runtime Hyperdrive for ESPN reconciliation/score previews; reserve the ESPN writer Hyperdrive for a future reviewed score updater.
 - [ ] Build and deploy a separate ESPN score updater with exact match linkage, allowed live-field columns, event idempotency, source timestamps, concurrency/rate limits and no settlement access.
 - [ ] Add a durable ESPN source-health state machine: separate upstream ESPN failure from Cloudflare Worker/Cron/network/DB/matcher/credential/quota failures; implement the owner-approved conditional FD fallback only after verified upstream degradation and with prompt ESPN recovery fencing.
 - [ ] Preserve 3-second frontend live response semantics and short edge cache; avoid per-viewer database reads and full-league upstream request storms.
