@@ -49,6 +49,10 @@ This is a database-authorization exposure at the policy/grant layer. External ex
 
 `app/api/settle/route.ts` calls `settle_match_points` and then separately sets `matches.points_distributed = true`. The function definition and transaction/idempotency behavior were not available in this source audit. If the RPC awards points but the flag update fails, a retry may award twice unless the function itself is transactionally idempotent. Verify the SQL function and add replay/concurrency tests before porting settlement.
 
+### P1 — The vault PIN cookie is a reusable unsigned boolean
+
+`verifyAdminPin()` sets `admin_vault_unlocked=true` for 12 hours. It is HttpOnly and Secure in production, which helps against script access, but it is not signed, bound to the authenticated user/session, or backed by server-side step-up state. API routes also check only the cookie value after their own email check. A caller holding an allowlisted admin session can manually supply the static cookie value and bypass the intended PIN step-up. Replace it with a short-lived signed/session-bound step-up assertion or server-side nonce, and enforce it inside every privileged handler/action. Add expiry, revocation and failed-attempt rate limiting.
+
 ### P1 — Production automation is still legacy and Supabase-coupled
 
 The active `main` workflows `schedule.yml`, `matchmaker.yml`, `allInOne.yml` and `monthly-audit.yml` continue to execute on GitHub-hosted runners and/or call `https://factsport.com/api/...`. They inject the Supabase service-role key into scripts and retain the legacy cron/API model. This is not Vercel, but it is not yet the v2 Cloudflare Worker scheduler either. Keep these legacy jobs running only as long as the current production system depends on them; do not enable equivalent v2 jobs against production until data ownership, idempotency and cutover are verified.
