@@ -31,3 +31,11 @@ The staging app is currently **not an end-user-ready production replacement**. I
 ## Namespacing
 
 All new Cloudflare resources are prefixed `factsport-v2-`; all native bindings use `FACTSPORT_`. Original admin Hyperdrive `factsport-v2-postgres` is retained only for controlled migrations, while normal staging reads use `factsport-v2-runtime-postgres`.
+
+
+## 2026-11-06 follow-up
+
+- The staging matches API now sends `private, no-store` while token-gated. App staging run [42259985117](https://github.com/MketyDigital/Factsport/actions/runs/42259985117) passed the header assertion and authorized → unauthenticated → authorized same-URL sequence.
+- ESPN reconciliation preview now uses the read-only runtime Hyperdrive and reader role rather than the ESPN writer. Run [42260972600](https://github.com/MketyDigital/Factsport/actions/runs/42260972600) passed: 48 fixtures scanned, 48 ESPN events normalized, 20 unique candidates, zero ambiguous, 28 no-match; zero writes.
+- A read-only catalog privilege audit workflow is being added to verify the effective rights of all three database roles, including PUBLIC grants, memberships, functions, sequences and schema/database privileges. Do not widen or change role grants until its sanitized report is reviewed.
+- The v2 schema and application feature parity remain incomplete; the staging app is not a production replacement.
