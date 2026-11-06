@@ -55,15 +55,13 @@ export default {
         $role$`);
         await tx`GRANT CONNECT ON DATABASE factsport_v2 TO factsport_v2_espn_writer`;
         await tx`GRANT USAGE ON SCHEMA public TO factsport_v2_espn_writer`;
-        await tx`REVOKE ALL ON TABLE public.matches FROM factsport_v2_espn_writer`;
+        await tx`REVOKE ALL ON TABLE public.matches FROM PUBLIC, factsport_v2_espn_writer`;
         await tx`GRANT SELECT ON TABLE public.matches TO factsport_v2_espn_writer`;
         await tx`GRANT UPDATE (
           espn_id, home_score, away_score, status, match_events, stats,
           source_updated_at, updated_at, version
         ) ON TABLE public.matches TO factsport_v2_espn_writer`;
-        await tx`REVOKE ALL ON TABLE public.app_users FROM factsport_v2_espn_writer`;
-        await tx`REVOKE ALL ON TABLE public.external_identities FROM factsport_v2_espn_writer`;
-        await tx`REVOKE ALL ON TABLE public.job_runs FROM factsport_v2_espn_writer`;
+        await tx`REVOKE ALL ON TABLE public.app_users, public.external_identities, public.job_runs FROM PUBLIC, factsport_v2_espn_writer`;
         const [p] = await tx`
           SELECT
             has_table_privilege('factsport_v2_espn_writer','public.matches','SELECT') AS can_read_matches,
