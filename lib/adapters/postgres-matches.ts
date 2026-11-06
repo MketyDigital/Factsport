@@ -21,8 +21,8 @@ function db() {
     const directUrl = process.env.DATABASE_URL;
     if (cloudflareUrl) {
       client = postgres(cloudflareUrl, {
-        max: 3, fetch_types: false, prepare: true,
-        idle_timeout: 10, connect_timeout: 10,
+        max: 1, fetch_types: false, prepare: true,
+        idle_timeout: 5, connect_timeout: 10,
       });
     } else if (directUrl) {
       // Azure direct TLS fallback for approved non-Worker verification only.
