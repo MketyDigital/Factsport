@@ -7,6 +7,6 @@
   "workers_dev": true,
   "observability": { "enabled": true },
   "hyperdrive": [
-    { "binding": "FACTSPORT_HYPERDRIVE", "id": "c5166b8496624a80a0a77c750585c271" }
+    { "binding": "FACTSPORT_HYPERDRIVE", "id": "895cca4c06104b8ab9f7c1b72a8ba18f" }
   ]
 }
