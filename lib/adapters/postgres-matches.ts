@@ -10,6 +10,9 @@ import { getTeamSearchVariations } from '@/app/lib/teamAliases';
 
 let client: ReturnType<typeof postgres> | undefined;
 
+// Explicit public DTO projection: never expose internal settlement flags or future columns by default.
+const MATCH_SELECT = 'id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, venue, stage, match_group, match_events, stats, lineups, h2h, referees, predictor, source, source_updated_at, version, created_at, updated_at';
+
 function db() {
   if (!client) {
     // vinext/Workers resolves credentials from the secure, server-only Hyperdrive
@@ -54,7 +57,7 @@ export async function listPostgresMatchesWindow(input: {
   if (input.teamFilter) {
     const patterns = teamPatterns(input.teamFilter);
     return sql`
-      SELECT * FROM public.matches
+      SELECT ${sql.unsafe(MATCH_SELECT)} FROM public.matches
       WHERE match_date >= ${from.toISOString()} AND match_date <= ${to.toISOString()}
         AND (home_team ILIKE ANY(${sql.array(patterns, 'text')})
           OR away_team ILIKE ANY(${sql.array(patterns, 'text')}))
@@ -62,7 +65,7 @@ export async function listPostgresMatchesWindow(input: {
     `;
   }
   return sql`
-    SELECT * FROM public.matches
+    SELECT ${sql.unsafe(MATCH_SELECT)} FROM public.matches
     WHERE match_date >= ${from.toISOString()} AND match_date <= ${to.toISOString()}
     ORDER BY match_date ASC, id ASC LIMIT 1500
   `;
@@ -110,24 +113,24 @@ export async function listPostgresMatches(input: {
   const cursor = date.toISOString();
 
   if (input.type === 'results') {
-    if (input.cursorId) return sql`SELECT * FROM public.matches WHERE league = ${input.league}
+    if (input.cursorId) return sql`SELECT ${sql.unsafe(MATCH_SELECT)} FROM public.matches WHERE league = ${input.league}
       AND status IN ('FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD')
       AND (match_date, id) < (${cursor}, ${input.cursorId}::uuid)
       ORDER BY match_date DESC, id DESC LIMIT 15`;
     return sql`
-      SELECT * FROM public.matches
+      SELECT ${sql.unsafe(MATCH_SELECT)} FROM public.matches
       WHERE league = ${input.league}
         AND status IN ('FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD')
         AND match_date < ${cursor}
       ORDER BY match_date DESC, id DESC LIMIT 15
     `;
   }
-  if (input.cursorId) return sql`SELECT * FROM public.matches WHERE league = ${input.league}
+  if (input.cursorId) return sql`SELECT ${sql.unsafe(MATCH_SELECT)} FROM public.matches WHERE league = ${input.league}
     AND status NOT IN ('FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD')
     AND (match_date, id) > (${cursor}, ${input.cursorId}::uuid)
     ORDER BY match_date ASC, id ASC LIMIT 15`;
   return sql`
-    SELECT * FROM public.matches
+    SELECT ${sql.unsafe(MATCH_SELECT)} FROM public.matches
     WHERE league = ${input.league}
       AND status NOT IN ('FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD')
       AND match_date > ${cursor}
