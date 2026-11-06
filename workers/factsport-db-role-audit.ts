@@ -42,6 +42,10 @@ export default {
       const [identity] = await sql`
         SELECT current_database() AS database, current_user AS connected_as
       `;
+      const [databaseOwner] = await sql`
+        SELECT pg_get_userbyid(datdba) AS database_owner
+        FROM pg_database WHERE datname = current_database()
+      `;
       if (identity.database !== 'factsport_v2' || identity.connected_as !== 'mketydbadmin') {
         return Response.json({ ok: false, error: 'unexpected_database_identity' }, {
           status: 503, headers: { 'Cache-Control': 'no-store' },
@@ -165,7 +169,9 @@ export default {
         matchColumnPrivileges,
         database: identity.database,
         connectedAs: identity.connected_as,
-        roles, tablePrivileges, memberships, databaseAndSchemaPrivileges,
+        databaseOwner: databaseOwner.database_owner,
+        roles, tablePrivileges, matchColumnPrivileges, memberships, databaseAndSchemaPrivileges,
+        publicFunctionAccess, publicSequenceAccess,
       }, { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
       const code = error && typeof error === 'object' && 'code' in error
