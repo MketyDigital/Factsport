@@ -101,6 +101,31 @@ export default {
         GROUP BY role_names.role_name
         ORDER BY role_names.role_name
       `;
+      const memberships = await sql`
+        SELECT member.rolname AS role_name, granted.rolname AS member_of
+        FROM pg_auth_members membership
+        JOIN pg_roles member ON member.oid = membership.member
+        JOIN pg_roles granted ON granted.oid = membership.roleid
+        WHERE member.rolname IN (
+          'factsport_v2_reader',
+          'factsport_v2_schedule_writer',
+          'factsport_v2_espn_writer'
+        )
+        ORDER BY member.rolname, granted.rolname
+      `;
+      const databaseAndSchemaPrivileges = await sql`
+        WITH role_names(role_name) AS (
+          VALUES ('factsport_v2_reader'), ('factsport_v2_schedule_writer'),
+                 ('factsport_v2_espn_writer')
+        )
+        SELECT role_name,
+          has_database_privilege(role_name::name, current_database(), 'CONNECT') AS can_connect,
+          has_database_privilege(role_name::name, current_database(), 'CREATE') AS can_create_database_objects,
+          has_database_privilege(role_name::name, current_database(), 'TEMP') AS can_create_temp,
+          has_schema_privilege(role_name::name, 'public', 'USAGE') AS can_use_public_schema,
+          has_schema_privilege(role_name::name, 'public', 'CREATE') AS can_create_in_public
+        FROM role_names ORDER BY role_name
+      `;
       return Response.json({
         ok: roles.length === 3,
         roleCount: roles.length,
