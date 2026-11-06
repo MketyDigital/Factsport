@@ -13,7 +13,7 @@ This plan operationalizes `docs/audit/ROADMAP.md`, the handoffs under `docs/audi
 |---|---|
 | Web application, APIs and frontend live proxy | Cloudflare Workers using vinext; one centrally managed Factsport deployment with modular routes |
 | Primary database | Azure Database for PostgreSQL Flexible Server, database `factsport_v2`, reached only server-side through Cloudflare Hyperdrive |
-| Database ingress | Public endpoint restricted to the owner's 15 Cloudflare IP ranges; TLS required; do not widen ingress |
+| Database ingress | Public endpoint restricted to the owner's 15 available Cloudflare IP ranges; owner confirms this is the intended/only available allowlist and accepts the shared Cloudflare egress boundary; TLS required; do not widen ingress |
 | Runtime database identity | Dedicated read-only `factsport_v2_reader`; never use bootstrap/admin credentials for app requests |
 | Background writers | Separate narrowly scoped PostgreSQL roles/Hyperdrive per job class; no shared omnipotent worker identity |
 | Object/media storage | Private Cloudflare R2 behind a MediaStore adapter; public delivery only through reviewed object policies/custom routes |
@@ -172,7 +172,7 @@ The staging app's `/api/matches` response previously used `Cache-Control: public
 ### P8 — Security, reliability and performance
 
 - [ ] Review Cloudflare Worker secrets, token scopes, routes, custom domains, access policies, R2 public access, Hyperdrive config, Cron schedules, logs and rollback versions.
-- [ ] Verify database firewall is still restricted to the owner's 15 Cloudflare IP ranges; do not widen it. Verify TLS and all role grants from database metadata without retrieving secrets or private rows.
+- [ ] Treat the owner's 15 Cloudflare IP ranges as the accepted database ingress boundary (the owner confirms these are the only available ranges); perform a routine drift check that they remain in place and do not widen ingress. Verify TLS and all role grants from database metadata without retrieving secrets or private rows.
 - [ ] Security test all public/private routes, admin actions, webhook endpoints, CSRF, rate limits, request sizes, upload content types, SQL parameterization and cache isolation.
 - [ ] Run dependency/license audit, secret scan, SAST, lint, typecheck, unit/integration/e2e and Workers compatibility/build checks.
 - [ ] Load-test Cloudflare Worker CPU/memory, Hyperdrive pool, Azure B1ms CPU credits, P95/P99 latency, R2, ESPN quota, 3-second cache hit ratio and burst fan-out.
