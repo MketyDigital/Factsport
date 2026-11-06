@@ -87,7 +87,7 @@ jobs:
             -X POST -H "Authorization: Bearer $FACTSPORT_HARDEN_TOKEN" \
             "https://factsport-v2-db-role-hardening.$DOMAIN.workers.dev/__internal/harden-staging-db-roles")"
           [ "$HTTP" = "200" ] && jq -e \
-            '.ok == true and (.roles | length) == 3 and
+            '.ok == true and .noTempTables == true and (.roles | length) == 3 and
              (.roles | all(.inherits_roles == false and .connection_limit == 5 and
                .is_superuser == false and .can_create_databases == false and
                .can_create_roles == false and .can_replicate == false and .bypasses_rls == false)) and
@@ -107,6 +107,7 @@ jobs:
             echo "## Factsport v2 staging database role hardening"
             echo "Applied NOINHERIT and five-connection limits to reader/schedule/ESPN roles."
             echo "Revoked unnecessary schedule-writer INSERT privileges on home_score and away_score."
+            echo "Revoked default TEMP database privilege from PUBLIC."
             jq -S '{roles,schedule,reader,espn}' /tmp/factsport-role-hardening.json
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Delete temporary role-hardening Worker
