@@ -21,3 +21,8 @@ The provisioning workflow generated a random password and created the dedicated 
 ## Deliberate non-actions
 
 No score ingestion worker, match-row update, Cron, ESPN ID reconciliation, production route, legacy ESPN/Supabase change, Azure Logic App activation, production DNS change or `main` branch commit. A separate reviewed ingestion implementation and staging canary remain required.
+
+
+## 2026-11-06 preview-role separation
+
+The ESPN writer role/Hyperdrive is reserved for a future score updater. The reconciliation and score-parity preview workers now use the already-provisioned read-only `factsport_v2_reader` runtime Hyperdrive (`895cca...`). Preview code must not use the column-limited writer identity merely because it only issues SELECT statements.
