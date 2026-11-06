@@ -114,3 +114,8 @@ A `Vercel` status context was observed on a v2 commit even though the inspected 
 The staging workflow now fails closed if it cannot inspect the runtime Hyperdrive, and it verifies the exact Azure database, reader identity, TLS-required setting, disabled Hyperdrive query cache and origin connection limit of five. It also checks both R2 public-access mechanisms through Cloudflare's account API: managed `r2.dev` access must be disabled and no custom domain may be enabled.
 
 Workflow [42261414894](https://github.com/MketyDigital/Factsport/actions/runs/42261414894) passed these checks, deployed the isolated smoke Worker, and returned `db-smoke: OK` and `r2-smoke: OK`. The R2 bucket remained private; no object was written. The later source update also adds TLS to the Hyperdrive identity guard, which is being re-run separately.
+
+
+### TLS gate rerun
+
+The follow-up staging run [42261593655](https://github.com/MketyDigital/Factsport/actions/runs/42261593655) passed after the Hyperdrive guard was tightened to require `mtls.sslmode == require` as well as the exact Azure origin identity, disabled caching and connection limit. The isolated smoke Worker again passed both DB and R2 probes. No production route, schema or data changed.
