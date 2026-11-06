@@ -7,10 +7,7 @@ on:
     branches:
       - refactor/factsport-v2
     paths:
-      - '.github/workflows/v2-runtime-db-setup.yml'
-      - 'workers/factsport-reader-bootstrap.ts'
-      - 'workers/factsport-reader-check.ts'
-      - 'wrangler.factsport-reader-bootstrap.jsonc'
+      - 'ops/provision-runtime-db.trigger'
 
 permissions:
   contents: read
