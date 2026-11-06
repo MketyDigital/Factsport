@@ -38,7 +38,10 @@ jobs:
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/$FACTSPORT_WRITER_HD_ID")"
           [ "$STATUS" = 200 ] &&
              jq -e '.success == true and .result.name == "factsport-v2-schedule-postgres" and
-                    .result.origin.database == "factsport_v2" and .result.origin.user == "factsport_v2_schedule_writer"' \
+                    .result.origin.database == "factsport_v2" and .result.origin.user == "factsport_v2_schedule_writer" and
+                    .result.origin.host == "mketypostgres.postgres.database.azure.com" and
+                    .result.mtls.sslmode == "require" and .result.caching.disabled == true and
+                    .result.origin_connection_limit == 5' \
                /tmp/factsport-cron-hd.json >/dev/null ||
                { echo "::error::Refusing Cron deployment: unexpected writer Hyperdrive"; exit 1; }
       - uses: actions/checkout@v4
