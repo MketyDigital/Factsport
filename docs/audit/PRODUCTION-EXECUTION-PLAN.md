@@ -238,3 +238,10 @@ Use [PAGE-MIGRATION-MATRIX.md](./PAGE-MIGRATION-MATRIX.md) with the API route ma
 ## Shared component implementation register
 
 Use [COMPONENT-MIGRATION-MATRIX.md](./COMPONENT-MIGRATION-MATRIX.md) to remove direct Supabase browser clients and client-side writes from shared components. The route/page matrix is not complete until these direct dependencies are ported too.
+
+
+## Latest verified staging security posture
+
+The runtime Hyperdrive/TLS/R2 gate passed [42262051142](https://github.com/MketyDigital/Factsport/actions/runs/42262051142), the matches cache-isolation test passed [42259985117](https://github.com/MketyDigital/Factsport/actions/runs/42259985117), schedule role/Cron deployment passed [42264186975](https://github.com/MketyDigital/Factsport/actions/runs/42264186975), ESPN writer role verification passed [42264640003](https://github.com/MketyDigital/Factsport/actions/runs/42264640003), and read-only ESPN preview passed [42260972600](https://github.com/MketyDigital/Factsport/actions/runs/42260972600).
+
+The read-only PostgreSQL catalog audit found all three runtime roles non-superuser, NOINHERIT, connection limit five, no memberships, no public-schema functions/sequences, no table-level writes and no access to private account/identity/job tables. The schedule role's unnecessary score INSERT grant has been revoked. The reader is SELECT-only; ESPN writer's column-level update list is limited to live fields and cannot alter schedule or settlement. A final staging run is checking removal of the default PUBLIC TEMP privilege.
