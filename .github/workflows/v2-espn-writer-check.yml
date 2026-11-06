@@ -36,7 +36,9 @@ jobs:
             jq -e '.success == true and .result.name == "factsport-v2-espn-postgres" and
               .result.origin.database == "factsport_v2" and
               .result.origin.user == "factsport_v2_espn_writer" and
-              .result.mtls.sslmode == "require" and .result.caching.disabled == true' \
+              .result.origin.host == "mketypostgres.postgres.database.azure.com" and
+              .result.mtls.sslmode == "require" and .result.caching.disabled == true and
+              .result.origin_connection_limit == 5' \
               /tmp/factsport-espn-hd.json >/dev/null ||
             { echo "::error::Unexpected ESPN Hyperdrive identity or TLS/cache configuration"; exit 1; }
       - uses: actions/checkout@v4
