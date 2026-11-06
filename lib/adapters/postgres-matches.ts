@@ -10,9 +10,6 @@ import { getTeamSearchVariations } from '@/app/lib/teamAliases';
 
 let client: ReturnType<typeof postgres> | undefined;
 
-// Explicit public DTO: do not expose settlement flags or future internal columns.
-const MATCH_SELECT = 'id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, venue, stage, match_group, match_events, stats, lineups, h2h, referees, predictor, source, source_updated_at, version, created_at, updated_at';
-
 // Explicit public DTO projection: never expose internal settlement flags or future columns by default.
 const MATCH_SELECT = 'id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, venue, stage, match_group, match_events, stats, lineups, h2h, referees, predictor, source, source_updated_at, version, created_at, updated_at';
 
