@@ -25,8 +25,9 @@ The V2 branch still contained active legacy API handlers that created Supabase s
 | `/api/admin/run-audit` | Prediction | legacy prize/winner audit | V2 prize audit workflow not yet wired |
 | `/api/admin/settings` | Shared | legacy global settings/social/payment config writes | Split Media settings from Prediction settings; secrets move to secret store |
 | `/api/admin/users` | Platform identity / Prediction admin | legacy profile/admin user management | V2 identity and role administration not yet wired |
+| `/api/stream/token` | Media broadcast | legacy StreamIO token issuance and stateless guest JWT invitations using Supabase profile roles, email allowlist and user_metadata admin claims | V2 room-scoped token issuer and revocable invite ledger schema exists (M26); token route remains 503 until provisioned |
 
-Each original source is under `docs/audit/legacy-source/`. Active route handlers use the shared `app/lib/v2/legacy-route-disabled.ts` guard (the social route has its dedicated dispatcher-not-provisioned response). They do not instantiate Supabase clients, read legacy service-role secrets, mutate legacy tables or call providers.
+Each original source is under `docs/audit/legacy-source/`, including the Stream token/guest invite handler. Active route handlers use the shared `app/lib/v2/legacy-route-disabled.ts` guard (the social route has its dedicated dispatcher-not-provisioned response). They do not instantiate Supabase clients, read legacy service-role secrets, mutate legacy tables or call providers.
 
 ## Ownership corrections retained
 
