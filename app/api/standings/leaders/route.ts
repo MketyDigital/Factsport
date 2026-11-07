@@ -47,7 +47,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json(leaders, {
-      headers: { 'Cache-Control': 'public, max-age=0, s-maxage=300, stale-while-revalidate=600' },
+      headers: { 'Cache-Control': env.FACTSPORT_ENVIRONMENT === 'staging' ? 'private, no-store, max-age=0' : 'public, max-age=0, s-maxage=300, stale-while-revalidate=600' },
     });
   } catch {
     return NextResponse.json({ error: 'Player statistics temporarily unavailable' }, {
