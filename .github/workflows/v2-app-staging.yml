@@ -123,7 +123,7 @@ jobs:
               break
             fi
             CODE="$(jq -r '.error // "non-json"' /tmp/factsport-staging-matches 2>/dev/null || echo non-json)"
-            DETAILS="$(jq -r 'if type == "object" then "sqlState=" + (.sqlState // "none") + " class=" + (.errorClass // "none") else "" end' /tmp/factsport-staging-matches 2>/dev/null || true)"
+            DETAILS="$(jq -r 'if type == "object" then "sqlState=" + (.sqlState // "none") + " class=" + (.errorClass // "none") + " hint=" + (.errorHint // "none") else "" end' /tmp/factsport-staging-matches 2>/dev/null || true)"
             GATE="$(grep -qFx 'Not found' /tmp/factsport-staging-matches && echo gate-or-404 || echo other)"
             echo "Factsport match probe attempt $attempt: HTTP $MATCH_STATUS; code $CODE; bodyClass=$GATE $DETAILS"
             sleep 3
