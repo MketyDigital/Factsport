@@ -4,7 +4,7 @@ const SITE_URL = 'https://factsport.com'
 const PRIVATE_PATHS = [
   '/admin', '/api', '/dashboard', '/login', '/register', '/account',
   '/auth', '/vip', '/predict', '/payment', '/checkout', '/chat',
-  '/studio', '/settings', '/embed', '/how-to-play',
+  '/studio', '/settings', '/embed', '/how-to-play', '/leaderboard',
 ]
 
 export default function robots(): MetadataRoute.Robots {
