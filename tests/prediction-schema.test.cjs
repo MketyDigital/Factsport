@@ -14,7 +14,10 @@ test('public prediction participants provide email contact without creating an a
   assert.match(sql, /email_normalized text NOT NULL UNIQUE/i);
   assert.match(sql, /CREATE TABLE IF NOT EXISTS public\.prediction_participants/i);
   assert.match(sql, /visitor_token_hash char\(64\) NOT NULL UNIQUE/i);
-  assert.match(sql, /contact_id uuid NOT NULL UNIQUE/i);
+  assert.match(sql, /contact_id uuid NOT NULL[\s\S]{0,120}REFERENCES public\\.prediction_contacts/i);
+  assert.doesNotMatch(sql, /contact_id uuid NOT NULL UNIQUE/i);
+  assert.match(sql, /prediction_participants_contact_idx/i);
+  assert.match(sql, /email alone must[\s\S]*never identify or transfer/i);
   assert.doesNotMatch(sql, /email_verified_at[^,\n]*NOT NULL/i);
   assert.doesNotMatch(sql, /CREATE TABLE IF NOT EXISTS public\.app_users/i);
 });
