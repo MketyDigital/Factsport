@@ -66,6 +66,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return NextResponse.json({
       status: 'ready',
       mediaUrl,
+      audioUrl: videoUrl ? audioUrl : null,
       mode: videoUrl ? 'video' : 'audio',
       isFinished,
     }, { headers: { 'Cache-Control': 'private, no-store, max-age=0', Vary: 'Cookie' } });
