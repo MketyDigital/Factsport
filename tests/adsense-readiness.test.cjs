@@ -127,3 +127,18 @@ test('legacy free PredictionBoard cannot read or write Supabase from production 
   assert.match(predictionMigration, /CREATE TABLE IF NOT EXISTS public\.predictions/);
   assert.match(predictionMigration, /is_eligible_for_prize boolean NOT NULL DEFAULT false/);
 });
+
+test('registered Prediction account and authentication routes are private-host only', () => {
+  const rootLayout = read('app/layout.tsx');
+  const header = read('app/components/SiteHeader.tsx');
+  const callback = read('app/auth/callback/route.ts');
+  assert.match(rootLayout, /FACTSPORT_PRIVATE_PRODUCT_HOST/);
+  assert.match(rootLayout, /isPrivateProductHost \? application/);
+  assert.match(rootLayout, /NODE_ENV === 'development' \? <AuthProvider>/);
+  assert.doesNotMatch(header, /useAuth|\/login|\/dashboard|Account/);
+  for (const file of [
+    'app/dashboard/layout.tsx', 'app/login/layout.tsx', 'app/register/layout.tsx',
+    'app/forgot-password/layout.tsx', 'app/auth/update-password/layout.tsx',
+  ]) assert.match(read(file), /requirePrivateProductHost/);
+  assert.match(callback, /requestUrl\.hostname\.toLowerCase\(\) !== privateHost/);
+});
