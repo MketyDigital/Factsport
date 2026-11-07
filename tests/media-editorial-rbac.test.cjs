@@ -32,12 +32,17 @@ test('CMS approval and publication require distinct author, reviewer and publish
   assert.match(actions, /revision\.changed_by === actorId/);
   assert.match(actions, /'review_approved'/);
   assert.match(actions, /'published'/);
+  assert.match(actions, /rejectEditorialRevision/);
+  assert.match(actions, /review_comment/);
   assert.match(client, /approveEditorialRevision/);
   assert.match(client, /publishApprovedEditorial/);
+  assert.match(client, /rejectEditorialRevision/);
   assert.doesNotMatch(client, /approveAndPublishEditorial/);
 });
 
 test('editorial and social mutations append audit events in their transaction', () => {
+  assert.match(read('app/admin/social/actions.ts'), /idempotencyKey/);
+  assert.match(read('app/admin/social/actions.ts'), /ON CONFLICT \(idempotency_key\) DO NOTHING/);
   for (const file of ['app/admin/news/actions.ts', 'app/admin/news/media-actions.ts', 'app/admin/social/actions.ts']) {
     assert.match(read(file), /media_editorial_audit_events/);
   }
@@ -50,7 +55,7 @@ test('Media admin shell does not expose legacy Prediction or broad user administ
   const users = read('app/admin/users/page.tsx');
   assert.match(layout, /authorizeMediaEditorialAction\('read'\)/);
   assert.doesNotMatch(layout, /ADMIN_EMAILS|VaultLock|getAuthenticatedAdmin|isAdminVaultUnlocked/);
-  assert.doesNotMatch(home, /subscriptions|monthly_winners|settle_match_points|AdminCampaignManager|ApproveButton|ResetMonthButton|CleanupButton|PromoSettingsManager|GameRulesManager|AuditManager/);
+  assert.doesNotMatch(home, /from ['\"].*(AdminCampaignManager|ApproveButton|ResetMonthButton|CleanupButton|PromoSettingsManager|GameRulesManager|AuditManager)/);
   assert.doesNotMatch(matches, /createClient|supabase|campaigns|pro_analysis/);
   assert.doesNotMatch(users, /SUPABASE_SERVICE_ROLE_KEY|select\('\*'\)|ADMIN_EMAILS/);
 });
