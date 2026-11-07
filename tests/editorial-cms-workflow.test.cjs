@@ -7,6 +7,11 @@ const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 const socialSql = read('db/migrations/0009_factsport_media_social_publishing.sql');
 const grantsSql = read('db/migrations/0010_factsport_editorial_writer_grants.sql');
 const revisionSql = read('db/migrations/0011_factsport_editorial_revision_workflow.sql');
+const legacyMediaSql = read('db/migrations/0012_factsport_editorial_legacy_media_mapping.sql');
+const teamMediaGrants = read('db/migrations/0013_factsport_editorial_team_media_grants.sql');
+const publicAdapter = read('lib/adapters/postgres-editorial.ts');
+const newsListing = read('app/news/page.tsx');
+const newsArticle = read('app/news/[slug]/page.tsx');
 const actions = read('app/admin/news/actions.ts');
 const page = read('app/admin/news/page.tsx');
 const adapter = read('lib/adapters/postgres-client.ts');
@@ -74,4 +79,18 @@ test('published article changes are versioned and reviewed without replacing liv
   assert.match(actions, /workflow_status='in_review'/i);
   assert.match(actions, /workflow_status='published'/i);
   assert.match(page, /FROM public\.editorial_article_revisions/i);
+});
+
+
+test('legacy match-story team names and logos map to rights-cleared V2 media assets', () => {
+  assert.match(legacyMediaSql, /team_1_name text/i);
+  assert.match(legacyMediaSql, /team_2_name text/i);
+  assert.match(legacyMediaSql, /legacy_media_references jsonb/i);
+  assert.match(legacyMediaSql, /CREATE TABLE IF NOT EXISTS public\.editorial_article_team_media/i);
+  assert.match(legacyMediaSql, /team_side IN \('team_1', 'team_2'\)/i);
+  assert.match(legacyMediaSql, /rights_reviewed_by IS NOT NULL/i);
+  assert.match(teamMediaGrants, /factsport_v2_editorial_writer/i);
+  assert.match(publicAdapter, /team_1_logo_key, team_2_logo_key/i);
+  assert.match(newsListing, /row\.team_1_logo_key/);
+  assert.match(newsArticle, /article\.team_1_logo_key/);
 });
