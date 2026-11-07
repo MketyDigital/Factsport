@@ -52,8 +52,8 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
           ...row,
           body: row.excerpt || row.body_markdown,
           image_url: row.hero_media_key ? `/api/media/${row.hero_media_key}` : null,
-          team_1_logo: null,
-          team_2_logo: null,
+          team_1_logo: row.team_1_logo_key ? `/api/media/${row.team_1_logo_key}` : null,
+          team_2_logo: row.team_2_logo_key ? `/api/media/${row.team_2_logo_key}` : null,
           created_at: row.original_created_at || row.published_at,
       }));
       count = Number(rows[0]?.total_count ?? 0);
