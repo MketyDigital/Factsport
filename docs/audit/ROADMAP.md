@@ -336,3 +336,12 @@ The protected staging run on commit \`24484f5\` built and deployed the Worker bu
 - Public sportsbook affiliate banner components were removed from public media/sports page surfaces as a rebrand and policy-readiness step; no AdSense integration or approval is claimed.
 - Added regression coverage for tournament directory/detail, public API projections, browser database isolation and promo absence.
 - The corrected tournament directory JSX and public promo test have been committed. Build/verification for the latest revision must pass before this slice is considered validated; migrations 0004-0007 remain unapplied and no production change was made.
+
+## 2026-11-07 verified competition/live-standings slice
+
+- Native Vinext build passed on 37281e9d141b88f0e3f22409fb49d7b045a0956f (run 42382907761).
+- Protected staging passed on that commit (run 42382907988): Worker build/deploy, deny-by-default, authorized /matches page render, stable timestamp+UUID pagination and authentication/cache isolation passed.
+- The first authorized match API request returned a transient 503; the retry returned a populated result and pagination succeeded. Treat the cold-start/transient failure as an operational reliability item, not as an unqualified clean pass.
+- Isolated verification passed on 1afe964c2d0a3a0d71655a4cc95334377a3c100e (run 42383032967), including the engine regression suite, TypeScript, prediction/consent schema contracts and migration inventory.
+- Staging test coverage is still focused on the existing matches endpoint; the new tournament endpoints and feature-flagged standings reads need their own authenticated integration probes once the matching migrations and current-season data are provisioned.
+- No migrations 0004-0007 were applied, no legacy data imported, and no production resources changed.
