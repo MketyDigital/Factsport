@@ -42,16 +42,20 @@ test('weekly activity uses all eligible predictions, while exact-score and leagu
   const predictions = [
     exact(2, 1, 'PL', '2026-01-05T12:00:00Z'),
     exact(0, 1, 'PD', '2026-01-12T12:00:00Z'),
-    exact(1, 1, 'BL1', '2026-01-19T12:00:00Z'),
-    exact(3, 2, 'SA', '2026-01-26T12:00:00Z'),
+    exact(1, 1, 'BL1', '2026-01-12T13:00:00Z'),
     {
       predicted_home_score: 5, predicted_away_score: 0,
-      created_at: '2026-01-26T13:00:00Z',
-      match: { league: 'CL', status: 'LIVE', home_score: 5, away_score: 0 },
+      created_at: '2026-01-19T13:00:00Z',
+      match: { league: 'SA', status: 'LIVE', home_score: 5, away_score: 0 },
     },
   ];
-  const result = evaluateMonthlyPrizeCandidate({ is_vip: true, eligible_monthly_points: 150 }, predictions);
+  const result = evaluateMonthlyPrizeCandidate(
+    { is_vip: true, eligible_monthly_points: 150 },
+    predictions,
+    { targetExactScores: 3, minPointsFloor: 100 },
+  );
   assert.equal(result.isQualified, true);
-  assert.equal(result.exactScores.length, 4);
-  assert.equal(result.reportCard.distinct_leagues, 4);
+  assert.equal(result.exactScores.length, 3);
+  assert.equal(result.reportCard.distinct_leagues, 3);
+  assert.equal(result.reportCard.weeks_active, 3);
 });
