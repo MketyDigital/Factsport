@@ -33,7 +33,7 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
   const currentLeague = rawLeague.length <= 80 ? rawLeague : 'All';
   const parsedPage = Number.parseInt(resolvedParams.page || '1', 10);
   const requestedPage = Number.isFinite(parsedPage) ? Math.min(417, Math.max(1, parsedPage)) : 1;
-  const usePostgres = process.env.FACTSPORT_MATCHES_BACKEND === 'postgres';
+  const usePostgres = process.env.FACTSPORT_HIGHLIGHTS_BACKEND === 'postgres';
 
   let currentPage = requestedPage;
   let totalPages = 1;
