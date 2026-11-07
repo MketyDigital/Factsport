@@ -3,7 +3,7 @@ import { MetadataRoute } from 'next'
 const SITE_URL = 'https://factsport.com'
 const PRIVATE_PATHS = [
   '/admin', '/api', '/dashboard', '/login', '/register', '/account',
-  '/auth', '/vip', '/predict', '/payment', '/checkout', '/chat',
+  '/auth', '/forgot-password', '/vip', '/predict', '/payment', '/checkout', '/chat',
   '/studio', '/settings', '/how-to-play', '/leaderboard',
 ]
 
