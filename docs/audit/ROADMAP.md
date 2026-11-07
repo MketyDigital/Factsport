@@ -300,3 +300,12 @@ The implementation remains on \`refactor/factsport-v2\` and follows the media-fi
 - **Editorial security/SEO:** raw article HTML passes through \`rehype-sanitize\`; iframe embeds are restricted to HTTPS YouTube, YouTube-nocookie and Vimeo player hosts. Existing match-widget tokens use a dedicated safe protocol. NewsArticle JSON-LD escapes script-breaking characters; reviewed SEO title/description/canonical and article author are projected.
 - **Known gaps:** the full \`/highlights\` and \`/standings\` routes remain legacy-backed; Bet of the Day's \`pro_analysis\` and public affiliate/config settings need V2 models; CMS writes/review/publish, media ingestion and rights operations are not yet implemented. These are not complete pages.
 - **Migration state:** migrations 0004-0006 and their tests are committed but unapplied. No legacy article bodies, match history or media have been imported. No production resource or data has been changed. Staging migration, role verification, content preservation classification and browser parity remain gates.
+
+
+## 2026-11-07 competition read paths — highlights and standings
+
+- Added migration 0007 for current-season player goals/assists, stable player IDs, team identity and provider freshness; public reader receives a narrow view only.
+- Full \`/highlights\` page now supports opt-in PostgreSQL pagination, league filters, source-video canonical links and rights-cleared R2 thumbnails. Legacy fallback remains.
+- Full \`/standings\` page now supports opt-in PostgreSQL standings, same-season completed-match form and a goals/assists leaders API. \`LeagueLeaders\` no longer queries Supabase directly in the browser.
+- Added \`matches.season\` and a bounded final-results index; form calculations are isolated to the selected current season.
+- No current-season rows are imported or fabricated. Migrations 0004-0007 are committed but unapplied. Provider ingestion, stats reconciliation, tie-break parity, team-crest rights mapping, live refresh and staging data evidence remain required.
