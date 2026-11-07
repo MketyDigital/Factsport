@@ -7,7 +7,7 @@ import 'server-only';
 import { getFactsportPostgres } from '@/lib/adapters/postgres-client';
 import { getTeamSearchVariations } from '@/app/lib/teamAliases';
 
-const MATCH_SELECT = 'id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, venue, stage, match_group, match_events, stats, lineups, h2h, referees, predictor, source, source_updated_at, version, created_at, updated_at';
+const MATCH_SELECT = 'id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, venue, stage, match_group, season, match_events, stats, lineups, h2h, referees, predictor, source, source_updated_at, version, created_at, updated_at';
 
 const MATCH_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -110,14 +110,16 @@ export async function listPostgresMatches(input: {
   `;
 }
 
-export async function listPostgresLeagueResults(league: string, limit = 1500) {
+export async function listPostgresLeagueResults(league: string, season: string, limit = 1500) {
   if (!league || league.length > 100) throw new Error('Invalid league');
+  if (!season || season.length > 32) throw new Error('Invalid season');
   if (!Number.isInteger(limit) || limit < 1 || limit > 2000) throw new Error('Invalid result limit');
   const sql = getFactsportPostgres();
   return sql`
     SELECT home_team, away_team, home_score, away_score, status, match_date
     FROM public.matches
     WHERE league = ${league}
+      AND season = ${season}
       AND status IN ('FT', 'FINISHED', 'AET', 'PEN', 'AWARDED')
       AND home_score IS NOT NULL AND away_score IS NOT NULL
     ORDER BY match_date DESC, id DESC
