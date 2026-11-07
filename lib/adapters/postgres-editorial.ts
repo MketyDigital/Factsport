@@ -3,8 +3,7 @@
  * Queries only published, rights-filtered PostgreSQL views; no browser DB access.
  */
 import 'server-only';
-import postgres from 'postgres';
-import { env } from 'cloudflare:workers';
+import { getFactsportPostgres } from '@/lib/adapters/postgres-client';
 
 export interface PublicEditorialArticle {
   id: string; slug: string; title: string; excerpt: string | null;
@@ -26,18 +25,6 @@ export interface PublicMediaAsset {
   alt_text: string | null; attribution_text: string | null;
 }
 
-let client: ReturnType<typeof postgres> | undefined;
-function db() {
-  if (!client) {
-    const connectionString = env?.FACTSPORT_HYPERDRIVE?.connectionString;
-    if (!connectionString) throw new Error('Factsport PostgreSQL connection is not configured');
-    client = postgres(connectionString, {
-      max: 1, fetch_types: false, prepare: true, idle_timeout: 5, connect_timeout: 10,
-    });
-  }
-  return client;
-}
-
 export async function listPublicEditorialArticles(input: {
   category?: string | null; limit?: number; offset?: number;
 } = {}) {
@@ -47,7 +34,7 @@ export async function listPublicEditorialArticles(input: {
   if (!Number.isInteger(limit) || limit < 1 || limit > 50) throw new Error('Invalid editorial page size');
   if (!Number.isInteger(offset) || offset < 0 || offset > 5000) throw new Error('Invalid editorial offset');
   if (category && category.length > 80) throw new Error('Invalid editorial category');
-  const sql = db();
+  const sql = getFactsportPostgres();
   if (category && category !== 'All') {
     return sql`
       SELECT id, slug, title, excerpt, body_markdown, category, tags,
@@ -77,7 +64,7 @@ export async function listPublicEditorialArticles(input: {
 
 export async function getPublicEditorialArticle(slug: string) {
   if (!slug || slug.length > 240 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return null;
-  const sql = db();
+  const sql = getFactsportPostgres();
   const rows = await sql`
     SELECT id, slug, title, excerpt, body_markdown, category, tags,
            is_headline, is_breaking, author_display_name, published_at,
@@ -93,7 +80,7 @@ export async function getPublicEditorialArticle(slug: string) {
 
 export async function getPublicMediaAsset(key: string) {
   if (!key || key.length > 512 || !/^editorial\/[A-Za-z0-9/_-]+$/.test(key) || key.includes('..') || key.includes('//')) return null;
-  const sql = db();
+  const sql = getFactsportPostgres();
   const rows = await sql`
     SELECT object_key, content_type, byte_size, sha256, width, height, alt_text, attribution_text
     FROM public.public_media_assets
