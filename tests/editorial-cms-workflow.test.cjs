@@ -33,8 +33,8 @@ test('social publishing is a separate durable Media workflow', () => {
 test('editorial writer privileges are isolated from public and sports runtimes', () => {
   assert.match(grantsSql, /factsport_v2_editorial_writer/i);
   assert.match(grantsSql, /GRANT SELECT, INSERT, UPDATE ON public\.editorial_articles/i);
-  assert.match(grantsSql, /GRANT SELECT, INSERT ON public\.editorial_article_revisions/i);
-  assert.match(grantsSql, /GRANT INSERT ON public\.media_social_outbox/i);
+  assert.match(grantsSql, /GRANT SELECT, INSERT, UPDATE ON public\.editorial_article_revisions/i);
+  assert.match(grantsSql, /GRANT SELECT, INSERT, UPDATE ON public\.media_social_outbox/i);
   assert.match(grantsSql, /factsport_v2_reader, factsport_v2_schedule_writer, factsport_v2_espn_writer/i);
   assert.doesNotMatch(grantsSql, /GRANT .* ON public\.matches/i);
   assert.doesNotMatch(grantsSql, /GRANT .* ON public\.predictions/i);
