@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Shield, TrendingUp, Activity } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
 
 const LEAGUE_MAP: Record<string, string> = {
     'Premier League': 'PL',
@@ -35,29 +34,16 @@ export default function LeagueLeaders({ leagueName }: { leagueName: string }) {
         const fetchLeaders = async () => {
             setIsLoading(true);
             try {
-                const supabase = createClient(
-                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-                );
-                
                 const leagueCode = LEAGUE_MAP[leagueName] || 'PL';
-                
-                const { data, error } = await supabase
-                    .from('tournament_scorers')
-                    .select('*')
-                    .eq('league_code', leagueCode)
-                    .order(leadersType, { ascending: false })
-                    .limit(5);
+                const response = await fetch(`/api/standings/leaders?league=${encodeURIComponent(leagueCode)}&stat=${leadersType}`, {
+                    cache: 'no-store',
+                });
+                if (!response.ok) throw new Error('Player statistics unavailable');
+                const data = await response.json();
 
                 if (isMounted) {
-                    if (data && data.length > 0) {
-                        const mappedData = data.map((d: any) => ({
-                            name: d.player_name,
-                            team: d.team_short_name || d.team_name,
-                            teamCrest: d.team_crest,
-                            value: leadersType === 'goals' ? d.goals : d.assists
-                        })).filter((l: Leader) => l.value > 0);
-                        setActiveList(mappedData);
+                    if (Array.isArray(data) && data.length > 0) {
+                        setActiveList(data);
                     } else {
                         setActiveList([]);
                     }
