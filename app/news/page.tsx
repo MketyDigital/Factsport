@@ -9,6 +9,7 @@ import { Metadata } from 'next';
 import { Calendar, ChevronRight, Zap, Trophy, Youtube, Newspaper, ArrowRight, Flame, Radio, BarChart2, ChevronLeft } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
+import BettingPromo from '@/app/components/BettingPromo';
 
 const CATEGORIES = ['All', 'Football', 'Transfers', 'Sports Update', 'Champions League', 'Euros', 'World Cup', 'AFCON', 'Copa America'];
 const ITEMS_PER_PAGE = 12;
@@ -121,6 +122,7 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
       <div className="px-4 mt-6 relative z-20 max-w-7xl mx-auto">
 
         <div className="mb-8 w-full max-w-3xl mx-auto overflow-hidden rounded-xl bg-white border border-slate-200 shadow-sm max-h-[90px]">
+            <BettingPromo affiliateLink={null} />
         </div>
 
         {featured && (
