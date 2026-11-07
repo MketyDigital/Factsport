@@ -13,7 +13,7 @@ export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
            data-font="0" 
            data-body-background="FFFFFF" 
            data-text-color="000000"
-           data-links="1"> 
+           data-links="0"> 
       </div>
       <script src="https://www.scoreaxis.com/widget/live-match-widget.js"></script>
     `;
