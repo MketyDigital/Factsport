@@ -28,7 +28,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Player statistics temporarily unavailable' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
         }
     }
-    if ((env.FACTSPORT_ENVIRONMENT === 'staging' || env.FACTSPORT_ENVIRONMENT === 'production')) {
+    if (env.FACTSPORT_ENVIRONMENT !== 'development') {
         return NextResponse.json({ error: 'V2 competition statistics reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     }
 
