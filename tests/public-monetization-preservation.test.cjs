@@ -22,8 +22,10 @@ test('AdSense-first public Media surfaces do not render betting affiliate widget
 });
 
 test('legacy affiliate UI components remain in source only for private Prediction parity', () => {
-  assert.match(read('app/components/BettingPromo.tsx'), /PROMO_CODE/);
-  assert.match(read('app/components/FreeTipsBanner.tsx'), /link1x/);
+  assert.match(read('app/components/BettingPromo.tsx'), /api\/prediction\/settings/);
+  assert.match(read('app/components/FreeTipsBanner.tsx'), /api\/prediction\/settings/);
+  assert.doesNotMatch(read('app/components/BettingPromo.tsx'), /refpa\d+\.com|FACTSPORT/);
+  assert.doesNotMatch(read('app/components/FreeTipsBanner.tsx'), /refpa\d+\.com|A8J92|7X2MM/);
   assert.match(read('app/components/AdsterraStandardBanner.tsx'), /AFFILIATE_LINK/);
   const privateApi = read('app/api/prediction/settings/route.ts');
   assert.match(privateApi, /FACTSPORT_PRIVATE_PRODUCT_HOST/);
