@@ -135,7 +135,7 @@ export default function AuditManager() {
                                         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] font-bold">
                                             <div className="flex justify-between"><span>VIP+Floor:</span> {report.vip_and_floor ? <span className="text-green-500">✅</span> : <span className="text-red-500">❌</span>}</div>
                                             <div className="flex justify-between"><span>Active Player:</span> {report.active_player ? <span className="text-green-500">✅</span> : <span className="text-red-500">❌</span>}</div>
-                                            <div className="flex justify-between"><span>4-Leagues:</span> {report.four_leagues ? <span className="text-green-500">✅</span> : <span className="text-red-500">❌</span>}</div>
+                                            <div className="flex justify-between"><span>{report.required_leagues || 4}-Leagues:</span> {report.four_leagues ? <span className="text-green-500">✅</span> : <span className="text-red-500">❌</span>}</div>
                                             <div className="flex justify-between"><span>Perfect Mix:</span> {report.perfect_mix ? <span className="text-green-500">✅</span> : <span className="text-red-500">❌</span>}</div>
                                             <div className="flex justify-between"><span>Score Variety:</span> {report.score_variety ? <span className="text-green-500">✅</span> : <span className="text-red-500">❌</span>}</div>
                                         </div>
