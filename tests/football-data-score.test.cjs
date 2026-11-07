@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { readVerifiedFullTimeScore } = require('../lib/football-data-score.cjs');
+const { readNonNegativeScore, readVerifiedFullTimeScore } = require('../lib/football-data-score.cjs');
 
 test('preserves a valid 0-0 full-time score', () => {
   assert.deepEqual(readVerifiedFullTimeScore({ fullTime: { home: 0, away: 0 } }), { home: 0, away: 0 });
@@ -16,4 +16,13 @@ test('treats missing, partial, negative and non-integer scores as unknown', () =
     { fullTime: { home: 1.5, away: 0 } },
     { fullTime: { home: '1', away: '0' } },
   ]) assert.equal(readVerifiedFullTimeScore(score), null);
+});
+
+test('parses ESPN score strings without turning blanks into zero', () => {
+  assert.equal(readNonNegativeScore('2'), 2);
+  assert.equal(readNonNegativeScore('0'), 0);
+  assert.equal(readNonNegativeScore(''), null);
+  assert.equal(readNonNegativeScore(null), null);
+  assert.equal(readNonNegativeScore('—'), null);
+  assert.equal(readNonNegativeScore('-1'), null);
 });
