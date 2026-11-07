@@ -15,7 +15,7 @@ export async function GET(request: Request) {
 
     try {
         const backend = env.FACTSPORT_COMPETITIONS_BACKEND ?? process.env.FACTSPORT_COMPETITIONS_BACKEND;
-        if (backend !== 'postgres' && env.FACTSPORT_ENVIRONMENT === 'staging') return NextResponse.json({ error: 'V2 standings reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+        if (backend !== 'postgres' && (env.FACTSPORT_ENVIRONMENT === 'staging' || env.FACTSPORT_ENVIRONMENT === 'production')) return NextResponse.json({ error: 'V2 standings reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
         const data = backend === 'postgres'
             ? await listCurrentCompetitionStandings(leagueCode)
             : await (async () => {
