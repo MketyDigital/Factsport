@@ -5,7 +5,8 @@ import { env } from 'cloudflare:workers';
 import { getPublicPredictionAffiliateSettings } from '@/lib/adapters/postgres-prediction-settings';
 
 export const runtime = 'edge';
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 /** Prediction-only settings endpoint; never serve this projection on the public Media host. */
 export async function GET() {
@@ -29,7 +30,7 @@ export async function GET() {
         linkMel: settings?.link_melbet ?? null,
         code1x: settings?.code_1xbet ?? null,
         codeMel: settings?.code_melbet ?? null,
-      }, { headers: { 'Cache-Control': env.FACTSPORT_ENVIRONMENT === 'staging' ? 'private, no-store, max-age=0' : 'private, max-age=0, s-maxage=300, stale-while-revalidate=600' } });
+      }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
     }
     if (env.FACTSPORT_ENVIRONMENT !== 'development') {
       return NextResponse.json({ error: 'V2 Prediction settings are not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
