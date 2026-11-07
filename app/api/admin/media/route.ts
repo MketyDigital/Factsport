@@ -47,8 +47,8 @@ export async function POST(request: Request) {
       customMetadata: { sha256, uploadedBy: actorId },
     });
 
-    const asset = await withFactsportEditorialPostgres(async sql => {
-      const rows = await sql`
+    const asset = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+      const rows = await tx`
         INSERT INTO public.media_assets (
           object_key, media_kind, content_type, byte_size, sha256, alt_text,
           rights_status, is_public, uploaded_by
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
           ${altText || null}, 'pending', false, ${actorId}::uuid
         ) RETURNING id, object_key, rights_status
       `;
-      await sql`
+      await tx`
         INSERT INTO public.media_editorial_audit_events (actor_user_id, action, details)
         VALUES (
           ${actorId}::uuid, 'media_uploaded',
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
         )
       `;
       return rows[0];
-    });
+    }));
     return NextResponse.json({ success: true, asset });
   } catch (error) {
     if (objectKey) {
