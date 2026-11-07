@@ -44,7 +44,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Match data temporarily unavailable' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
         }
     }
-    if (env.FACTSPORT_ENVIRONMENT === 'staging') {
+    if ((env.FACTSPORT_ENVIRONMENT === 'staging' || env.FACTSPORT_ENVIRONMENT === 'production')) {
         return NextResponse.json({ error: 'V2 match detail reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     }
 
