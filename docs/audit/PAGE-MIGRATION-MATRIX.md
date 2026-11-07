@@ -116,3 +116,11 @@ The base \`FACTSPORT_MATCHES_BACKEND\` flag must remain independent of migration
 - Isolated verification passed on 1afe964c2d0a3a0d71655a4cc95334377a3c100e (run 42383032967), including the engine regression suite, TypeScript, prediction/consent schema contracts and migration inventory.
 - Staging test coverage is still focused on the existing matches endpoint; the new tournament endpoints and feature-flagged standings reads need their own authenticated integration probes once the matching migrations and current-season data are provisioned.
 - No migrations 0004-0007 were applied, no legacy data imported, and no production resources changed.
+
+## 2026-11-07 Hyperdrive lifecycle correction — M11
+
+- Intermittent staging 503s were investigated. The app had a module-scoped postgres.js client reused across Worker requests, and the match reader used sql.unsafe() for its dynamic projection. Both were removed: adapters now use a request-scoped client closed in finally, and static SELECT projections preserve prepared statements.
+- Isolated verification passed on 3ed1df5 (run 42383870339); native Vinext build passed (run 42383870315).
+- Protected staging passed (run 42383870331): deny-by-default, Hyperdrive/R2 health, /matches initial render, timestamp+UUID cursor pagination without duplicate row, and auth/cache isolation all passed. The pagination 503 did not reproduce after the lifecycle change.
+- Continue monitoring transient database errors; a successful rerun is not a guarantee against future infrastructure failures.
+- Main /match/[id] remains a legacy path until canonical legacy-ID crosswalk, prediction/campaign parity, server-authorized stream grants, VIP analysis RBAC, ticker and settings reads are complete. See M11.
