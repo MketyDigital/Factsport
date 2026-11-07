@@ -47,6 +47,18 @@ export async function listPublicMatchHighlights(limit = 5) {
   });
 }
 
+export async function getPublicMediaStudioSettings() {
+  return withFactsportPostgres(async sql => {
+    const rows = await sql`
+      SELECT title, audio_url, video_url, is_active, room_name,
+             public_listening_enabled, callin_enabled
+      FROM public.public_media_studio_settings
+      LIMIT 1
+    `;
+    return rows[0] ?? null;
+  });
+}
+
 export async function getPublicHomepageSettings() {
   return withFactsportPostgres(async sql => {
     const rows = await sql`
