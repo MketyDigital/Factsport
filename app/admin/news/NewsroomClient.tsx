@@ -93,8 +93,9 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
       });
       if (!result.success) { setMessage(result.error); return; }
       if (!result.data) { setMessage('Draft save returned no article identifier.'); return; }
+      const savedArticleId = result.data.id;
       setMessage('Draft saved. Reload the newsroom to see the updated record.');
-      setForm(current => ({ ...current, id: result.data.id }));
+      setForm(current => ({ ...current, id: savedArticleId }));
     });
   }
 
