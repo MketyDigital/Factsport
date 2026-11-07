@@ -17,16 +17,20 @@ export default async function MiniStandings({ leagueName = 'Premier League' }: {
 
     const leagueCode = LEAGUE_MAP[leagueName] || 'PL'; 
     let dbStandings: any[] = [];
-    if (process.env.FACTSPORT_COMPETITIONS_BACKEND === 'postgres') {
-        dbStandings = await listCurrentCompetitionStandings(leagueCode);
-    } else {
-        const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-        const result = await supabase
-            .from('standings')
-            .select('team_name, team_short_name, position, played_games, points')
-            .eq('league_code', leagueCode)
-            .order('position', { ascending: true });
-        dbStandings = result.data || [];
+    try {
+        if (process.env.FACTSPORT_COMPETITIONS_BACKEND === 'postgres') {
+            dbStandings = await listCurrentCompetitionStandings(leagueCode);
+        } else {
+            const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+            const result = await supabase
+                .from('standings')
+                .select('team_name, team_short_name, position, played_games, points')
+                .eq('league_code', leagueCode)
+                .order('position', { ascending: true });
+            dbStandings = result.data || [];
+        }
+    } catch {
+        return null;
     }
 
     if (dbStandings.length === 0) return null;
