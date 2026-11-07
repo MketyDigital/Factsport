@@ -34,3 +34,26 @@ test('homepage, news listing and article pages support an explicit PostgreSQL ed
   assert.match(news, /listPublicEditorialArticles/);
   assert.match(article, /getPublicEditorialArticle/);
 });
+
+test('article rendering sanitizes raw HTML and restricts iframe embeds to trusted providers', () => {
+  const renderer = read('app/components/MarkdownRenderer.tsx');
+  assert.match(renderer, /rehypeSanitize/);
+  assert.match(renderer, /rehypePlugins=\{\[rehypeRaw, \[rehypeSanitize, articleSanitizeSchema\], rehypeSafeEmbeds\]\}/);
+  assert.match(renderer, /www\\.youtube\\.com/);
+  assert.match(renderer, /www\\.youtube-nocookie\\.com/);
+  assert.match(renderer, /player\\.vimeo\\.com/);
+  assert.match(renderer, /sandbox: 'allow-scripts allow-same-origin allow-presentation'/);
+  assert.match(renderer, /match-widget:/);
+  assert.doesNotMatch(renderer, /match-widget-embed/);
+});
+
+test('article metadata uses approved SEO fields and safe JSON-LD serialization', () => {
+  const helper = read('lib/seo/json-ld.ts');
+  assert.match(helper, /replace\(/);
+  assert.match(helper, /\\\\u003c/);
+  assert.match(helper, /toPlainText/);
+  assert.match(article, /serializeJsonLd\(jsonLd\)/);
+  assert.match(article, /article\.seo_title/);
+  assert.match(article, /article\.seo_description/);
+  assert.match(article, /article\.canonical_url/);
+});
