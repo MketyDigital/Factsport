@@ -1,4 +1,5 @@
 import { MetadataRoute } from 'next'
+import { headers } from 'next/headers'
 import { listPublicEditorialArticles } from '@/lib/adapters/postgres-editorial'
 import { listPostgresMatchesWindow } from '@/lib/adapters/postgres-matches'
 
@@ -22,6 +23,11 @@ const STATIC_ROUTES = [
 ] as const
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const privateHost = (process.env.FACTSPORT_PRIVATE_PRODUCT_HOST || '').trim().toLowerCase();
+  const requestHeaders = await headers();
+  const requestHost = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').split(',')[0].trim().toLowerCase().split(':')[0];
+  if (privateHost && requestHost === privateHost) return [];
+
   // Sitemap is intentionally fail-closed. Do not query the legacy Supabase
   // database from the V2 public sitemap or expose a partial mixed data source.
   const ready =
