@@ -13,6 +13,8 @@ type Article = {
   excerpt: string | null;
   body_markdown: string;
   category: string;
+  team_1_name: string | null;
+  team_2_name: string | null;
   tags: string[];
   status: string;
   review_status: string;
@@ -28,7 +30,7 @@ type Article = {
 
 const blank = {
   id: undefined as string | undefined,
-  title: '', slug: '', excerpt: '', bodyMarkdown: '', category: 'Football',
+  title: '', slug: '', excerpt: '', bodyMarkdown: '', category: 'Football', team1Name: '', team2Name: '',
   tagsText: '', seoTitle: '', seoDescription: '', canonicalUrl: '',
   authorDisplayName: 'FactSport Desk', isHeadline: false, isBreaking: false,
 };
@@ -55,7 +57,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   function edit(article: Article) {
     setForm({
       id: article.id, title: article.title, slug: article.slug, excerpt: article.excerpt || '',
-      bodyMarkdown: article.body_markdown, category: article.category, tagsText: (article.tags || []).join(', '),
+      bodyMarkdown: article.body_markdown, category: article.category, team1Name: article.team_1_name || '', team2Name: article.team_2_name || '', tagsText: (article.tags || []).join(', '),
       seoTitle: article.seo_title || '', seoDescription: article.seo_description || '',
       canonicalUrl: article.canonical_url || '', authorDisplayName: article.author_display_name || 'FactSport Desk',
       isHeadline: article.is_headline, isBreaking: article.is_breaking,
@@ -74,7 +76,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
       const result = await saveEditorialDraft({
         id: form.id, title: form.title, slug: form.slug || slugify(form.title),
         excerpt: form.excerpt, bodyMarkdown: form.bodyMarkdown, category: form.category,
-        tags: form.tagsText.split(',').map(value => value.trim()).filter(Boolean),
+        team1Name: form.team1Name, team2Name: form.team2Name, tags: form.tagsText.split(',').map(value => value.trim()).filter(Boolean),
         seoTitle: form.seoTitle, seoDescription: form.seoDescription,
         canonicalUrl: form.canonicalUrl, authorDisplayName: form.authorDisplayName,
         isHeadline: form.isHeadline, isBreaking: form.isBreaking,
@@ -119,6 +121,12 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
             </label>
             <label className="text-xs font-bold text-slate-600">Category
               <input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} maxLength={80} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
+            </label>
+            <label className="text-xs font-bold text-slate-600">Team 1 / home-side name
+              <input value={form.team1Name} onChange={e => setForm({ ...form, team1Name: e.target.value })} maxLength={120} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
+            </label>
+            <label className="text-xs font-bold text-slate-600">Team 2 / away-side name
+              <input value={form.team2Name} onChange={e => setForm({ ...form, team2Name: e.target.value })} maxLength={120} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
             </label>
             <label className="md:col-span-2 text-xs font-bold text-slate-600">Excerpt / social preview
               <textarea value={form.excerpt} onChange={e => setForm({ ...form, excerpt: e.target.value })} maxLength={500} rows={2} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
