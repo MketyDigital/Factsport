@@ -294,3 +294,16 @@ The primary delivery target is the complete public Factsport football-media plat
 - Keep this lightweight: unique email index, participant contact index, unique subscription key and transactional upsert; no extra identity service.
 
 This clarification supersedes any earlier wording in AUTH-005 that said free predictions collect no email at all. The current owner-approved flow is email at first explicit prediction submission, then reuse/deduplicate as above. Email is not a login or identity-claim key.
+
+
+## 16. 2026-11-07 editorial and homepage implementation checkpoint
+
+- Migration 0004 creates empty editorial, revision, source-provenance and media metadata structures; its public views expose only published article records and rights-cleared media.
+- Migration 0005 makes article origin explicit, preserves legacy body/content separately, carries original creation and SEO/reverification fields, and requires an identified human reviewer before publishing. Public media is gated by a recorded rights review.
+- Migration 0006 adds featured-match flags, a safe homepage setting view, season/group-aware standings and YouTube/Vimeo highlight records with provider-matched URL constraints and human rights review.
+- Homepage, news and article pages now have explicit opt-in PostgreSQL read paths. Homepage featured matches/highlights and mini standings have public-view adapters. The full highlights and standings pages remain legacy-backed.
+- Article Markdown sanitization, trusted embed allowlisting, safe match-widget protocol, SEO metadata and JSON-LD escaping are implemented in the V2 branch.
+- The \`HomeDashboardClient\` no longer accesses Supabase directly for featured-match settings; it calls a same-origin server route. The legacy API branch projects only the fields needed rather than selecting the entire settings row.
+- Shared match/editorial/homepage adapters use one bounded PostgreSQL client per Worker isolate.
+- **Not complete:** CMS create/edit/review/publish/rollback and RBAC, media upload/rights-review workflow, social outbox, full highlights/standings route parity, public affiliate settings and the Bet of the Day \`pro_analysis\` model remain open.
+- Migrations 0004-0006 are committed but unapplied; no legacy article bodies/media were imported and no production resources/data were changed. These read paths cannot be enabled against staging until migration and role verification pass.
