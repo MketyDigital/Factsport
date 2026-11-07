@@ -2,7 +2,7 @@
 
 Date: 2026-11-07
 Branch: refactor/factsport-v2
-Status: additive Prediction schema and separate readers implemented; no legacy values imported and production flags remain off.
+Status: additive Prediction schema and separate readers implemented; M30 supersedes the original combined API facade. No legacy values imported and production flags remain off.
 
 ## Legacy response contract
 
@@ -23,14 +23,18 @@ The first four are Prediction monetization/referral settings. featured_match_id 
 - The public reader receives SELECT on the narrow Prediction view only; the Media editorial writer receives no access to the Prediction settings table.
 - A dedicated Prediction admin role is required before the settings can be edited in V2.
 
-## Compatibility API
+## Superseding API boundary (M30)
 
-GET /api/settings remains a compatibility facade for existing frontend consumers. When both backend flags are set, it reads Media and Prediction projections independently in parallel, then returns the same five-field response shape. The response is combined only at the public API boundary; database ownership and permissions remain separate.
+The initial compatibility facade was superseded to enforce the AdSense-first public Media boundary.
 
-- FACTSPORT_HOMEPAGE_BACKEND=postgres selects the Media homepage view.
-- FACTSPORT_PREDICTION_SETTINGS_BACKEND=postgres selects the Prediction affiliate view.
-- Outside local development, if either projection is not provisioned, the endpoint returns 503 and does not silently fall back to the legacy mixed Supabase settings row.
-- The old mixed settings read is retained for local development compatibility only.
+- Public GET /api/settings returns only Media-owned homepage fields: featured_match_id, announcement_text, announcement_link and announcement_enabled.
+- Private GET /api/prediction/settings returns link1x, linkMel, code1x and codeMel only when the request hostname exactly matches FACTSPORT_PRIVATE_PRODUCT_HOST.
+- The Prediction settings endpoint is force-dynamic and sends Cache-Control: private, no-store, max-age=0. It never exposes affiliate data to the public Media host.
+- The FreeTipsBanner and BettingPromo private components now read the private Prediction endpoint and have no hardcoded affiliate URL/code fallbacks.
+- Migration 0024 adds the announcement fields to homepage_settings and its narrow public view. These remain Media-owned.
+- Public Media production pages no longer mount the legacy AuthProvider or account navigation. Dashboard, login, register, password recovery, VIP upgrade, private leaderboard and how-to-play routes are gated to the private product hostname.
+
+The earlier five-field combined /api/settings response is no longer a valid V2 contract. Do not reintroduce it.
 
 ## Data migration requirement
 
@@ -41,4 +45,4 @@ Do not import any social access token, payment credential, webhook secret or oth
 
 ## Validation and no-go conditions
 
-Source tests verify response shape, separate adapter usage, view-only reader grant and fail-closed production/staging behavior. Migration 0018 has not been applied, Prediction writer role is not provisioned, flags are not enabled and no production settings have been changed. Do not enable either backend flag until migration and data reconciliation are complete.
+Source tests verify the Media-only public response, private-host-only Prediction endpoint, separate adapter usage, view-only reader grant and fail-closed behavior. Migration 0018 has not been applied, Prediction writer role is not provisioned, flags are not enabled and no production settings have been changed. Do not enable either backend flag until migration and data reconciliation are complete.
