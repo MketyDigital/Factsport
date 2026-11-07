@@ -17,7 +17,7 @@ export default async function MiniStandings({ leagueName = 'Premier League' }: {
 
     const leagueCode = LEAGUE_MAP[leagueName] || 'PL'; 
     let dbStandings: any[] = [];
-    if (process.env.FACTSPORT_MATCHES_BACKEND === 'postgres') {
+    if (process.env.FACTSPORT_COMPETITIONS_BACKEND === 'postgres') {
         dbStandings = await listCurrentCompetitionStandings(leagueCode);
     } else {
         const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
