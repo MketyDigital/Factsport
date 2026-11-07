@@ -26,7 +26,12 @@ test('legacy Supabase side-effect endpoints are archived and fail closed in V2',
   for (const [activePath, archivePath] of disabledRoutes) {
     const active = read(activePath);
     const archived = read(archivePath);
-    assert.match(active, /legacyRouteDisabled|V2_LEGACY_ROUTE_DISABLED/);
+    if (activePath === 'app/api/social/route.ts') {
+      assert.match(active, /status: 410/);
+      assert.match(active, /V2_SOCIAL_DISPATCHER_NOT_PROVISIONED/);
+    } else {
+      assert.match(active, /legacyRouteDisabled|V2_LEGACY_ROUTE_DISABLED/);
+    }
     assert.doesNotMatch(active, /createClient|getSupabaseAdmin|SUPABASE_SERVICE_ROLE_KEY/);
     assert.match(archived, /Archived verbatim|Archived verbatim from/);
     assert.match(archived, /SUPABASE_SERVICE_ROLE_KEY|createClient|getSupabaseAdmin/);
