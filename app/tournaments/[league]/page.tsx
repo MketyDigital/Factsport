@@ -1,7 +1,8 @@
 export const runtime = 'edge';
 export const revalidate = 60;
 
-import { createClient } from '@supabase/supabase-js'; 
+import { createClient } from '@supabase/supabase-js';
+import { listPostgresLeagueMatches } from '@/lib/adapters/postgres-matches';
 import Link from 'next/link';
 import { Metadata, ResolvingMetadata } from 'next';
 import { ChevronLeft, Trophy, Calendar, CheckCircle, Search, CalendarDays, BarChart2, Star, Shield, Info, MapPin } from 'lucide-react';
@@ -58,22 +59,20 @@ export default async function TournamentDetailsPage({ params }: { params: Promis
     const resolvedParams = await params;
     const leagueName = decodeURIComponent(resolvedParams.league);
 
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-
-    const now = new Date();
-    const startOfWindow = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString(); 
-    const endOfWindow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString();
-
-    const { data: dbMatches } = await supabase
-        .from('matches')
-        .select('*')
-        .eq('league', leagueName)
-        .gte('match_date', startOfWindow)
-        .lte('match_date', endOfWindow)
-        .order('match_date', { ascending: true });
-
-    // Use DB matches or empty array if none
-    const matches = dbMatches || [];
+    let matches: any[] = [];
+    if (process.env.FACTSPORT_MATCHES_BACKEND === 'postgres') {
+        matches = await listPostgresLeagueMatches(leagueName, 500);
+    } else {
+        const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+        const { data, error } = await supabase
+            .from('matches')
+            .select('id, api_id, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, stage, match_group, venue')
+            .eq('league', leagueName)
+            .order('match_date', { ascending: true })
+            .limit(500);
+        if (error) throw error;
+        matches = data || [];
+    }
 
     const style = LEAGUE_STYLES[leagueName] || {
         themeClass: 'from-[#1e293b] to-[#0f172a]',
