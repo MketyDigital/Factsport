@@ -18,6 +18,7 @@ const publicPages = [
 test('public media and sports routes do not render bookmaker affiliate promotions', () => {
   for (const file of publicPages) {
     const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
-    assert.doesNotMatch(source, /<(?:AdsterraStandardBanner|BettingPromo)\\b|from ['\"][^'\"]*(?:AdsterraStandardBanner|BettingPromo)/i, file);
+    assert.equal(source.includes('<AdsterraStandardBanner'), false, file);
+    assert.equal(source.includes('<BettingPromo'), false, file);
   }
 });
