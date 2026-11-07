@@ -76,7 +76,7 @@ async function getHomepageData(leagueFilter: string | undefined) {
     }
   };
 
-  const [news, highlights, featuredMatches] = await Promise.all([
+  const [news, highlights, featuredMatches]: [any[], any[], any[]] = await Promise.all([
     usePostgresEditorial
       ? listPublicEditorialArticles({ limit: 25 }).then(rows => rows.map((row: any) => ({
           ...row,
@@ -140,8 +140,8 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
     
   const { matches, news, highlights, featuredMatches } = await getHomepageData(selectedLeague);
 
-  const finalHeadlines = news.filter(n => n.is_headline).slice(0, 3);
-  const nonHeadlineNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id));
+  const finalHeadlines = news.filter((n: any) => n.is_headline).slice(0, 3);
+  const nonHeadlineNews = news.filter((n: any) => !finalHeadlines.some((h: any) => h.id === n.id));
   const latestNews = nonHeadlineNews.slice(0, 5);
   const rawTicker = nonHeadlineNews.slice(0, 20);
   const tickerNews = [...rawTicker, ...rawTicker];
