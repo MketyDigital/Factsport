@@ -286,3 +286,11 @@ The complete acceptance contract is [V2-PARITY-REBRAND-ADSENSE-ACCEPTANCE.md](./
 - Full \`/standings\` now has an opt-in PostgreSQL table path, same-season recent form and a same-origin goals/assists leaders API. \`LeagueLeaders\` no longer queries Supabase from the browser.
 - Added explicit \`matches.season\` and a bounded completed-results index to migration 0006; recent form is never computed across seasons.
 - These are read-path implementations, not complete sports operations. Provider jobs, current-season standings/player-stat population, freshness, tie-break parity and actual staging data remain outstanding. Migrations 0004-0007 are unapplied.
+
+
+## Protected staging diagnostic — 2026-11-07
+
+- Protected staging run on \`24484f5\`: native Worker build/deploy succeeded; deny-by-default checks passed; authorized \`/matches\` returned HTTP 500.
+- Cause found in source/schema boundary: the base matches projection included \`season\`, a column only created by unapplied migration 0006. Removed \`season\` from the base match projection; kept it only in the current-season results reader.
+- Added migration-specific flags: base matches (0001), editorial (0004-0005), homepage/highlights (0006), competitions/player leaders (0006-0007). This prevents partially migrated staging databases from querying future views.
+- Fresh isolated verification and native build passed on \`40cb46b\`; the protected staging rerun on corrected commit \`ee8e30e\` is pending. The prior keyset pagination 503 has not yet been re-probed after this fix.
