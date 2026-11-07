@@ -4,7 +4,10 @@ export const revalidate = 300;
 import Link from 'next/link';
 import { Metadata } from 'next';
 import { ChevronLeft, BarChart2, AlertTriangle } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js'; 
+import { createClient } from '@supabase/supabase-js';
+import { listCurrentCompetitionStandings } from '@/lib/adapters/postgres-homepage';
+import { listPostgresLeagueResults } from '@/lib/adapters/postgres-matches';
+import { serializeJsonLd } from '@/lib/seo/json-ld';
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import LeagueLeaders from '@/app/components/LeagueLeaders'; 
 
@@ -56,26 +59,34 @@ const normalizeName = (name: string) => {
 
 async function getStandings(leagueName: string) {
     const leagueCode = LEAGUE_MAP[leagueName] || 'PL'; 
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-
+    let dbStandings: any[] = [];
+    let dbMatches: any[] = [];
     try {
-        const { data: dbStandings, error: standingsError } = await supabase
-            .from('standings')
-            .select('*')
-            .eq('league_code', leagueCode)
-            .order('match_group', { ascending: true }) // 🟢 ENSURES GROUPS RENDER CORRECTLY
-            .order('position', { ascending: true });
-
-        if (standingsError || !dbStandings || dbStandings.length === 0) {
-            return { error: 'No standings data available yet.', data: [] };
+        if (process.env.FACTSPORT_MATCHES_BACKEND === 'postgres') {
+            const results = await Promise.all([
+                listCurrentCompetitionStandings(leagueCode),
+                listPostgresLeagueResults(leagueName, 2000),
+            ]);
+            dbStandings = results[0];
+            dbMatches = results[1];
+        } else {
+            const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+            const [standingsResult, matchesResult] = await Promise.all([
+                supabase.from('standings').select('*').eq('league_code', leagueCode)
+                    .order('match_group', { ascending: true }).order('position', { ascending: true }),
+                supabase.from('matches').select('home_team, away_team, home_score, away_score')
+                    .eq('league', leagueName)
+                    .in('status', ['FT', 'FINISHED', 'AWARDED', 'AET', 'PEN'])
+                    .order('match_date', { ascending: false }),
+            ]);
+            if (standingsResult.error) throw standingsResult.error;
+            dbStandings = standingsResult.data || [];
+            dbMatches = matchesResult.data || [];
         }
 
-        const { data: dbMatches } = await supabase
-            .from('matches')
-            .select('home_team, away_team, home_score, away_score')
-            .eq('league', leagueName)
-            .in('status', ['FT', 'FINISHED', 'AWARDED', 'AET', 'PEN'])
-            .order('match_date', { ascending: false });
+        if (dbStandings.length === 0) {
+            return { error: 'No standings data available yet.', data: [] };
+        }
 
         const teamForms: Record<string, string[]> = {};
 
@@ -128,8 +139,8 @@ async function getStandings(leagueName: string) {
 
         return { error: null, data: formattedStandings };
 
-    } catch (error: any) {
-        return { error: `Database Error: ${error.message}`, data: [] }; 
+    } catch {
+        return { error: 'Standings are temporarily unavailable.', data: [] };
     }
 }
 
@@ -162,7 +173,7 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
 
     return (
         <div className="min-h-screen bg-[#F0F2F5] text-slate-900 pb-20 font-sans">
-            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
 
             <div className="bg-[#0a1428] text-white p-3 md:p-4 flex items-center gap-3 md:gap-4 sticky top-0 z-50 shadow-lg">
                 <Link href="/matches" className="p-1.5 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-sm">
