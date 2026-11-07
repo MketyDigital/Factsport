@@ -3,13 +3,14 @@ import 'server-only';
 import { createClient } from '@/app/lib/supabase/server';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 
-export type MediaEditorialCapability = 'read' | 'draft' | 'review' | 'publish' | 'archive' | 'media' | 'social';
+export type MediaEditorialCapability = 'workspace' | 'read' | 'draft' | 'review' | 'publish' | 'archive' | 'media' | 'social';
 export type MediaEditorialAuthorization =
   | { ok: true; user: { id: string; domainUserId: string; roles: string[] } }
   | { ok: false; status: 401 | 403; error: string };
 
 const allowedRoles: Record<MediaEditorialCapability, string[]> = {
-  read: ['writer', 'editor', 'publisher', 'social_manager', 'media_admin'],
+  workspace: ['writer', 'editor', 'publisher', 'social_manager', 'media_admin'],
+  read: ['writer', 'editor', 'publisher', 'media_admin'],
   draft: ['writer', 'editor', 'publisher', 'media_admin'],
   review: ['editor', 'publisher', 'media_admin'],
   publish: ['publisher', 'media_admin'],
