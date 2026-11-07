@@ -7,7 +7,7 @@ import 'server-only';
 import { getFactsportPostgres } from '@/lib/adapters/postgres-client';
 import { getTeamSearchVariations } from '@/app/lib/teamAliases';
 
-const MATCH_SELECT = 'id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, venue, stage, match_group, season, match_events, stats, lineups, h2h, referees, predictor, source, source_updated_at, version, created_at, updated_at';
+const MATCH_SELECT = 'id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, venue, stage, match_group, match_events, stats, lineups, h2h, referees, predictor, source, source_updated_at, version, created_at, updated_at';
 
 const MATCH_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
