@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
-import { authorizeAdminAction } from '@/app/lib/admin/authorization';
+import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 
 type MediaReviewInput = {
   articleId: string; assetId: string; placement: 'hero' | 'team_1' | 'team_2';
@@ -11,7 +11,7 @@ type MediaReviewInput = {
 };
 
 export async function reviewRightsAndAttachMedia(input: MediaReviewInput) {
-  const authorization = await authorizeAdminAction();
+  const authorization = await authorizeMediaEditorialAction('media');
   if (!authorization.ok) return { success: false, error: authorization.error };
   if (!/^[0-9a-f-]{36}$/i.test(input?.articleId || '') || !/^[0-9a-f-]{36}$/i.test(input?.assetId || '')) {
     return { success: false, error: 'Invalid article or media asset identifier.' };
@@ -33,7 +33,7 @@ export async function reviewRightsAndAttachMedia(input: MediaReviewInput) {
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
       const actors = await tx`
         SELECT user_id FROM public.external_identities
-        WHERE subject=${authorization.user.id} ORDER BY created_at DESC LIMIT 2
+        WHERE subject=${authorization.user.domainUserId} ORDER BY created_at DESC LIMIT 2
       `;
       if (actors.length !== 1) throw new Error('This administrator has no unique Factsport domain identity mapping.');
       const actorId = actors[0].user_id as string;
