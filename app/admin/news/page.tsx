@@ -30,6 +30,7 @@ export default async function AdminNewsPage() {
         a.status,
         COALESCE(r.workflow_status, a.review_status) AS review_status,
         r.workflow_status AS revision_status,
+        r.review_comment,
         COALESCE((r.snapshot->>'is_headline')::boolean, a.is_headline) AS is_headline,
         COALESCE((r.snapshot->>'is_breaking')::boolean, a.is_breaking) AS is_breaking,
         CASE WHEN r.snapshot IS NULL THEN a.seo_title ELSE r.snapshot->>'seo_title' END AS seo_title,
@@ -39,9 +40,9 @@ export default async function AdminNewsPage() {
         a.updated_at
       FROM public.editorial_articles a
       LEFT JOIN LATERAL (
-        SELECT snapshot, workflow_status, created_at
+        SELECT snapshot, workflow_status, review_comment, created_at
         FROM public.editorial_article_revisions
-        WHERE article_id=a.id AND workflow_status IN ('draft','in_review','approved')
+        WHERE article_id=a.id AND workflow_status IN ('draft','in_review','approved','rejected')
         ORDER BY revision_number DESC LIMIT 1
       ) r ON true
       ORDER BY GREATEST(a.updated_at, COALESCE(r.created_at, a.updated_at)) DESC
