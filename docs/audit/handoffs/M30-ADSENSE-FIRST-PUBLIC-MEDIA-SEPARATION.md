@@ -56,10 +56,12 @@ Updated the public Privacy Policy, Terms and Disclaimer to describe the public M
 
 The privacy notice explicitly states that AdSense is not currently enabled and explains the future advertising/cookie/consent processing that must be disclosed before activation. The Advertising Policy describes the current absence of AdSense and the no-bookmaker-promotion public inventory rule.
 
+Migration 0024 adds Media-owned public announcement fields to homepage_settings and extends the narrow public view. The public settings endpoint and match/embed players now read these fields from PostgreSQL; Prediction affiliate settings remain isolated from this projection.
+
 ## SEO and crawler readiness
 
 - app/robots.ts remains deny-all unless indexing is explicitly enabled in production and the editorial, matches and sitemap backends are all set to PostgreSQL.
-- It also excludes private/admin/auth/API/payment/chat/studio/embed/legacy private leaderboard/how-to-play routes.
+- It also excludes private/admin/auth/API/payment/chat/studio/legacy private leaderboard/how-to-play routes. The embed player is crawlable for social player-card validation but declares noindex and is excluded from AdSense.
 - app/sitemap.ts no longer reads legacy Supabase. It fails closed unless the explicit indexing and V2 PostgreSQL backend flags are set, then builds static, public editorial and match URLs from V2 read adapters.
 - Public About, Contact, Editorial Standards and Advertising Policy pages are in the sitemap only after the V2 sitemap gates are satisfied.
 - public/ads.txt retains the existing Google seller line pub-6393486260333696; the line has not been verified against the current owner AdSense account or live root response.
