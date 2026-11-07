@@ -18,11 +18,31 @@ export default async function AdminNewsPage() {
 
   try {
     const articles = await withFactsportEditorialPostgres(async sql => sql`
-      SELECT id, title, slug, excerpt, body_markdown, category, tags, status, review_status,
-             is_headline, is_breaking, seo_title, seo_description, canonical_url,
-             author_display_name, updated_at
-      FROM public.editorial_articles
-      ORDER BY updated_at DESC
+      SELECT a.id,
+        COALESCE(r.snapshot->>'title', a.title) AS title,
+        COALESCE(r.snapshot->>'slug', a.slug) AS slug,
+        COALESCE(r.snapshot->>'excerpt', a.excerpt) AS excerpt,
+        COALESCE(r.snapshot->>'body_markdown', a.body_markdown) AS body_markdown,
+        COALESCE(r.snapshot->>'category', a.category) AS category,
+        COALESCE(ARRAY(SELECT jsonb_array_elements_text(r.snapshot->'tags')), a.tags) AS tags,
+        a.status,
+        COALESCE(r.workflow_status, a.review_status) AS review_status,
+        r.workflow_status AS revision_status,
+        COALESCE((r.snapshot->>'is_headline')::boolean, a.is_headline) AS is_headline,
+        COALESCE((r.snapshot->>'is_breaking')::boolean, a.is_breaking) AS is_breaking,
+        COALESCE(r.snapshot->>'seo_title', a.seo_title) AS seo_title,
+        COALESCE(r.snapshot->>'seo_description', a.seo_description) AS seo_description,
+        COALESCE(r.snapshot->>'canonical_url', a.canonical_url) AS canonical_url,
+        COALESCE(r.snapshot->>'author_display_name', a.author_display_name) AS author_display_name,
+        a.updated_at
+      FROM public.editorial_articles a
+      LEFT JOIN LATERAL (
+        SELECT snapshot, workflow_status
+        FROM public.editorial_article_revisions
+        WHERE article_id=a.id AND workflow_status IN ('draft','in_review')
+        ORDER BY revision_number DESC LIMIT 1
+      ) r ON true
+      ORDER BY a.updated_at DESC
       LIMIT 200
     `);
     return <NewsroomClient initialArticles={articles as any[]} />;
