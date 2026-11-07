@@ -10,11 +10,11 @@ The v2 Worker currently proves only the protected health and matches read path. 
 
 | Page / route | Current dependency found in source | v2 domain owner | Production acceptance |
 |---|---|---|---|
-| `/` | Supabase `news`, `matches`; headlines, ticker, latest news, highlights, ads | Public home/read models + editorial | Same hero/headlines/news ticker/live results, SEO/metadata, mobile parity, cache rules, no Supabase runtime |
+| `/` | Optional `FACTSPORT_EDITORIAL_BACKEND=postgres` for published news and `FACTSPORT_MATCHES_BACKEND=postgres` for the main match window; featured-match and highlight queries still use legacy Supabase | Public home/read models + editorial + match service | Complete migration of featured/highlight read models, no Supabase runtime, same home modules, cache correctness, SEO and mobile parity |
 | `/matches` | Staging v2 path now reads initial matches and team form through the read-only PostgreSQL Hyperdrive; legacy Supabase fallback remains when backend flag is unset. Client live polling still calls the external `live-api.factsport.com` endpoint. | Match list service + fast live proxy | Staging initial SSR and load-more reads verified; stable `(match_date,id)` cursor; canonical IDs, team aliases, live/scheduled/finished filters, 3-second live UX, cache correctness and eventual same-origin live proxy migration |
 | `/match/[id]` | Supabase `matches`, `site_settings`, player and match-detail components | Match center domain + MediaStore | Complete match details, lineups, events, stats, h2h, video/player entitlements, 3s live refresh, no provider-ID drift |
-| `/news` | Supabase `news`, news artwork and ad components | Editorial/CMS read model | Published-only content, SEO, pagination, safe image rendering, provenance/attribution |
-| `/news/[slug]` | Supabase `news`, related `matches`, MarkdownRenderer | Editorial/CMS | Preserve reviewed authored content, body/content semantics, stable slug, revisions, canonical metadata, source links |
+| `/news` | Explicit PostgreSQL read path now available through `public_editorial_articles`; Supabase remains the fallback when `FACTSPORT_EDITORIAL_BACKEND` is unset. Existing artwork/ad components remain. | Editorial/CMS read model | Apply and stage-test migration 0004, preserve SEO/pagination, test empty pages and category filters, retire Supabase fallback only after parity |
+| `/news/[slug]` | Explicit PostgreSQL published-article read path; related fixtures can use PostgreSQL when `FACTSPORT_MATCHES_BACKEND=postgres`; Supabase fallback remains. | Editorial/CMS + match service | Remove remaining Supabase fallback after staging parity; validate Markdown safety, metadata, source links and article/sidebar behavior |
 | `/highlights` | Supabase `matches`, video/highlight links | Highlights/media | Verified video metadata, rights/provenance, safe embed, match association and fallback |
 | `/live` | Supabase `matches`, `global_studio`, FactSportMediaRoom, FanZoneChat, LiveMediaClient | Live hub + community + studio config | Live state, chat moderation, stream config, MOTM/interactive widgets, rate limits and 3s freshness |
 | `/standings` | Supabase `standings`, `matches`, LeagueLeaders | Competition/standings domain | Season/group aware, deterministic order, source freshness, correct tie-breaks |
@@ -63,3 +63,14 @@ The v2 Worker currently proves only the protected health and matches read path. 
 ## Completion rule
 
 A page is not complete merely because it renders. It must be exercised with real v2 adapters, role-correct test identities, staging database records, external integration sandboxes, mobile/browser coverage, provider failures and rollback. The route/API mapping is in [ROUTE-MIGRATION-MATRIX.md](./ROUTE-MIGRATION-MATRIX.md).
+
+
+## 2026-11-07 implementation checkpoint — editorial V2 vertical slice
+
+- Added `db/migrations/0004_factsport_editorial_media.sql`: empty editorial article, revision, source-provenance, and R2 media metadata structures. It creates published-only read views and exposes only those views to `factsport_v2_reader`; drafts and rights-pending/expired media are excluded.
+- Added `lib/adapters/postgres-editorial.ts` for bounded published article listing, slug lookup, and rights-cleared media metadata lookup.
+- Added `app/api/media/[...key]/route.ts` to serve only approved raster images whose object keys exist in the public-media view. SVG and unapproved media are not served by this route.
+- Added explicit, opt-in PostgreSQL paths to the homepage editorial feed, homepage match window, news listing, and article body/related fixtures. Existing Supabase fallbacks remain in place; featured-match/highlight reads and the rest of the platform are not yet migrated.
+- Added schema/read-path regression tests and extended `.github/workflows/v2-verify.yml` path coverage plus migration inventory checks.
+- **Not applied to Azure PostgreSQL and not deployed.** The existing generated bootstrap intentionally bundles only migration 0001; migration 0004 requires its own reviewed staging migration execution and post-migration verification. No content or media rows were imported.
+- Status: implementation committed to `refactor/factsport-v2`; CI and runtime verification pending. Production remains untouched.
