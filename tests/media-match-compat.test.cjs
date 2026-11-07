@@ -29,7 +29,7 @@ test('V2 Media match projection preserves legacy playback and live frontend fiel
   assert.match(reader, /display_clock/);
   assert.match(matchData, /getPostgresMatchById/);
   assert.match(matchData, /displayClock: match\.display_clock/);
-  assert.match(playback, /getPostgresMatchById/);
+  assert.match(playback, /getPostgresMatchPlaybackById/);
   assert.match(playback, /safePlaybackUrl/);
   assert.match(matchWidget, /getPostgresMatchById/);
   assert.match(matchPin, /getPostgresMatchById/);
