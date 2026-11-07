@@ -27,6 +27,8 @@ test('playback endpoint withholds media URLs until the server-side 15-minute unl
   const lockedBranch = playback.slice(playback.indexOf("status: 'locked'"), playback.indexOf('const videoSource'));
   assert.doesNotMatch(lockedBranch, /mediaUrl\s*:|videoUrl\s*:|audioUrl\s*:/);
   assert.match(playback, /safePlaybackUrl/);
+  assert.match(playback, /audioUrl: videoUrl \? audioUrl : null/);
+  assert.match(player, /audioUrl=\{playback\.audioUrl\}/);
   assert.match(playback, /\['https:', 'http:'\]/);
   assert.match(player, /\/api\/match\/.*\/playback/);
   assert.match(player, /state === 'ready' && playback\?\.mediaUrl/);
