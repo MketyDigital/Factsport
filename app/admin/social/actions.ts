@@ -28,6 +28,9 @@ export async function scheduleSocialPublication(input: {
     if (input.articleId && !/^[0-9a-f-]{36}$/i.test(input.articleId)) return { success: false, error: 'Invalid linked article.' };
 
     const id = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+      const actors = await tx`SELECT user_id FROM public.external_identities WHERE subject=${authorization.user.id} ORDER BY created_at DESC LIMIT 2`;
+      if (actors.length !== 1) throw new Error('This administrator has no unique Factsport domain identity mapping.');
+      const actorId = actors[0].user_id as string;
       const channels = await tx\`SELECT id FROM public.media_social_channels WHERE id=\${input.channelId}::uuid AND is_enabled=true FOR SHARE\`;
       if (!channels.length) throw new Error('This social channel is not enabled for publishing.');
       if (input.articleId) {
@@ -40,7 +43,7 @@ export async function scheduleSocialPublication(input: {
       }
       const publication = await tx\`
         INSERT INTO public.media_social_publications (
-          article_id, channel_id, content_text, link_url, status, scheduled_at, idempotency_key
+          article_id, channel_id, content_text, link_url, status, scheduled_at, idempotency_key, created_by, updated_by
         ) VALUES (
           \${input.articleId || null}::uuid, \${input.channelId}::uuid, \${content}, \${linkUrl},
           'scheduled', \${scheduledAt.toISOString()}::timestamptz, \${crypto.randomUUID()}
@@ -67,7 +70,7 @@ export async function cancelSocialPublication(publicationId: string): Promise<Re
   try {
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
       const rows = await tx\`
-        UPDATE public.media_social_publications SET status='cancelled', updated_at=now()
+        UPDATE public.media_social_publications SET status='cancelled', updated_by=${actorId}::uuid, updated_at=now()
         WHERE id=\${publicationId}::uuid AND status IN ('draft','scheduled','queued') RETURNING id
       \`;
       if (!rows.length) throw new Error('Only draft or scheduled posts can be cancelled.');
