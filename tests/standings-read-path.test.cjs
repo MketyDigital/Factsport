@@ -11,7 +11,7 @@ const homepageAdapter = read('lib/adapters/postgres-homepage.ts');
 const matchesAdapter = read('lib/adapters/postgres-matches.ts');
 
 test('standings page reads season-aware PostgreSQL tables and completed results when enabled', () => {
-  assert.ok(page.includes("FACTSPORT_MATCHES_BACKEND === 'postgres'"));
+  assert.ok(page.includes("FACTSPORT_COMPETITIONS_BACKEND === 'postgres'"));
   assert.ok(page.includes('listCurrentCompetitionStandings'));
   assert.ok(page.includes('listPostgresLeagueResults'));
   assert.ok(page.includes('dbStandings[0]?.season'));
@@ -26,7 +26,7 @@ test('league leaders use a same-origin API rather than a browser database client
 });
 
 test('leaders API returns an explicit public projection from PostgreSQL or a narrow legacy fallback', () => {
-  assert.ok(route.includes('listCurrentCompetitionPlayerLeaders'));
+  assert.ok(route.includes('FACTSPORT_COMPETITIONS_BACKEND') && route.includes('listCurrentCompetitionPlayerLeaders'));
   assert.ok(route.includes('public, max-age=0, s-maxage=300'));
   assert.ok(route.includes("select('player_name, team_name, team_short_name, team_crest, goals, assists')"));
   assert.ok(!route.includes("select('*')"));
