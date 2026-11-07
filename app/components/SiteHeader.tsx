@@ -1,6 +1,6 @@
 'use client';
 import Link from "next/link";
-import { Trophy, Radio, UserCircle, LayoutDashboard, Newspaper, Calendar, PlayCircle } from "lucide-react";
+import { Radio, UserCircle, LayoutDashboard, Newspaper, Calendar, PlayCircle } from "lucide-react";
 import { useAuth } from "@/app/components/AuthProvider"; 
 
 export default function SiteHeader() {
@@ -35,11 +35,6 @@ export default function SiteHeader() {
             <Link href="/highlights" className="shrink-0 flex flex-col items-center gap-1 min-w-[56px] text-slate-400 hover:text-white transition-colors group">
                 <PlayCircle size={18} className="group-hover:scale-110 transition-transform" />
                 <span className="text-[9px] font-bold uppercase tracking-wider">Videos</span>
-            </Link>
-
-            <Link href="/vip/upgrade" className="shrink-0 flex flex-col items-center gap-1 min-w-[56px] text-slate-400 hover:text-white transition-colors group">
-                <Trophy size={18} className="text-yellow-500 group-hover:scale-110 transition-transform" />
-                <span className="text-[9px] font-bold uppercase tracking-wider text-yellow-500">Predict & Win</span>
             </Link>
 
             <div className="shrink-0 flex flex-col items-center min-w-[56px]">
