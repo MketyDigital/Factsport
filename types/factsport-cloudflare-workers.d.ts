@@ -9,6 +9,9 @@ declare module 'cloudflare:workers' {
     FACTSPORT_STAGING_TOKEN?: string;
     FACTSPORT_MATCHES_BACKEND?: string;
     FACTSPORT_MATCH_DETAIL_BACKEND?: string;
+    FACTSPORT_COMPETITIONS_BACKEND?: string;
+    FACTSPORT_HOMEPAGE_BACKEND?: string;
+    FACTSPORT_PREDICTION_SETTINGS_BACKEND?: string;
     FACTSPORT_HYPERDRIVE: { connectionString: string };
     FACTSPORT_MEDIA_BUCKET: {
       head(key: string): Promise<unknown | null>;
