@@ -26,7 +26,8 @@ import GoalRushTicker from '@/app/components/GoalRushTicker';
 const sanitizeUrl = (url: string | null | undefined) => {
     if (!url) return null;
     try {
-        const parsed = new URL(url.trim());
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://factsport.com';
+        const parsed = new URL(url.trim(), baseUrl);
         if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) return null;
         return parsed.toString();
     } catch {
