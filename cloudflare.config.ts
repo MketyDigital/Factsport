@@ -25,6 +25,11 @@ export default defineConfig({
       }),
       FACTSPORT_ENVIRONMENT: bindings.text("staging"),
       FACTSPORT_MATCHES_BACKEND: bindings.text("postgres"),
+      // Keep unprovisioned readers explicitly disabled until their migrations and data are verified.
+      FACTSPORT_MATCH_DETAIL_BACKEND: bindings.text("disabled"),
+      FACTSPORT_COMPETITIONS_BACKEND: bindings.text("disabled"),
+      FACTSPORT_HOMEPAGE_BACKEND: bindings.text("disabled"),
+      FACTSPORT_PREDICTION_SETTINGS_BACKEND: bindings.text("disabled"),
     },
   }),
 });
