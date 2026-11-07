@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { env } from 'cloudflare:workers';
 import { createClient } from '@supabase/supabase-js';
 import { listCurrentCompetitionPlayerLeaders } from '@/lib/adapters/postgres-homepage';
 
@@ -18,7 +19,9 @@ export async function GET(request: Request) {
 
   try {
     let leaders: any[];
-    if (process.env.FACTSPORT_COMPETITIONS_BACKEND === 'postgres') {
+    const backend = env.FACTSPORT_COMPETITIONS_BACKEND ?? process.env.FACTSPORT_COMPETITIONS_BACKEND;
+    if (backend !== 'postgres' && env.FACTSPORT_ENVIRONMENT === 'staging') return NextResponse.json({ error: 'V2 player statistics reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+    if (backend === 'postgres') {
       const rows = await listCurrentCompetitionPlayerLeaders(league, stat, 5);
       leaders = rows.map((row: any) => ({
         name: row.player_name,
