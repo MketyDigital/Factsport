@@ -29,7 +29,7 @@ GET /api/settings remains a compatibility facade for existing frontend consumers
 
 - FACTSPORT_HOMEPAGE_BACKEND=postgres selects the Media homepage view.
 - FACTSPORT_PREDICTION_SETTINGS_BACKEND=postgres selects the Prediction affiliate view.
-- In staging and production, if either projection is not provisioned, the endpoint returns 503 and does not silently fall back to the legacy mixed Supabase settings row.
+- Outside local development, if either projection is not provisioned, the endpoint returns 503 and does not silently fall back to the legacy mixed Supabase settings row.
 - The old mixed settings read is retained for local development compatibility only.
 
 ## Data migration requirement
