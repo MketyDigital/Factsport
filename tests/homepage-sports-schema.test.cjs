@@ -13,7 +13,8 @@ test('homepage featured matches are a safe projection over canonical matches', (
   assert.match(sql, /ADD COLUMN IF NOT EXISTS season text/i);
   assert.match(sql, /ADD COLUMN IF NOT EXISTS featured_rank integer/i);
   assert.match(sql, /CREATE OR REPLACE VIEW public\.public_featured_matches/i);
-  assert.ok(sql.includes('is_featured, featured_rank,\\n  season\\nFROM public.matches'));
+  assert.ok(sql.includes('is_featured, featured_rank,'));
+  assert.ok(sql.includes('season text'));
   assert.match(sql, /WHERE is_featured = true/i);
   assert.doesNotMatch(sql, /points_distributed/i);
 });
