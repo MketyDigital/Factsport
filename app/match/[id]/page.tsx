@@ -245,7 +245,11 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
       .limit(50); 
       
   const siteSettingsQuery = await publicSupabase.from('site_settings').select('announcement_text, announcement_link, announcement_enabled').limit(1).maybeSingle();
-  const siteSettings = siteSettingsQuery.data || {};
+  const siteSettings = (siteSettingsQuery.data || {}) as {
+      announcement_text?: string | null;
+      announcement_link?: string | null;
+      announcement_enabled?: boolean | null;
+  };
   const announcement = {
       text: siteSettings.announcement_text || '',
       link: siteSettings.announcement_link || null,
