@@ -57,4 +57,6 @@ The existing match-event social automation route and its event safety map are no
 
 ## Validation status
 
-Source-level tests were added. A successful local typecheck, full test run, Cloudflare build, migration application, database grant audit and staging UI test have **not** yet been recorded for this slice. Passing repository commits are not proof of runtime readiness.
+On commit `21d1e844748d47af06024160b810788df4101691`, the repository engine regression suite, isolated ingestion regression tests, TypeScript check and native Cloudflare build passed. The V2 staging Worker was deployed at `https://factsport-v2-staging.dry-glitter-7e16.workers.dev`; staging smoke tests confirmed deny-by-default access, authorized Hyperdrive/R2 health, PostgreSQL-backed `/matches` rendering, timestamp+UUID pagination and cache/auth isolation. The staging deployment is protected by a temporary access token; do not expose that token.
+
+These checks validate the V2 app deployment and existing reader path, **not** the new editorial writer binding. The CMS admin route remains unavailable until its separate role/binding and administrator identity bridge are provisioned. Migrations 0009–0013 have not been applied; no database grant audit, CMS publishing UI test, R2 upload test or social-provider delivery test has been recorded. Passing build/deployment checks are not proof of CMS runtime readiness.
