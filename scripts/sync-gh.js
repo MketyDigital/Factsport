@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { readVerifiedFullTimeScore } from '../lib/football-data-score.cjs';
 
 // Config
 const API_KEY = process.env.FOOTBALL_DATA_KEY;
@@ -87,7 +88,7 @@ async function run() {
   console.log(`🔍 Checking database for existing rich data...`);
   const { data: dbMatches, error: dbErr } = await supabase
     .from('matches')
-    .select('api_id, h2h, venue, referees, stage, match_group')
+    .select('api_id, espn_id, status, home_score, away_score, h2h, venue, referees, stage, match_group')
     .gte('match_date', fromStr)
     .lte('match_date', toStr);
 
@@ -165,15 +166,24 @@ async function run() {
           else if (m.status === 'TIMED') finalStatus = 'SCHEDULED';
           else finalStatus = m.status; 
 
+          const verifiedFullTimeScore = readVerifiedFullTimeScore(m.score);
+          const isEspnLinked = Boolean(existing?.espn_id);
+          const safeStatus = finalStatus === 'FT' && !verifiedFullTimeScore
+            ? (existing?.status || 'SCHEDULED')
+            : finalStatus;
+
           matches.push({
             api_id: m.id,
             league: league.name,
             home_team: m.homeTeam.shortName || m.homeTeam.name,
             away_team: m.awayTeam.shortName || m.awayTeam.name,
-            home_score: m.score.fullTime.home ?? 0,
-            away_score: m.score.fullTime.away ?? 0,
+            ...(verifiedFullTimeScore ? {
+              home_score: verifiedFullTimeScore.home,
+              away_score: verifiedFullTimeScore.away,
+            } : (!existing ? { home_score: null, away_score: null } : {})),
             match_date: m.utcDate,
-            status: finalStatus, 
+            // The schedule importer never supersedes the linked ESPN live engine.
+            ...(!isEspnLinked ? { status: safeStatus } : {}), 
             home_logo: safeHomeLogo, 
             away_logo: safeAwayLogo, 
             updated_at: new Date().toISOString(),
