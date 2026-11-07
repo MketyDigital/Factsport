@@ -55,3 +55,8 @@ The schedule writer's unnecessary INSERT permission on `home_score` and `away_sc
 The staging hardening run [42265651629](https://github.com/MketyDigital/Factsport/actions/runs/42265651629) successfully revoked PostgreSQL's default `TEMP` privilege from `PUBLIC`. The subsequent independent read-only catalog audit [42265971339](https://github.com/MketyDigital/Factsport/actions/runs/42265971339) confirmed `can_create_temp=false` for all three runtime roles. It also confirmed zero executable public functions and zero usable public sequences for each role. This residual privilege is closed in staging.
 
 The current role migration is `db/migrations/0002_factsport_v2_runtime_role_hardening.sql`. It is staging-only until the same migration is deliberately approved and validated against the production database. The admin Hyperdrive credential must remain isolated to provisioning/audit workflows.
+
+
+## Match identity alias privilege note
+
+Migration 0008 adds only a nullable `legacy_match_id` column and unique partial index on `public.matches`. It grants no new INSERT or UPDATE privileges to runtime roles. The existing reader SELECT grant on `public.matches` permits the narrow alias-resolution query. Population of aliases is an import/admin operation and must use an explicitly authorized migration/import identity; the schedule writer must not be able to change legacy aliases.
