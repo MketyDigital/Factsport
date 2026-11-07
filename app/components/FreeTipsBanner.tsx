@@ -47,7 +47,7 @@ export default function FreeTipsBanner() {
       {/* Squashed Grid */}
       <div className="grid grid-cols-2 gap-1.5 relative z-10">
         {/* 1XBET */}
-        <div className="bg-[#1A1A1A] p-1.5 rounded-md border border-white/5 flex flex-col gap-1.5 shadow-sm">
+        {globalLinks.link1x && bookingCodes.code1x && <div className="bg-[#1A1A1A] p-1.5 rounded-md border border-white/5 flex flex-col gap-1.5 shadow-sm">
              <div className="flex justify-between items-center">
                  <div className="flex items-center gap-1">
                      <div className="w-3.5 h-3.5 bg-blue-600 rounded flex items-center justify-center font-black text-white italic text-[6px]">1X</div>
@@ -64,10 +64,10 @@ export default function FreeTipsBanner() {
                     <ExternalLink size={10}/>
                 </a>
              </div>
-        </div>
+        </div>}
 
         {/* MELBET */}
-        <div className="bg-[#1A1A1A] p-1.5 rounded-md border border-white/5 flex flex-col gap-1.5 shadow-sm">
+        {globalLinks.linkMel && bookingCodes.codeMel && <div className="bg-[#1A1A1A] p-1.5 rounded-md border border-white/5 flex flex-col gap-1.5 shadow-sm">
              <div className="flex justify-between items-center">
                  <div className="flex items-center gap-1">
                      <div className="w-3.5 h-3.5 bg-yellow-500 rounded flex items-center justify-center font-black text-black italic text-[6px]">M</div>
@@ -84,7 +84,7 @@ export default function FreeTipsBanner() {
                     <ExternalLink size={10}/>
                 </a>
              </div>
-        </div>
+        </div>}
       </div>
     </div>
   );
