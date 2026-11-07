@@ -4,11 +4,16 @@ BEGIN;
 
 ALTER TABLE public.matches
   ADD COLUMN IF NOT EXISTS is_featured boolean NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS featured_rank integer NOT NULL DEFAULT 100;
+  ADD COLUMN IF NOT EXISTS featured_rank integer NOT NULL DEFAULT 100,
+  ADD COLUMN IF NOT EXISTS season text;
 
 ALTER TABLE public.matches
   DROP CONSTRAINT IF EXISTS matches_featured_rank_nonnegative,
   ADD CONSTRAINT matches_featured_rank_nonnegative CHECK (featured_rank >= 0);
+
+CREATE INDEX IF NOT EXISTS matches_league_season_results_idx
+  ON public.matches (league, season, match_date DESC, id DESC)
+  WHERE status IN ('FT', 'FINISHED', 'AET', 'PEN', 'AWARDED');
 
 CREATE INDEX IF NOT EXISTS matches_featured_window_idx
   ON public.matches (featured_rank, match_date, id)
@@ -30,7 +35,8 @@ CREATE OR REPLACE VIEW public.public_featured_matches AS
 SELECT
   id, league, home_team, away_team, home_score, away_score,
   match_date, status, home_logo, away_logo, venue, stage, match_group,
-  espn_id, source, source_updated_at, version, is_featured, featured_rank
+  espn_id, source, source_updated_at, version, is_featured, featured_rank,
+  season
 FROM public.matches
 WHERE is_featured = true;
 
