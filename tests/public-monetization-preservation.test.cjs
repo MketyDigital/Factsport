@@ -13,6 +13,7 @@ test('AdSense-first public Media surfaces do not render betting affiliate widget
     'app/highlights/page.tsx', 'app/standings/page.tsx',
     'app/tournaments/page.tsx', 'app/tournaments/[league]/page.tsx',
     'app/components/Footer.tsx', 'app/components/SiteHeader.tsx',
+    'app/components/HomeDashboardClient.tsx', 'app/components/MatchMobileHub.tsx',
   ];
   for (const file of publicFiles) {
     const source = read(file);
