@@ -17,6 +17,8 @@ This slice belongs to the **Media system**. It does not add prediction campaigns
 - Added editorial revision workflow metadata in migration 0011.
 - Added social channel, publication, delivery-attempt and durable outbox tables in migration 0009.
 - Added a separate Social Publishing admin workspace for channel-specific scheduled posts, linked only to already-published approved articles.
+- Added an admin-only R2 image upload endpoint with JPEG/PNG/WebP signature validation, an 8 MB limit, SHA-256 metadata, private-by-default asset rows and cleanup on failed DB registration.
+- Added a rights-review and draft-attachment workflow for hero images and team logos. Public delivery is gated by explicit rights state, reviewer identity, attribution and optional expiry.
 - Social scheduling is idempotent, uses an outbox record, and is distinct from article publication.
 - Added migration 0010 with a dedicated editorial writer's minimum table/column grants. The role is explicitly denied match, prediction and other writer responsibilities.
 - Added static regression coverage for workflow boundaries and database grants.
@@ -46,7 +48,7 @@ The existing match-event social automation route and its event safety map are no
 
 ## Remaining CMS capabilities
 
-- Rights-aware asset upload, R2 metadata creation, attribution/source capture, expiration and editorial media picker. Team-logo attachment storage and public read-model fields are present; the actual upload/picker workflow remains to be built.
+- Media preview and crop/resize tooling, inline article media ordering, asset replacement/versioning, and public-page preview parity. Hero/team attachment and basic rights review are implemented; full media-library search and revision-aware media replacement remain.
 - Preview rendering that matches the public article renderer, scheduled article publication, revision diff/restore, approval comments and review rejection/change requests.
 - Editorial role matrix (writer, editor, publisher, media admin), audit events and stronger review separation than a single admin flag.
 - Social calendar, per-channel copy variants, media attachments, approval, edit/reschedule, retry/dead-letter UI, delivery receipts and analytics.
