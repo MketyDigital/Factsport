@@ -4,7 +4,15 @@ import { getSupabaseAdmin } from '@/app/lib/supabase/admin';
 import { authorizeAdminAction, unlockAdminVault } from '@/app/lib/admin/authorization';
 import { runMonthlyPrizeAudit } from '@/app/lib/admin/monthly-prize-audit';
 
-export async function triggerAuditAction() {
+export type AuditActionResult = {
+  success: boolean;
+  message?: string;
+  error?: string;
+  monthYear?: string;
+  drafted?: number;
+};
+
+export async function triggerAuditAction(): Promise<AuditActionResult> {
   try {
     const authorization = await authorizeAdminAction();
     if (!authorization.ok) return { success: false, error: authorization.error };
