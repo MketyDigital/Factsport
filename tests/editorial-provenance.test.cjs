@@ -38,7 +38,8 @@ test('media cannot become public until a rights review is recorded', () => {
   assert.ok(sql.includes('AND rights_reviewed_by IS NOT NULL'));
   assert.ok(sql.includes('AND rights_reviewed_at IS NOT NULL'));
   assert.match(sql, /NOT is_public[\s\S]*rights_status IN \('owned', 'licensed', 'editorial_exception'\)[\s\S]*rights_reviewed_at IS NOT NULL/i);
-  assert.match(sql, /m\.rights_reviewed_at IS NOT NULL/i);
+  assert.ok(sql.includes('AND m.rights_reviewed_by IS NOT NULL'));
+  assert.ok(sql.includes('AND m.rights_reviewed_at IS NOT NULL'));
   assert.match(sql, /GRANT SELECT ON public\.public_editorial_articles, public\.public_media_assets[\s\S]*TO factsport_v2_reader/i);
 });
 
