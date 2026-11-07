@@ -24,6 +24,8 @@ export default async function AdminNewsPage() {
         COALESCE(r.snapshot->>'excerpt', a.excerpt) AS excerpt,
         COALESCE(r.snapshot->>'body_markdown', a.body_markdown) AS body_markdown,
         COALESCE(r.snapshot->>'category', a.category) AS category,
+        COALESCE(r.snapshot->>'team_1_name', a.team_1_name) AS team_1_name,
+        COALESCE(r.snapshot->>'team_2_name', a.team_2_name) AS team_2_name,
         CASE WHEN r.snapshot IS NULL THEN a.tags ELSE ARRAY(SELECT jsonb_array_elements_text(r.snapshot->'tags')) END AS tags,
         a.status,
         COALESCE(r.workflow_status, a.review_status) AS review_status,
