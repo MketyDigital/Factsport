@@ -70,3 +70,18 @@ Legacy function audit requires special care:
 - Do not migrate secrets, passwords, tokens or service-role credentials.
 - Do not enable both legacy and v2 production schedulers against the same data without explicit dual-run/idempotency design.
 - Do not call settlement, reset, cleanup or destructive cron functions during audit.
+
+
+## 2026-11-07 V2 editorial/homepage schema additions
+
+The following migrations are additive and checked in on `refactor/factsport-v2`; they have **not** been applied to Azure PostgreSQL.
+
+| Migration | New domain structures | Data/reset rule |
+|---|---|---|
+| `0004_factsport_editorial_media.sql` | `editorial_articles`, article revisions/source provenance, `media_assets`, article-media links, published editorial/media read views | Create empty. Do not copy old news bodies or image URLs until article origin, rights and ownership are reviewed. |
+| `0005_factsport_editorial_provenance_review.sql` | Origin classification, original timestamps, legacy body/content preservation fields, SEO/reverification, human review and media-rights review | Default origin is `unknown`; never infer human authorship from slug/author. Publishing requires a recorded reviewer. Keep legacy body and content fields distinct in any private preservation export. |
+| `0006_factsport_homepage_sports_read_models.sql` | Featured-match flags, safe homepage setting view, season/group-aware competition standings, match highlights with provider and rights checks | Fresh operational data only. Do not import legacy standings snapshots or highlight URLs automatically. Rebuild standings from new provider ingestion and manually approve highlight rights. |
+
+Reader access is SELECT-only on the narrowly projected public views. Editorial write tables, revisions, source metadata, homepage settings, standings write tables and highlight records are not granted to the public reader. The match read adapter continues to project an explicit public DTO and excludes settlement flags.
+
+The homepage read model is intentionally not a substitute for the full CMS or sports ingestion workflows. Migration 0006 creates the target shapes; provider jobs, CMS commands, admin/RBAC and actual staging data validation remain separate deliverables.
