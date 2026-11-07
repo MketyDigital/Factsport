@@ -142,3 +142,11 @@ test('registered Prediction account and authentication routes are private-host o
   ]) assert.match(read(file), /requirePrivateProductHost/);
   assert.match(callback, /requestUrl\.hostname\.toLowerCase\(\) !== privateHost/);
 });
+
+test('private Prediction deployment cannot publish the Media robots or sitemap', () => {
+  const robots = read('app/robots.ts');
+  const sitemap = read('app/sitemap.ts');
+  assert.match(robots, /requestHost === privateHost/);
+  assert.match(robots, /disallow: '\/'/);
+  assert.match(sitemap, /requestHost === privateHost\) return \[\]/);
+});
