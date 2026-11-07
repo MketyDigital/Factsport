@@ -1,71 +1,31 @@
 export const runtime = 'edge';
+export const metadata = {
+  title: 'Terms of Service | FactSport',
+  description: 'Terms governing use of the public FactSport football-media website.',
+}
 
 import Link from 'next/link';
-import { ChevronLeft, BookOpen, Scale, Gavel } from 'lucide-react';
+import { ChevronLeft, BookOpen } from 'lucide-react';
 
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-[#F0F2F5] p-6 font-sans text-slate-800">
       <div className="max-w-4xl mx-auto bg-white p-8 md:p-12 rounded-2xl shadow-sm border border-slate-200">
-        <Link href="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-blue-600 mb-8 text-sm font-bold transition">
-            <ChevronLeft size={16} /> Back to Home
-        </Link>
-        
+        <Link href="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-blue-600 mb-8 text-sm font-bold transition"><ChevronLeft size={16} /> Back to Home</Link>
         <header className="mb-10 border-b border-slate-100 pb-6">
-            <h1 className="text-3xl font-black uppercase mb-3 flex items-center gap-3 text-slate-900">
-                <BookOpen className="text-blue-600" size={32} /> Terms of Service
-            </h1>
-            <p className="text-slate-500 text-sm">Last Updated: March 1, 2026</p>
+          <h1 className="text-3xl font-black uppercase mb-3 flex items-center gap-3 text-slate-900"><BookOpen className="text-blue-600" size={32} /> Terms of Service</h1>
+          <p className="text-slate-500 text-sm">Last updated: 7 November 2026</p>
         </header>
-
         <div className="prose prose-slate prose-sm max-w-none space-y-8">
-            <p className="lead text-lg text-slate-600">
-                Welcome to <strong>FactSport</strong> ("we," "us," or "our"). By accessing our website, mobile application, or media services (including FactSport TV and Radio), you agree to be bound by these Terms.
-            </p>
-
-            <section>
-                <h3 className="font-bold text-xl text-slate-900 mb-3">1. Service Description & Usage</h3>
-                <p>FactSport is a digital sports media platform providing news, analysis, audiovisual content, and a free-to-play prediction game. You agree to use this platform only for lawful purposes. You must not use our services to distribute spam, malware, or engage in harassment.</p>
-            </section>
-
-            <section>
-                <h3 className="font-bold text-xl text-slate-900 mb-3">2. Intellectual Property & Media Rights</h3>
-                <ul className="list-disc pl-5 space-y-2">
-                    <li><strong>News & Editorial:</strong> Our news content is original or rewritten from official sources (club press releases, media kits) in accordance with fair use principles for news reporting.</li>
-                    <li><strong>Third-Party Assets:</strong> Club logos and team names are the property of their respective owners. We use them solely for identification and informational purposes.</li>
-                    <li><strong>YouTube & Embeds:</strong> We may embed content from official YouTube channels (e.g., Highlights). By watching this content, you also agree to <a href="https://www.youtube.com/t/terms" target="_blank" rel="noreferrer" className="text-blue-600 underline">YouTube's Terms of Service</a>.</li>
-                </ul>
-            </section>
-
-            <section>
-                <h3 className="font-bold text-xl text-slate-900 mb-3">3. Prediction Game & Contest Rules</h3>
-                <p>Our "Predict & Win" game is a game of skill, not chance. To participate:</p>
-                <ul className="list-disc pl-5 space-y-2">
-                    <li><strong>Virtual Points:</strong> Points awarded (e.g 3pts for Outcome, 10pts for Exact Score) have no cash value and cannot be exchanged for currency.</li>
-                    <li><strong>Prize Eligibility:</strong> Monthly prizes are reserved strictly for <strong>VIP Members</strong>. Free users may appear on the leaderboard but are not eligible for physical or cash rewards.</li>
-                    <li><strong>Winning Criteria:</strong> To claim a 1st, 2nd, or 3rd place prize, a user must meet the specific criteria set out in our "How to Play" rules page (e.g., minimum 4 Correct Scores per month).</li>
-                    <li><strong>Fair Play:</strong> We reserve the right to disqualify any user suspected of multi-accounting, bot usage, or exploiting system glitches.</li>
-                </ul>
-            </section>
-
-            <section>
-                <h3 className="font-bold text-xl text-slate-900 mb-3">4. VIP Membership & Payments</h3>
-                <p>VIP subscriptions grant access to premium features and prize eligibility.</p>
-                <ul className="list-disc pl-5 space-y-2">
-                    <li><strong>Non-Refundable:</strong> All VIP payments are final and non-refundable, except where required by applicable consumer law.</li>
-                    <li><strong>No Guarantee:</strong> Purchasing VIP status does not guarantee a prize; it only grants eligibility to compete for one.</li>
-                </ul>
-            </section>
-
-            <section>
-                <h3 className="font-bold text-xl text-slate-900 mb-3">5. Disclaimer of Warranties</h3>
-                <p>FactSport is provided "as is." We do not guarantee that match data, live scores, or news updates will be error-free or uninterrupted. We are not responsible for any decisions you make based on our analysis or predictions.</p>
-            </section>
-
-            <section>
-                <h3 className="font-bold text-xl text-slate-900 mb-3">6. Governing Law</h3>
-                <p>These Terms are governed by the laws of the jurisdiction in which FactSport is registered. Any disputes shall be resolved through binding arbitration.</p>
-            </section>
+          <p className="lead text-lg text-slate-600">These terms govern your use of the public FactSport football-media website, including sports news, match information, editorial analysis, video and other public media features.</p>
+          <section><h2>1. Public media service</h2><p>FactSport provides sports information and media content for general information and entertainment. Match schedules, live scores, statistics and other provider-supplied information may be delayed, corrected or unavailable. We do not guarantee that data is complete or error-free.</p></section>
+          <section><h2>2. Acceptable use</h2><p>You must use the service lawfully. You must not interfere with the website, attempt unauthorized access, misuse public forms or endpoints, distribute malware or spam, harass others, or infringe intellectual-property or privacy rights.</p></section>
+          <section><h2>3. Editorial content and intellectual property</h2><p>FactSport publishes editorial material and sports information. Third-party names, marks, logos, photographs, video and embedded material remain subject to their respective rights. You may not reproduce or commercially exploit FactSport content without permission or another valid legal basis.</p><p>Where third-party media is embedded, your use of that media may also be governed by the provider's terms.</p></section>
+          <section><h2>4. Predictions and interactive features</h2><p>Any free public prediction or interactive feature is provided for entertainment and informational purposes only. Unless a separate, valid agreement expressly says otherwise, public points and rankings are not money, are not redeemable and do not create an entitlement to a prize. Do not treat predictions or analysis as financial advice.</p></section>
+          <section><h2>5. Separate products</h2><p>Private, premium, subscription, payment, campaign or other separately operated Factsport products are not governed by this public-media terms page. Access to those services, if offered, is subject to their own terms, eligibility requirements and notices presented within the relevant product. This clause does not change or cancel existing obligations.</p></section>
+          <section><h2>6. Third-party services</h2><p>The public website may link to or embed third-party services. We do not control their availability, content or privacy practices. Their own terms and notices apply when you use them.</p></section>
+          <section><h2>7. Availability and liability</h2><p>The public website is provided subject to applicable law. We may update, suspend or correct content and functionality. Nothing in these terms excludes rights or liabilities that cannot lawfully be excluded.</p></section>
+          <section><h2>8. Changes</h2><p>We may update these terms as the public service changes. The revision date above identifies the current version. Continued use after an update constitutes acceptance where permitted by applicable law.</p></section>
         </div>
       </div>
     </div>
