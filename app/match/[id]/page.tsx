@@ -289,8 +289,6 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
                        </div>
                    )}
                       </div>
-                  )}
-              </div>
           ) : (
               <div className="bg-[#0a1428] text-white p-3 shadow-md flex items-center justify-between sticky top-0 z-40">
                   <Link href="/matches" className="p-1.5 bg-white/10 rounded-full"><ChevronLeft size={16} /></Link>
