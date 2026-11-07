@@ -24,7 +24,7 @@ export async function GET() {
         featured_match_id: mediaSettings?.featured_match_id ? String(mediaSettings.featured_match_id) : null,
       }, { headers: { 'Cache-Control': env.FACTSPORT_ENVIRONMENT === 'staging' ? 'private, no-store, max-age=0' : 'public, max-age=0, s-maxage=300, stale-while-revalidate=600' } });
     }
-    if (env.FACTSPORT_ENVIRONMENT === 'staging' || env.FACTSPORT_ENVIRONMENT === 'production') {
+    if (env.FACTSPORT_ENVIRONMENT !== 'development') {
       return NextResponse.json({ error: 'V2 public settings projections are not fully provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     }
 
