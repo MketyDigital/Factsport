@@ -49,8 +49,7 @@ ALTER TABLE public.media_assets
       OR (
         rights_status IN ('owned', 'licensed', 'editorial_exception')
         AND rights_reviewed_by IS NOT NULL
-        AND rights_reviewed_by IS NOT NULL
-  AND rights_reviewed_at IS NOT NULL
+        AND rights_reviewed_at IS NOT NULL
       )
     );
 
@@ -77,6 +76,7 @@ LEFT JOIN LATERAL (
     AND am.placement = 'hero'
     AND m.is_public = true
     AND m.rights_status IN ('owned', 'licensed', 'editorial_exception')
+    AND m.rights_reviewed_by IS NOT NULL
     AND m.rights_reviewed_at IS NOT NULL
     AND (m.usage_expires_at IS NULL OR m.usage_expires_at > now())
   LIMIT 1
@@ -93,6 +93,7 @@ SELECT object_key, content_type, byte_size, sha256, width, height, alt_text,
 FROM public.media_assets
 WHERE is_public = true
   AND rights_status IN ('owned', 'licensed', 'editorial_exception')
+  AND rights_reviewed_by IS NOT NULL
   AND rights_reviewed_at IS NOT NULL
   AND (usage_expires_at IS NULL OR usage_expires_at > now());
 
