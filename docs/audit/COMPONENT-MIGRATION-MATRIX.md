@@ -47,3 +47,11 @@ See [PAGE-MIGRATION-MATRIX.md](./PAGE-MIGRATION-MATRIX.md) for full page journey
 - \`LeagueLeaders.tsx\` no longer creates a browser Supabase client; its goals/assists toggle requests a validated same-origin API.
 - \`/standings\` reads the current season/group projection and computes form from season-scoped completed matches. \`/highlights\` has a PostgreSQL paginated listing and verified source links.
 - All paths are opt-in until migrations 0004-0007 are applied and provider ingestion supplies current-season standings/scorers/highlights.
+
+## 2026-11-07 match-centre access boundary update — M12
+
+- SecureMatchPlayer.tsx now obtains playback state from GET /api/match/[id]/playback; raw media URLs are no longer supplied as initial client props by /match/[id]. The API withholds URL fields until the server-side 15-minute unlock. Video, audio-only and secondary audio modes are retained.
+- ProBettingSlipLock.tsx no longer creates a browser Supabase client and no longer receives pro_analysis from MatchMobileHub. It requests GET /api/match/[id]/analysis; the server performs session and legacy profiles.is_vip checks before exposing analysis.
+- MatchHeaderClient and MatchMobileHub receive an explicit public match DTO rather than the full legacy row. Existing child components still rely on legacy match/live/chat/prediction services; no claim of full component parity is made.
+- tests/match-media-access.test.cjs covers the client DTO boundary, server unlock response, audio preservation and server-side VIP check. Isolated verification, native build and protected staging passed on commit 45d5cd3b4a5fcd39ab33e1eb58bdf47ba40c5ecd; staging did not invoke these two new endpoints.
+- Remaining: V2 entitlement integration, short-lived signed playback grant/proxy, same-origin ticker and child-service migrations, and browser-level authorization/media tests.

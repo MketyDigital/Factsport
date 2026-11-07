@@ -108,3 +108,11 @@ A route is not complete because it compiles or returns HTTP 200. For every route
 - `GET /api/match/[id]` now has an independently opt-in `FACTSPORT_MATCH_DETAIL_BACKEND=postgres` branch requiring migration 0008. It resolves canonical or legacy UUID alias and returns the normalized ESPN-enriched public match projection.
 - The V2 projection intentionally omits stream/audio/video URLs, VIP pro-analysis, campaign IDs, affiliate URLs and settlement state. Staging responses are private/no-store.
 - The main server-rendered `/match/[id]` page is not switched. Legacy ID reconciliation, media playback authorization, VIP RBAC, prediction/campaign parity and child-component service contracts remain blockers.
+
+## 2026-11-07 match-centre playback and VIP route slice — M12
+
+- Added GET /api/match/[id]/playback: validates a UUID, reads the legacy match's schedule/status/media metadata, applies the 15-minute pre-kickoff gate on the server, and returns no media URL fields while locked. After unlock it returns safe HTTP(S)/relative playback sources and preserves the existing streamio mode.
+- Added GET /api/match/[id]/analysis: checks the server session and legacy profiles.is_vip value; public/non-VIP responses expose only hasAnalysis, while the analysis payload is returned only to a verified VIP profile.
+- SecureMatchPlayer and ProBettingSlipLock consume these same-origin APIs. Regression coverage is in tests/match-media-access.test.cjs.
+- Both routes still read legacy Supabase. They are not backed by PostgreSQL and have not been exercised against protected staging. The protected staging workflow currently validates the /matches read path, not /match/[id].
+- Before treating these routes as complete, add signed short-lived playback grants or a controlled media proxy where provider capabilities allow, connect VIP checks to the V2 entitlement service, test all media/status branches and failure modes, and migrate the remaining match-centre service dependencies without changing legacy IDs or prediction references.

@@ -131,3 +131,13 @@ The base \`FACTSPORT_MATCHES_BACKEND\` flag must remain independent of migration
 - Added a bounded reader that resolves canonical or legacy UUID and returns the canonical V2 ID.
 - Added an independently gated /api/match/[id] PostgreSQL API path with a public projection that excludes stream URLs, audio/video links, pro_analysis, campaign IDs, affiliate URLs and settlement state.
 - Migration 0008 is not applied and no aliases are populated. The main /match/[id] page remains on its legacy path pending approved ID reconciliation and stream/prediction/VIP parity.
+
+## 2026-11-07 match-centre media and VIP access hardening — M12
+
+- The legacy /match/[id] page remains Supabase-backed. Its match query is now an explicit column projection rather than select('*'); a safe client DTO is passed to MatchHeaderClient and MatchMobileHub, excluding raw video/live/audio URLs, pro_analysis, campaign identifiers and affiliate URLs.
+- SecureMatchPlayer requests GET /api/match/[id]/playback. The server applies the existing 15-minute pre-kickoff lock and does not include playback URL fields in the locked response. After unlock it returns the selected video/audio source; the secondary audio source is preserved when a video source is also present. The existing streamio sentinel remains supported.
+- ProBettingSlipLock no longer queries the browser Supabase client or receives pro_analysis in props. It requests GET /api/match/[id]/analysis; the server validates the session and checks the legacy profiles.is_vip flag before returning the analysis object.
+- The match page now selects only the three announcement fields it uses from site_settings. The existing ticker, prediction board, affiliate widget and other legacy child journeys remain on their existing services; they have not been migrated by this slice.
+- Verification on 45d5cd3b4a5fcd39ab33e1eb58bdf47ba40c5ecd: isolated verification passed (run 42385395641), native vinext build passed (run 42385395567), and protected staging passed (run 42385395586).
+- The protected staging run validates the existing PostgreSQL-backed /matches path, pagination, deny-by-default access, Hyperdrive/R2 health and cache isolation. It does not exercise the new match-detail playback or VIP endpoints; those are source/test/build verified only.
+- This is not match-centre PostgreSQL parity. Remaining blockers include legacy-ID alias population, campaign/prediction parity, V2 entitlement/RBAC integration, signed short-lived playback grant or controlled media proxy, ticker/settings migration, and end-to-end tests for stream unlock, audio/video, finished highlights, VIP/non-VIP and provider failures. No migration was applied and no production resource changed.

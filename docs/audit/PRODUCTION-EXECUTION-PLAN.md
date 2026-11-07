@@ -318,3 +318,9 @@ The complete acceptance contract is [V2-PARITY-REBRAND-ADSENSE-ACCEPTANCE.md](./
 - Added a bounded reader that resolves canonical or legacy UUID and returns the canonical V2 ID.
 - Added an independently gated /api/match/[id] PostgreSQL API path with a public projection that excludes stream URLs, audio/video links, pro_analysis, campaign IDs, affiliate URLs and settlement state.
 - Migration 0008 is not applied and no aliases are populated. The main /match/[id] page remains on its legacy path pending approved ID reconciliation and stream/prediction/VIP parity.
+
+## 2026-11-07 M12 — match-centre access hardening checkpoint
+
+Source changes on commit 45d5cd3b4a5fcd39ab33e1eb58bdf47ba40c5ecd add server-side 15-minute playback unlock and server-side VIP analysis authorization. The match page now sends a restricted public DTO to client components and narrows the site_settings read. Isolated verification run 42385395641, native vinext build run 42385395567 and protected staging run 42385395586 all passed.
+
+This is an incremental security boundary, not a completed match-centre migration. Both new APIs still query legacy Supabase; raw playback URLs are returned after the time gate (no signed short-lived grant or controlled proxy yet); VIP checks still use legacy profiles.is_vip rather than the V2 entitlement service. The staging workflow did not invoke /match/[id] or either new API. Keep P2 match-centre parity OPEN and do not enable FACTSPORT_MATCH_DETAIL_BACKEND on this basis.

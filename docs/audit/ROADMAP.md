@@ -366,3 +366,11 @@ The acceptance contract prohibits silent removal of monetization. Existing publi
 - Added getPostgresMatchById() to resolve either V2 or legacy UUID and return the canonical V2 match ID.
 - Added a separately gated PostgreSQL branch to GET /api/match/[id] with a narrow public DTO. Media URLs, campaign IDs, pro-analysis, affiliate links and settlement fields are excluded.
 - The main /match/[id] page remains legacy-backed. Do not enable FACTSPORT_MATCH_DETAIL_BACKEND until the alias is populated through approved reconciliation and the separate stream entitlement, VIP analysis, campaign/prediction and ticker/settings contracts are complete.
+
+## 2026-11-07 M12 match-centre access hardening checkpoint
+
+- Added server-side playback unlock and VIP analysis APIs; client components no longer receive raw stream URLs or VIP analysis as initial page props.
+- Restricted match-detail client DTO and site-settings projection; preserved video/audio/streamio modes and existing legacy prediction/affiliate child journeys.
+- Isolated verification (42385395641), native vinext build (42385395567), and protected staging (42385395586) passed on 45d5cd3b4a5fcd39ab33e1eb58bdf47ba40c5ecd.
+- Evidence scope: staging verifies the existing /matches PostgreSQL path, not the new match-detail endpoints. Those are source/test/build verified only and still read legacy Supabase.
+- M11 match-centre migration gate remains OPEN: signed short-lived playback grant or controlled proxy, V2 entitlement/RBAC, canonical/legacy alias population, prediction/campaign parity, ticker/settings API migration, full child-component contracts and browser E2E are outstanding. No DB migration or production change was made.
