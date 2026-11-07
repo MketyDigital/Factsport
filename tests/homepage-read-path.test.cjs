@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const read = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 const home = read('app/page.tsx');
+const highlightsPage = read('app/highlights/page.tsx');
 const dashboard = read('app/components/HomeDashboardClient.tsx');
 const standings = read('app/components/MiniStandings.tsx');
 const settingsRoute = read('app/api/settings/route.ts');
@@ -57,4 +58,15 @@ test('domain adapters share one bounded Hyperdrive client per Worker isolate', (
   assert.ok(homepageAdapter.includes('getFactsportPostgres'));
   assert.ok(!matchesAdapter.includes('let client: ReturnType<typeof postgres>'));
   assert.ok(!editorialAdapter.includes('let client: ReturnType<typeof postgres>'));
+});
+
+test('full highlights page supports PostgreSQL pagination and rights-cleared source links', () => {
+  assert.ok(highlightsPage.includes("FACTSPORT_MATCHES_BACKEND === 'postgres'"));
+  assert.ok(highlightsPage.includes('listPublicHighlightLeagues'));
+  assert.ok(highlightsPage.includes('countPublicMatchHighlights'));
+  assert.ok(highlightsPage.includes('listPublicMatchHighlightsPage'));
+  assert.ok(highlightsPage.includes('item.canonical_url ||'));
+  assert.ok(highlightsPage.includes('item.thumbnail_url'));
+  assert.ok(highlightsPage.includes('serializeJsonLd(jsonLd)'));
+  assert.ok(homepageAdapter.includes('public_match_highlights'));
 });
