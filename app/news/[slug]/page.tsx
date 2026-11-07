@@ -13,6 +13,7 @@ import NewsArtwork from '@/app/components/NewsArtwork';
 import ShareButton from '@/app/components/ShareButton';
 import MarkdownRenderer from '@/app/components/MarkdownRenderer'; 
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
+import BettingPromo from '@/app/components/BettingPromo';
 
 const getArticleData = cache(async (slug: string) => {
   if (process.env.FACTSPORT_EDITORIAL_BACKEND === 'postgres') {
@@ -147,6 +148,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
             <div className="bg-white">
 
                 <div className="mb-8 w-full max-w-3xl overflow-hidden rounded-xl bg-slate-50 border border-slate-100 shadow-sm max-h-[90px]">
+                    <BettingPromo affiliateLink={null} />
                 </div>
 
                 <div className="prose prose-lg prose-slate max-w-none text-slate-800 leading-relaxed md:leading-loose font-medium prose-headings:font-black prose-headings:tracking-tight prose-a:text-blue-600 prose-img:rounded-2xl prose-img:shadow-lg">
