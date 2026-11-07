@@ -91,7 +91,7 @@ test('lineup publication requires full elevens for both teams', () => {
 test('stale goal commentary and records without a canonical match ID are ignored', () => {
   const stale = detectMatchSocialEvent({
     oldMatch: base,
-    newMatch: { ...base, home_score: 1, match_events: [{ id: 'old-goal', type: 'goal', player: 'Saka', time: '1' }] },
+    newMatch: { ...base, match_date: '2026-11-07T15:00:00.000Z', home_score: 1, match_events: [{ id: 'old-goal', type: 'goal', player: 'Saka', time: '1' }] },
     nowMs,
   });
   assert.equal(stale, null);
