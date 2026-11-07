@@ -1,6 +1,7 @@
 export const runtime = 'edge'; 
 
 import { NextResponse } from 'next/server';
+import { env } from 'cloudflare:workers';
 import { createClient } from '@/app/lib/supabase/server';
 import { SignJWT, jwtVerify } from 'jose';
 
@@ -18,6 +19,7 @@ const ADMIN_EMAILS = [
 // GET: THE BOUNCER (Lets people into the room)
 // ==========================================
 export async function GET(req: Request) {
+    if (env.FACTSPORT_ENVIRONMENT !== 'development') return NextResponse.json({ error: 'V2 Media broadcast token issuer is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     try {
         const { searchParams } = new URL(req.url);
         const matchId = searchParams.get('match_id');
@@ -96,6 +98,7 @@ export async function GET(req: Request) {
 // POST: THE GENERATOR (Only Admins can use this to make Guest Links)
 // ==========================================
 export async function POST(req: Request) {
+    if (env.FACTSPORT_ENVIRONMENT !== 'development') return NextResponse.json({ error: 'V2 Media broadcast invite issuer is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     try {
         const { matchId } = await req.json();
         
