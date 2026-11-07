@@ -107,3 +107,12 @@ The base \`FACTSPORT_MATCHES_BACKEND\` flag must remain independent of migration
 - `LiveStandings` no longer queries Supabase from the browser. It reads same-origin competition-match and standings APIs and refreshes periodically.
 - The full `/standings` and `/highlights` pages already have feature-flagged PostgreSQL read implementations, but provider population, staging data verification, full browser parity and operational freshness remain incomplete. No page is declared fully complete.
 - Latest build and isolated verification are pending after corrections to a JSX template literal and promo regression test. Migrations 0004-0007 remain unapplied.
+
+## 2026-11-07 verified competition/live-standings slice
+
+- Native Vinext build passed on 37281e9d141b88f0e3f22409fb49d7b045a0956f (run 42382907761).
+- Protected staging passed on that commit (run 42382907988): Worker build/deploy, deny-by-default, authorized /matches page render, stable timestamp+UUID pagination and authentication/cache isolation passed.
+- The first authorized match API request returned a transient 503; the retry returned a populated result and pagination succeeded. Treat the cold-start/transient failure as an operational reliability item, not as an unqualified clean pass.
+- Isolated verification passed on 1afe964c2d0a3a0d71655a4cc95334377a3c100e (run 42383032967), including the engine regression suite, TypeScript, prediction/consent schema contracts and migration inventory.
+- Staging test coverage is still focused on the existing matches endpoint; the new tournament endpoints and feature-flagged standings reads need their own authenticated integration probes once the matching migrations and current-season data are provisioned.
+- No migrations 0004-0007 were applied, no legacy data imported, and no production resources changed.
