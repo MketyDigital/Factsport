@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS public.media_social_channels (
   is_enabled boolean NOT NULL DEFAULT false,
   settings jsonb NOT NULL DEFAULT '{}'::jsonb
     CHECK (jsonb_typeof(settings) = 'object')
-    CHECK (NOT (settings ?| ARRAY['access_token', 'refresh_token', 'token', 'secret', 'password', 'api_key'])),
+    CHECK (settings::text !~* '"(access_token|refresh_token|token|secret|password|api_key)"'),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT social_channel_key_format CHECK (channel_key ~ '^[a-z0-9][a-z0-9_-]{1,63}$'),
