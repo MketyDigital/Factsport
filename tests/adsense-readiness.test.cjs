@@ -26,6 +26,7 @@ test('public pages do not render betting affiliate widgets or promote private VI
     'app/live/page.tsx', 'app/match/[id]/page.tsx',
     'app/highlights/page.tsx', 'app/standings/page.tsx', 'app/tournaments/page.tsx', 'app/tournaments/[league]/page.tsx',
     'app/components/Footer.tsx', 'app/components/SiteHeader.tsx',
+    'app/components/HomeDashboardClient.tsx', 'app/components/MatchMobileHub.tsx',
   ];
   for (const file of publicFiles) {
     const source = read(file);
