@@ -40,6 +40,8 @@ test('mini standings has a PostgreSQL season-aware read path', () => {
 
 test('highlight cards use public R2 thumbnails and stable highlight identifiers', () => {
   assert.ok(highlights.includes('item.thumbnail_url'));
+  assert.ok(highlights.includes('item.canonical_url || `/match/${item.id}`'));
+  assert.ok(highlights.includes('noopener noreferrer'));
   assert.ok(highlights.includes('item.highlight_id || item.id'));
   assert.ok(homepageAdapter.includes('FROM public.public_match_highlights'));
   assert.ok(homepageAdapter.includes('FROM public.public_featured_matches'));
