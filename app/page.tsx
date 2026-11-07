@@ -78,15 +78,15 @@ async function getHomepageData(leagueFilter: string | undefined) {
           created_at: row.original_created_at || row.published_at,
         })))
       : getSupabase().from('news').select('*').order('created_at', { ascending: false }).limit(25)
-          .then(result => result.data || []),
+          .then(result => result.data || []).catch(() => []),
     usePostgresHomepage
       ? listPublicMatchHighlights(5)
       : getSupabase().from('matches').select('*').not('video_url', 'is', null).neq('video_url', '').order('match_date', { ascending: false }).limit(5)
-          .then(result => result.data || []),
+          .then(result => result.data || []).catch(() => []),
     usePostgresHomepage
       ? listPublicFeaturedMatches({ from: wideWindowStart, to: wideWindowEnd, limit: 10 })
       : getSupabase().from('matches').select('*').eq('is_featured', true).gte('match_date', wideWindowStart).lte('match_date', wideWindowEnd).order('match_date', { ascending: true }).limit(10)
-          .then(result => result.data || []),
+          .then(result => result.data || []).catch(() => []),
   ]);
 
   let matches: any[] = [];
@@ -100,23 +100,23 @@ async function getHomepageData(leagueFilter: string | undefined) {
       : rows);
   } else if (leagueFilter) {
     const nowStr = new Date().toISOString();
-    const [{ data: upcoming }, { data: past }] = await Promise.all([
-      getSupabase().from('matches').select('*').ilike('league', `%${leagueFilter}%`).gte('match_date', nowStr).order('match_date', { ascending: true }).limit(5),
-      getSupabase().from('matches').select('*').ilike('league', `%${leagueFilter}%`).lt('match_date', nowStr).order('match_date', { ascending: false }).limit(5),
+    const [upcoming, past] = await Promise.all([
+      getSupabase().from('matches').select('*').ilike('league', `%${leagueFilter}%`).gte('match_date', nowStr).order('match_date', { ascending: true }).limit(5).then(result => result.data || []).catch(() => []),
+      getSupabase().from('matches').select('*').ilike('league', `%${leagueFilter}%`).lt('match_date', nowStr).order('match_date', { ascending: false }).limit(5).then(result => result.data || []).catch(() => []),
     ]);
-    const combined = [...(upcoming || []), ...(past || [])];
+    const combined = [...upcoming, ...past];
     if (combined.length > 0) matches = sortMatches(combined);
   } else {
-    const { data: allMatches } = await getSupabase().from('matches').select('*')
+    const allMatches = await getSupabase().from('matches').select('*')
       .gte('match_date', wideWindowStart)
       .lte('match_date', wideWindowEnd)
       .order('match_date', { ascending: true })
-      .limit(150);
-    if (allMatches && allMatches.length > 0) {
+      .limit(150).then(result => result.data || []).catch(() => []);
+    if (allMatches.length > 0) {
       matches = allMatches;
     } else {
-      const { data: recentMatches } = await getSupabase().from('matches').select('*').order('match_date', { ascending: false }).limit(10);
-      if (recentMatches) matches = recentMatches;
+      const recentMatches = await getSupabase().from('matches').select('*').order('match_date', { ascending: false }).limit(10).then(result => result.data || []).catch(() => []);
+      if (recentMatches.length > 0) matches = recentMatches;
     }
   }
 
