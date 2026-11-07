@@ -55,7 +55,7 @@ test('editorial lifecycle requires review before publication and records revisio
   assert.ok(actions.includes("status='in_review'"));
   assert.ok(actions.includes("status='published'"));
   assert.ok(actions.includes('editorial_article_revisions'));
-  assert.ok(actions.includes('A different administrator must approve the article.'));
+  assert.ok(actions.includes('A different administrator must review and approve the revision.'));
   assert.ok(actions.includes('reviewed_by'));
   assert.ok(actions.includes('reviewed_at'));
   assert.ok(ui.includes('Save draft'));
