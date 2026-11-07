@@ -1,12 +1,12 @@
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
-import { authorizeAdminAction } from '@/app/lib/admin/authorization';
+import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 import SocialClient from './SocialClient';
 
 export default async function AdminSocialPage() {
-  const authorization = await authorizeAdminAction();
+  const authorization = await authorizeMediaEditorialAction('social');
   if (!authorization.ok) {
     return <main className="rounded-2xl border border-amber-200 bg-amber-50 p-6"><h1 className="text-xl font-black">Social publishing access unavailable</h1><p className="mt-2 text-sm">{authorization.error}</p></main>;
   }
