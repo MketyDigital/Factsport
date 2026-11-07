@@ -17,7 +17,6 @@ import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
 import PredictionBoard from '@/app/components/PredictionBoard';
 import HeadToHeadStats from '@/app/components/HeadToHeadStats';
 import FreeTipsBanner from '@/app/components/FreeTipsBanner';
-import BettingPromo from '@/app/components/BettingPromo'; 
 
 import { getExternalData } from '@/app/lib/matchService';
 import { getTeamForm } from '@/app/lib/teamForm';
