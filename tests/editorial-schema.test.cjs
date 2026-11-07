@@ -44,7 +44,8 @@ test('public editorial view excludes unpublished content and unapproved or expir
 
 test('public reader gets only the published view, not editorial write tables', () => {
   assert.match(sql, /REVOKE ALL ON TABLE[\s\S]*FROM PUBLIC, factsport_v2_reader/i);
-  assert.match(sql, /GRANT SELECT ON public\.public_editorial_articles TO factsport_v2_reader/i);
+  assert.match(sql, /CREATE OR REPLACE VIEW public\.public_media_assets/i);
+  assert.match(sql, /GRANT SELECT ON public\.public_editorial_articles, public\.public_media_assets[\s\S]*TO factsport_v2_reader/i);
   assert.doesNotMatch(sql, /\b(DROP|TRUNCATE)\b/i);
   assert.doesNotMatch(sql, /\bGRANT\s+(INSERT|UPDATE|DELETE)\b/i);
 });
