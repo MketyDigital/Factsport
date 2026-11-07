@@ -1,94 +1,112 @@
 export const runtime = 'edge';
-export const revalidate = 3; 
+export const revalidate = 3;
 
-import { createClient as createPublicClient } from '@supabase/supabase-js'; 
+import { createClient as createPublicClient } from '@supabase/supabase-js';
 import { Metadata, ResolvingMetadata } from 'next';
+import { notFound } from 'next/navigation';
 import EmbedPlayerClient from '@/app/components/EmbedPlayerClient';
+import { getPostgresMatchById, getPostgresMatchPlaybackById } from '@/lib/adapters/postgres-matches';
+import { getPublicHomepageSettings } from '@/lib/adapters/postgres-homepage';
 
-const getSupabaseData = async (id: string) => {
-    const supabase = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    const { data, error } = await supabase.from('matches').select('*').eq('id', id).single();
-    if (error) return null;
-    return data;
+const getMatchData = async (id: string) => {
+  if (process.env.FACTSPORT_MATCH_DETAIL_BACKEND === 'postgres') {
+    return getPostgresMatchById(id);
+  }
+  if (process.env.NODE_ENV !== 'development') return null;
+  const supabase = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  const { data, error } = await supabase.from('matches')
+    .select('id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo')
+    .eq('id', id).single();
+  return error ? null : data;
 };
 
-const getSiteSettings = async () => {
-    const supabase = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    const { data } = await supabase.from('site_settings').select('*').limit(1).maybeSingle();
-    return data || {};
+const getPlaybackProjection = async (id: string) => {
+  if (process.env.FACTSPORT_MATCH_DETAIL_BACKEND === 'postgres') {
+    return getPostgresMatchPlaybackById(id);
+  }
+  if (process.env.NODE_ENV !== 'development') return null;
+  const supabase = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  const { data } = await supabase.from('matches')
+    .select('video_url, livestream_url, audio_url')
+    .eq('id', id).maybeSingle();
+  return data || null;
 };
 
-// 🟢 Dynamically generate the strict Player Card metadata that X/Twitter requires
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }, parent: ResolvingMetadata): Promise<Metadata> {
-    const resolvedParams = await params;
-    const match = await getSupabaseData(resolvedParams.id);
-    if (!match) return { title: 'Match Not Found | FactSport' };
-
-    const appUrl = process.env.APP_URL || 'https://factsport.com';
-    const title = `🔴 LIVE STREAM: ${match.home_team} vs ${match.away_team} | FactSport`;
-    const description = `Watch the live match broadcast. Tap to play the full live stream completely free.`;
-
-    // Construct the OG Image data buffer for the preview poster
-    const ogData = Buffer.from(JSON.stringify({ 
-        type: 'versus', 
-        home: match.home_team, 
-        away: match.away_team, 
-        homeLogo: match.home_logo, 
-        awayLogo: match.away_logo 
-    })).toString('base64');
-
-    return { 
-        title, 
-        description, 
-        other: {
-            'twitter:card': 'player',
-            'twitter:title': title,
-            'twitter:description': description,
-            'twitter:player': `${appUrl}/embed/${match.id}`,
-            'twitter:player:width': '1280',
-            'twitter:player:height': '720',
-            'twitter:image': `${appUrl}/api/og?data=${ogData}`,
-        }
+const getAnnouncement = async () => {
+  if (process.env.FACTSPORT_HOMEPAGE_BACKEND === 'postgres') {
+    const settings = await getPublicHomepageSettings();
+    return {
+      text: settings?.announcement_text || '',
+      link: settings?.announcement_link || null,
+      enabled: settings?.announcement_enabled === true,
     };
+  }
+  if (process.env.NODE_ENV !== 'development') return { text: '', link: null, enabled: false };
+  const supabase = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  const { data } = await supabase.from('site_settings')
+    .select('announcement_text, announcement_link, announcement_enabled')
+    .limit(1).maybeSingle();
+  return {
+    text: data?.announcement_text || '',
+    link: data?.announcement_link || null,
+    enabled: data?.announcement_enabled === true,
+  };
+};
+
+export async function generateMetadata(
+  { params }: { params: Promise<{ id: string }> },
+  _parent: ResolvingMetadata
+): Promise<Metadata> {
+  const resolved = await params;
+  const match = await getMatchData(resolved.id);
+  if (!match) return { title: 'Match Not Found | FactSport', robots: { index: false, follow: false } };
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://factsport.com';
+  const title = `LIVE MATCH: ${match.home_team} vs ${match.away_team} | FactSport`;
+  const description = `Open the secure FactSport match player for ${match.home_team} vs ${match.away_team}.`;
+  const bytes = new TextEncoder().encode(JSON.stringify({
+    type: 'versus', home: match.home_team, away: match.away_team,
+    homeLogo: match.home_logo, awayLogo: match.away_logo,
+  }));
+  const binary = Array.from(bytes, byte => String.fromCodePoint(byte)).join('');
+  const ogData = btoa(binary);
+
+  return {
+    title, description,
+    robots: { index: false, follow: false, noarchive: true },
+    other: {
+      'twitter:card': 'player',
+      'twitter:title': title,
+      'twitter:description': description,
+      'twitter:player': `${appUrl}/embed/${match.id}`,
+      'twitter:player:width': '1280',
+      'twitter:player:height': '720',
+      'twitter:image': `${appUrl}/api/og?data=${ogData}`,
+    },
+  };
 }
 
 export default async function EmbedPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = await params;
-  if (!resolvedParams?.id) return (<div className="w-full h-full bg-black"></div>);
+  const resolved = await params;
+  if (!resolved?.id) return notFound();
+  if (process.env.NODE_ENV !== 'development' && process.env.FACTSPORT_MATCH_DETAIL_BACKEND !== 'postgres') return notFound();
 
-  const dbData = await getSupabaseData(resolvedParams.id);
-  if (!dbData) return (<div className="w-full h-full bg-black"></div>);
+  const [match, playback, announcement] = await Promise.all([
+    getMatchData(resolved.id),
+    getPlaybackProjection(resolved.id),
+    getAnnouncement(),
+  ]);
+  if (!match) return notFound();
 
-  const siteSettings = await getSiteSettings();
-  
-  const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
-  const currentStatus = (dbData.status || '').toUpperCase();
-  const isFinishedApi = FINISHED_STATUSES.includes(currentStatus);
-  
-  const matchDateMs = new Date(dbData.match_date).getTime();
-  const minutesToKick = (matchDateMs - Date.now()) / 60000;
-  
-  // Universally finished means we should display highlights and hide the stream
-  // We rely purely on the API status to handle extra time, penalties, or delays properly.
-  const isUniversallyFinished = isFinishedApi;
-
-  // The active URL for the embed
-  const activeVideoUrl = isUniversallyFinished ? dbData.video_url : dbData.livestream_url;
-
-  // Global Announcement
-  const announcement = {
-      text: siteSettings.announcement_text || '',
-      link: siteSettings.announcement_link || null,
-      enabled: siteSettings.announcement_enabled === true
-  };
+  const initialMode: 'video' | 'audio' =
+    !playback?.video_url && !playback?.livestream_url && playback?.audio_url ? 'audio' : 'video';
 
   return (
-    <EmbedPlayerClient 
-        match={dbData}
-        activeVideoUrl={activeVideoUrl}
-        telegramSupport={siteSettings.telegram_support || null}
-        announcement={announcement}
-        appUrl={process.env.APP_URL || 'https://factsport.com'}
+    <EmbedPlayerClient
+      match={match}
+      initialMode={initialMode}
+      announcement={announcement}
+      appUrl={process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://factsport.com'}
     />
   );
 }
