@@ -58,6 +58,10 @@ export async function GET(request: Request) {
         }
     }
 
+    if (env.FACTSPORT_ENVIRONMENT !== 'development') {
+        return NextResponse.json({ error: 'V2 PostgreSQL match reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+    }
+
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     
