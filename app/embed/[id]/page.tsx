@@ -8,7 +8,7 @@ import EmbedPlayerClient from '@/app/components/EmbedPlayerClient';
 import { getPostgresMatchById, getPostgresMatchPlaybackById } from '@/lib/adapters/postgres-matches';
 import { getPublicHomepageSettings } from '@/lib/adapters/postgres-homepage';
 
-const getMatchData = async (id: string) => {
+const getMatchData = async (id: string): Promise<any> => {
   if (process.env.FACTSPORT_MATCH_DETAIL_BACKEND === 'postgres') {
     return getPostgresMatchById(id);
   }
@@ -20,7 +20,7 @@ const getMatchData = async (id: string) => {
   return error ? null : data;
 };
 
-const getPlaybackProjection = async (id: string) => {
+const getPlaybackProjection = async (id: string): Promise<any> => {
   if (process.env.FACTSPORT_MATCH_DETAIL_BACKEND === 'postgres') {
     return getPostgresMatchPlaybackById(id);
   }
@@ -32,7 +32,7 @@ const getPlaybackProjection = async (id: string) => {
   return data || null;
 };
 
-const getAnnouncement = async () => {
+const getAnnouncement = async (): Promise<any> => {
   if (process.env.FACTSPORT_HOMEPAGE_BACKEND === 'postgres') {
     const settings = await getPublicHomepageSettings();
     return {
