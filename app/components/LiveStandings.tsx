@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState, Fragment } from 'react';
 import { Trophy, ChevronUp, ChevronDown, Minus, Calendar, MapPin, Activity } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 
 const LEAGUE_MAP: Record<string, string> = {
@@ -62,66 +61,63 @@ export default function LiveStandings({ leagueName, homeTeam, awayTeam, homeScor
 
     useEffect(() => {
         let isMounted = true;
+        let requestInFlight = false;
 
-        // Handle initial knockout stage selection
         const updateInitialStage = (currentMatches: any[]) => {
             const knockoutMatches = currentMatches.filter(m => stageOrder.includes(normalizeStage(m.stage)));
             if (knockoutMatches.length > 0 && !selectedStage) {
                 const activeOrLive = knockoutMatches.find(m => ['LIVE', '1H', '2H', 'HT', 'ET', 'P', 'IN_PLAY'].includes(m.status));
-                if (activeOrLive && activeOrLive.stage) {
-                    setSelectedStage(normalizeStage(activeOrLive.stage));
-                } else {
-                    const scheduled = knockoutMatches.find(m => m.status === 'SCHEDULED');
-                    if (scheduled && scheduled.stage) {
-                        setSelectedStage(normalizeStage(scheduled.stage));
-                    } else {
-                        setSelectedStage(normalizeStage(knockoutMatches[knockoutMatches.length - 1].stage) || 'FINAL');
-                    }
-                }
+                const scheduled = knockoutMatches.find(m => m.status === 'SCHEDULED');
+                const nextStage = activeOrLive?.stage || scheduled?.stage || knockoutMatches[knockoutMatches.length - 1].stage;
+                if (nextStage) setSelectedStage(normalizeStage(nextStage) || 'FINAL');
             }
         };
 
-        const fetchStandingsAndMatches = async () => {
+        const fetchStandingsAndMatches = async (initial = false) => {
+            if (requestInFlight) return;
+            requestInFlight = true;
+            if (initial) setIsLoading(true);
+
             const cleanLeague = leagueName.replace(' Matches', '');
             const leagueCode = LEAGUE_MAP[cleanLeague];
-            setIsLoading(true);
 
             try {
-                // Fetch Standings
-                let standingsData: any[] = [];
+                const requests: Promise<Response>[] = [
+                    fetch(`/api/competitions/matches?league=${encodeURIComponent(cleanLeague)}`, { cache: 'no-store' }),
+                ];
                 if (leagueCode) {
-                    const res = await fetch(`/api/cache/standings?league=${leagueCode}`);
-                    if (res.ok) {
-                        standingsData = await res.json();
+                    requests.push(fetch(`/api/cache/standings?league=${encodeURIComponent(leagueCode)}`, { cache: 'no-store' }));
+                }
+
+                const responses = await Promise.all(requests);
+                const matchesResponse = responses[0];
+                if (matchesResponse.ok) {
+                    const dbMatches = await matchesResponse.json();
+                    if (isMounted && Array.isArray(dbMatches)) {
+                        setMatches(dbMatches);
+                        updateInitialStage(dbMatches);
                     }
                 }
-                if (isMounted) setStandings(standingsData);
 
-                // Fetch Matches
-                const supabase = createClient(
-                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-                );
-                
-                const { data: dbMatches } = await supabase
-                    .from('matches')
-                    .select('*')
-                    .eq('league', cleanLeague)
-                    .order('match_date', { ascending: true });
-
-                if (isMounted && dbMatches) {
-                    setMatches(dbMatches);
-                    updateInitialStage(dbMatches);
+                const standingsResponse = responses[1];
+                if (standingsResponse?.ok) {
+                    const standingsData = await standingsResponse.json();
+                    if (isMounted && Array.isArray(standingsData)) setStandings(standingsData);
                 }
-            } catch (e) {
-                console.error("Error fetching standings/matches:", e);
+            } catch (error) {
+                console.error('Error fetching standings/matches:', error);
             } finally {
-                if (isMounted) setIsLoading(false);
+                requestInFlight = false;
+                if (isMounted && initial) setIsLoading(false);
             }
         };
 
-        fetchStandingsAndMatches();
-        return () => { isMounted = false; };
+        void fetchStandingsAndMatches(true);
+        const refresh = setInterval(() => void fetchStandingsAndMatches(false), 15000);
+        return () => {
+            isMounted = false;
+            clearInterval(refresh);
+        };
     }, [leagueName, selectedStage]);
 
     if (isLoading) {
