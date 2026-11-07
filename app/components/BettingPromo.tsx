@@ -30,7 +30,7 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
   if (!targetLink || !promoCode) return null;
 
   const copyCode = () => {
-      navigator.clipboard.writeText(PROMO_CODE);
+      navigator.clipboard.writeText(promoCode);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
   };
