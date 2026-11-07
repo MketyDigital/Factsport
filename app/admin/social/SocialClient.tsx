@@ -18,6 +18,7 @@ export default function SocialClient({ channels, publications }: { channels: Cha
   const [message, setMessage] = useState('');
   const [pending, startTransition] = useTransition();
   const [idempotencyKey, setIdempotencyKey] = useState('');
+  const [publicContentConfirmed, setPublicContentConfirmed] = useState(false);
 
   function schedule() {
     startTransition(async () => {
@@ -27,10 +28,11 @@ export default function SocialClient({ channels, publications }: { channels: Cha
       const result = await scheduleSocialPublication({
         channelId, contentText, articleId: articleId.trim() || undefined,
         linkUrl, scheduledAt: new Date(scheduledAt).toISOString(), idempotencyKey: requestKey,
+        publicContentConfirmed,
       });
       if (!result.success) { setMessage(result.error); return; }
       setMessage('Social post scheduled and placed in the durable outbox. Delivery awaits the dedicated channel dispatcher.');
-      setContentText(''); setArticleId(''); setLinkUrl(''); setScheduledAt(''); setIdempotencyKey('');
+      setContentText(''); setArticleId(''); setLinkUrl(''); setScheduledAt(''); setIdempotencyKey(''); setPublicContentConfirmed(false);
       window.location.reload();
     });
   }
@@ -40,7 +42,7 @@ export default function SocialClient({ channels, publications }: { channels: Cha
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,.55fr)]">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-black">Compose social post</h2>
-          <p className="mt-1 text-sm text-slate-500">Create a channel-specific post without changing article publication status.</p>
+          <p className="mt-1 text-sm text-slate-500">Create a public Media post without changing article publication status. Private Prediction channels use a separate system.</p>
           <div className="mt-4 space-y-4">
             <label className="block text-xs font-bold text-slate-600">Destination channel
               <select value={channelId} onChange={e => setChannelId(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm">
@@ -60,7 +62,11 @@ export default function SocialClient({ channels, publications }: { channels: Cha
             <label className="block text-xs font-bold text-slate-600">Schedule (your local time)
               <input type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
             </label>
-            <button disabled={pending || !channelId || channels.length === 0} onClick={schedule} className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">
+            <label className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
+              <input type="checkbox" checked={publicContentConfirmed} onChange={e => setPublicContentConfirmed(e.target.checked)} className="mt-1" />
+              <span>I confirm this is appropriate for public Factsport Media distribution: no bookmaker or betting-affiliate promotion, bonus code, wagering call-to-action, paid-prize inducement or private Prediction details. Linked content is approved for public sharing.</span>
+            </label>
+            <button disabled={pending || !channelId || channels.length === 0 || !publicContentConfirmed} onClick={schedule} className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">
               {pending ? 'Scheduling…' : 'Schedule post'}
             </button>
             {message && <p role="status" className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">{message}</p>}
