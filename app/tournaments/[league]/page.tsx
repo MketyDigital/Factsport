@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { listPostgresLeagueMatches } from '@/lib/adapters/postgres-matches';
 import Link from 'next/link';
 import { Metadata, ResolvingMetadata } from 'next';
+import { notFound } from 'next/navigation';
 import { ChevronLeft, Trophy, Calendar, CheckCircle, Search, CalendarDays, BarChart2, Star, Shield, Info, MapPin } from 'lucide-react';
 import LeagueMatchGroup from '@/app/components/LeagueMatchGroup';
 import LiveStandings from '@/app/components/LiveStandings';
@@ -63,6 +64,7 @@ export default async function TournamentDetailsPage({ params }: { params: Promis
     if (process.env.FACTSPORT_MATCHES_BACKEND === 'postgres') {
         matches = await listPostgresLeagueMatches(leagueName, 500);
     } else {
+        if (process.env.NODE_ENV !== 'development') return notFound();
         const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
         const { data, error } = await supabase
             .from('matches')
