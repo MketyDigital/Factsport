@@ -8,7 +8,7 @@ import WinProbability from '@/app/components/WinProbability';
 import MOTMVoteWidget from '@/app/components/MOTMVoteWidget'; 
 import { useMatchLive } from '@/app/providers/MatchLiveProvider';
 
-export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
+export default function MatchMobileHub({ matchId, espnId, dbData, chatEnabled = false }: any) {
     const [activeTab, setActiveTab] = useState<'chat' | 'stats' | 'table'>('stats');
     const liveData = useMatchLive();
 
@@ -21,10 +21,10 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
     const isUniversallyFinished = isFinished || minutesToKick < -240;
 
     useEffect(() => {
-        if (isUniversallyFinished && activeTab === 'table') {
+        if ((isUniversallyFinished && activeTab === 'table') || (!chatEnabled && activeTab === 'chat')) {
             setActiveTab('stats');
         }
-    }, [isUniversallyFinished, activeTab]);
+    }, [isUniversallyFinished, activeTab, chatEnabled]);
 
     const scrollToSection = (id: string) => {
         const element = document.getElementById(id);
@@ -40,9 +40,9 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
             <WinProbability predictor={liveData?.predictor} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
 
             <div className="flex overflow-x-auto scrollbar-hide border-b border-slate-200 bg-white sticky top-0 z-40 shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
-                <button onClick={() => setActiveTab('chat')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'chat' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
+                {chatEnabled && <button onClick={() => setActiveTab('chat')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'chat' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
                     <MessageCircle size={14} className={activeTab === 'chat' ? 'fill-blue-100' : ''}/> Live Chat
-                </button>
+                </button>}
                 <button onClick={() => setActiveTab('stats')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'stats' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
                     <BarChart2 size={14} /> Stats & XI
                 </button>
