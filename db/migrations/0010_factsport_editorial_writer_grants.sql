@@ -13,8 +13,6 @@ GRANT SELECT, INSERT, UPDATE ON public.editorial_article_revisions
   TO factsport_v2_editorial_writer;
 GRANT SELECT, INSERT, UPDATE ON public.editorial_article_media
   TO factsport_v2_editorial_writer;
-GRANT SELECT, INSERT, UPDATE ON public.editorial_article_team_media
-  TO factsport_v2_editorial_writer;
 GRANT SELECT, INSERT, UPDATE ON public.media_assets
   TO factsport_v2_editorial_writer;
 GRANT SELECT, INSERT ON public.editorial_article_sources
