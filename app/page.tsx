@@ -4,7 +4,7 @@ export const revalidate = 3;
 import { createClient } from '@supabase/supabase-js';
 import { listPublicEditorialArticles } from '@/lib/adapters/postgres-editorial';
 import { listPostgresMatchesWindow } from '@/lib/adapters/postgres-matches';
-import { getPublicHomepageSettings, listPublicFeaturedMatches, listPublicMatchHighlights } from '@/lib/adapters/postgres-homepage';
+import { listPublicFeaturedMatches, listPublicMatchHighlights } from '@/lib/adapters/postgres-homepage';
 import Link from "next/link";
 import { Metadata } from 'next';
 import { ArrowRight, Youtube, Newspaper, Award, Trophy } from "lucide-react";
@@ -66,7 +66,7 @@ async function getHomepageData(leagueFilter: string | undefined) {
     return supabase;
   };
 
-  const [news, highlights, featuredMatches, homepageSettings] = await Promise.all([
+  const [news, highlights, featuredMatches] = await Promise.all([
     usePostgresEditorial
       ? listPublicEditorialArticles({ limit: 25 }).then(rows => rows.map((row: any) => ({
           ...row,
@@ -86,7 +86,6 @@ async function getHomepageData(leagueFilter: string | undefined) {
       ? listPublicFeaturedMatches({ from: wideWindowStart, to: wideWindowEnd, limit: 10 })
       : getSupabase().from('matches').select('*').eq('is_featured', true).gte('match_date', wideWindowStart).lte('match_date', wideWindowEnd).order('match_date', { ascending: true }).limit(10)
           .then(result => result.data || []),
-    usePostgresMatches ? getPublicHomepageSettings() : Promise.resolve(null),
   ]);
 
   let matches: any[] = [];
@@ -125,7 +124,6 @@ async function getHomepageData(leagueFilter: string | undefined) {
     news: news || [],
     highlights: highlights || [],
     featuredMatches: featuredMatches || [],
-    featuredMatchId: homepageSettings?.featured_match_id ? String(homepageSettings.featured_match_id) : null,
   };
 }
 
@@ -133,7 +131,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
   const resolvedParams = await searchParams;
   const selectedLeague = resolvedParams.league;
     
-  const { matches, news, highlights, featuredMatches, featuredMatchId } = await getHomepageData(selectedLeague);
+  const { matches, news, highlights, featuredMatches } = await getHomepageData(selectedLeague);
 
   const finalHeadlines = news.filter(n => n.is_headline).slice(0, 3);
   const nonHeadlineNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id));
@@ -149,7 +147,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       <HomeDashboardClient 
           globalMatches={matches} 
           featuredMatches={featuredMatches} 
-          featuredMatchId={featuredMatchId}
           selectedLeague={selectedLeague} 
           
           /* 🟢 ZERO MARGINS BETWEEN THESE THREE COMPONENTS */
