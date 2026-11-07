@@ -14,6 +14,11 @@ export interface PublicEditorialArticle {
   canonical_url: string | null; hero_media_key: string | null;
   hero_media_content_type: string | null; hero_media_alt_text: string | null;
   hero_media_attribution: string | null;
+  origin: 'manual' | 'ai_assisted' | 'automated' | 'imported' | 'unknown';
+  seo_title: string | null;
+  seo_description: string | null;
+  original_created_at: string | null;
+  last_verified_at: string | null;
 }
 export interface PublicMediaAsset {
   object_key: string; content_type: string; byte_size: number;
@@ -49,6 +54,7 @@ export async function listPublicEditorialArticles(input: {
              is_headline, is_breaking, author_display_name, published_at,
              created_at, updated_at, canonical_url, hero_media_key,
              hero_media_content_type, hero_media_alt_text, hero_media_attribution,
+             origin, seo_title, seo_description, original_created_at, last_verified_at,
              (SELECT count(*)::integer FROM public.public_editorial_articles WHERE category = ${category}) AS total_count
       FROM public.public_editorial_articles
       WHERE category = ${category}
@@ -75,7 +81,8 @@ export async function getPublicEditorialArticle(slug: string) {
     SELECT id, slug, title, excerpt, body_markdown, category, tags,
            is_headline, is_breaking, author_display_name, published_at,
            created_at, updated_at, canonical_url, hero_media_key,
-           hero_media_content_type, hero_media_alt_text, hero_media_attribution
+           hero_media_content_type, hero_media_alt_text, hero_media_attribution,
+           origin, seo_title, seo_description, original_created_at, last_verified_at
     FROM public.public_editorial_articles
     WHERE slug = ${slug}
     LIMIT 1
