@@ -16,6 +16,7 @@ const articleSanitizeSchema = {
   },
   protocols: {
     ...defaultSchema.protocols,
+    href: [...(defaultSchema.protocols?.href || []), 'match-widget'],
     src: ['https'],
   },
 };
