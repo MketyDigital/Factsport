@@ -173,8 +173,8 @@ export async function listPostgresLeagueMatches(league: string, limit = 500) {
 /**
  * Resolve either the canonical V2 match UUID or an imported legacy Supabase
  * UUID alias. The returned id is always the canonical V2 matches.id value.
- * Requires migration 0008; do not enable its route flag before that migration
- * and its reader grant are present in the target database.
+ * Requires migrations 0008 and 0017; do not enable the match-detail route flag
+ * before both migrations and their reader grants are present in the target database.
  */
 export async function getPostgresMatchById(matchId: string) {
   if (!MATCH_UUID_PATTERN.test(matchId)) return null;
@@ -200,7 +200,7 @@ export async function getPostgresMatchById(matchId: string) {
 /**
  * Private server-only playback projection. Raw stream URLs are returned only
  * to the playback route, which enforces status, rights and the server unlock
- * before serializing any URL to a browser.
+ * before serializing any URL to a browser. Requires migration 0017.
  */
 export async function getPostgresMatchPlaybackById(matchId: string) {
   if (!MATCH_UUID_PATTERN.test(matchId)) return null;
