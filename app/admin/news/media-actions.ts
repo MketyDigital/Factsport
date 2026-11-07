@@ -76,6 +76,15 @@ export async function reviewRightsAndAttachMedia(input: MediaReviewInput) {
         ON CONFLICT (revision_id, placement) DO UPDATE SET
           media_id=EXCLUDED.media_id, remove_media=false, updated_at=now()
       `;
+      await tx`
+        INSERT INTO public.media_editorial_audit_events
+          (actor_user_id, action, article_id, revision_id, details)
+        VALUES (
+          ${actorId}::uuid, 'media_rights_reviewed', ${input.articleId}::uuid,
+          ${revisions[0].id}::uuid,
+          ${JSON.stringify({ assetId: input.assetId, placement: input.placement, rightsStatus: input.rightsStatus })}::jsonb
+        )
+      `;
     }));
     revalidatePath('/admin/news');
     return { success: true };
