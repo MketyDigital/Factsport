@@ -2,7 +2,8 @@ export const runtime = 'edge';
 export const revalidate = 180; 
 
 import { createClient } from '@supabase/supabase-js';
-import { getPublicEditorialArticle } from '@/lib/adapters/postgres-editorial'; 
+import { getPublicEditorialArticle } from '@/lib/adapters/postgres-editorial';
+import { listPostgresMatchesWindow } from '@/lib/adapters/postgres-matches'; 
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { cache } from 'react'; 
@@ -64,8 +65,19 @@ export default async function ArticlePage({ params }: { params: { slug: string }
     
   if (!article) return notFound();
 
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-  const { data: matches } = await supabase.from('matches').select('*').eq('status', 'SCHEDULED').limit(3);
+  let matches: any[] = [];
+  if (process.env.FACTSPORT_MATCHES_BACKEND === 'postgres') {
+    const now = new Date();
+    const rows = await listPostgresMatchesWindow({
+      from: now.toISOString(),
+      to: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    matches = rows.filter((match: any) => match.status === 'SCHEDULED').slice(0, 3);
+  } else {
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const result = await supabase.from('matches').select('*').eq('status', 'SCHEDULED').limit(3);
+    matches = result.data || [];
+  }
 
   const jsonLd = {
       "@context": "https://schema.org",
