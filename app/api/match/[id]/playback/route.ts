@@ -79,7 +79,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       });
     }
   }
-  if ((env.FACTSPORT_ENVIRONMENT === 'staging' || env.FACTSPORT_ENVIRONMENT === 'production')) {
+  if (env.FACTSPORT_ENVIRONMENT !== 'development') {
     return NextResponse.json({ error: 'V2 playback reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
 
