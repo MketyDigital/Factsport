@@ -3,25 +3,32 @@ export const revalidate = 60; // 🟢 Cache for exactly 60 seconds
 
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { listCurrentCompetitionStandings } from '@/lib/adapters/postgres-homepage';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const leagueCode = searchParams.get('league');
 
-    if (!leagueCode) return NextResponse.json({ error: 'Missing league code' }, { status: 400 });
+    const allowed = new Set(['PL', 'PD', 'BL1', 'SA', 'FL1', 'CL', 'WC', 'EC', 'CLI', 'AFCON']);
+    if (!leagueCode || !allowed.has(leagueCode)) return NextResponse.json({ error: 'Invalid league code' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
 
     try {
-        const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-        const { data, error } = await supabase
-            .from('standings')
-            .select('*')
-            .eq('league_code', leagueCode)
-            .order('match_group', { ascending: true }) // 🟢 SORTS BY GROUP A-Z
-            .order('position', { ascending: true }); // 🟢 SORTS BY RANK
-
-        if (error) throw error;
-        return NextResponse.json(data, { headers: { 'Cache-Control': 'max-age=0, s-maxage=60' } });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const data = process.env.FACTSPORT_COMPETITIONS_BACKEND === 'postgres'
+            ? await listCurrentCompetitionStandings(leagueCode)
+            : await (async () => {
+                const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+                const { data, error } = await supabase
+                    .from('standings')
+                    .select('league_code, league_name, season, match_group, team_id, team_name, team_short_name, team_crest, position, played_games, won, draw, lost, goals_for, goals_against, goal_difference, points, source_updated_at')
+                    .eq('league_code', leagueCode)
+                    .order('match_group', { ascending: true })
+                    .order('position', { ascending: true });
+                if (error) throw error;
+                return data || [];
+            })();
+        const staging = process.env.FACTSPORT_ENVIRONMENT === 'staging';
+        return NextResponse.json(data, { headers: { 'Cache-Control': staging ? 'private, no-store, max-age=0' : 'public, max-age=0, s-maxage=60, stale-while-revalidate=30' } });
+    } catch {
+        return NextResponse.json({ error: 'Standings temporarily unavailable' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     }
 }
