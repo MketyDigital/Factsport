@@ -103,7 +103,7 @@ export default async function LiveMediaPage() {
                 <div className="lg:col-span-2 flex flex-col h-full">
                     <FactSportMediaRoom matchId="global-goal-rush" mediaUrl={globalMediaUrl} title={studioTitle} />
                 </div>
-                <div className="lg:col-span-1 bg-[#0f1c3a] rounded-2xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.5)] border border-slate-700 flex flex-col h-full max-h-[600px] lg:max-h-none">
+                {process.env.NODE_ENV === 'development' || (process.env.FACTSPORT_PUBLIC_CHAT_BACKEND === 'postgres' && process.env.FACTSPORT_PUBLIC_CHAT_ENABLED === 'true') ? <div className="lg:col-span-1 bg-[#0f1c3a] rounded-2xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.5)] border border-slate-700 flex flex-col h-full max-h-[600px] lg:max-h-none">
                      <div className="bg-[#0a1428] p-3.5 border-b border-slate-800 flex items-center justify-between shrink-0 shadow-md relative z-10">
                           <div className="flex items-center gap-2.5">
                               <div className="w-8 h-8 bg-blue-600/20 rounded-full flex items-center justify-center border border-blue-500/30">
@@ -122,7 +122,7 @@ export default async function LiveMediaPage() {
                      <div className="flex-1 overflow-hidden relative">
                           <FanZoneChat matchId="global-goal-rush" />
                      </div>
-                </div>
+                </div> : null}
             </div>
         )}
 
