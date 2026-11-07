@@ -35,7 +35,8 @@ test('public editorial view includes SEO and provenance-safe publication metadat
 test('media cannot become public until a rights review is recorded', () => {
   assert.match(sql, /rights_reviewed_by uuid REFERENCES public\.app_users/i);
   assert.match(sql, /rights_reviewed_at timestamptz/i);
-  assert.ok(sql.includes('AND rights_reviewed_by IS NOT NULL\\n        AND rights_reviewed_at IS NOT NULL'));
+  assert.ok(sql.includes('AND rights_reviewed_by IS NOT NULL'));
+  assert.ok(sql.includes('AND rights_reviewed_at IS NOT NULL'));
   assert.match(sql, /NOT is_public[\s\S]*rights_status IN \('owned', 'licensed', 'editorial_exception'\)[\s\S]*rights_reviewed_at IS NOT NULL/i);
   assert.match(sql, /m\.rights_reviewed_at IS NOT NULL/i);
   assert.match(sql, /GRANT SELECT ON public\.public_editorial_articles, public\.public_media_assets[\s\S]*TO factsport_v2_reader/i);
