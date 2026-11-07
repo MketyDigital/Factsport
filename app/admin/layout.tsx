@@ -12,7 +12,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const access = await authorizeMediaEditorialAction('read');
+  const access = await authorizeMediaEditorialAction('workspace');
   if (!access.ok) {
     return (
       <main className="mx-auto mt-12 max-w-2xl rounded-2xl border border-amber-200 bg-amber-50 p-6">
