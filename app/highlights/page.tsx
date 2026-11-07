@@ -7,6 +7,7 @@ import { serializeJsonLd } from '@/lib/seo/json-ld';
 import Link from "next/link";
 import { Metadata } from 'next';
 import { PlayCircle, Calendar, ArrowLeft, Tv, ShieldCheck, Trophy, ArrowRight, ChevronRight, ChevronLeft } from "lucide-react";
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
 const ITEMS_PER_PAGE = 12;
 
@@ -131,6 +132,7 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
         
         {/* Top Banner */}
 
+        <AdsterraStandardBanner />
         {safeHighlights.length > 0 ? (
             <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
@@ -236,6 +238,7 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
 
                  {/* Reserved editorial ad slot: no bookmaker affiliate creative */}
                  <div className="mt-8">
+                     <AdsterraStandardBanner />
                  </div>
 
                 <div className="mt-10 max-w-3xl mx-auto bg-[#0f1c3a] rounded-2xl p-4 md:p-5 border border-yellow-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden group">
