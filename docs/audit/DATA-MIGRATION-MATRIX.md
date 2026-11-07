@@ -81,10 +81,10 @@ The following migrations are additive and checked in on `refactor/factsport-v2`;
 | `0004_factsport_editorial_media.sql` | `editorial_articles`, article revisions/source provenance, `media_assets`, article-media links, published editorial/media read views | Create empty. Do not copy old news bodies or image URLs until article origin, rights and ownership are reviewed. |
 | `0005_factsport_editorial_provenance_review.sql` | Origin classification, original timestamps, legacy body/content preservation fields, SEO/reverification, human review and media-rights review | Default origin is `unknown`; never infer human authorship from slug/author. Publishing requires a recorded reviewer. Keep legacy body and content fields distinct in any private preservation export. |
 | `0006_factsport_homepage_sports_read_models.sql` | Featured-match flags, safe homepage setting view, `matches.season`, season/group-aware standings, completed-results index, match highlights with provider and rights checks | Fresh operational data only. Do not import legacy standings snapshots or highlight URLs automatically. Rebuild standings from new provider ingestion and manually approve highlight rights. |
+| `0007_factsport_competition_player_stats.sql` | Season-aware current player goals/assists, team identity and provider freshness; public-only player-stat view | Create empty. Do not bulk-import legacy scorer rows until player identity, nullable legacy IDs, season and source are reconciled. |
 
 Reader access is SELECT-only on the narrowly projected public views. Editorial write tables, revisions, source metadata, homepage settings, standings write tables and highlight records are not granted to the public reader. The match read adapter continues to project an explicit public DTO and excludes settlement flags.
 
 The homepage read model is intentionally not a substitute for the full CMS or sports ingestion workflows. Migration 0006 creates the target shapes; provider jobs, CMS commands, admin/RBAC and actual staging data validation remain separate deliverables.
 
-| `0007_factsport_competition_player_stats.sql` | Season-aware current player goals/assists, team identity and provider freshness; public-only player-stat view | Create empty. Do not bulk-import legacy scorer rows until player identity, nullable legacy IDs, season and source are reconciled. |
 
