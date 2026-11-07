@@ -24,7 +24,7 @@ export async function GET(req: Request) {
                 chat_pin_link: match?.chat_pin_link ?? null,
             }, { headers: { 'Cache-Control': staging ? 'private, no-store, max-age=0' : 'public, max-age=0, s-maxage=10' } });
         }
-        if (env.FACTSPORT_ENVIRONMENT === 'staging') {
+        if ((env.FACTSPORT_ENVIRONMENT === 'staging' || env.FACTSPORT_ENVIRONMENT === 'production')) {
             return NextResponse.json({ error: 'V2 match pin reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
         }
 
