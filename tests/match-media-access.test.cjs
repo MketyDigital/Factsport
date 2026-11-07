@@ -28,6 +28,11 @@ test('playback endpoint withholds media URLs until the server-side 15-minute unl
   assert.doesNotMatch(playback, /!SCHEDULED\.has\(status\) && !isFinished/);
   assert.match(playback, /UNAVAILABLE\.has\(status\)/);
   assert.match(playback, /trimmed\.startsWith\('\/'\)/);
+  assert.match(playback, /String\.fromCharCode\(92\)/);
+  assert.match(playback, /const isLive = LIVE\.has\(status\)/);
+  assert.doesNotMatch(playback, /!SCHEDULED\.has\(status\) && !isFinished/);
+  assert.match(playback, /UNAVAILABLE\.has\(status\)/);
+  assert.match(playback, /trimmed\.startsWith\('\/'\)/);
   const lockedBranch = playback.slice(playback.indexOf("status: 'locked'"), playback.indexOf('const videoSource'));
   assert.doesNotMatch(lockedBranch, /mediaUrl\s*:|videoUrl\s*:|audioUrl\s*:/);
   assert.match(playback, /safePlaybackUrl/);
