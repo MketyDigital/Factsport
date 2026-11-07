@@ -2,7 +2,8 @@ export const runtime = 'edge';
 export const revalidate = 180;
 
 import { createClient } from '@supabase/supabase-js';
-import { listPublicEditorialArticles } from '@/lib/adapters/postgres-editorial'; 
+import { listPublicEditorialArticles } from '@/lib/adapters/postgres-editorial';
+import { serializeJsonLd } from '@/lib/seo/json-ld'; 
 import Link from 'next/link';
 import { Metadata } from 'next';
 import { Calendar, ChevronRight, Zap, Trophy, Youtube, Newspaper, ArrowRight, Flame, Radio, BarChart2, ChevronLeft } from 'lucide-react';
@@ -86,7 +87,7 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] pb-24 font-sans text-slate-900">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
 
       <div className="bg-[#0a1428] text-white pt-8 pb-12 px-6 relative overflow-hidden shadow-lg border-b border-blue-900/30">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
