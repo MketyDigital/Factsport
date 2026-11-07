@@ -2,9 +2,57 @@
 
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw'; 
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import Link from 'next/link';
 import { ExternalLink, Link as LinkIcon, Trophy, Calendar, ChevronRight } from 'lucide-react';
+
+const articleSanitizeSchema = {
+  ...defaultSchema,
+  tagNames: [...(defaultSchema.tagNames || []), 'iframe'],
+  attributes: {
+    ...defaultSchema.attributes,
+    iframe: ['src', 'width', 'height', 'title', 'allow', 'allowFullScreen', 'loading', 'referrerPolicy'],
+  },
+  protocols: {
+    ...defaultSchema.protocols,
+    src: ['https'],
+  },
+};
+
+function rehypeSafeEmbeds() {
+  return (tree: any) => {
+    const visit = (node: any) => {
+      if (!Array.isArray(node.children)) return;
+      node.children = node.children.filter((child: any) => {
+        if (child.type === 'element' && child.tagName === 'iframe') {
+          let url: URL;
+          try {
+            url = new URL(String(child.properties?.src || ''));
+          } catch {
+            return false;
+          }
+          const youtube = ['www.youtube.com', 'www.youtube-nocookie.com'].includes(url.hostname)
+            && /^\/embed\/[A-Za-z0-9_-]+$/.test(url.pathname);
+          const vimeo = url.hostname === 'player.vimeo.com'
+            && /^\/video\/\d+$/.test(url.pathname);
+          if ((!youtube && !vimeo) || url.protocol !== 'https:') return false;
+          child.properties = {
+            ...child.properties,
+            loading: 'lazy',
+            referrerPolicy: 'strict-origin-when-cross-origin',
+            sandbox: 'allow-scripts allow-same-origin allow-presentation',
+            allowFullScreen: true,
+          };
+          return true;
+        }
+        visit(child);
+        return true;
+      });
+    };
+    visit(tree);
+  };
+}
 
 // 🟢 FETCHES FROM CACHE INSTEAD OF SUPABASE
 function EmbeddedMatchCard({ matchId }: { matchId: string }) {
@@ -87,21 +135,21 @@ function EmbeddedMatchCard({ matchId }: { matchId: string }) {
 
 export default function MarkdownRenderer({ content }: { content: string }) {
   const processedContent = content.replace(
-      /\[MATCH_WIDGET:([a-zA-Z0-9-]+)\]?/gi, 
-      '<div class="match-widget-embed" id="$1"></div>'
+      /\[MATCH_WIDGET:([a-zA-Z0-9-]+)\]?/gi,
+      '[Match details](match-widget:$1)'
   );
 
   return (
     <ReactMarkdown
-      rehypePlugins={[rehypeRaw]} 
+      rehypePlugins={[rehypeRaw, [rehypeSanitize, articleSanitizeSchema], rehypeSafeEmbeds]} 
       components={{
-        div: ({ className, id, children, ...props }) => {
-            if (className === 'match-widget-embed' && id) {
-                return <EmbeddedMatchCard matchId={id} />;
-            }
-            return <div className={className} id={id} {...props}>{children}</div>;
-        },
         a: ({ href, children, ...props }) => {
+          if (href?.startsWith('match-widget:')) {
+            const matchId = href.slice('match-widget:'.length);
+            return /^[a-zA-Z0-9-]{1,80}$/.test(matchId)
+              ? <EmbeddedMatchCard matchId={matchId} />
+              : null;
+          }
           const isInternal = href?.startsWith('/');
           const buttonClasses = "inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-lg font-black text-xs uppercase tracking-wider hover:bg-blue-600 hover:text-white transition shadow-sm border border-blue-100 my-1 no-underline group active:scale-95";
 
