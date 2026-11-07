@@ -22,7 +22,7 @@ export default function Footer() {
             </div>
 
             <p className="text-xs leading-relaxed max-w-xs text-slate-500">
-                The Ultimate Platform for Live Football, Sport News, live scores, analysis and breaking news. Join VIP to win monthly prizes in Our Predict & Win Game.
+                Independent football coverage, live scores, fixtures, match analysis and highlights from leagues around the world.
             </p>
 
             {/* Social Media Buttons */}
@@ -70,7 +70,6 @@ export default function Footer() {
                 <li><Link href="/matches" className="hover:text-white transition">Matches</Link></li>
                 <li><Link href="/news" className="hover:text-white transition">News</Link></li>
                 <li><Link href="/leaderboard" className="hover:text-white transition">Leaderboard</Link></li>
-                <li><Link href="/vip/upgrade" className="hover:text-yellow-400 transition font-bold text-yellow-500">VIP Upgrade</Link></li>
             </ul>
         </div>
 
@@ -91,7 +90,7 @@ export default function Footer() {
       <div className="border-t border-white/5 pt-8 text-center text-[10px] text-slate-600 leading-relaxed">
         <p>&copy; {currentYear} FactSport. All rights reserved.</p>
         <p className="mt-2 max-w-2xl mx-auto">
-            FactSport is not a bookmaker, betting site, or lottery operator. We provide sports information and a free-to-play prediction game for entertainment purposes only. We do not accept real money deposits.
+            FactSport provides sports information, original editorial coverage, live match data and free football features. Paid or premium services, where available, are governed by their own terms and are not part of this public editorial experience.
         </p>
       </div>
     </footer>
