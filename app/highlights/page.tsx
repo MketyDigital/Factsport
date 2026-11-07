@@ -234,7 +234,7 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
                     </div>
                 )}
 
-                 {/* Bottom Banner replacing BettingPromo */}
+                 {/* Reserved editorial ad slot: no bookmaker affiliate creative */}
                  <div className="mt-8">
                  </div>
 
