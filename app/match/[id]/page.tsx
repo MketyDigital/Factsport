@@ -51,7 +51,7 @@ const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET'
 
 const getSupabaseData = cache(async (id: string) => {
     const supabase = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    const { data, error } = await supabase.from('matches').select('id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, video_url, livestream_url, audio_url, widget_id, affiliate_link, venue, stage, match_group, match_events, stats, lineups, h2h, referees, predictor, displayClock').eq('id', id).single();
+    const { data, error } = await supabase.from('matches').select('id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, video_url, livestream_url, audio_url, widget_id, venue, stage, match_group, match_events, stats, lineups, h2h, referees, predictor, displayClock').eq('id', id).single();
     if (error) return null;
     return data;
 });
@@ -90,7 +90,7 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
     }
 
     let title = `${match.home_team} vs ${match.away_team} Predictions, H2H & Live Score | FactSport`;
-    let description = `Get expert predictions, pro betting analysis, starting lineups, and live updates for ${match.home_team} vs ${match.away_team} in the ${match.league}.`;
+    let description = `View match details, team form, starting lineups and live updates for ${match.home_team} vs ${match.away_team} in the ${match.league}.`;
     let label = 'UPCOMING MATCH';
 
     if (isLive) {
@@ -99,7 +99,7 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
         label = 'LIVE MATCH UPDATE';
     } else if (isFinished) {
         title = `${match.home_team} ${hScore}-${aScore} ${match.away_team} Result, Highlights & Match Stats`;
-        description = `Full time result: ${match.home_team} ${hScore}-${aScore} ${match.away_team}. Watch the highlights, review the pro analysis, and check the final match stats.`;
+        description = `Full time result: ${match.home_team} ${hScore}-${aScore} ${match.away_team}. Watch the highlights, review the match report, and check the final match stats.`;
         label = 'FULL TIME RESULT';
     }
 
@@ -233,7 +233,7 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
       '@context': 'https://schema.org',
       '@type': 'SportsEvent',
       name: `${dbData.home_team} vs ${dbData.away_team}`,
-      description: `Live scores, H2H stats, and predictions for ${dbData.home_team} vs ${dbData.away_team} in the ${dbData.league}.`,
+      description: `Live scores, H2H stats, and match information for ${dbData.home_team} vs ${dbData.away_team} in the ${dbData.league}.`,
       startDate: new Date(dbData.match_date).toISOString(),
       eventStatus: isUniversallyFinished ? 'https://schema.org/EventScheduled' : (isLive ? 'https://schema.org/EventLive' : 'https://schema.org/EventScheduled'),
       sport: 'Soccer',
@@ -316,7 +316,7 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
               {!hasWidget ? (
                   <MatchMobileHub matchId={dbData.id} espnId={dbData.espn_id} dbData={clientMatchData} />
               ) : (
-                  <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={sanitizeUrl(dbData.affiliate_link) || undefined} />
+                  <ScoreAxisWidget matchId={dbData.widget_id} />
               )}
 
               {!hasWidget && (
