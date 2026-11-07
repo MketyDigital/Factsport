@@ -1,7 +1,8 @@
 export const runtime = 'edge';
 export const revalidate = 3; 
 
-import { createClient } from '@supabase/supabase-js'; 
+import { createClient } from '@supabase/supabase-js';
+import { listPublicEditorialArticles } from '@/lib/adapters/postgres-editorial'; 
 import Link from "next/link";
 import { Metadata } from 'next';
 import { ArrowRight, Youtube, Newspaper, Award, Trophy } from "lucide-react";
@@ -57,8 +58,19 @@ async function getHomepageData(leagueFilter: string | undefined) {
 
   let matches: any[] = [];
 
-  const [newsRes, highlightsRes, featuredRes] = await Promise.all([
-    supabase.from('news').select('*').order('created_at', { ascending: false }).limit(25),
+  const usePostgresEditorial = process.env.FACTSPORT_EDITORIAL_BACKEND === 'postgres';
+  const [newsRows, highlightsRes, featuredRes] = await Promise.all([
+    usePostgresEditorial
+      ? listPublicEditorialArticles({ limit: 25 }).then(rows => rows.map((row: any) => ({
+          ...row,
+          body: row.excerpt || row.body_markdown,
+          image_url: row.hero_media_key ? `/api/media/${row.hero_media_key}` : null,
+          team_1_logo: null,
+          team_2_logo: null,
+          created_at: row.published_at,
+        })))
+      : supabase.from('news').select('*').order('created_at', { ascending: false }).limit(25)
+          .then(result => result.data || []),
     supabase.from('matches').select('*').not('video_url', 'is', null).neq('video_url', '').order('match_date', { ascending: false }).limit(5),
     supabase.from('matches').select('*').eq('is_featured', true).gte('match_date', wideWindowStart).lte('match_date', wideWindowEnd).order('match_date', { ascending: true }).limit(10)
   ]);
@@ -88,7 +100,7 @@ async function getHomepageData(leagueFilter: string | undefined) {
       }
   }
 
-  return { matches, news: newsRes.data || [], highlights: highlightsRes.data || [], featuredMatches: featuredRes.data || [] };
+  return { matches, news: newsRows || [], highlights: highlightsRes.data || [], featuredMatches: featuredRes.data || [] };
 }
 
 export default async function Home({ searchParams }: { searchParams: { league?: string } }) {
