@@ -58,6 +58,10 @@ test('domain adapters share one bounded Hyperdrive client per Worker isolate', (
   assert.ok(homepageAdapter.includes('getFactsportPostgres'));
   assert.ok(!matchesAdapter.includes('let client: ReturnType<typeof postgres>'));
   assert.ok(!editorialAdapter.includes('let client: ReturnType<typeof postgres>'));
+  const baseMatchProjection = matchesAdapter.match(/const MATCH_SELECT = '([^']+)'/)?.[1] || '';
+  assert.ok(baseMatchProjection.length > 0);
+  assert.ok(!baseMatchProjection.includes('season'));
+  assert.ok(matchesAdapter.includes('AND season ='));
 });
 
 test('full highlights page supports PostgreSQL pagination and rights-cleared source links', () => {
