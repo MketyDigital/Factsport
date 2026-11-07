@@ -7,6 +7,7 @@ on:
       - refactor/factsport-v2
     paths:
       - 'app/api/matches/**'
+      - 'app/api/match/**'
       - 'app/api/media/**'
       - 'app/api/settings/**'
       - 'app/api/standings/**'
@@ -23,6 +24,7 @@ on:
       - 'lib/adapters/postgres-client.ts'
       - 'lib/seo/**'
       - 'lib/adapters/postgres-matches.ts'
+      - 'app/lib/matchService.ts'
       - 'lib/adapters/factsport-cloudflare-bindings.ts'
       - 'types/factsport-cloudflare-workers.d.ts'
       - 'workers/factsport-schema-bootstrap.ts'
