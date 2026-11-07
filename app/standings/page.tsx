@@ -8,7 +8,6 @@ import { createClient } from '@supabase/supabase-js';
 import { listCurrentCompetitionStandings } from '@/lib/adapters/postgres-homepage';
 import { listPostgresLeagueResults } from '@/lib/adapters/postgres-matches';
 import { serializeJsonLd } from '@/lib/seo/json-ld';
-import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import LeagueLeaders from '@/app/components/LeagueLeaders'; 
 
 const LEAGUE_MAP: Record<string, string> = {
@@ -327,7 +326,6 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
                 </div>
 
                 <div className="mt-8">
-                    <AdsterraStandardBanner />
                 </div>
             </div>
         </div>
