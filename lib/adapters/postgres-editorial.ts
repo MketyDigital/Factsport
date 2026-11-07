@@ -67,6 +67,7 @@ export async function listPublicEditorialArticles(input: {
            is_headline, is_breaking, author_display_name, published_at,
            created_at, updated_at, canonical_url, hero_media_key,
            hero_media_content_type, hero_media_alt_text, hero_media_attribution,
+           origin, seo_title, seo_description, original_created_at, last_verified_at,
            (SELECT count(*)::integer FROM public.public_editorial_articles) AS total_count
     FROM public.public_editorial_articles
     ORDER BY published_at DESC, id DESC
