@@ -172,6 +172,12 @@ export async function approveAndPublishEditorial(articleId: string): Promise<Act
       if (!revision.changed_by) throw new Error('The revision has no verified author identity. Approval is blocked.');
       if (revision.changed_by === actorId || revision.submitted_by === actorId) throw new Error('A different administrator must review and approve the revision.');
       const snapshot = JSON.parse(revision.snapshot_text);
+      const revisionMedia = await tx`
+        SELECT placement, media_id, remove_media
+        FROM public.editorial_article_revision_media
+        WHERE revision_id=${revision.id}::uuid
+        FOR UPDATE
+      `;
       await tx`
         UPDATE public.editorial_articles SET
           title=${snapshot.title}, slug=${snapshot.slug}, excerpt=${snapshot.excerpt},
@@ -185,6 +191,45 @@ export async function approveAndPublishEditorial(articleId: string): Promise<Act
           updated_by=${actorId}::uuid, updated_at=now()
         WHERE id=${articleId}::uuid
       `;
+      for (const attachment of revisionMedia) {
+        const mediaId = attachment.media_id as string | null;
+        if (mediaId) {
+          const approvedAsset = await tx`
+            SELECT id FROM public.media_assets
+            WHERE id=${mediaId}::uuid
+              AND media_kind='image'
+              AND rights_status IN ('owned', 'licensed', 'editorial_exception')
+              AND rights_reviewed_by IS NOT NULL AND rights_reviewed_at IS NOT NULL
+              AND (usage_expires_at IS NULL OR usage_expires_at > now())
+            FOR SHARE
+          `;
+          if (!approvedAsset.length) throw new Error('A revision image no longer has valid rights approval. Publishing is blocked.');
+        }
+
+        if (attachment.placement === 'hero') {
+          await tx`DELETE FROM public.editorial_article_media WHERE article_id=${articleId}::uuid AND placement='hero'`;
+          if (mediaId && !attachment.remove_media) {
+            await tx`
+              INSERT INTO public.editorial_article_media (article_id, media_id, placement, position)
+              VALUES (${articleId}::uuid, ${mediaId}::uuid, 'hero', 0)
+            `;
+          }
+        } else {
+          await tx`
+            DELETE FROM public.editorial_article_team_media
+            WHERE article_id=${articleId}::uuid AND team_side=${attachment.placement}
+          `;
+          if (mediaId && !attachment.remove_media) {
+            await tx`
+              INSERT INTO public.editorial_article_team_media (article_id, team_side, media_id)
+              VALUES (${articleId}::uuid, ${attachment.placement}, ${mediaId}::uuid)
+            `;
+          }
+        }
+        if (mediaId && !attachment.remove_media) {
+          await tx`UPDATE public.media_assets SET is_public=true, updated_at=now() WHERE id=${mediaId}::uuid`;
+        }
+      }
       await tx`
         UPDATE public.editorial_article_revisions SET
           workflow_status='published', reviewed_by=${actorId}::uuid, reviewed_at=now(), published_at=now()
