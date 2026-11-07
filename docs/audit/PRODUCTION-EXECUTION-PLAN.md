@@ -253,7 +253,7 @@ The read-only PostgreSQL catalog audit [42265971339](https://github.com/MketyDig
 
 ### 2026-11-06 matches-page read-path staging work
 
-The v2 /matches page now uses the read-only PostgreSQL adapter for initial server rendering and team form when FACTSPORT_MATCHES_BACKEND=postgres. The load-more API uses timestamp+UUID keyset pagination, explicit public DTO projection, dynamic execution and private/no-store staging responses. The native vinext build, TypeScript checks, regression suite, protected /matches initial render, populated PostgreSQL matches API, deny-by-default routes and post-cache authenticated request all passed in [run 42283459376](https://github.com/MketyDigital/Factsport/actions/runs/42283459376). The app and health Hyperdrive clients are limited to one connection per isolate to respect the five-connection staging database. A follow-up run adds a direct assertion that a real timestamp+UUID cursor does not repeat the cursor row; keep full page parity open until that passes.
+The v2 /matches page now uses the read-only PostgreSQL adapter for initial server rendering and team form when FACTSPORT_MATCHES_BACKEND=postgres. The load-more API uses timestamp+UUID keyset pagination, explicit public DTO projection, dynamic execution and private/no-store staging responses. The native vinext build, TypeScript checks, regression suite, protected /matches initial render, populated PostgreSQL matches API, deny-by-default routes and post-cache authenticated request all passed in [run 42283459376](https://github.com/MketyDigital/Factsport/actions/runs/42283459376). App database operations now use request-scoped postgres.js clients (max one connection each) and close them after the operation; Hyperdrive manages backend pooling. This avoids stale I/O context from module-scoped client reuse. A follow-up run adds a direct assertion that a real timestamp+UUID cursor does not repeat the cursor row; keep full page parity open until that passes.
 
 ## Hyperdrive and role identity register
 
@@ -274,7 +274,7 @@ The complete acceptance contract is [V2-PARITY-REBRAND-ADSENSE-ACCEPTANCE.md](./
 - Committed additive migrations 0004-0006 for editorial/media, provenance/human review, featured matches, public highlights and season/group-aware standings. None is applied to Azure PostgreSQL.
 - Public news and article pages have opt-in PostgreSQL readers; article metadata now uses reviewed SEO/canonical/author fields. Raw HTML is sanitized and embedded video hosts are allowlisted.
 - Homepage now has opt-in PostgreSQL readers for news, match window, featured matches and rights-reviewed highlights. MiniStandings has a PostgreSQL path. HomeDashboardClient no longer queries Supabase directly for featured-match settings; `/api/settings` exposes a narrow server-side setting projection.
-- Shared domain adapters now use one bounded PostgreSQL client per Worker isolate.
+- Shared domain adapters now use a request-scoped PostgreSQL client per operation; Hyperdrive manages the underlying connection pool.
 - Remaining parity blockers: Bet of the Day's legacy `pro_analysis` model, public affiliate settings, full highlights and standings routes, CMS write/review/publish commands, media ingestion, social outbox, and live/browser journey evidence. No public page is declared complete.
 - New schema/readers are code-only until migrations are reviewed/applied in isolated staging and populated through approved new provider/CMS workflows. No legacy article content or match history has been imported; no production resources changed.
 
