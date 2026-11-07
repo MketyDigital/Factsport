@@ -6,6 +6,7 @@ import AuthProvider from "@/app/components/AuthProvider";
 import Footer from '@/app/components/Footer';
 import SiteHeader from '@/app/components/SiteHeader';
 import StickyAffiliateBanner from '@/app/components/StickyAffiliateBanner';
+import PublicMediaAnnouncement from '@/app/components/PublicMediaAnnouncement';
 import { GlobalMediaProvider } from '@/app/providers/GlobalMediaProvider';
 
 export const runtime = 'edge';
@@ -61,6 +62,7 @@ export default async function RootLayout({
   const publicMediaShell = (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
+      <PublicMediaAnnouncement />
       <main className="flex-grow">{children}</main>
       <Footer />
       <StickyAffiliateBanner />
