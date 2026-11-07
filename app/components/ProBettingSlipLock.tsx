@@ -1,54 +1,50 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { createClient } from '@/app/lib/supabase/client'; // 🟢 FIXED: Using your configured browser client to read the secure cookies!
 import { Lock, Sparkles, Send, ShieldCheck, BrainCircuit, ExternalLink, Target, Shield, Loader2 } from 'lucide-react';
 
 interface ProBettingSlipProps {
     homeTeam: string;
     awayTeam: string;
     status?: string;
-    proAnalysis?: any;
+    matchId: string;
 }
 
-export default function ProBettingSlipLock({ homeTeam, awayTeam, status = 'SCHEDULED', proAnalysis }: ProBettingSlipProps) {
+export default function ProBettingSlipLock({ matchId, homeTeam, awayTeam, status = 'SCHEDULED' }: ProBettingSlipProps) {
     const [isVIP, setIsVIP] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [hasAnalysis, setHasAnalysis] = useState(false);
+    const [proAnalysis, setProAnalysis] = useState<any>(null);
 
     useEffect(() => {
-        const checkVipStatus = async () => {
+        let active = true;
+        const loadAuthorizedAnalysis = async () => {
             try {
-                // 🟢 FIXED: It now knows exactly how to read your login session
-                const supabase = createClient();
-
-                const { data: { session } } = await supabase.auth.getSession();
-                
-                if (session?.user) {
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('is_vip')
-                        .eq('id', session.user.id)
-                        .single();
-                        
-                    if (profile?.is_vip) {
+                const response = await fetch(`/api/match/${encodeURIComponent(matchId)}/analysis`, { cache: 'no-store' });
+                const data = await response.json();
+                if (!active) return;
+                if (response.ok) {
+                    setHasAnalysis(data.hasAnalysis === true);
+                    if (data.analysis && typeof data.analysis === 'object') {
+                        setProAnalysis(data.analysis);
                         setIsVIP(true);
                     }
                 }
             } catch (error) {
-                console.error("Auth check failed:", error);
+                console.error('Analysis access check failed:', error);
             } finally {
-                setIsLoading(false);
+                if (active) setIsLoading(false);
             }
         };
-
-        checkVipStatus();
-    }, []);
+        void loadAuthorizedAnalysis();
+        return () => { active = false; };
+    }, [matchId]);
     
     const currentStatus = status?.toUpperCase() || '';
     const isScheduled = ['SCHEDULED', 'PRE'].includes(currentStatus);
     const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'ABD'].includes(currentStatus);
 
-    if (!proAnalysis || Object.keys(proAnalysis).length === 0) {
+    if (!hasAnalysis) {
         if (isScheduled) {
             return (
                 <div className="bg-white border border-slate-200 rounded-xl p-3 text-center shadow-sm flex flex-col items-center justify-center">
@@ -62,7 +58,32 @@ export default function ProBettingSlipLock({ homeTeam, awayTeam, status = 'SCHED
                 </div>
             );
         }
-        return null; 
+        return null;
+    }
+
+    if (!isVIP || !proAnalysis) {
+        return (
+            <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-slate-900 to-[#0a1428] p-2 flex justify-between items-center border-b border-slate-800">
+                    <div className="flex items-center gap-1.5">
+                        <BrainCircuit className="text-yellow-500" size={12}/>
+                        <h3 className="text-white font-black uppercase tracking-widest text-[9px]">Verified AI Analysis</h3>
+                    </div>
+                    <div className="flex items-center gap-1 bg-yellow-500/20 text-yellow-300 px-1.5 py-0.5 rounded text-[7px] font-bold border border-yellow-500/30">
+                        <Lock className="w-2.5 h-2.5" /> VIP
+                    </div>
+                </div>
+                <div className="p-4 text-center flex flex-col items-center">
+                    {isLoading ? <Loader2 className="w-8 h-8 text-yellow-500 animate-spin mb-2" /> : <Lock className="w-8 h-8 text-yellow-500 mb-2" />}
+                    <h4 className="font-black text-slate-900 uppercase tracking-tighter text-xs mb-1">Pro Analysis Locked</h4>
+                    <p className="text-[9px] text-slate-600 font-bold mb-3 max-w-[220px]">Unlock the primary bet and tactical data with VIP access.</p>
+                    <div className="flex flex-row gap-2 w-full max-w-[260px]">
+                        <Link href="/vip/upgrade" className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-600 text-black py-2 rounded text-[9px] font-black uppercase tracking-widest shadow-sm flex items-center justify-center gap-1"><Lock size={10} /> Unlock</Link>
+                        <a href="https://t.me/factsportlive" target="_blank" rel="noopener noreferrer" className="flex-1 bg-[#229ED9] text-white py-2 rounded text-[9px] font-black uppercase tracking-widest shadow-sm flex items-center justify-center gap-1"><Send size={10} /> Telegram</a>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -81,7 +102,7 @@ export default function ProBettingSlipLock({ homeTeam, awayTeam, status = 'SCHED
             </div>
 
             <div className="p-2.5 relative group bg-slate-50/50">
-                <div className={`space-y-2 transition-all duration-300 ${!isVIP ? 'filter blur-[4px] opacity-40 select-none pointer-events-none' : ''}`}>
+                <div className="space-y-2">
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
                         <div className="bg-white border border-blue-200 rounded-md p-2 shadow-sm relative overflow-hidden flex justify-between items-center">
@@ -121,26 +142,7 @@ export default function ProBettingSlipLock({ homeTeam, awayTeam, status = 'SCHED
                     </div>
                 </div>
 
-                {!isVIP && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[3px] z-10 p-2">
-                        {isLoading ? (
-                            <>
-                                <Loader2 className="w-8 h-8 text-yellow-500 animate-spin mb-2" />
-                                <h4 className="font-black text-slate-900 uppercase tracking-tighter text-xs mb-0.5">Verifying Access...</h4>
-                            </>
-                        ) : (
-                            <>
-                                <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center shadow-md mb-1.5"><Lock className="w-3.5 h-3.5 text-black" /></div>
-                                <h4 className="font-black text-slate-900 uppercase tracking-tighter text-xs mb-0.5">Pro Analysis Locked</h4>
-                                <p className="text-[8px] text-slate-700 font-bold mb-2 text-center max-w-[200px] leading-tight">Unlock primary bet & tactical data.</p>
-                                <div className="flex flex-row gap-1.5 w-full max-w-[240px]">
-                                    <Link href="/vip/upgrade" className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-600 text-black py-1.5 rounded text-[8px] font-black uppercase tracking-widest shadow-sm flex items-center justify-center gap-1"><Lock size={10} /> Unlock</Link>
-                                    <a href="https://t.me/factsportlive" target="_blank" rel="noopener noreferrer" className="flex-1 bg-[#229ED9] text-white py-1.5 rounded text-[8px] font-black uppercase tracking-widest shadow-sm flex items-center justify-center gap-1"><Send size={10} /> Telegram</a>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                )}
+
             </div>
         </div>
     );
