@@ -12,8 +12,6 @@ import { ChevronLeft, Calendar, Clock, ArrowRight, Trophy, Flame, Zap, ChevronRi
 import NewsArtwork from '@/app/components/NewsArtwork'; 
 import ShareButton from '@/app/components/ShareButton';
 import MarkdownRenderer from '@/app/components/MarkdownRenderer'; 
-import BettingPromo from '@/app/components/BettingPromo';
-import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
 const getArticleData = cache(async (slug: string) => {
   if (process.env.FACTSPORT_EDITORIAL_BACKEND === 'postgres') {
@@ -132,7 +130,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
             </h1>
             
             <div className="mb-4">
-                <AdsterraStandardBanner />
             </div>
             
             <div className="flex items-center gap-6 text-xs font-bold text-slate-300 uppercase tracking-widest">
@@ -148,7 +145,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
             <div className="bg-white">
 
                 <div className="mb-8 w-full max-w-3xl overflow-hidden rounded-xl bg-slate-50 border border-slate-100 shadow-sm max-h-[90px]">
-                    <BettingPromo affiliateLink={null} />
                 </div>
 
                 <div className="prose prose-lg prose-slate max-w-none text-slate-800 leading-relaxed md:leading-loose font-medium prose-headings:font-black prose-headings:tracking-tight prose-a:text-blue-600 prose-img:rounded-2xl prose-img:shadow-lg">
@@ -158,7 +154,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                             
                             {part2 && (
                                 <div className="my-8">
-                                    <AdsterraStandardBanner />
                                 </div>
                             )}
 
@@ -175,7 +170,6 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                 </div>
 
                 <div className="mt-6">
-                    <AdsterraStandardBanner />
                 </div>
 
             </div> 
