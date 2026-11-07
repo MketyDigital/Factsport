@@ -13,7 +13,8 @@ function safePlaybackUrl(value: unknown): string | null {
   if (typeof value !== 'string' || !value.trim()) return null;
   if (value.trim() === 'streamio') return 'streamio';
   try {
-    const url = new URL(value.trim());
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://factsport.com';
+    const url = new URL(value.trim(), baseUrl);
     if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return null;
     const host = url.hostname.toLowerCase();
     if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.local')) return null;
