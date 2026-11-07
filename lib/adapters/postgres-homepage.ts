@@ -134,3 +134,32 @@ export async function listPublicMatchHighlightsPage(input: {
     thumbnail_url: row.thumbnail_media_key ? `/api/media/${row.thumbnail_media_key}` : null,
   }));
 }
+
+export async function listCurrentCompetitionPlayerLeaders(
+  leagueCode: string,
+  stat: 'goals' | 'assists',
+  limit = 5
+) {
+  if (!/^[A-Z0-9_-]{1,16}$/.test(leagueCode)) throw new Error('Invalid league code');
+  if (stat !== 'goals' && stat !== 'assists') throw new Error('Invalid player statistic');
+  if (!Number.isInteger(limit) || limit < 1 || limit > 10) throw new Error('Invalid player leader limit');
+  const sql = getFactsportPostgres();
+  if (stat === 'goals') {
+    return sql`
+      SELECT player_id, player_name, team_name, team_short_name, team_crest,
+             goals AS value, assists, source_updated_at
+      FROM public.public_competition_player_stats
+      WHERE league_code = ${leagueCode} AND goals > 0
+      ORDER BY goals DESC, assists DESC, player_name ASC, player_id ASC
+      LIMIT ${limit}
+    `;
+  }
+  return sql`
+    SELECT player_id, player_name, team_name, team_short_name, team_crest,
+           assists AS value, goals, source_updated_at
+    FROM public.public_competition_player_stats
+    WHERE league_code = ${leagueCode} AND assists > 0
+    ORDER BY assists DESC, goals DESC, player_name ASC, player_id ASC
+    LIMIT ${limit}
+  `;
+}
