@@ -25,9 +25,20 @@ import GoalRushTicker from '@/app/components/GoalRushTicker';
 
 const sanitizeUrl = (url: string | null | undefined) => {
     if (!url) return null;
+    const trimmed = url.trim();
+    if (!trimmed || trimmed.toLowerCase() === 'streamio') return trimmed || null;
+    if (trimmed.startsWith('//') || trimmed.includes(String.fromCharCode(92))) return null;
+    const rawPath = trimmed.split(/[?#]/, 1)[0];
+    if (rawPath.split('/').some(segment => segment === '..')) return null;
     try {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://factsport.com';
-        const parsed = new URL(url.trim(), baseUrl);
+        let parsed: URL;
+        try {
+            parsed = new URL(trimmed);
+        } catch {
+            parsed = new URL(trimmed, 'https://factsport.invalid');
+            if (parsed.origin !== 'https://factsport.invalid') return null;
+            return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+        }
         if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) return null;
         return parsed.toString();
     } catch {
@@ -35,7 +46,7 @@ const sanitizeUrl = (url: string | null | undefined) => {
     }
 };
 
-const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
+const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'HALF TIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES', 'PAUSED', 'SUSPENDED'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
 const getSupabaseData = cache(async (id: string) => {
@@ -59,7 +70,7 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
     if (!match) return { title: 'Match Not Found | FactSport' };
 
     const status = (match.status || '').toUpperCase();
-    const isLive = !SCHEDULED_STATUSES.includes(status) && !FINISHED_STATUSES.includes(status);
+    const isLive = LIVE_STATUSES.includes(status);
     const isFinished = FINISHED_STATUSES.includes(status);
     
     let hScore = match.home_score || 0;
@@ -207,7 +218,7 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
   
   const currentStatus = (dbData.status || '').toUpperCase();
   const isFinishedApi = FINISHED_STATUSES.includes(currentStatus);
-  const isLive = !SCHEDULED_STATUSES.includes(currentStatus) && !isFinishedApi;
+  const isLive = LIVE_STATUSES.includes(currentStatus);
   
   // Raw media URLs remain server-side; the playback API enforces the unlock time.
   const isUniversallyFinished = isFinishedApi;

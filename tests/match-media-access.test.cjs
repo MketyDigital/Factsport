@@ -18,6 +18,10 @@ test('match page does not serialize raw stream or VIP analysis data into client 
   assert.doesNotMatch(page, /mediaUrl=\{activeVideoUrl\}|mediaUrl=\{activeAudioUrl\}/);
   assert.doesNotMatch(page, /pro_analysis|campaign_id/);
   assert.match(page, /mediaUnlocked = isFinished \|\| isLive/);
+  assert.match(page, /const LIVE_STATUSES = \[/);
+  assert.doesNotMatch(page, /!SCHEDULED_STATUSES\.includes/);
+  assert.match(page, /trimmed\.toLowerCase\(\) === 'streamio'/);
+  assert.match(page, /new URL\(trimmed, 'https:\/\/factsport\.invalid'\)/);
   assert.match(page, /announcement_text, announcement_link, announcement_enabled/);
 });
 
