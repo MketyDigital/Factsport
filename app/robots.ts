@@ -1,4 +1,5 @@
 import { MetadataRoute } from 'next'
+import { headers } from 'next/headers'
 
 const SITE_URL = 'https://factsport.com'
 const PRIVATE_PATHS = [
@@ -7,7 +8,11 @@ const PRIVATE_PATHS = [
   '/studio', '/settings', '/how-to-play', '/leaderboard',
 ]
 
-export default function robots(): MetadataRoute.Robots {
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  const privateHost = (process.env.FACTSPORT_PRIVATE_PRODUCT_HOST || '').trim().toLowerCase();
+  const requestHeaders = await headers();
+  const requestHost = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').split(',')[0].trim().toLowerCase().split(':')[0];
+  if (privateHost && requestHost === privateHost) return { rules: { userAgent: '*', disallow: '/' } };
   // Cloudflare Workers does not guarantee Vercel's VERCEL_ENV variable.
   // Indexing is disabled unless the owner explicitly enables it after the
   // V2 PostgreSQL sitemap, public content and live host have been verified.
