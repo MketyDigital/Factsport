@@ -16,6 +16,7 @@ const STATIC_ROUTES = [
   ['/terms', 0.3, 'yearly'],
   ['/disclaimer', 0.3, 'yearly'],
   ['/about', 0.4, 'yearly'],
+  ['/contact', 0.3, 'yearly'],
   ['/editorial-standards', 0.4, 'yearly'],
   ['/advertising-policy', 0.3, 'yearly'],
 ] as const
