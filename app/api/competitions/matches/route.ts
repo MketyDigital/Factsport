@@ -22,6 +22,9 @@ export async function GET(request: Request) {
     if ((env.FACTSPORT_MATCHES_BACKEND ?? process.env.FACTSPORT_MATCHES_BACKEND) === 'postgres') {
       matches = await listPostgresLeagueMatches(league, 500);
     } else {
+      if (env.FACTSPORT_ENVIRONMENT !== 'development') {
+        return NextResponse.json({ error: 'V2 PostgreSQL competition reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+      }
       const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
       const { data, error } = await supabase
         .from('matches')
