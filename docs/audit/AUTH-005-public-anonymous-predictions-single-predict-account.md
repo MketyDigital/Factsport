@@ -1,7 +1,7 @@
 # AUTH-005 — Public anonymous predictions and one central Predict account
 
 **Date:** 2026-11-07  
-**Status:** owner-approved architecture; implementation starts on `refactor/factsport-v2`.  
+**Status:** owner-approved architecture; first V2 schema slice committed; API/runtime integration remains in progress.  
 **Public host:** `https://factsport.com`  
 **Registered account host:** `https://predict.factsport.com`  
 **Scope:** staging/code only. No production DNS, database cutover, identity-provider changes or destructive data migration.
@@ -105,3 +105,14 @@ Do not implement browser-side direct writes, trust a client clock, or use an ema
 - All existing VIP/premium/prize capabilities and transactional records remain preserved.
 - Newsletter consent, if implemented later, is separate, explicit and auditable.
 - Public and private app deployments, data access, ad configuration and route policies are independently tested.
+
+
+## 10. First implementation slice (2026-11-07)
+
+- Added `db/migrations/0003_factsport_public_predictions.sql` with pseudonymous visitor participants, prediction rows, claim audit events and explicit same-match conflict records.
+- Anonymous participant identity is represented by a 256-bit lowercase SHA-256 token hash; no email field, marketing field or direct public database grant is introduced.
+- Predictions have database-level participant/match uniqueness, registered-user/match uniqueness, allowed-outcome checks, paired nonnegative score checks, kickoff lock timestamp, campaign snapshot and default `is_eligible_for_prize = false`.
+- Claim conflicts have explicit records so a same-match collision cannot silently overwrite either prediction.
+- Added `tests/prediction-schema.test.cjs` and wired it into the isolated V2 verification workflow.
+- **Not yet applied to Azure PostgreSQL.** The migration is checked in only. The current Hyperdrive application runtime is read-only; the dedicated prediction API writer role/Hyperdrive, API route, visitor cookie, claim transaction and PredictionBoard migration must be implemented and verified before enabling public submissions.
+- No production database, DNS, Worker route, identity provider or legacy Supabase record was changed.
