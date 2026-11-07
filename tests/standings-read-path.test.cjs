@@ -14,7 +14,9 @@ test('standings page reads season-aware PostgreSQL tables and completed results 
   assert.ok(page.includes("FACTSPORT_COMPETITIONS_BACKEND === 'postgres'"));
   assert.ok(page.includes('listCurrentCompetitionStandings'));
   assert.ok(page.includes('listPostgresLeagueResults'));
-  assert.ok(page.includes('dbStandings[0]?.season'));
+  assert.ok(page.includes('dbStandings[0].season'));
+  assert.ok(page.indexOf('dbStandings = await listCurrentCompetitionStandings') < page.indexOf('dbMatches = await listPostgresLeagueResults'));
+  assert.ok(page.includes('dbStandings[0].league_name'));
   assert.ok(matchesAdapter.includes('AND season ='));
   assert.ok(page.includes('serializeJsonLd(jsonLd)'));
 });
