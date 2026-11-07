@@ -5,6 +5,7 @@ export const fetchCache = 'force-no-store';
 
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { readVerifiedFullTimeScore } from '@/lib/football-data-score.cjs';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -126,8 +127,12 @@ export async function GET(request: Request) {
                     const isDbLive = ['LIVE', 'HT', '1H', '2H', 'ET', 'P'].includes(dbMatch.status);
                     const hasEspnId = !!dbMatch.espn_id;
                     
-                    const fdHomeScore = m.score?.fullTime?.home ?? 0;
-                    const fdAwayScore = m.score?.fullTime?.away ?? 0;
+                    const verifiedFullTimeScore = readVerifiedFullTimeScore(m.score);
+                    // A missing provider score is unknown, never a synthetic 0-0.
+                    // Do not transition a fixture to FT until both final scores exist.
+                    const effectiveStatus = fdStatusMapped === 'FT' && !verifiedFullTimeScore
+                        ? dbMatch.status
+                        : fdStatusMapped;
                     let shouldUpdateMatch = false;
 
                     if (['LIVE', 'HT', 'FT', 'FINISHED', 'AWARDED'].includes(fdStatusMapped) || isDbLive) {
@@ -136,29 +141,34 @@ export async function GET(request: Request) {
 
                     if (hasEspnId) {
                         // Strict limitation: Only act if enforcing missing FT records. No touching of active/scheduled match states.
-                        if (fdStatusMapped === 'FT') {
-                            if (dbMatch.status !== 'FT' || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
+                        if (fdStatusMapped === 'FT' && verifiedFullTimeScore) {
+                            if (dbMatch.status !== 'FT' || dbMatch.home_score !== verifiedFullTimeScore.home || dbMatch.away_score !== verifiedFullTimeScore.away) {
                                 shouldUpdateMatch = true;
                                 leaguesNeedingStandingsUpdate.add(compCode); 
                             }
                         }
                     } else {
                         // Standard logic strictly for records not tracked by ESPN ID
-                        if (dbMatch.status !== fdStatusMapped || dbMatch.home_score !== fdHomeScore || dbMatch.away_score !== fdAwayScore) {
+                        if (dbMatch.status !== effectiveStatus || (verifiedFullTimeScore &&
+                            (dbMatch.home_score !== verifiedFullTimeScore.home || dbMatch.away_score !== verifiedFullTimeScore.away))) {
                             shouldUpdateMatch = true;
                         }
                     }
 
                     if (shouldUpdateMatch) {
-                        await supabase.from('matches').update({ 
-                            home_score: fdHomeScore, 
-                            away_score: fdAwayScore, 
-                            status: fdStatusMapped, 
-                            updated_at: new Date().toISOString() 
-                        }).eq('api_id', m.id);
-                        
-                        matchesFinalized++; 
-                        logs.push(`Cron Sync: ${m.id} (${compCode}) -> ${fdStatusMapped} ${fdHomeScore}-${fdAwayScore}`);
+                        const matchUpdate: Record<string, unknown> = {
+                            status: effectiveStatus,
+                            updated_at: new Date().toISOString(),
+                        };
+                        if (verifiedFullTimeScore) {
+                            matchUpdate.home_score = verifiedFullTimeScore.home;
+                            matchUpdate.away_score = verifiedFullTimeScore.away;
+                        }
+                        await supabase.from('matches').update(matchUpdate).eq('api_id', m.id);
+
+                        matchesFinalized++;
+                        logs.push(`Cron Sync: ${m.id} (${compCode}) -> ${effectiveStatus}` +
+                            (verifiedFullTimeScore ? ` ${verifiedFullTimeScore.home}-${verifiedFullTimeScore.away}` : ' (score unavailable; preserved)'));
                     }
                 }
             }
