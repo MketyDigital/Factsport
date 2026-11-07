@@ -9,6 +9,7 @@ import { listCurrentCompetitionStandings } from '@/lib/adapters/postgres-homepag
 import { listPostgresLeagueResults } from '@/lib/adapters/postgres-matches';
 import { serializeJsonLd } from '@/lib/seo/json-ld';
 import LeagueLeaders from '@/app/components/LeagueLeaders'; 
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
 const LEAGUE_MAP: Record<string, string> = {
     'Premier League': 'PL',
@@ -326,6 +327,7 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
                 </div>
 
                 <div className="mt-8">
+                    <AdsterraStandardBanner />
                 </div>
             </div>
         </div>
