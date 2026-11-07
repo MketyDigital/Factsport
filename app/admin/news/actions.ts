@@ -23,7 +23,7 @@ function safeHttpUrl(value: string | undefined): string | null {
 async function getActorId(sql: any, authId: string): Promise<string | null> {
   const rows = await sql\`
     SELECT user_id FROM public.external_identities
-    WHERE subject = \${authId}
+    WHERE subject = ${authId}
     ORDER BY created_at DESC
     LIMIT 2
   \`;
@@ -63,27 +63,27 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
       let articleId = input.id || null;
       let currentStatus = 'draft';
       if (articleId) {
-        const rows = await tx\`SELECT id, status FROM public.editorial_articles WHERE id=\${articleId}::uuid FOR UPDATE\`;
+        const rows = await tx\`SELECT id, status FROM public.editorial_articles WHERE id=${articleId}::uuid FOR UPDATE\`;
         if (!rows[0] || rows[0].status === 'archived') throw new Error('Article was not found or has been archived.');
         currentStatus = rows[0].status;
         // Published content is immutable until its replacement revision is approved.
         if (currentStatus !== 'published') {
           await tx\`
             UPDATE public.editorial_articles SET
-              title=\${snapshot.title}, slug=\${snapshot.slug}, excerpt=\${snapshot.excerpt},
-              body_markdown=\${snapshot.body_markdown}, category=\${snapshot.category},
-              team_1_name=\${snapshot.team_1_name}, team_2_name=\${snapshot.team_2_name}, tags=\${snapshot.tags},
-              seo_title=\${snapshot.seo_title}, seo_description=\${snapshot.seo_description},
-              canonical_url=\${snapshot.canonical_url}, author_display_name=\${snapshot.author_display_name},
-              is_headline=\${snapshot.is_headline}, is_breaking=\${snapshot.is_breaking},
+              title=${snapshot.title}, slug=${snapshot.slug}, excerpt=${snapshot.excerpt},
+              body_markdown=${snapshot.body_markdown}, category=${snapshot.category},
+              team_1_name=${snapshot.team_1_name}, team_2_name=${snapshot.team_2_name}, tags=${snapshot.tags},
+              seo_title=${snapshot.seo_title}, seo_description=${snapshot.seo_description},
+              canonical_url=${snapshot.canonical_url}, author_display_name=${snapshot.author_display_name},
+              is_headline=${snapshot.is_headline}, is_breaking=${snapshot.is_breaking},
               status='draft', review_status='pending', reviewed_by=NULL, reviewed_at=NULL,
-              published_at=NULL, updated_by=\${actorId}::uuid, updated_at=now()
-            WHERE id=\${articleId}::uuid
+              published_at=NULL, updated_by=${actorId}::uuid, updated_at=now()
+            WHERE id=${articleId}::uuid
           \`;
         }
         await tx\`
           UPDATE public.editorial_article_revisions SET workflow_status='superseded'
-          WHERE article_id=\${articleId}::uuid AND workflow_status IN ('draft','in_review')
+          WHERE article_id=${articleId}::uuid AND workflow_status IN ('draft','in_review')
         \`;
       } else {
         const rows = await tx\`
@@ -92,22 +92,22 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
             canonical_url, author_display_name, is_headline, is_breaking, status, review_status,
             origin, created_by, updated_by
           ) VALUES (
-            \${snapshot.title}, \${snapshot.slug}, \${snapshot.excerpt}, \${snapshot.body_markdown},
-            \${snapshot.category}, \${snapshot.team_1_name}, \${snapshot.team_2_name}, \${snapshot.tags}, \${snapshot.seo_title}, \${snapshot.seo_description},
-            \${snapshot.canonical_url}, \${snapshot.author_display_name}, \${snapshot.is_headline},
-            \${snapshot.is_breaking}, 'draft', 'pending', 'manual', \${actorId}::uuid, \${actorId}::uuid
+            ${snapshot.title}, ${snapshot.slug}, ${snapshot.excerpt}, ${snapshot.body_markdown},
+            ${snapshot.category}, ${snapshot.team_1_name}, ${snapshot.team_2_name}, ${snapshot.tags}, ${snapshot.seo_title}, ${snapshot.seo_description},
+            ${snapshot.canonical_url}, ${snapshot.author_display_name}, ${snapshot.is_headline},
+            ${snapshot.is_breaking}, 'draft', 'pending', 'manual', ${actorId}::uuid, ${actorId}::uuid
           ) RETURNING id
         \`;
         articleId = rows[0].id;
       }
 
-      const revisions = await tx\`SELECT COALESCE(MAX(revision_number), 0)::integer AS current FROM public.editorial_article_revisions WHERE article_id=\${articleId}::uuid\`;
+      const revisions = await tx\`SELECT COALESCE(MAX(revision_number), 0)::integer AS current FROM public.editorial_article_revisions WHERE article_id=${articleId}::uuid\`;
       await tx\`
         INSERT INTO public.editorial_article_revisions
           (article_id, revision_number, snapshot, changed_by, change_note, workflow_status)
         VALUES (
-          \${articleId}::uuid, \${Number(revisions[0].current) + 1},
-          \${JSON.stringify(snapshot)}::jsonb, \${actorId}::uuid, 'Editorial revision saved', 'draft'
+          ${articleId}::uuid, ${Number(revisions[0].current) + 1},
+          ${JSON.stringify(snapshot)}::jsonb, ${actorId}::uuid, 'Editorial revision saved', 'draft'
         )
       \`;
       return articleId!;
@@ -128,21 +128,21 @@ export async function submitEditorialForReview(articleId: string): Promise<Actio
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
       const actorId = await getActorId(tx, authorization.user.id);
       if (!actorId) throw new Error('This administrator has no unique Factsport domain identity mapping.');
-      const articles = await tx\`SELECT id, status FROM public.editorial_articles WHERE id=\${articleId}::uuid FOR UPDATE\`;
+      const articles = await tx\`SELECT id, status FROM public.editorial_articles WHERE id=${articleId}::uuid FOR UPDATE\`;
       if (!articles.length || articles[0].status === 'archived') throw new Error('Article is unavailable.');
       const revisions = await tx\`
         SELECT id FROM public.editorial_article_revisions
-        WHERE article_id=\${articleId}::uuid AND workflow_status='draft'
+        WHERE article_id=${articleId}::uuid AND workflow_status='draft'
         ORDER BY revision_number DESC LIMIT 1 FOR UPDATE
       \`;
       if (!revisions.length) throw new Error('Save a new draft revision before submitting for review.');
       await tx\`
         UPDATE public.editorial_article_revisions SET
-          workflow_status='in_review', submitted_by=\${actorId}::uuid, submitted_at=now()
-        WHERE id=\${revisions[0].id}::uuid
+          workflow_status='in_review', submitted_by=${actorId}::uuid, submitted_at=now()
+        WHERE id=${revisions[0].id}::uuid
       \`;
       if (articles[0].status !== 'published') {
-        await tx\`UPDATE public.editorial_articles SET status='in_review', review_status='pending', updated_at=now() WHERE id=\${articleId}::uuid\`;
+        await tx\`UPDATE public.editorial_articles SET status='in_review', review_status='pending', updated_at=now() WHERE id=${articleId}::uuid\`;
       }
     }));
     revalidateEditorial(); return { success: true };
@@ -159,12 +159,12 @@ export async function approveAndPublishEditorial(articleId: string): Promise<Act
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
       const actorId = await getActorId(tx, authorization.user.id);
       if (!actorId) throw new Error('This administrator has no unique Factsport domain identity mapping. Publishing is blocked.');
-      const articles = await tx\`SELECT id, status FROM public.editorial_articles WHERE id=\${articleId}::uuid FOR UPDATE\`;
+      const articles = await tx\`SELECT id, status FROM public.editorial_articles WHERE id=${articleId}::uuid FOR UPDATE\`;
       if (!articles.length || articles[0].status === 'archived') throw new Error('Article is unavailable.');
       const revisions = await tx\`
         SELECT id, changed_by, submitted_by, snapshot::text AS snapshot_text
         FROM public.editorial_article_revisions
-        WHERE article_id=\${articleId}::uuid AND workflow_status='in_review'
+        WHERE article_id=${articleId}::uuid AND workflow_status='in_review'
         ORDER BY revision_number DESC LIMIT 1 FOR UPDATE
       \`;
       const revision = revisions[0];
@@ -174,21 +174,21 @@ export async function approveAndPublishEditorial(articleId: string): Promise<Act
       const snapshot = JSON.parse(revision.snapshot_text);
       await tx\`
         UPDATE public.editorial_articles SET
-          title=\${snapshot.title}, slug=\${snapshot.slug}, excerpt=\${snapshot.excerpt},
-          body_markdown=\${snapshot.body_markdown}, category=\${snapshot.category},
-          team_1_name=\${snapshot.team_1_name}, team_2_name=\${snapshot.team_2_name}, tags=\${snapshot.tags},
-          seo_title=\${snapshot.seo_title}, seo_description=\${snapshot.seo_description},
-          canonical_url=\${snapshot.canonical_url}, author_display_name=\${snapshot.author_display_name},
-          is_headline=\${snapshot.is_headline}, is_breaking=\${snapshot.is_breaking},
-          status='published', review_status='approved', reviewed_by=\${actorId}::uuid,
+          title=${snapshot.title}, slug=${snapshot.slug}, excerpt=${snapshot.excerpt},
+          body_markdown=${snapshot.body_markdown}, category=${snapshot.category},
+          team_1_name=${snapshot.team_1_name}, team_2_name=${snapshot.team_2_name}, tags=${snapshot.tags},
+          seo_title=${snapshot.seo_title}, seo_description=${snapshot.seo_description},
+          canonical_url=${snapshot.canonical_url}, author_display_name=${snapshot.author_display_name},
+          is_headline=${snapshot.is_headline}, is_breaking=${snapshot.is_breaking},
+          status='published', review_status='approved', reviewed_by=${actorId}::uuid,
           reviewed_at=now(), published_at=COALESCE(published_at, now()),
-          updated_by=\${actorId}::uuid, updated_at=now()
-        WHERE id=\${articleId}::uuid
+          updated_by=${actorId}::uuid, updated_at=now()
+        WHERE id=${articleId}::uuid
       \`;
       await tx\`
         UPDATE public.editorial_article_revisions SET
-          workflow_status='published', reviewed_by=\${actorId}::uuid, reviewed_at=now(), published_at=now()
-        WHERE id=\${revision.id}::uuid
+          workflow_status='published', reviewed_by=${actorId}::uuid, reviewed_at=now(), published_at=now()
+        WHERE id=${revision.id}::uuid
       \`;
     }));
     revalidateEditorial(); return { success: true };
@@ -205,7 +205,7 @@ export async function archiveEditorialArticle(articleId: string): Promise<Action
   try {
     const changed = await withFactsportEditorialPostgres(async sql => sql\`
       UPDATE public.editorial_articles SET status='archived', updated_at=now()
-      WHERE id=\${articleId}::uuid AND status <> 'archived' RETURNING id
+      WHERE id=${articleId}::uuid AND status <> 'archived' RETURNING id
     \`);
     if (!changed.length) return { success: false, error: 'Article was not found or is already archived.' };
     revalidateEditorial(); return { success: true };
