@@ -6,6 +6,7 @@ const path = require('node:path');
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 const socialSql = read('db/migrations/0009_factsport_media_social_publishing.sql');
 const grantsSql = read('db/migrations/0010_factsport_editorial_writer_grants.sql');
+const revisionSql = read('db/migrations/0011_factsport_editorial_revision_workflow.sql');
 const actions = read('app/admin/news/actions.ts');
 const page = read('app/admin/news/page.tsx');
 const adapter = read('lib/adapters/postgres-client.ts');
@@ -61,4 +62,16 @@ test('CMS does not publish social content as articles or merge Prediction respon
   assert.ok(!actions.includes('prediction'));
   assert.ok(!actions.includes('settlement'));
   assert.ok(!actions.includes('winner'));
+});
+
+
+test('published article changes are versioned and reviewed without replacing live copy early', () => {
+  assert.match(revisionSql, /workflow_status IN \('draft', 'in_review', 'approved', 'published', 'rejected', 'superseded'\)/i);
+  assert.match(revisionSql, /submitted_by uuid REFERENCES public\.app_users/i);
+  assert.match(revisionSql, /reviewed_by uuid REFERENCES public\.app_users/i);
+  assert.match(actions, /Published content is immutable until its replacement revision is approved/i);
+  assert.match(actions, /workflow_status='superseded'/i);
+  assert.match(actions, /workflow_status='in_review'/i);
+  assert.match(actions, /workflow_status='published'/i);
+  assert.match(page, /FROM public\.editorial_article_revisions/i);
 });
