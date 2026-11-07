@@ -162,7 +162,7 @@ export async function approveAndPublishEditorial(articleId: string): Promise<Act
       const articles = await tx\`SELECT id, status FROM public.editorial_articles WHERE id=\${articleId}::uuid FOR UPDATE\`;
       if (!articles.length || articles[0].status === 'archived') throw new Error('Article is unavailable.');
       const revisions = await tx\`
-        SELECT id, changed_by, snapshot::text AS snapshot_text
+        SELECT id, changed_by, submitted_by, snapshot::text AS snapshot_text
         FROM public.editorial_article_revisions
         WHERE article_id=\${articleId}::uuid AND workflow_status='in_review'
         ORDER BY revision_number DESC LIMIT 1 FOR UPDATE
@@ -170,7 +170,7 @@ export async function approveAndPublishEditorial(articleId: string): Promise<Act
       const revision = revisions[0];
       if (!revision) throw new Error('No editorial revision is awaiting approval.');
       if (!revision.changed_by) throw new Error('The revision has no verified author identity. Approval is blocked.');
-      if (revision.changed_by === actorId) throw new Error('A different administrator must approve the article.');
+      if (revision.changed_by === actorId || revision.submitted_by === actorId) throw new Error('A different administrator must review and approve the revision.');
       const snapshot = JSON.parse(revision.snapshot_text);
       await tx\`
         UPDATE public.editorial_articles SET
