@@ -77,3 +77,14 @@ User supplied metadata listing for 79 articles not covered by the two original A
 2. Verify actual author provenance for 42 editorial candidates with editorial review. Do not infer originality from title, image presence, or default author.
 3. Independently preserve backup of all 366 articles until migration decisions signed off; keep source DB intact.
 4. Request aggregate counts by slug group + image host if needed, but no automatic publication to GitHub.
+
+
+## V2 implementation update — 2026-11-07
+
+- \`0004_factsport_editorial_media.sql\` adds empty article/revision/source/media structures and published-only read views. No legacy rows or bodies were imported.
+- \`0005_factsport_editorial_provenance_review.sql\` adds explicit origin classification with default \`unknown\`, separate legacy \`body\` and \`content\` preservation fields, original creation timestamp, SEO/reverification fields and a hard human-review gate before publish. Rights-cleared media requires a recorded reviewer and timestamp.
+- The PostgreSQL public article adapter exposes SEO/canonical/author/provenance metadata only from the reviewed public view. The article page now uses those fields and safely serializes JSON-LD.
+- Markdown HTML is sanitized; iframe embeds are limited to HTTPS YouTube, YouTube-nocookie and Vimeo player hosts. Match widget tokens remain supported through a dedicated allowlisted protocol.
+- Homepage/news/article read paths are opt-in and the legacy fallback remains until content, media, pagination, SEO and responsive parity are verified in isolated staging.
+- The legacy article preservation decision remains unchanged: 366 rows were previously inventoried; 79 unknown-origin rows are still not proven human-authored by metadata alone. No body or title export has been committed to GitHub.
+- Migrations 0004-0005 are **not applied** to Azure PostgreSQL. CMS author/review/publish/rollback, article import tooling, editorial RBAC, rights-review UI, AI draft workflow and social publishing/outbox remain outstanding.
