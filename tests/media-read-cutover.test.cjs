@@ -18,7 +18,7 @@ test('Media match detail, live data, widget, pins and playback have explicit Pos
     const source = read(path);
     assert.match(source, /FACTSPORT_MATCH_DETAIL_BACKEND/);
     assert.match(source, /cloudflare:workers/);
-    assert.match(source, /FACTSPORT_ENVIRONMENT === 'staging'/);
+    assert.match(source, /FACTSPORT_ENVIRONMENT !== 'development'/);
     assert.match(source, /status: 503/);
   }
   assert.match(read('app/api/match/[id]/playback/route.ts'), /getPostgresMatchPlaybackById/);
@@ -34,7 +34,7 @@ test('competition standings and player leaders do not silently fall back to lega
   ]) {
     const source = read(path);
     assert.match(source, /FACTSPORT_COMPETITIONS_BACKEND|FACTSPORT_MATCHES_BACKEND/);
-    assert.match(source, /FACTSPORT_ENVIRONMENT === 'staging'/);
+    assert.match(source, /FACTSPORT_ENVIRONMENT !== 'development'/);
     assert.match(source, /status: 503/);
   }
   assert.match(read('app/api/cache/leaders/route.ts'), /listCurrentCompetitionPlayerLeaders/);
@@ -45,7 +45,7 @@ test('Prediction analysis remains a separate fail-closed route, not folded into 
   const analysis = read('app/api/match/[id]/analysis/route.ts');
   const mediaReader = read('lib/adapters/postgres-matches.ts');
   assert.match(analysis, /V2 Prediction analysis reader is not provisioned/);
-  assert.match(analysis, /FACTSPORT_ENVIRONMENT === 'staging'/);
+  assert.match(analysis, /FACTSPORT_ENVIRONMENT !== 'development'/);
   assert.doesNotMatch(mediaReader, /pro_analysis|campaign_id|affiliate_link|settlement/i);
 });
 
