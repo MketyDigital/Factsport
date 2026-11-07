@@ -2,8 +2,8 @@ name: Matchmaker (ESPN ID Sync)
 
 on:
   schedule:
-    - cron: '0 6 * * *'  
-    - cron: '0 12 * * *' 
+    - cron: '0 6 * * *'
+    - cron: '0 12 * * *'
   workflow_dispatch:
 
 jobs:
@@ -11,6 +11,21 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: Hit the Matchmaker API on Production
+      - name: Validate cron credential
+        env:
+          CRON_KEY: ${{ secrets.CRON_KEY }}
         run: |
-          curl -L -sS -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36" "https://factsport.com/api/matchmaker?key=${{ secrets.CRON_KEY }}&t=$(date +%s)"
+          set -euo pipefail
+          [ -n "$CRON_KEY" ] && [ "${#CRON_KEY}" -ge 32 ] || {
+            echo "::error::CRON_KEY is missing or too short"
+            exit 1
+          }
+      - name: Hit the Matchmaker API on Production
+        env:
+          CRON_KEY: ${{ secrets.CRON_KEY }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 90 -X POST \
+            -H "Authorization: Bearer $CRON_KEY" \
+            -H "User-Agent: Factsport-Matchmaker/2.0" \
+            "https://factsport.com/api/matchmaker"
