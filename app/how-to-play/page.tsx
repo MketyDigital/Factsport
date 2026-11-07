@@ -1,6 +1,14 @@
 export const runtime = 'edge';
-export const revalidate = 3600; // Caches for 3600 seconds to keep campaigns fresh but save DB reads!
+export const revalidate = 3600;
 
+// This legacy rules page contains VIP cash-prize eligibility and campaign mechanics.
+// Keep it out of search until those mechanics have been redesigned and audited.
+export const metadata: Metadata = {
+  title: 'How to Play | FactSport',
+  robots: { index: false, follow: true },
+};
+
+import type { Metadata } from 'next';
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { ChevronLeft, Trophy, Target, Star, ShieldAlert, Zap, Flame, Info, CheckCircle } from 'lucide-react';
