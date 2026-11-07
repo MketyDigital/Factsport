@@ -10,7 +10,7 @@ import { Metadata, ResolvingMetadata } from 'next';
 import { cache } from 'react'; 
 import { ChevronLeft, Zap } from 'lucide-react';
 
-import FactSportPlayer from '@/app/components/FactSportPlayer';
+import SecureMatchPlayer from '@/app/components/SecureMatchPlayer';
 import MatchHeaderClient from '@/app/components/MatchHeaderClient'; 
 import MatchMobileHub from '@/app/components/MatchMobileHub'; 
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
@@ -25,8 +25,13 @@ import GoalRushTicker from '@/app/components/GoalRushTicker';
 
 const sanitizeUrl = (url: string | null | undefined) => {
     if (!url) return null;
-    if (url.trim().toLowerCase().startsWith('javascript:')) return '#';
-    return url;
+    try {
+        const parsed = new URL(url.trim());
+        if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) return null;
+        return parsed.toString();
+    } catch {
+        return null;
+    }
 };
 
 const SCHEDULED_STATUSES = ['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED'];
@@ -34,7 +39,7 @@ const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET'
 
 const getSupabaseData = cache(async (id: string) => {
     const supabase = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    const { data, error } = await supabase.from('matches').select('*').eq('id', id).single();
+    const { data, error } = await supabase.from('matches').select('id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, video_url, livestream_url, audio_url, widget_id, affiliate_link, venue, stage, match_group, match_events, stats, lineups, h2h, referees, predictor, displayClock').eq('id', id).single();
     if (error) return null;
     return data;
 });
@@ -108,7 +113,9 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
     const ogImageUrl = `${appUrl}/api/og?data=${encodedData}`;
 
     const previousImages = (await parent).openGraph?.images || [];
-    const activeVideoUrl = sanitizeUrl(isFinished ? match.video_url : match.livestream_url);
+    const mediaUnlockAt = new Date(match.match_date).getTime() - 15 * 60 * 1000;
+    const mediaUnlocked = isFinished || isLive || (Number.isFinite(mediaUnlockAt) && Date.now() >= mediaUnlockAt);
+    const activeVideoUrl = mediaUnlocked ? sanitizeUrl(isFinished ? match.video_url : match.livestream_url) : null;
 
     const isPlayerShare = resolvedSearchParams?.embed === 'true' || resolvedSearchParams?.play === 'true';
 
@@ -163,39 +170,50 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
   const dbData = await getSupabaseData(resolvedParams.id);
   if (!dbData) return notFound();
 
-  const rawData = await getExternalData(dbData);
+  // Only the safe public match projection crosses into client components.
+  // Raw stream URLs stay server-side and VIP analysis is fetched through an
+  // authenticated API that verifies the user's profile on the server.
+  const clientMatchData = {
+      id: dbData.id,
+      api_id: dbData.api_id,
+      espn_id: dbData.espn_id,
+      league: dbData.league,
+      home_team: dbData.home_team,
+      away_team: dbData.away_team,
+      home_score: dbData.home_score,
+      away_score: dbData.away_score,
+      match_date: dbData.match_date,
+      status: dbData.status,
+      home_logo: dbData.home_logo,
+      away_logo: dbData.away_logo,
+      venue: dbData.venue,
+      stage: dbData.stage,
+      match_group: dbData.match_group,
+      match_events: dbData.match_events,
+      stats: dbData.stats,
+      lineups: dbData.lineups,
+      h2h: dbData.h2h,
+      referees: dbData.referees,
+      predictor: dbData.predictor,
+      widget_id: dbData.widget_id,
+  };
+
+  const rawData = await getExternalData(clientMatchData);
   const data: any = rawData || {};
   
   data.home_form = await getTeamForm(dbData.home_team);
   data.away_form = await getTeamForm(dbData.away_team);
   
-  // EDIT HERE: Configuration for player lock/unlock and visibility
-  const UNLOCK_MINUTES_BEFORE_KICKOFF = 15; 
-
   const currentStatus = (dbData.status || '').toUpperCase();
   const isFinishedApi = FINISHED_STATUSES.includes(currentStatus);
   const isLive = !SCHEDULED_STATUSES.includes(currentStatus) && !isFinishedApi;
   
-  const matchDateMs = new Date(dbData.match_date).getTime();
-  const minutesToKick = (matchDateMs - Date.now()) / 60000;
-  
-  // Universally finished means we should display highlights and hide the stream
-  // We rely purely on the API status (FT, AET, PEN, etc.) to handle extra time and delays properly.
+  // Raw media URLs remain server-side; the playback API enforces the unlock time.
   const isUniversallyFinished = isFinishedApi;
-
-  const activeVideoUrl = sanitizeUrl(isUniversallyFinished ? dbData.video_url : dbData.livestream_url);
-  const activeAudioUrl = sanitizeUrl(isUniversallyFinished ? null : dbData.audio_url);
-
-  let isServerLocked = true;
-  if (isUniversallyFinished) {
-      isServerLocked = false; 
-  } else if (isLive) {
-      isServerLocked = false;
-  } else {
-      if (minutesToKick <= UNLOCK_MINUTES_BEFORE_KICKOFF) {
-          isServerLocked = false; 
-      }
-  }
+  const hasVideoSource = !!sanitizeUrl(isUniversallyFinished ? dbData.video_url : dbData.livestream_url);
+  const hasAudioSource = !isUniversallyFinished && !!sanitizeUrl(dbData.audio_url);
+  const hasPlayerSource = hasVideoSource || hasAudioSource;
+  const initialPlayerMode: 'video' | 'audio' = hasVideoSource ? 'video' : 'audio';
 
   const hasWidget = !!dbData.widget_id; 
 
@@ -225,7 +243,7 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
       .lte('match_date', windowEnd)
       .limit(50); 
       
-  const siteSettingsQuery = await publicSupabase.from('site_settings').select('*').limit(1).maybeSingle();
+  const siteSettingsQuery = await publicSupabase.from('site_settings').select('announcement_text, announcement_link, announcement_enabled').limit(1).maybeSingle();
   const siteSettings = siteSettingsQuery.data || {};
   const announcement = {
       text: siteSettings.announcement_text || '',
@@ -248,45 +266,27 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
                           <span className="text-[9px] font-black tracking-widest uppercase opacity-80">{dbData.league}</span>
                           <div className="w-6"></div>
                       </div>
-                      <MatchHeaderClient dbData={dbData} />
+                      <MatchHeaderClient dbData={clientMatchData} />
                   </div>
 
                   <div className="w-full bg-white border-b border-slate-200">
                       <HeadToHeadStats dbData={data} />
                   </div>
 
-                  {(activeVideoUrl || activeAudioUrl) && (
-                      <div className="w-full bg-black">
-                          {activeVideoUrl ? (
-                              <FactSportPlayer 
-                                  mediaUrl={activeVideoUrl} 
-                                  audioUrl={activeAudioUrl}
-                                  matchId={dbData.id} 
-                                  mode="video" 
-                                  isLocked={isServerLocked} 
-                                  matchDate={dbData.match_date} 
-                                  isFinished={isUniversallyFinished} 
-                                  homeTeam={dbData.home_team}
-                                  awayTeam={dbData.away_team}
-                                  homeLogo={dbData.home_logo}
-                                  awayLogo={dbData.away_logo}
-                                  announcement={announcement} 
-                              />
-                          ) : (
-                              <FactSportPlayer 
-                                  mediaUrl={activeAudioUrl!} 
-                                  matchId={dbData.id} 
-                                  mode="audio" 
-                                  isLocked={isServerLocked} 
-                                  matchDate={dbData.match_date} 
-                                  isFinished={isUniversallyFinished} 
-                                  homeTeam={dbData.home_team}
-                                  awayTeam={dbData.away_team}
-                                  homeLogo={dbData.home_logo}
-                                  awayLogo={dbData.away_logo}
-                                  announcement={announcement} 
-                              />
-                          )}
+                  {hasPlayerSource && (
+                       <div className="w-full bg-black">
+                           <SecureMatchPlayer
+                               matchId={dbData.id}
+                               initialMode={initialPlayerMode}
+                               matchDate={dbData.match_date}
+                               homeTeam={dbData.home_team}
+                               awayTeam={dbData.away_team}
+                               homeLogo={dbData.home_logo}
+                               awayLogo={dbData.away_logo}
+                               announcement={announcement}
+                           />
+                       </div>
+                   )}
                       </div>
                   )}
               </div>
@@ -300,7 +300,7 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
 
           <div className="max-w-4xl mx-auto mt-3 px-2">
               {!hasWidget ? (
-                  <MatchMobileHub matchId={dbData.id} espnId={dbData.espn_id} dbData={dbData} />
+                  <MatchMobileHub matchId={dbData.id} espnId={dbData.espn_id} dbData={clientMatchData} />
               ) : (
                   <ScoreAxisWidget matchId={dbData.widget_id} affiliateLink={sanitizeUrl(dbData.affiliate_link) || undefined} />
               )}
