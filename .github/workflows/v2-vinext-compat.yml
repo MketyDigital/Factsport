@@ -17,6 +17,7 @@ on:
       - 'workers/**'
       - 'types/**'
       - 'tests/**'
+      - 'scripts/**'
       - 'next.config.*'
       - 'postcss.config.*'
 
@@ -48,6 +49,12 @@ jobs:
         run: node --test tests/factsport-schedule.test.mjs tests/factsport-espn-reconciliation.test.mjs tests/factsport-espn-score-preview.test.mjs
       - name: Validate read-only score preview Worker syntax
         run: node --check workers/factsport-espn-score-preview.mjs
+      - name: Validate legacy automation scripts under ESM mode
+        run: |
+          set -euo pipefail
+          for script in scripts/sync-gh.js scripts/fetch-espn-cups.js scripts/generate-pro-slips.js scripts/daily-preview.js scripts/daily-summary.js; do
+            node --check "$script"
+          done
       - name: TypeScript check
         run: npm run typecheck
       - name: Cloudflare vinext build
