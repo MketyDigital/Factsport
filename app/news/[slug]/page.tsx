@@ -12,6 +12,7 @@ import { ChevronLeft, Calendar, Clock, ArrowRight, Trophy, Flame, Zap, ChevronRi
 import NewsArtwork from '@/app/components/NewsArtwork'; 
 import ShareButton from '@/app/components/ShareButton';
 import MarkdownRenderer from '@/app/components/MarkdownRenderer'; 
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
 const getArticleData = cache(async (slug: string) => {
   if (process.env.FACTSPORT_EDITORIAL_BACKEND === 'postgres') {
@@ -130,6 +131,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
             </h1>
             
             <div className="mb-4">
+                <AdsterraStandardBanner />
             </div>
             
             <div className="flex items-center gap-6 text-xs font-bold text-slate-300 uppercase tracking-widest">
@@ -154,6 +156,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                             
                             {part2 && (
                                 <div className="my-8">
+                                    <AdsterraStandardBanner />
                                 </div>
                             )}
 
@@ -170,6 +173,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                 </div>
 
                 <div className="mt-6">
+                    <AdsterraStandardBanner />
                 </div>
 
             </div> 
