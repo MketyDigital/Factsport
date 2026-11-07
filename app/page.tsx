@@ -3,7 +3,8 @@ export const revalidate = 3;
 
 import { createClient } from '@supabase/supabase-js';
 import { listPublicEditorialArticles } from '@/lib/adapters/postgres-editorial';
-import { listPostgresMatchesWindow } from '@/lib/adapters/postgres-matches'; 
+import { listPostgresMatchesWindow } from '@/lib/adapters/postgres-matches';
+import { getPublicHomepageSettings, listPublicFeaturedMatches, listPublicMatchHighlights } from '@/lib/adapters/postgres-homepage';
 import Link from "next/link";
 import { Metadata } from 'next';
 import { ArrowRight, Youtube, Newspaper, Award, Trophy } from "lucide-react";
@@ -51,16 +52,21 @@ const sortMatches = (matches: any[]) => {
 };
 
 async function getHomepageData(leagueFilter: string | undefined) {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    
   const now = new Date();
   const wideWindowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
   const wideWindowEnd = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
-
-  let matches: any[] = [];
-
   const usePostgresEditorial = process.env.FACTSPORT_EDITORIAL_BACKEND === 'postgres';
-  const [newsRows, highlightsRes, featuredRes] = await Promise.all([
+  const usePostgresMatches = process.env.FACTSPORT_MATCHES_BACKEND === 'postgres';
+
+  let supabase: ReturnType<typeof createClient> | undefined;
+  const getSupabase = () => {
+    if (!supabase) {
+      supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    }
+    return supabase;
+  };
+
+  const [news, highlights, featuredMatches, homepageSettings] = await Promise.all([
     usePostgresEditorial
       ? listPublicEditorialArticles({ limit: 25 }).then(rows => rows.map((row: any) => ({
           ...row,
@@ -68,55 +74,66 @@ async function getHomepageData(leagueFilter: string | undefined) {
           image_url: row.hero_media_key ? `/api/media/${row.hero_media_key}` : null,
           team_1_logo: null,
           team_2_logo: null,
-          created_at: row.published_at,
+          created_at: row.original_created_at || row.published_at,
         })))
-      : supabase.from('news').select('*').order('created_at', { ascending: false }).limit(25)
+      : getSupabase().from('news').select('*').order('created_at', { ascending: false }).limit(25)
           .then(result => result.data || []),
-    supabase.from('matches').select('*').not('video_url', 'is', null).neq('video_url', '').order('match_date', { ascending: false }).limit(5),
-    supabase.from('matches').select('*').eq('is_featured', true).gte('match_date', wideWindowStart).lte('match_date', wideWindowEnd).order('match_date', { ascending: true }).limit(10)
+    usePostgresMatches
+      ? listPublicMatchHighlights(5)
+      : getSupabase().from('matches').select('*').not('video_url', 'is', null).neq('video_url', '').order('match_date', { ascending: false }).limit(5)
+          .then(result => result.data || []),
+    usePostgresMatches
+      ? listPublicFeaturedMatches({ from: wideWindowStart, to: wideWindowEnd, limit: 10 })
+      : getSupabase().from('matches').select('*').eq('is_featured', true).gte('match_date', wideWindowStart).lte('match_date', wideWindowEnd).order('match_date', { ascending: true }).limit(10)
+          .then(result => result.data || []),
+    usePostgresMatches ? getPublicHomepageSettings() : Promise.resolve(null),
   ]);
 
-  if (process.env.FACTSPORT_MATCHES_BACKEND === 'postgres') {
-      const rows = await listPostgresMatchesWindow({
-          from: wideWindowStart,
-          to: wideWindowEnd,
-      });
-      matches = sortMatches(leagueFilter
-          ? rows.filter((match: any) => String(match.league || '').toLowerCase().includes(leagueFilter.toLowerCase()))
-          : rows);
+  let matches: any[] = [];
+  if (usePostgresMatches) {
+    const rows = await listPostgresMatchesWindow({
+      from: wideWindowStart,
+      to: wideWindowEnd,
+    });
+    matches = sortMatches(leagueFilter
+      ? rows.filter((match: any) => String(match.league || '').toLowerCase().includes(leagueFilter.toLowerCase()))
+      : rows);
   } else if (leagueFilter) {
-      const nowStr = new Date().toISOString();
-      const [{ data: upcoming }, { data: past }] = await Promise.all([
-          supabase.from('matches').select('*').ilike('league', `%${leagueFilter}%`).gte('match_date', nowStr).order('match_date', { ascending: true }).limit(5),
-          supabase.from('matches').select('*').ilike('league', `%${leagueFilter}%`).lt('match_date', nowStr).order('match_date', { ascending: false }).limit(5)
-      ]);
-      
-      const combined = [...(upcoming || []), ...(past || [])];
-      if (combined.length > 0) matches = sortMatches(combined);
-
+    const nowStr = new Date().toISOString();
+    const [{ data: upcoming }, { data: past }] = await Promise.all([
+      getSupabase().from('matches').select('*').ilike('league', `%${leagueFilter}%`).gte('match_date', nowStr).order('match_date', { ascending: true }).limit(5),
+      getSupabase().from('matches').select('*').ilike('league', `%${leagueFilter}%`).lt('match_date', nowStr).order('match_date', { ascending: false }).limit(5),
+    ]);
+    const combined = [...(upcoming || []), ...(past || [])];
+    if (combined.length > 0) matches = sortMatches(combined);
   } else {
-      const { data: allMatches } = await supabase.from('matches').select('*')
-        .gte('match_date', wideWindowStart)
-        .lte('match_date', wideWindowEnd)
-        .order('match_date', { ascending: true })
-        .limit(150); 
-      
-      if (allMatches && allMatches.length > 0) {
-          matches = allMatches; 
-      } else {
-          const { data: recentMatches } = await supabase.from('matches').select('*').order('match_date', { ascending: false }).limit(10);
-          if (recentMatches) matches = recentMatches;
-      }
+    const { data: allMatches } = await getSupabase().from('matches').select('*')
+      .gte('match_date', wideWindowStart)
+      .lte('match_date', wideWindowEnd)
+      .order('match_date', { ascending: true })
+      .limit(150);
+    if (allMatches && allMatches.length > 0) {
+      matches = allMatches;
+    } else {
+      const { data: recentMatches } = await getSupabase().from('matches').select('*').order('match_date', { ascending: false }).limit(10);
+      if (recentMatches) matches = recentMatches;
+    }
   }
 
-  return { matches, news: newsRows || [], highlights: highlightsRes.data || [], featuredMatches: featuredRes.data || [] };
+  return {
+    matches,
+    news: news || [],
+    highlights: highlights || [],
+    featuredMatches: featuredMatches || [],
+    featuredMatchId: homepageSettings?.featured_match_id ? String(homepageSettings.featured_match_id) : null,
+  };
 }
 
 export default async function Home({ searchParams }: { searchParams: { league?: string } }) {
   const resolvedParams = await searchParams;
   const selectedLeague = resolvedParams.league;
     
-  const { matches, news, highlights, featuredMatches } = await getHomepageData(selectedLeague);
+  const { matches, news, highlights, featuredMatches, featuredMatchId } = await getHomepageData(selectedLeague);
 
   const finalHeadlines = news.filter(n => n.is_headline).slice(0, 3);
   const nonHeadlineNews = news.filter(n => !finalHeadlines.some(h => h.id === n.id));
@@ -132,6 +149,7 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
       <HomeDashboardClient 
           globalMatches={matches} 
           featuredMatches={featuredMatches} 
+          featuredMatchId={featuredMatchId}
           selectedLeague={selectedLeague} 
           
           /* 🟢 ZERO MARGINS BETWEEN THESE THREE COMPONENTS */
