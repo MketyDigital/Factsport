@@ -21,7 +21,7 @@ test('PostgreSQL match detail response is a safe public projection', () => {
   const start = adapter.indexOf('export async function getPostgresMatchById');
   const reader = adapter.slice(start);
   assert.ok(start >= 0);
-  assert.match(reader, /SELECT id, api_id, espn_id, league/);
+  assert.match(reader, /SELECT m\.id, m\.api_id, m\.espn_id, m\.league/);
   for (const privateField of ['video_url', 'livestream_url', 'audio_url', 'pro_analysis', 'campaign_id', 'affiliate_link', 'points_distributed']) {
     assert.equal(reader.includes(privateField), false, privateField);
   }
