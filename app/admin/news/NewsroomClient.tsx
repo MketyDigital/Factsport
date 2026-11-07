@@ -16,6 +16,7 @@ type Article = {
   tags: string[];
   status: string;
   review_status: string;
+  revision_status: string | null;
   is_headline: boolean;
   is_breaking: boolean;
   seo_title: string | null;
