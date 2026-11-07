@@ -26,6 +26,7 @@ test('social publishing is a separate durable Media workflow', () => {
   assert.match(socialSql, /CREATE TABLE IF NOT EXISTS public\.media_social_delivery_attempts/i);
   assert.match(socialSql, /CREATE TABLE IF NOT EXISTS public\.media_social_outbox/i);
   assert.match(socialSql, /idempotency_key text NOT NULL UNIQUE/i);
+  assert.match(socialSql, /settings \?\| ARRAY\['access_token', 'refresh_token', 'token', 'secret', 'password', 'api_key'\]/i);
   assert.match(socialSql, /lease_expires_at timestamptz/i);
   assert.match(socialSql, /UNIQUE \(publication_id, attempt_number\)/i);
   assert.match(socialSql, /REVOKE ALL ON public\.media_social_channels[\s\S]*factsport_v2_reader/i);
