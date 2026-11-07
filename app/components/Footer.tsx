@@ -83,7 +83,6 @@ export default function Footer() {
                 <li><Link href="/contact" className="hover:text-white transition">Contact</Link></li>
                 <li><Link href="/editorial-standards" className="hover:text-white transition">Editorial Standards</Link></li>
                 <li><Link href="/advertising-policy" className="hover:text-white transition">Advertising Policy</Link></li>
-                <li className="text-red-500 font-bold mt-3 border-t border-white/5 pt-2">18+ Gamble Responsibly</li>
             </ul>
         </div>
       </div>
@@ -92,7 +91,7 @@ export default function Footer() {
       <div className="border-t border-white/5 pt-8 text-center text-[10px] text-slate-600 leading-relaxed">
         <p>&copy; {currentYear} FactSport. All rights reserved.</p>
         <p className="mt-2 max-w-2xl mx-auto">
-            FactSport provides sports information, original editorial coverage, live match data and free football features. Paid or premium services, where available, are governed by their own terms and are not part of this public editorial experience.
+            FactSport provides sports information, original editorial coverage, live match data and highlights. Private Prediction and premium services, where available, are separately operated under their own terms and are not part of this public Media experience.
         </p>
       </div>
     </footer>
