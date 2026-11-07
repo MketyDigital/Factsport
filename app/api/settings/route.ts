@@ -1,46 +1,51 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/app/lib/supabase/server'; 
+import { createClient } from '@/app/lib/supabase/server';
+import { getPublicHomepageSettings } from '@/lib/adapters/postgres-homepage';
 
-// 🟢 THE MAGIC SHIELD: This caches the response globally for 1 hour.
-// 1 million users could hit this route, and Supabase only sees 1 request.
-export const revalidate = 3600; 
+export const runtime = 'edge';
+export const revalidate = 300;
 
 export async function GET() {
-    try {
-        const supabase = createClient();
-        
-        // 1. Fetch Global Settings
-        const { data: settings } = await supabase.from('site_settings').select('*').eq('id', 1).single();
-        
-        let code1x = settings?.code_1xbet;
-        let codeMel = settings?.code_melbet;
-
-        // 2. Fallback: If Admin 1xBet code is empty, find the newest match with a code
-        if (!code1x) {
-            const { data: latestMatch } = await supabase
-                .from('matches')
-                .select('booking_code')
-                .not('booking_code', 'is', null)
-                .neq('booking_code', '')
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
-
-            if (latestMatch?.booking_code) {
-                code1x = latestMatch.booking_code;
-            }
-        }
-
-        // Return a clean, formatted payload
-        return NextResponse.json({
-            link1x: settings?.link_1xbet || null,
-            linkMel: settings?.link_melbet || null,
-            code1x: code1x || null,
-            codeMel: codeMel || null
-        });
-
-    } catch (error) {
-        console.error("Cache API Error:", error);
-        return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
+  try {
+    if (process.env.FACTSPORT_MATCHES_BACKEND === 'postgres') {
+      const settings = await getPublicHomepageSettings();
+      return NextResponse.json({
+        link1x: null,
+        linkMel: null,
+        code1x: null,
+        codeMel: null,
+        featured_match_id: settings?.featured_match_id ? String(settings.featured_match_id) : null,
+      }, { headers: { 'Cache-Control': 'public, max-age=0, s-maxage=300, stale-while-revalidate=600' } });
     }
+
+    const supabase = createClient();
+    const { data: settings } = await supabase
+      .from('site_settings')
+      .select('code_1xbet, code_melbet, link_1xbet, link_melbet, featured_match_id:social_config->>featured_match_id')
+      .eq('id', 1)
+      .single();
+
+    let code1x = settings?.code_1xbet;
+    if (!code1x) {
+      const { data: latestMatch } = await supabase
+        .from('matches')
+        .select('booking_code')
+        .not('booking_code', 'is', null)
+        .neq('booking_code', '')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (latestMatch?.booking_code) code1x = latestMatch.booking_code;
+    }
+
+    return NextResponse.json({
+      link1x: settings?.link_1xbet || null,
+      linkMel: settings?.link_melbet || null,
+      code1x: code1x || null,
+      codeMel: settings?.code_melbet || null,
+      featured_match_id: settings?.featured_match_id || null,
+    }, { headers: { 'Cache-Control': 'public, max-age=0, s-maxage=300, stale-while-revalidate=600' } });
+  } catch {
+    return NextResponse.json({ error: 'Failed to fetch public settings' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
+  }
 }
