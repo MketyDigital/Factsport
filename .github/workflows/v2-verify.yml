@@ -9,6 +9,8 @@ on:
       - 'app/api/matches/**'
       - 'app/api/media/**'
       - 'app/api/settings/**'
+      - 'app/api/standings/**'
+      - 'app/standings/**'
       - 'app/components/**'
       - 'app/news/**'
       - 'app/page.tsx'
