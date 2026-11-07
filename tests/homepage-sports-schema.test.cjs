@@ -42,6 +42,7 @@ test('public highlights require reviewed rights and allow only approved video ho
   assert.ok(sql.includes('player\\.vimeo\\.com/video'));
   assert.match(sql, /CREATE OR REPLACE VIEW public\.public_match_highlights/i);
   assert.match(sql, /thumbnail_media_key/i);
+  assert.match(sql, /m\.match_date, m\.home_score, m\.away_score/i);
   assert.match(sql, /match_highlight_provider_url/i);
   assert.match(sql, /match_highlight_provider_embed/i);
 });
