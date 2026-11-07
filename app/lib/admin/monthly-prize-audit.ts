@@ -26,6 +26,7 @@ export async function runMonthlyPrizeAudit(supabase: any, now = new Date()) {
       .eq('is_vip', true)
       .gte('eligible_monthly_points', minPointsFloor)
       .order('eligible_monthly_points', { ascending: false })
+      .order('id', { ascending: true }) // deterministic tie-break for equal point totals
       .range(offset, offset + PAGE_SIZE - 1);
     if (usersError) throw usersError;
     if (!users?.length) break;
