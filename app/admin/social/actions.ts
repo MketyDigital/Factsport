@@ -25,9 +25,7 @@ export async function scheduleSocialPublication(input: {
     const content = typeof input.contentText === 'string' ? input.contentText.trim() : '';
     if (!content || content.length > 10000) return { success: false, error: 'Post text must be between 1 and 10,000 characters.' };
     const scheduledAt = new Date(input.scheduledAt);
-    if (!Number.isFinite(scheduledAt.valueOf()) || scheduledAt.valueOf() < Date.now() + 30_000) {
-      return { success: false, error: 'Choose a future time at least 30 seconds from now.' };
-    }
+    if (!Number.isFinite(scheduledAt.valueOf()) || scheduledAt.valueOf() < Date.now() + 30_000) return { success: false, error: 'Choose a future time at least 30 seconds from now.' };
     let linkUrl: string | null = null;
     if (input.linkUrl?.trim()) {
       const parsed = new URL(input.linkUrl.trim());
@@ -79,6 +77,13 @@ export async function cancelSocialPublication(publicationId: string): Promise<Re
   try {
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
       const actorId = await getActorId(tx, authorization.user.id);
+      const outbox = await tx\`
+        SELECT id, status FROM public.media_social_outbox
+        WHERE publication_id=\${publicationId}::uuid FOR UPDATE
+      \`;
+      if (!outbox.length || !['pending', 'retry'].includes(outbox[0].status)) {
+        throw new Error('This post is already being delivered or has completed; cancellation is no longer safe.');
+      }
       const rows = await tx\`
         UPDATE public.media_social_publications
         SET status='cancelled', updated_by=\${actorId}::uuid, updated_at=now()
@@ -88,7 +93,7 @@ export async function cancelSocialPublication(publicationId: string): Promise<Re
       await tx\`
         UPDATE public.media_social_outbox SET status='cancelled', lease_owner=NULL,
           lease_expires_at=NULL, updated_at=now()
-        WHERE publication_id=\${publicationId}::uuid AND status IN ('pending','retry')
+        WHERE id=\${outbox[0].id}::uuid
       \`;
     }));
     revalidatePath('/admin/social');
