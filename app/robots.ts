@@ -1,12 +1,17 @@
 import { MetadataRoute } from 'next'
 
-export default function robots(): MetadataRoute.Robots {
-  // 🟢 Check if this is a Vercel production build
-  // If it's a preview branch, VERCEL_ENV will be 'preview'
-  const isProduction = process.env.VERCEL_ENV === 'production';
+const SITE_URL = 'https://factsport.com'
 
-  // 🛑 If it is a preview domain (or local dev), block all robots completely
-  if (!isProduction) {
+export default function robots(): MetadataRoute.Robots {
+  // Cloudflare Workers does not guarantee Vercel's VERCEL_ENV variable.
+  // Indexing is therefore an explicit release setting, disabled by default.
+  // Set FACTSPORT_INDEXING_ENABLED=true only on the approved public production
+  // deployment after the sitemap, canonical URLs, and content have been verified.
+  const indexingEnabled =
+    process.env.FACTSPORT_INDEXING_ENABLED === 'true' &&
+    process.env.NODE_ENV === 'production'
+
+  if (!indexingEnabled) {
     return {
       rules: {
         userAgent: '*',
@@ -15,13 +20,15 @@ export default function robots(): MetadataRoute.Robots {
     }
   }
 
-  // ✅ If it is your main factsport.com production site, allow crawling
   return {
-    rules: {
-      userAgent: '*',
-      allow: '/',
-      disallow: ['/admin/', '/api/'], // Keep them out of your secure backend areas
-    },
-    sitemap: 'https://factsport.com/sitemap.xml',
+    rules: [
+      {
+        userAgent: '*',
+        allow: '/',
+        disallow: ['/admin/', '/api/', '/dashboard/', '/login', '/register', '/account/'],
+      },
+    ],
+    sitemap: `${SITE_URL}/sitemap.xml`,
+    host: SITE_URL,
   }
 }
