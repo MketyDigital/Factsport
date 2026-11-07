@@ -10,6 +10,9 @@ const revisionSql = read('db/migrations/0011_factsport_editorial_revision_workfl
 const legacyMediaSql = read('db/migrations/0012_factsport_editorial_legacy_media_mapping.sql');
 const teamMediaGrants = read('db/migrations/0013_factsport_editorial_team_media_grants.sql');
 const revisionMediaSql = read('db/migrations/0014_factsport_revision_scoped_media.sql');
+const socialAutomationSql = read('db/migrations/0015_factsport_social_event_automation.sql');
+const socialRoute = read('app/api/social/route.ts');
+const archivedSocialRoute = read('docs/audit/legacy-source/api-social-route-v1.ts');
 const publicAdapter = read('lib/adapters/postgres-editorial.ts');
 const newsListing = read('app/news/page.tsx');
 const newsArticle = read('app/news/[slug]/page.tsx');
@@ -130,4 +133,28 @@ test('editorial media uploads are private, validated, hashed and rights-reviewed
   assert.match(revisionMediaSql, /public_media_assets[\s\S]*EXISTS \([\s\S]*editorial_articles/i);
   assert.match(revisionMediaSql, /GRANT SELECT, INSERT, UPDATE ON public\.editorial_article_revision_media/i);
   assert.match(ui, /Approve rights & attach/);
+});
+
+
+test('legacy match-event social behaviour is preserved as V2 policy but cannot invoke legacy Supabase sender', () => {
+  assert.match(socialAutomationSql, /fallback_first_match_when_no_vip_today boolean NOT NULL DEFAULT true/i);
+  assert.match(socialAutomationSql, /images_enabled boolean NOT NULL DEFAULT false/i);
+  assert.match(socialAutomationSql, /Premier League/);
+  assert.match(socialAutomationSql, /Nigeria/);
+  assert.match(socialAutomationSql, /'lineups'.*'buf_x1'.*true/s);
+  assert.match(socialAutomationSql, /'goals'.*'fb1'.*true/s);
+  assert.match(socialAutomationSql, /'fulltime'.*'make1'.*true/s);
+  assert.match(socialAutomationSql, /INSERT INTO public\.media_social_channels[\s\S]*false\)/i);
+  assert.match(socialAutomationSql, /REVOKE ALL ON public\.media_social_automation_settings/i);
+  assert.match(socialRoute, /status: 410/);
+  assert.match(socialRoute, /V2_SOCIAL_DISPATCHER_NOT_PROVISIONED/);
+  assert.doesNotMatch(socialRoute, /createClient|SUPABASE_SERVICE_ROLE_KEY|BUFFER_ACCESS_TOKEN/);
+  assert.match(archivedSocialRoute, /SAFETY_MAP/);
+  assert.match(archivedSocialRoute, /normalizeLineupsEventConfig/);
+  assert.match(archivedSocialRoute, /parseTemplate/);
+  assert.match(archivedSocialRoute, /postToBufferWithRetry/);
+  assert.match(archivedSocialRoute, /postToFbWithRetry/);
+  assert.match(archivedSocialRoute, /postToMakeWithRetry/);
+  assert.match(archivedSocialRoute, /telegram_bot_token/);
+  assert.match(archivedSocialRoute, /TEMPORARY: images disabled for all outgoing posts/);
 });
