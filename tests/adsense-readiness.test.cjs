@@ -133,7 +133,7 @@ test('registered Prediction account and authentication routes are private-host o
   const header = read('app/components/SiteHeader.tsx');
   const callback = read('app/auth/callback/route.ts');
   assert.match(rootLayout, /FACTSPORT_PRIVATE_PRODUCT_HOST/);
-  assert.match(rootLayout, /isPrivateProductHost \? application/);
+  assert.match(rootLayout, /const application = isPrivateProductHost[\s\S]*\? children/);
   assert.match(rootLayout, /NODE_ENV === 'development' \? <AuthProvider>/);
   assert.doesNotMatch(header, /useAuth|\/login|\/dashboard|Account/);
   for (const file of [
