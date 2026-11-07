@@ -33,7 +33,8 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
   const resolvedParams = await searchParams;
   
   const currentCategory = resolvedParams.category || 'All';
-  const currentPage = parseInt(resolvedParams.page || '1');
+  const requestedPage = Number.parseInt(resolvedParams.page || '1', 10);
+  const currentPage = Number.isFinite(requestedPage) ? Math.min(417, Math.max(1, requestedPage)) : 1;
 
   const from = (currentPage - 1) * ITEMS_PER_PAGE;
   const to = from + ITEMS_PER_PAGE - 1;
