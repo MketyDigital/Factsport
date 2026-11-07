@@ -40,7 +40,7 @@ export async function GET(
     }
   }
 
-  if ((env.FACTSPORT_ENVIRONMENT === 'staging' || env.FACTSPORT_ENVIRONMENT === 'production')) {
+  if (env.FACTSPORT_ENVIRONMENT !== 'development') {
     return NextResponse.json({ error: 'V2 match detail reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
 
