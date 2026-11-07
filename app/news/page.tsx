@@ -6,6 +6,7 @@ import { listPublicEditorialArticles } from '@/lib/adapters/postgres-editorial';
 import { serializeJsonLd } from '@/lib/seo/json-ld'; 
 import Link from 'next/link';
 import { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { Calendar, ChevronRight, Zap, Trophy, Youtube, Newspaper, ArrowRight, Flame, Radio, BarChart2, ChevronLeft } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
 
@@ -56,6 +57,7 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
       }));
       count = Number(rows[0]?.total_count ?? 0);
   } else {
+      if (process.env.NODE_ENV !== 'development') return notFound();
       const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
       let query = supabase.from('news').select('*', { count: 'exact' }).order('created_at', { ascending: false });
       if (currentCategory !== 'All') query = query.eq('category', currentCategory);
