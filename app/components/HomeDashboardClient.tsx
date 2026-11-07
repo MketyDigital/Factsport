@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import Link from "next/link";
 import { ArrowRight, TrendingUp, Calendar, Info, BarChart2 } from "lucide-react";
-import { createClient } from '@/app/lib/supabase/client'; 
 import HeroMatchCards from '@/app/components/HeroMatchCards'; 
 import CompactMatchRow from '@/app/components/CompactMatchRow';
 import BetOfTheDay from '@/app/components/BetOfTheDay'; 
@@ -24,16 +23,19 @@ export default function HomeDashboardClient({
     useEffect(() => { setLeagueTab('matches'); }, [selectedLeague]);
 
     useEffect(() => {
+        let active = true;
         const fetchSettings = async () => {
-            const supabase = createClient();
-            const { data } = await supabase.from('site_settings').select('social_config').single();
-            if (data?.social_config?.featured_match_id) {
-                setFeaturedMatchId(data.social_config.featured_match_id);
-            } else {
-                setFeaturedMatchId(''); 
+            try {
+                const response = await fetch('/api/settings');
+                if (!response.ok) return;
+                const settings = await response.json();
+                if (active) setFeaturedMatchId(settings.featured_match_id ? String(settings.featured_match_id) : '');
+            } catch {
+                if (active) setFeaturedMatchId('');
             }
         };
         fetchSettings();
+        return () => { active = false; };
     }, []);
 
     useEffect(() => {
