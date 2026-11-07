@@ -71,7 +71,8 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
           await tx\`
             UPDATE public.editorial_articles SET
               title=\${snapshot.title}, slug=\${snapshot.slug}, excerpt=\${snapshot.excerpt},
-              body_markdown=\${snapshot.body_markdown}, category=\${snapshot.category}, tags=\${snapshot.tags},
+              body_markdown=\${snapshot.body_markdown}, category=\${snapshot.category},
+              team_1_name=\${snapshot.team_1_name}, team_2_name=\${snapshot.team_2_name}, tags=\${snapshot.tags},
               seo_title=\${snapshot.seo_title}, seo_description=\${snapshot.seo_description},
               canonical_url=\${snapshot.canonical_url}, author_display_name=\${snapshot.author_display_name},
               is_headline=\${snapshot.is_headline}, is_breaking=\${snapshot.is_breaking},
@@ -92,7 +93,7 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
             origin, created_by, updated_by
           ) VALUES (
             \${snapshot.title}, \${snapshot.slug}, \${snapshot.excerpt}, \${snapshot.body_markdown},
-            \${snapshot.category}, \${snapshot.tags}, \${snapshot.seo_title}, \${snapshot.seo_description},
+            \${snapshot.category}, \${snapshot.team_1_name}, \${snapshot.team_2_name}, \${snapshot.tags}, \${snapshot.seo_title}, \${snapshot.seo_description},
             \${snapshot.canonical_url}, \${snapshot.author_display_name}, \${snapshot.is_headline},
             \${snapshot.is_breaking}, 'draft', 'pending', 'manual', \${actorId}::uuid, \${actorId}::uuid
           ) RETURNING id
@@ -174,7 +175,8 @@ export async function approveAndPublishEditorial(articleId: string): Promise<Act
       await tx\`
         UPDATE public.editorial_articles SET
           title=\${snapshot.title}, slug=\${snapshot.slug}, excerpt=\${snapshot.excerpt},
-          body_markdown=\${snapshot.body_markdown}, category=\${snapshot.category}, tags=\${snapshot.tags},
+          body_markdown=\${snapshot.body_markdown}, category=\${snapshot.category},
+          team_1_name=\${snapshot.team_1_name}, team_2_name=\${snapshot.team_2_name}, tags=\${snapshot.tags},
           seo_title=\${snapshot.seo_title}, seo_description=\${snapshot.seo_description},
           canonical_url=\${snapshot.canonical_url}, author_display_name=\${snapshot.author_display_name},
           is_headline=\${snapshot.is_headline}, is_breaking=\${snapshot.is_breaking},
