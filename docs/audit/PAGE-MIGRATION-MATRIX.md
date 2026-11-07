@@ -93,3 +93,8 @@ A page is not complete merely because it renders. It must be exercised with real
 - Full \`/standings\` table now reads season/group-aware standings and computes last-five form only from final scored matches in the selected season. The \`LeagueLeaders\` client no longer accesses Supabase directly; it calls \`GET /api/standings/leaders\`, which has a narrow public projection and a PostgreSQL player-stat reader.
 - Migration 0006 now adds \`matches.season\` and a bounded completed-results index. Migration 0007 adds season-aware player goals/assists with a public-only view. Both are additive and unapplied.
 - Remaining competition work: provider ingestion for standings/scorers, tie-break and freshness parity against real fixtures, full tournaments pages, cup/round metadata and match-centre integration. No data is fabricated or imported from legacy standings snapshots.
+
+
+## Read-flag deployment contract
+
+The base \`FACTSPORT_MATCHES_BACKEND\` flag must remain independent of migrations 0004-0007. Editorial, homepage, highlights and competition read paths use separate flags so a partially migrated staging database cannot accidentally query a view/column that is not yet installed.
