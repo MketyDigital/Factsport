@@ -11,7 +11,6 @@ import InstallAppBanner from '@/app/components/InstallAppBanner';
 import NewsTicker from '@/app/components/NewsTicker'; 
 import LatestNewsList from '@/app/components/LatestNewsList'; 
 import HighlightsSlider from '@/app/components/HighlightsSlider'; 
-import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import MiniStandings from '@/app/components/MiniStandings'; 
 import HomeDashboardClient from '@/app/components/HomeDashboardClient'; 
 
@@ -133,7 +132,6 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
           <HighlightsSlider highlights={highlights} />
       </div>
 
-      <div className="max-w-4xl mx-auto mt-8"><AdsterraStandardBanner /></div>
 
       <div className="grid grid-cols-4 gap-3 px-4 py-6 max-w-4xl mx-auto">
           <Link href="/matches" className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition hover:shadow-md">
