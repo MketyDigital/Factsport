@@ -29,7 +29,7 @@ GRANT SELECT ON public.media_social_channels
   TO factsport_v2_editorial_writer;
 GRANT SELECT, INSERT, UPDATE ON public.media_social_publications
   TO factsport_v2_editorial_writer;
-GRANT INSERT ON public.media_social_outbox
+GRANT SELECT, INSERT, UPDATE ON public.media_social_outbox
   TO factsport_v2_editorial_writer;
 
 -- Explicitly preserve private-table isolation from public runtime identities.
