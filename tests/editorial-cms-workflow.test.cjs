@@ -11,6 +11,7 @@ const legacyMediaSql = read('db/migrations/0012_factsport_editorial_legacy_media
 const teamMediaGrants = read('db/migrations/0013_factsport_editorial_team_media_grants.sql');
 const revisionMediaSql = read('db/migrations/0014_factsport_revision_scoped_media.sql');
 const socialAutomationSql = read('db/migrations/0015_factsport_social_event_automation.sql');
+const socialOutboxSql = read('db/migrations/0016_factsport_media_social_event_outbox.sql');
 const socialRoute = read('app/api/social/route.ts');
 const archivedSocialRoute = read('docs/audit/legacy-source/api-social-route-v1.ts');
 const publicAdapter = read('lib/adapters/postgres-editorial.ts');
@@ -157,4 +158,21 @@ test('legacy match-event social behaviour is preserved as V2 policy but cannot i
   assert.match(archivedSocialRoute, /postToMakeWithRetry/);
   assert.match(archivedSocialRoute, /telegram_bot_token/);
   assert.match(archivedSocialRoute, /TEMPORARY: images disabled for all outgoing posts/);
+});
+
+
+test('match-event fan-out has a durable Media outbox and a separate provider dispatcher identity', () => {
+  assert.match(socialOutboxSql, /CREATE TABLE IF NOT EXISTS public\.media_social_match_events/i);
+  assert.match(socialOutboxSql, /dedupe_key text NOT NULL UNIQUE/i);
+  assert.match(socialOutboxSql, /UNIQUE \(match_id, event_key\)/i);
+  assert.match(socialOutboxSql, /CREATE TABLE IF NOT EXISTS public\.media_social_match_deliveries/i);
+  assert.match(socialOutboxSql, /UNIQUE \(event_id, channel_id\)/i);
+  assert.match(socialOutboxSql, /lease_expires_at timestamptz/i);
+  assert.match(socialOutboxSql, /CREATE TABLE IF NOT EXISTS public\.media_social_match_delivery_attempts/i);
+  assert.match(socialOutboxSql, /factsport_v2_media_automation_writer/i);
+  assert.match(socialOutboxSql, /factsport_v2_social_dispatcher/i);
+  assert.match(socialOutboxSql, /GRANT SELECT ON public\.matches/i);
+  assert.match(socialOutboxSql, /factsport_v2_editorial_writer/i);
+  assert.doesNotMatch(socialOutboxSql, /GRANT .* ON public\.predictions/i);
+  assert.doesNotMatch(socialOutboxSql, /GRANT .* ON public\.settlement/i);
 });
