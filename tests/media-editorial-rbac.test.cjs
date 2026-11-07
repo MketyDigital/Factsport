@@ -50,7 +50,7 @@ test('Media admin shell does not expose legacy Prediction or broad user administ
   const users = read('app/admin/users/page.tsx');
   assert.match(layout, /authorizeMediaEditorialAction\('read'\)/);
   assert.doesNotMatch(layout, /ADMIN_EMAILS|VaultLock|getAuthenticatedAdmin|isAdminVaultUnlocked/);
-  assert.doesNotMatch(home, /subscriptions|campaigns|monthly_winners|settle_match_points/);
+  assert.doesNotMatch(home, /subscriptions|monthly_winners|settle_match_points|AdminCampaignManager|ApproveButton|ResetMonthButton|CleanupButton|PromoSettingsManager|GameRulesManager|AuditManager/);
   assert.doesNotMatch(matches, /createClient|supabase|campaigns|pro_analysis/);
   assert.doesNotMatch(users, /SUPABASE_SERVICE_ROLE_KEY|select\('\*'\)|ADMIN_EMAILS/);
 });
