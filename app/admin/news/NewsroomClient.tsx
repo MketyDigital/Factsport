@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import {
-  archiveEditorialArticle, approveAndPublishEditorial, saveEditorialDraft,
+  archiveEditorialArticle, approveEditorialRevision, publishApprovedEditorial, saveEditorialDraft,
   submitEditorialForReview,
 } from './actions';
 import { reviewRightsAndAttachMedia } from './media-actions';
@@ -255,7 +255,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
             <ol className="mt-3 space-y-3 text-sm text-slate-600">
               <li><b>1. Draft</b><br/>Write and save the article.</li>
               <li><b>2. Review</b><br/>Submit the draft for editorial review.</li>
-              <li><b>3. Publish</b><br/>A different authorized editor approves it.</li>
+              <li><b>3. Approve</b><br/>A different editor approves the submitted revision.</li><li><b>4. Publish</b><br/>A separate publisher releases the approved revision.</li>
             </ol>
           </div>
         </aside>
@@ -283,7 +283,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 <button onClick={() => edit(article)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold">Edit</button>
-                {(article.status === 'in_review' || article.revision_status === 'in_review') && <button disabled={isPending} onClick={() => runAction(approveAndPublishEditorial, article.id, 'Article published.')} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white">Approve & publish</button>}
+                {article.revision_status === 'in_review' && <button disabled={isPending} onClick={() => runAction(approveEditorialRevision, article.id, 'Revision approved. A separate publisher must publish it.')} className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white">Approve revision</button>}{article.revision_status === 'approved' && <button disabled={isPending} onClick={() => runAction(publishApprovedEditorial, article.id, 'Approved revision published.')} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white">Publish approved</button>}
                 {article.status !== 'archived' && <button disabled={isPending} onClick={() => runAction(archiveEditorialArticle, article.id, 'Article archived.')} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700">Archive</button>}
               </div>
             </article>
