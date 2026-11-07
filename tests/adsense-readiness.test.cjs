@@ -157,3 +157,10 @@ test('root layout has one valid document shell after public/private split', () =
   assert.equal((rootLayout.match(/<html lang="en">/g) || []).length, 1);
   assert.equal(rootLayout.split('</html>').length - 1, 1);
 });
+
+test('legacy user-generated chat is not exposed in production Media surfaces', () => {
+  const match = read('app/match/[id]/page.tsx');
+  const live = read('app/live/page.tsx');
+  assert.match(match, /chatEnabled=\{process\.env\.NODE_ENV === 'development'\}/);
+  assert.match(live, /process\.env\.NODE_ENV === 'development' \? <div/);
+});
