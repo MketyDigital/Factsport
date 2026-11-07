@@ -29,7 +29,7 @@ export async function GET(request: Request) {
                 if (error) throw error;
                 return data || [];
             })();
-        const staging = process.env.FACTSPORT_ENVIRONMENT === 'staging';
+        const staging = env.FACTSPORT_ENVIRONMENT === 'staging';
         return NextResponse.json(data, { headers: { 'Cache-Control': staging ? 'private, no-store, max-age=0' : 'public, max-age=0, s-maxage=60, stale-while-revalidate=30' } });
     } catch {
         return NextResponse.json({ error: 'Standings temporarily unavailable' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
