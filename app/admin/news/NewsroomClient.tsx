@@ -49,6 +49,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const [statusFilter, setStatusFilter] = useState('all');
   const [message, setMessage] = useState('');
   const [reviewComment, setReviewComment] = useState('');
+  const [publicPolicyConfirmed, setPublicPolicyConfirmed] = useState<Record<string, boolean>>({});
   const [isPending, startTransition] = useTransition();
   const [mediaPending, startMediaTransition] = useTransition();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -288,7 +289,13 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 <button onClick={() => edit(article)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold">Edit</button>
-                {article.revision_status === 'in_review' && <button disabled={isPending} onClick={() => runAction(approveEditorialRevision, article.id, 'Revision approved. A separate publisher must publish it.')} className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white">Approve revision</button>}{article.revision_status === 'approved' && <button disabled={isPending} onClick={() => runAction(publishApprovedEditorial, article.id, 'Approved revision published.')} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white">Publish approved</button>}
+                {article.revision_status === 'in_review' && <button disabled={isPending} onClick={() => runAction(approveEditorialRevision, article.id, 'Revision approved. A separate publisher must publish it.')} className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white">Approve revision</button>}{article.revision_status === 'approved' && <div className="min-w-[230px] space-y-2">
+                  <label className="flex items-start gap-2 text-[10px] leading-4 text-slate-600">
+                    <input type="checkbox" checked={!!publicPolicyConfirmed[article.id]} onChange={e => setPublicPolicyConfirmed(current => ({ ...current, [article.id]: e.target.checked }))} className="mt-0.5" />
+                    <span>I confirm this revision is appropriate for public Media: no bookmaker/affiliate links, betting promotions, bonus codes, wagering CTAs or private Prediction offers.</span>
+                  </label>
+                  <button disabled={isPending || !publicPolicyConfirmed[article.id]} onClick={() => runAction(id => publishApprovedEditorial(id, true), article.id, 'Approved revision published.')} className="w-full rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Publish approved</button>
+                </div>}
                 {article.status !== 'archived' && <button disabled={isPending} onClick={() => runAction(archiveEditorialArticle, article.id, 'Article archived.')} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700">Archive</button>}
               </div>
             </article>
