@@ -322,3 +322,8 @@ Keep each read path disabled until its exact schema and reader grants are applie
 - \`FACTSPORT_COMPETITIONS_BACKEND=postgres\`: standings, same-season form and player leaders; requires 0006-0007.
 
 Do not use one broad match flag to activate later schema surfaces. This separation was added after protected staging correctly exposed that the base match reader must remain compatible with the base schema while 0006 is still unapplied.
+
+
+### Protected staging finding — base match reader / migration boundary
+
+The protected staging run on commit \`24484f5\` built and deployed the Worker but returned HTTP 500 on the authorized \`/matches\` page. Source inspection found that the base \`MATCH_SELECT\` projection had accidentally started selecting \`matches.season\`, which is introduced only by migration 0006 and is not present in the currently provisioned staging schema. The column was removed from the base match projection; season remains selected only by the competition-results reader behind \`FACTSPORT_COMPETITIONS_BACKEND\`. New homepage/highlights/competition flags are now separate from \`FACTSPORT_MATCHES_BACKEND\`. A fresh protected staging run on the corrected code is pending. The earlier keyset-pagination 503 still needs a fresh probe after the page render succeeds.
