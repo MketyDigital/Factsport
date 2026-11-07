@@ -8,7 +8,6 @@ import { Metadata, ResolvingMetadata } from 'next';
 import { ChevronLeft, Trophy, Calendar, CheckCircle, Search, CalendarDays, BarChart2, Star, Shield, Info, MapPin } from 'lucide-react';
 import LeagueMatchGroup from '@/app/components/LeagueMatchGroup';
 import LiveStandings from '@/app/components/LiveStandings';
-import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
 export async function generateMetadata({ params }: { params: Promise<{ league: string }> }, parent: ResolvingMetadata): Promise<Metadata> {
     const resolvedParams = await params;
@@ -149,7 +148,6 @@ export default async function TournamentDetailsPage({ params }: { params: Promis
             {/* BODY COMPONENT LAYOUT */}
             <div className="max-w-6xl mx-auto px-4 mt-8 space-y-8">
 
-                <AdsterraStandardBanner />
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* LEFT COLUMN: MATCHES & BRACKET */}
                     <div className="lg:col-span-2 space-y-6">
