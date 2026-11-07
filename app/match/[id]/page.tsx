@@ -1,8 +1,9 @@
 export const runtime = 'edge';
 export const revalidate = 3; 
 
-import { createClient as createPublicClient } from '@supabase/supabase-js'; 
-import { createClient as createServerClient } from '@/app/lib/supabase/server'; 
+import { createClient as createPublicClient } from '@supabase/supabase-js';
+import { getPostgresMatchById, getPostgresMatchPlaybackById, listPostgresMatchesWindow, getPostgresTeamForm } from '@/lib/adapters/postgres-matches';
+import { getPublicHomepageSettings } from '@/lib/adapters/postgres-homepage';
 
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -48,12 +49,41 @@ const sanitizeUrl = (url: string | null | undefined) => {
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'HALF TIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES', 'PAUSED', 'SUSPENDED'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
-const getSupabaseData = cache(async (id: string) => {
+const isPostgresMatchDetail = () => process.env.FACTSPORT_MATCH_DETAIL_BACKEND === 'postgres';
+
+const getMatchData = cache(async (id: string) => {
+    if (isPostgresMatchDetail()) {
+        const row = await getPostgresMatchById(id);
+        if (!row) return null;
+        return {
+            ...row,
+            widget_id: row.provider_widget_id || null,
+            displayClock: row.display_clock || '',
+        };
+    }
+    if (process.env.NODE_ENV !== 'development') return null;
+
+    // Development-only parity fallback. Production Media pages never read the
+    // legacy Supabase match row or its Prediction-only columns.
     const supabase = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    const { data, error } = await supabase.from('matches').select('id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, video_url, livestream_url, audio_url, widget_id, venue, stage, match_group, match_events, stats, lineups, h2h, referees, predictor, displayClock').eq('id', id).single();
+    const { data, error } = await supabase.from('matches')
+        .select('id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, video_url, livestream_url, audio_url, widget_id, venue, stage, match_group, match_events, stats, lineups, h2h, referees, predictor, displayClock')
+        .eq('id', id).single();
     if (error) return null;
     return data;
 });
+
+const getMatchPlayback = cache(async (id: string) => {
+    if (isPostgresMatchDetail()) return getPostgresMatchPlaybackById(id);
+    if (process.env.NODE_ENV !== 'development') return null;
+    const match = await getMatchData(id);
+    if (!match) return null;
+    return {
+        id: match.id, match_date: match.match_date, status: match.status,
+        video_url: match.video_url, livestream_url: match.livestream_url, audio_url: match.audio_url,
+    };
+});
+
 
 // Next 15 Dynamic Route Types
 type Props = {
@@ -64,7 +94,7 @@ type Props = {
 export async function generateMetadata({ params, searchParams }: Props, parent: ResolvingMetadata): Promise<Metadata> {
     const resolvedParams = await params;
     const resolvedSearchParams = await searchParams;
-    const match = await getSupabaseData(resolvedParams.id);
+    const [match, playback] = await Promise.all([getMatchData(resolvedParams.id), getMatchPlayback(resolvedParams.id)]);
     
     if (!match) return { title: 'Match Not Found | FactSport' };
 
@@ -126,7 +156,7 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
     const previousImages = (await parent).openGraph?.images || [];
     const mediaUnlockAt = new Date(match.match_date).getTime() - 15 * 60 * 1000;
     const mediaUnlocked = isFinished || isLive || (Number.isFinite(mediaUnlockAt) && Date.now() >= mediaUnlockAt);
-    const activeVideoUrl = mediaUnlocked ? sanitizeUrl(isFinished ? match.video_url : match.livestream_url) : null;
+    const activeVideoUrl = mediaUnlocked ? sanitizeUrl(isFinished ? playback?.video_url : playback?.livestream_url) : null;
 
     const isPlayerShare = resolvedSearchParams?.embed === 'true' || resolvedSearchParams?.play === 'true';
 
@@ -178,7 +208,7 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
   const resolvedParams = await params;
   if (!resolvedParams?.id) return notFound();
 
-  const dbData = await getSupabaseData(resolvedParams.id);
+  const [dbData, playback] = await Promise.all([getMatchData(resolvedParams.id), getMatchPlayback(resolvedParams.id)]);
   if (!dbData) return notFound();
 
   // Only the safe public match projection crosses into client components.
@@ -206,14 +236,20 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
       h2h: dbData.h2h,
       referees: dbData.referees,
       predictor: dbData.predictor,
-      widget_id: dbData.widget_id,
+      widget_id: dbData.widget_id || dbData.provider_widget_id || null,
+      displayClock: dbData.displayClock || dbData.display_clock || '',
   };
 
   const rawData = await getExternalData(clientMatchData);
   const data: any = rawData || {};
   
-  data.home_form = await getTeamForm(dbData.home_team);
-  data.away_form = await getTeamForm(dbData.away_team);
+  if (isPostgresMatchDetail()) {
+      data.home_form = await getPostgresTeamForm(dbData.home_team);
+      data.away_form = await getPostgresTeamForm(dbData.away_team);
+  } else {
+      data.home_form = await getTeamForm(dbData.home_team);
+      data.away_form = await getTeamForm(dbData.away_team);
+  }
   
   const currentStatus = (dbData.status || '').toUpperCase();
   const isFinishedApi = FINISHED_STATUSES.includes(currentStatus);
@@ -221,8 +257,8 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
   
   // Raw media URLs remain server-side; the playback API enforces the unlock time.
   const isUniversallyFinished = isFinishedApi;
-  const hasVideoSource = !!sanitizeUrl(isUniversallyFinished ? dbData.video_url : dbData.livestream_url);
-  const hasAudioSource = !isUniversallyFinished && !!sanitizeUrl(dbData.audio_url);
+  const hasVideoSource = !!sanitizeUrl(isUniversallyFinished ? playback?.video_url : playback?.livestream_url);
+  const hasAudioSource = !isUniversallyFinished && !!sanitizeUrl(playback?.audio_url);
   const hasPlayerSource = hasVideoSource || hasAudioSource;
   const initialPlayerMode: 'video' | 'audio' = hasVideoSource ? 'video' : 'audio';
 
@@ -246,20 +282,31 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
   const windowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
   const windowEnd = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
   
-  const publicSupabase = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-  const { data: tickerMatches } = await publicSupabase
-      .from('matches')
-      .select('id, espn_id, home_team, away_team, status, home_score, away_score, match_date, displayClock')
-      .gte('match_date', windowStart)
-      .lte('match_date', windowEnd)
-      .limit(50); 
-      
-  const siteSettingsQuery = await publicSupabase.from('site_settings').select('announcement_text, announcement_link, announcement_enabled').limit(1).maybeSingle();
-  const siteSettings = (siteSettingsQuery.data || {}) as {
-      announcement_text?: string | null;
-      announcement_link?: string | null;
-      announcement_enabled?: boolean | null;
-  };
+  let tickerMatches: any[] = [];
+  if (isPostgresMatchDetail()) {
+      const rows = await listPostgresMatchesWindow({ from: windowStart, to: windowEnd });
+      tickerMatches = rows.slice(0, 50).map((row: any) => ({
+          id: row.id, espn_id: row.espn_id, home_team: row.home_team, away_team: row.away_team,
+          status: row.status, home_score: row.home_score, away_score: row.away_score,
+          match_date: row.match_date, displayClock: row.display_clock || '',
+      }));
+  } else if (process.env.NODE_ENV === 'development') {
+      const publicSupabase = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+      const { data } = await publicSupabase.from('matches')
+          .select('id, espn_id, home_team, away_team, status, home_score, away_score, match_date, displayClock')
+          .gte('match_date', windowStart).lte('match_date', windowEnd).limit(50);
+      tickerMatches = data || [];
+  }
+
+  let siteSettings: { announcement_text?: string | null; announcement_link?: string | null; announcement_enabled?: boolean | null } = {};
+  if (process.env.FACTSPORT_HOMEPAGE_BACKEND === 'postgres') {
+      siteSettings = (await getPublicHomepageSettings()) || {};
+  } else if (process.env.NODE_ENV === 'development') {
+      const publicSupabase = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+      const result = await publicSupabase.from('site_settings')
+          .select('announcement_text, announcement_link, announcement_enabled').limit(1).maybeSingle();
+      siteSettings = (result.data || {}) as typeof siteSettings;
+  }
   const announcement = {
       text: siteSettings.announcement_text || '',
       link: siteSettings.announcement_link || null,
