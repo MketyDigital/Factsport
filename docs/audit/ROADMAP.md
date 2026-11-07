@@ -350,3 +350,11 @@ The protected staging run on commit \`24484f5\` built and deployed the Worker bu
 ### Monetization placement preservation
 
 The acceptance contract prohibits silent removal of monetization. Existing public placements have been restored on the V2 branch and the test suite now guards their expected counts. Any later change to affiliate inventory or placement requires an explicit product/legal decision.
+
+## 2026-11-07 Hyperdrive lifecycle correction — M11
+
+- Intermittent staging 503s were investigated. The app had a module-scoped postgres.js client reused across Worker requests, and the match reader used sql.unsafe() for its dynamic projection. Both were removed: adapters now use a request-scoped client closed in finally, and static SELECT projections preserve prepared statements.
+- Isolated verification passed on 3ed1df5 (run 42383870339); native Vinext build passed (run 42383870315).
+- Protected staging passed (run 42383870331): deny-by-default, Hyperdrive/R2 health, /matches initial render, timestamp+UUID cursor pagination without duplicate row, and auth/cache isolation all passed. The pagination 503 did not reproduce after the lifecycle change.
+- Continue monitoring transient database errors; a successful rerun is not a guarantee against future infrastructure failures.
+- Main /match/[id] remains a legacy path until canonical legacy-ID crosswalk, prediction/campaign parity, server-authorized stream grants, VIP analysis RBAC, ticker and settings reads are complete. See M11.
