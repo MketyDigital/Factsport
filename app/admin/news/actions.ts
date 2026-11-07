@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
-import { authorizeAdminAction } from '@/app/lib/admin/authorization';
+import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 
 type EditorialInput = {
   id?: string; title: string; slug: string; excerpt?: string; bodyMarkdown: string;
@@ -20,22 +20,12 @@ function safeHttpUrl(value: string | undefined): string | null {
   return parsed.toString();
 }
 
-async function getActorId(sql: any, authId: string): Promise<string | null> {
-  const rows = await sql`
-    SELECT user_id FROM public.external_identities
-    WHERE subject = ${authId}
-    ORDER BY created_at DESC
-    LIMIT 2
-  `;
-  return rows.length === 1 ? rows[0].user_id : null;
-}
-
 function revalidateEditorial() {
   revalidatePath('/admin/news'); revalidatePath('/'); revalidatePath('/news'); revalidatePath('/sitemap.xml');
 }
 
 export async function saveEditorialDraft(input: EditorialInput): Promise<ActionResult<{ id: string }>> {
-  const authorization = await authorizeAdminAction();
+  const authorization = await authorizeMediaEditorialAction('draft');
   if (!authorization.ok) return { success: false, error: authorization.error };
   try {
     const title = cleanText(input?.title, 240);
@@ -58,7 +48,7 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
     };
 
     const id = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
-      const actorId = await getActorId(tx, authorization.user.id);
+      const actorId = await getActorId(tx, authorization.user.domainUserId);
       if (!actorId) throw new Error('This administrator has no unique Factsport domain identity mapping. Draft ownership cannot be recorded.');
       let articleId = input.id || null;
       let currentStatus = 'draft';
@@ -121,12 +111,12 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
 }
 
 export async function submitEditorialForReview(articleId: string): Promise<ActionResult> {
-  const authorization = await authorizeAdminAction();
+  const authorization = await authorizeMediaEditorialAction('draft');
   if (!authorization.ok) return { success: false, error: authorization.error };
   if (!/^[0-9a-f-]{36}$/i.test(articleId)) return { success: false, error: 'Invalid article identifier.' };
   try {
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
-      const actorId = await getActorId(tx, authorization.user.id);
+      const actorId = await getActorId(tx, authorization.user.domainUserId);
       if (!actorId) throw new Error('This administrator has no unique Factsport domain identity mapping.');
       const articles = await tx`SELECT id, status FROM public.editorial_articles WHERE id=${articleId}::uuid FOR UPDATE`;
       if (!articles.length || articles[0].status === 'archived') throw new Error('Article is unavailable.');
@@ -152,12 +142,12 @@ export async function submitEditorialForReview(articleId: string): Promise<Actio
 }
 
 export async function approveAndPublishEditorial(articleId: string): Promise<ActionResult> {
-  const authorization = await authorizeAdminAction();
+  const authorization = await authorizeMediaEditorialAction('publish');
   if (!authorization.ok) return { success: false, error: authorization.error };
   if (!/^[0-9a-f-]{36}$/i.test(articleId)) return { success: false, error: 'Invalid article identifier.' };
   try {
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
-      const actorId = await getActorId(tx, authorization.user.id);
+      const actorId = await getActorId(tx, authorization.user.domainUserId);
       if (!actorId) throw new Error('This administrator has no unique Factsport domain identity mapping. Publishing is blocked.');
       const articles = await tx`SELECT id, status FROM public.editorial_articles WHERE id=${articleId}::uuid FOR UPDATE`;
       if (!articles.length || articles[0].status === 'archived') throw new Error('Article is unavailable.');
@@ -244,7 +234,7 @@ export async function approveAndPublishEditorial(articleId: string): Promise<Act
 }
 
 export async function archiveEditorialArticle(articleId: string): Promise<ActionResult> {
-  const authorization = await authorizeAdminAction();
+  const authorization = await authorizeMediaEditorialAction('archive');
   if (!authorization.ok) return { success: false, error: authorization.error };
   if (!/^[0-9a-f-]{36}$/i.test(articleId)) return { success: false, error: 'Invalid article identifier.' };
   try {
