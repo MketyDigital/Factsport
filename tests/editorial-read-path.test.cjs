@@ -43,6 +43,7 @@ test('article rendering sanitizes raw HTML and restricts iframe embeds to truste
   assert.ok(renderer.includes('www.youtube-nocookie.com'));
   assert.ok(renderer.includes('player.vimeo.com'));
   assert.ok(renderer.includes("sandbox: 'allow-scripts allow-same-origin allow-presentation'"));
+  assert.ok(renderer.includes("href: [...(defaultSchema.protocols?.href || []), 'match-widget']"));
   assert.ok(renderer.includes('match-widget:'));
   assert.ok(!renderer.includes('match-widget-embed'));
 });
