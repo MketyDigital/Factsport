@@ -148,7 +148,17 @@ REVOKE ALL ON TABLE
   public.editorial_article_revisions,
   public.editorial_article_sources
 FROM PUBLIC, factsport_v2_reader;
+CREATE OR REPLACE VIEW public.public_media_assets AS
+SELECT object_key, content_type, byte_size, sha256, width, height, alt_text,
+       attribution_text
+FROM public.media_assets
+WHERE is_public = true
+  AND rights_status IN ('owned', 'licensed', 'editorial_exception')
+  AND (usage_expires_at IS NULL OR usage_expires_at > now());
+
 REVOKE ALL ON public.public_editorial_articles FROM PUBLIC;
-GRANT SELECT ON public.public_editorial_articles TO factsport_v2_reader;
+REVOKE ALL ON public.public_media_assets FROM PUBLIC;
+GRANT SELECT ON public.public_editorial_articles, public.public_media_assets
+  TO factsport_v2_reader;
 
 COMMIT;
