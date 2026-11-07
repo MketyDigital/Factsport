@@ -9,7 +9,7 @@ GRANT USAGE ON SCHEMA public TO factsport_v2_editorial_writer;
 -- Editorial content and revision history. No DELETE or TRUNCATE privileges.
 GRANT SELECT, INSERT, UPDATE ON public.editorial_articles
   TO factsport_v2_editorial_writer;
-GRANT SELECT, INSERT ON public.editorial_article_revisions
+GRANT SELECT, INSERT, UPDATE ON public.editorial_article_revisions
   TO factsport_v2_editorial_writer;
 GRANT SELECT, INSERT, UPDATE ON public.editorial_article_media
   TO factsport_v2_editorial_writer;
