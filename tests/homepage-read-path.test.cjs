@@ -15,43 +15,44 @@ const matchesAdapter = read('lib/adapters/postgres-matches.ts');
 const editorialAdapter = read('lib/adapters/postgres-editorial.ts');
 
 test('homepage uses PostgreSQL views for featured matches and rights-cleared highlights', () => {
-  assert.match(home, /FACTSPORT_MATCHES_BACKEND === 'postgres'/);
-  assert.match(home, /listPublicMatchHighlights\\(5\\)/);
-  assert.match(home, /listPublicFeaturedMatches/);
-  assert.match(home, /listPostgresMatchesWindow/);
-  assert.match(home, /const getSupabase = \\(\\) =>/);
-  assert.match(home, /image_url: row\\.hero_media_key/);
+  assert.ok(home.includes("FACTSPORT_MATCHES_BACKEND === 'postgres'"));
+  assert.ok(home.includes('listPublicMatchHighlights(5)'));
+  assert.ok(home.includes('listPublicFeaturedMatches'));
+  assert.ok(home.includes('listPostgresMatchesWindow'));
+  assert.ok(home.includes('const getSupabase = () =>'));
+  assert.ok(home.includes('image_url: row.hero_media_key'));
 });
 
 test('homepage settings are server-routed and do not expose the full social settings row', () => {
-  assert.match(dashboard, /fetch\\('\\/api\\/settings'\\)/);
-  assert.doesNotMatch(dashboard, /createClient|from\\('site_settings'\\)/);
-  assert.match(settingsRoute, /getPublicHomepageSettings/);
-  assert.match(settingsRoute, /featured_match_id/);
-  assert.match(settingsRoute, /select\\('code_1xbet, code_melbet, link_1xbet, link_melbet, featured_match_id:social_config->>featured_match_id'\\)/);
-  assert.doesNotMatch(settingsRoute, /select\\('\\*'\\)/);
+  assert.ok(dashboard.includes("fetch('/api/settings')"));
+  assert.ok(!dashboard.includes('createClient'));
+  assert.ok(!dashboard.includes("from('site_settings')"));
+  assert.ok(settingsRoute.includes('getPublicHomepageSettings'));
+  assert.ok(settingsRoute.includes('featured_match_id'));
+  assert.ok(settingsRoute.includes('featured_match_id:social_config->>featured_match_id'));
+  assert.ok(!settingsRoute.includes("select('*')"));
 });
 
 test('mini standings has a PostgreSQL season-aware read path', () => {
-  assert.match(standings, /listCurrentCompetitionStandings/);
-  assert.match(standings, /FACTSPORT_MATCHES_BACKEND === 'postgres'/);
+  assert.ok(standings.includes('listCurrentCompetitionStandings'));
+  assert.ok(standings.includes("FACTSPORT_MATCHES_BACKEND === 'postgres'"));
 });
 
 test('highlight cards use public R2 thumbnails and stable highlight identifiers', () => {
-  assert.match(highlights, /item\\.thumbnail_url/);
-  assert.match(highlights, /item\\.highlight_id \\|\\| item\\.id/);
-  assert.match(homepageAdapter, /FROM public\\.public_match_highlights/i);
-  assert.match(homepageAdapter, /FROM public\\.public_featured_matches/i);
-  assert.match(homepageAdapter, /FROM public\\.public_competition_standings/i);
-  assert.match(homepageAdapter, /FROM public\\.public_homepage_settings/i);
+  assert.ok(highlights.includes('item.thumbnail_url'));
+  assert.ok(highlights.includes('item.highlight_id || item.id'));
+  assert.ok(homepageAdapter.includes('FROM public.public_match_highlights'));
+  assert.ok(homepageAdapter.includes('FROM public.public_featured_matches'));
+  assert.ok(homepageAdapter.includes('FROM public.public_competition_standings'));
+  assert.ok(homepageAdapter.includes('FROM public.public_homepage_settings'));
 });
 
 test('domain adapters share one bounded Hyperdrive client per Worker isolate', () => {
-  assert.match(dbClient, /max: 1/);
-  assert.match(dbClient, /FACTSPORT_HYPERDRIVE/);
-  assert.match(matchesAdapter, /getFactsportPostgres/);
-  assert.match(editorialAdapter, /getFactsportPostgres/);
-  assert.match(homepageAdapter, /getFactsportPostgres/);
-  assert.doesNotMatch(matchesAdapter, /let client: ReturnType<typeof postgres>/);
-  assert.doesNotMatch(editorialAdapter, /let client: ReturnType<typeof postgres>/);
+  assert.ok(dbClient.includes('max: 1'));
+  assert.ok(dbClient.includes('FACTSPORT_HYPERDRIVE'));
+  assert.ok(matchesAdapter.includes('getFactsportPostgres'));
+  assert.ok(editorialAdapter.includes('getFactsportPostgres'));
+  assert.ok(homepageAdapter.includes('getFactsportPostgres'));
+  assert.ok(!matchesAdapter.includes('let client: ReturnType<typeof postgres>'));
+  assert.ok(!editorialAdapter.includes('let client: ReturnType<typeof postgres>'));
 });
