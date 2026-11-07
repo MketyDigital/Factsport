@@ -5,7 +5,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, CalendarDays, Trophy } from 'lucide-react';
 import { listCurrentCompetitionDirectory } from '@/lib/adapters/postgres-homepage';
-import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
 export const metadata: Metadata = {
   title: 'Football Tournaments & Competitions | FactSport',
@@ -62,7 +61,6 @@ export default async function TournamentsPage() {
         </div>
 
         <div className="mb-6">
-          <AdsterraStandardBanner />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
