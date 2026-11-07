@@ -37,7 +37,6 @@ CREATE TABLE IF NOT EXISTS public.match_media (
       rights_status IN ('owned', 'licensed', 'editorial_exception')
       AND rights_reviewed_by IS NOT NULL
       AND rights_reviewed_at IS NOT NULL
-      AND (usage_expires_at IS NULL OR usage_expires_at > now())
     )
   ),
   CONSTRAINT match_media_safe_video_url CHECK (
