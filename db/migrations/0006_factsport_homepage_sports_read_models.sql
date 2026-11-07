@@ -100,12 +100,16 @@ CREATE TABLE IF NOT EXISTS public.match_highlights (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT match_highlight_video_id CHECK (
-    (provider = 'youtube' AND external_video_id ~ '^[A-Za-z0-9_-]{6,64}
-  CONSTRAINT match_highlight_canonical_url CHECK (
-    canonical_url ~ '^https://(www\.)?(youtube\.com/watch\?v=[A-Za-z0-9_-]{6,64}|youtu\.be/[A-Za-z0-9_-]{6,64}|vimeo\.com/[0-9]+)([?&][A-Za-z0-9_=%&.-]*)?$'
+    (provider = 'youtube' AND external_video_id ~ '^[A-Za-z0-9_-]{6,64}$')
+    OR (provider = 'vimeo' AND external_video_id ~ '^[0-9]{1,20}$')
   ),
-  CONSTRAINT match_highlight_embed_url CHECK (
-    embed_url ~ '^https://(www\.)?(youtube\.com/embed/[A-Za-z0-9_-]{6,64}|youtube-nocookie\.com/embed/[A-Za-z0-9_-]{6,64}|player\.vimeo\.com/video/[0-9]+)([?&][A-Za-z0-9_=%&.-]*)?$'
+  CONSTRAINT match_highlight_provider_url CHECK (
+    (provider = 'youtube' AND canonical_url ~ '^https://(www\.)?(youtube\.com/watch\?v=[A-Za-z0-9_-]{6,64}|youtu\.be/[A-Za-z0-9_-]{6,64})([?&][A-Za-z0-9_=%&.-]*)?$')
+    OR (provider = 'vimeo' AND canonical_url ~ '^https://vimeo\.com/[0-9]+([?&][A-Za-z0-9_=%&.-]*)?$')
+  ),
+  CONSTRAINT match_highlight_provider_embed CHECK (
+    (provider = 'youtube' AND embed_url ~ '^https://(www\.)?(youtube\.com/embed/[A-Za-z0-9_-]{6,64}|youtube-nocookie\.com/embed/[A-Za-z0-9_-]{6,64})([?&][A-Za-z0-9_=%&.-]*)?$')
+    OR (provider = 'vimeo' AND embed_url ~ '^https://player\.vimeo\.com/video/[0-9]+([?&][A-Za-z0-9_=%&.-]*)?$')
   ),
   CONSTRAINT match_highlight_rights_reference CHECK (
     rights_status NOT IN ('licensed', 'editorial_exception') OR rights_reference IS NOT NULL
