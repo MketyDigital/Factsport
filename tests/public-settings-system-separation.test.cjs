@@ -26,6 +26,6 @@ test('legacy public settings response is preserved through separate Media and Pr
   assert.match(route, /Promise\.all/);
   assert.match(route, /FACTSPORT_HOMEPAGE_BACKEND/);
   assert.match(route, /FACTSPORT_PREDICTION_SETTINGS_BACKEND/);
-  assert.match(route, /FACTSPORT_ENVIRONMENT === 'production'/);
+  assert.match(route, /FACTSPORT_ENVIRONMENT !== 'development'/);
   assert.doesNotMatch(route, /link1x: null/);
 });
