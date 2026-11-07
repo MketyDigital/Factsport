@@ -13,8 +13,8 @@ test('legacy match identity is an additive alias; V2 primary IDs remain canonica
   assert.match(migration, /UNIQUE INDEX IF NOT EXISTS matches_legacy_match_id_uidx/i);
   assert.match(migration, /WHERE legacy_match_id IS NOT NULL/i);
   assert.doesNotMatch(migration, /DROP COLUMN|UPDATE public\.matches\s+SET\s+id\s*=/i);
-  assert.match(adapter, /WHERE m\\.id = \\${matchId}::uuid OR m\\.legacy_match_id = \\${matchId}::uuid/);
-  assert.match(adapter, /ORDER BY CASE WHEN m\\.id = \\${matchId}::uuid THEN 0 ELSE 1 END/);
+  assert.match(adapter, /WHERE m\.id = \$\{matchId\}::uuid OR m\.legacy_match_id = \$\{matchId\}::uuid/);
+  assert.match(adapter, /ORDER BY CASE WHEN m\.id = \$\{matchId\}::uuid THEN 0 ELSE 1 END/);
 });
 
 test('PostgreSQL match detail response is a safe public projection', () => {
