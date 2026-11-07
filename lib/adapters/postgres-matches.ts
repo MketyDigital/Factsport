@@ -186,9 +186,11 @@ export async function getPostgresMatchById(matchId: string) {
              m.h2h, m.referees, m.predictor, m.source_updated_at, m.display_clock,
              m.provider_widget_id,
              mm.video_url, mm.livestream_url, mm.audio_url, mm.media_url, mm.stream_url,
-             mm.media_mode, mm.chat_pin_text, mm.chat_pin_link, mm.attribution_text
+             mm.media_mode, mm.attribution_text,
+             mp.pin_text AS chat_pin_text, mp.pin_link AS chat_pin_link
       FROM public.matches m
       LEFT JOIN public.public_match_media mm ON mm.match_id = m.id
+      LEFT JOIN public.public_match_pins mp ON mp.match_id = m.id
       WHERE m.id = ${matchId}::uuid OR m.legacy_match_id = ${matchId}::uuid
       ORDER BY CASE WHEN m.id = ${matchId}::uuid THEN 0 ELSE 1 END
       LIMIT 1
