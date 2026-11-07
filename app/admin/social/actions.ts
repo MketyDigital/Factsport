@@ -2,23 +2,14 @@
 
 import { revalidatePath } from 'next/cache';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
-import { authorizeAdminAction } from '@/app/lib/admin/authorization';
+import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 
 type Result = { success: true; id?: string } | { success: false; error: string };
-
-async function getActorId(tx: any, authId: string): Promise<string> {
-  const actors = await tx`
-    SELECT user_id FROM public.external_identities
-    WHERE subject=${authId} ORDER BY created_at DESC LIMIT 2
-  `;
-  if (actors.length !== 1) throw new Error('This administrator has no unique Factsport domain identity mapping.');
-  return actors[0].user_id as string;
-}
 
 export async function scheduleSocialPublication(input: {
   channelId: string; contentText: string; articleId?: string; linkUrl?: string; scheduledAt: string;
 }): Promise<Result> {
-  const authorization = await authorizeAdminAction();
+  const authorization = await authorizeMediaEditorialAction('social');
   if (!authorization.ok) return { success: false, error: authorization.error };
   if (!/^[0-9a-f-]{36}$/i.test(input?.channelId || '')) return { success: false, error: 'Choose a valid social channel.' };
   try {
@@ -35,7 +26,7 @@ export async function scheduleSocialPublication(input: {
     if (input.articleId && !/^[0-9a-f-]{36}$/i.test(input.articleId)) return { success: false, error: 'Invalid linked article.' };
 
     const id = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
-      const actorId = await getActorId(tx, authorization.user.id);
+      const actorId = await getActorId(tx, authorization.user.domainUserId);
       const channels = await tx`SELECT id FROM public.media_social_channels WHERE id=${input.channelId}::uuid AND is_enabled=true FOR SHARE`;
       if (!channels.length) throw new Error('This social channel is not enabled for publishing.');
       if (input.articleId) {
@@ -71,12 +62,12 @@ export async function scheduleSocialPublication(input: {
 }
 
 export async function cancelSocialPublication(publicationId: string): Promise<Result> {
-  const authorization = await authorizeAdminAction();
+  const authorization = await authorizeMediaEditorialAction('social');
   if (!authorization.ok) return { success: false, error: authorization.error };
   if (!/^[0-9a-f-]{36}$/i.test(publicationId)) return { success: false, error: 'Invalid social post identifier.' };
   try {
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
-      const actorId = await getActorId(tx, authorization.user.id);
+      const actorId = await getActorId(tx, authorization.user.domainUserId);
       const outbox = await tx`
         SELECT id, status FROM public.media_social_outbox
         WHERE publication_id=${publicationId}::uuid FOR UPDATE
