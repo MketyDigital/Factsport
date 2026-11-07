@@ -1,9 +1,10 @@
 /**
  * Public editorial read adapter for Factsport V2.
  * Queries only published, rights-filtered PostgreSQL views; no browser DB access.
+ * Each operation creates and closes its own request-scoped Hyperdrive client.
  */
 import 'server-only';
-import { getFactsportPostgres } from '@/lib/adapters/postgres-client';
+import { withFactsportPostgres } from '@/lib/adapters/postgres-client';
 
 export interface PublicEditorialArticle {
   id: string; slug: string; title: string; excerpt: string | null;
@@ -34,58 +35,61 @@ export async function listPublicEditorialArticles(input: {
   if (!Number.isInteger(limit) || limit < 1 || limit > 50) throw new Error('Invalid editorial page size');
   if (!Number.isInteger(offset) || offset < 0 || offset > 5000) throw new Error('Invalid editorial offset');
   if (category && category.length > 80) throw new Error('Invalid editorial category');
-  const sql = getFactsportPostgres();
-  if (category && category !== 'All') {
+  return withFactsportPostgres(async sql => {
+    if (category && category !== 'All') {
+      return sql`
+        SELECT id, slug, title, excerpt, body_markdown, category, tags,
+               is_headline, is_breaking, author_display_name, published_at,
+               created_at, updated_at, canonical_url, hero_media_key,
+               hero_media_content_type, hero_media_alt_text, hero_media_attribution,
+               origin, seo_title, seo_description, original_created_at, last_verified_at,
+               (SELECT count(*)::integer FROM public.public_editorial_articles WHERE category = ${category}) AS total_count
+        FROM public.public_editorial_articles
+        WHERE category = ${category}
+        ORDER BY published_at DESC, id DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+    }
     return sql`
       SELECT id, slug, title, excerpt, body_markdown, category, tags,
              is_headline, is_breaking, author_display_name, published_at,
              created_at, updated_at, canonical_url, hero_media_key,
              hero_media_content_type, hero_media_alt_text, hero_media_attribution,
              origin, seo_title, seo_description, original_created_at, last_verified_at,
-             (SELECT count(*)::integer FROM public.public_editorial_articles WHERE category = ${category}) AS total_count
+             (SELECT count(*)::integer FROM public.public_editorial_articles) AS total_count
       FROM public.public_editorial_articles
-      WHERE category = ${category}
       ORDER BY published_at DESC, id DESC
       LIMIT ${limit} OFFSET ${offset}
     `;
-  }
-  return sql`
-    SELECT id, slug, title, excerpt, body_markdown, category, tags,
-           is_headline, is_breaking, author_display_name, published_at,
-           created_at, updated_at, canonical_url, hero_media_key,
-           hero_media_content_type, hero_media_alt_text, hero_media_attribution,
-           origin, seo_title, seo_description, original_created_at, last_verified_at,
-           (SELECT count(*)::integer FROM public.public_editorial_articles) AS total_count
-    FROM public.public_editorial_articles
-    ORDER BY published_at DESC, id DESC
-    LIMIT ${limit} OFFSET ${offset}
-  `;
+  });
 }
 
 export async function getPublicEditorialArticle(slug: string) {
   if (!slug || slug.length > 240 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return null;
-  const sql = getFactsportPostgres();
-  const rows = await sql`
-    SELECT id, slug, title, excerpt, body_markdown, category, tags,
-           is_headline, is_breaking, author_display_name, published_at,
-           created_at, updated_at, canonical_url, hero_media_key,
-           hero_media_content_type, hero_media_alt_text, hero_media_attribution,
-           origin, seo_title, seo_description, original_created_at, last_verified_at
-    FROM public.public_editorial_articles
-    WHERE slug = ${slug}
-    LIMIT 1
-  `;
-  return rows[0] ?? null;
+  return withFactsportPostgres(async sql => {
+    const rows = await sql`
+      SELECT id, slug, title, excerpt, body_markdown, category, tags,
+             is_headline, is_breaking, author_display_name, published_at,
+             created_at, updated_at, canonical_url, hero_media_key,
+             hero_media_content_type, hero_media_alt_text, hero_media_attribution,
+             origin, seo_title, seo_description, original_created_at, last_verified_at
+      FROM public.public_editorial_articles
+      WHERE slug = ${slug}
+      LIMIT 1
+    `;
+    return rows[0] ?? null;
+  });
 }
 
 export async function getPublicMediaAsset(key: string) {
   if (!key || key.length > 512 || !/^editorial\/[A-Za-z0-9/_-]+$/.test(key) || key.includes('..') || key.includes('//')) return null;
-  const sql = getFactsportPostgres();
-  const rows = await sql`
-    SELECT object_key, content_type, byte_size, sha256, width, height, alt_text, attribution_text
-    FROM public.public_media_assets
-    WHERE object_key = ${key}
-    LIMIT 1
-  `;
-  return rows[0] ?? null;
+  return withFactsportPostgres(async sql => {
+    const rows = await sql`
+      SELECT object_key, content_type, byte_size, sha256, width, height, alt_text, attribution_text
+      FROM public.public_media_assets
+      WHERE object_key = ${key}
+      LIMIT 1
+    `;
+    return rows[0] ?? null;
+  });
 }
