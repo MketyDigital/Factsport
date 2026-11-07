@@ -1,4 +1,3 @@
-import { createClient } from '@/app/lib/supabase/client';
 import { fetchEspnDetails } from '@/app/lib/espn';
 import { readVerifiedFullTimeScore } from '@/lib/football-data-score.cjs';
 
