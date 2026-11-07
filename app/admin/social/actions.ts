@@ -51,6 +51,13 @@ export async function scheduleSocialPublication(input: {
         INSERT INTO public.media_social_outbox (publication_id, status, available_at)
         VALUES (${publication[0].id}::uuid, 'pending', ${scheduledAt.toISOString()}::timestamptz)
       `;
+      await tx`
+        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, article_id, details)
+        VALUES (
+          ${actorId}::uuid, 'social_scheduled', ${input.articleId || null}::uuid,
+          ${JSON.stringify({ publicationId: publication[0].id, channelId: input.channelId, scheduledAt: scheduledAt.toISOString() })}::jsonb
+        )
+      `;
       return publication[0].id as string;
     }));
     revalidatePath('/admin/social');
@@ -85,6 +92,10 @@ export async function cancelSocialPublication(publicationId: string): Promise<Re
         UPDATE public.media_social_outbox SET status='cancelled', lease_owner=NULL,
           lease_expires_at=NULL, updated_at=now()
         WHERE id=${outbox[0].id}::uuid
+      `;
+      await tx`
+        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, details)
+        VALUES (${actorId}::uuid, 'social_cancelled', ${JSON.stringify({ publicationId })}::jsonb)
       `;
     }));
     revalidatePath('/admin/social');
