@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { readNonNegativeScore } from '../lib/football-data-score.cjs';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -84,9 +85,8 @@ async function fetchEspnCups() {
 
             const { data: pendingMatches, error: fetchErr } = await supabase
                 .from('matches')
-                .select('api_id, home_team, away_team')
-                .eq('league', leagueName)
-                .in('status', ['SCHEDULED', 'HT', 'LIVE']); 
+                .select('api_id, espn_id, home_team, away_team, home_score, away_score, status, points_distributed')
+                .eq('league', leagueName); 
 
             if (fetchErr) {
                 console.error(`   ⚠️ Could not fetch pending matches to verify IDs: ${fetchErr.message}`);
@@ -107,10 +107,12 @@ async function fetchEspnCups() {
                 }
 
                 if (pendingMatches) {
-                    const existingMatch = pendingMatches.find(m => 
-                        m.home_team === homeName && 
-                        m.away_team === awayName && 
-                        m.api_id !== espnId
+                    const existingMatch = pendingMatches.find(m =>
+                        ['SCHEDULED', 'HT', 'LIVE'].includes(m.status) &&
+                        m.home_team === homeName &&
+                        m.away_team === awayName &&
+                        m.api_id !== espnId &&
+                        !m.points_distributed
                     );
 
                     if (existingMatch) {
@@ -122,16 +124,25 @@ async function fetchEspnCups() {
                     }
                 }
                 
+                const homeScore = readNonNegativeScore(homeCompetitor.score);
+                const awayScore = readNonNegativeScore(awayCompetitor.score);
+                const existingById = pendingMatches?.find(m => m.api_id === espnId || m.espn_id === espnId);
+                const isSettled = Boolean(existingById?.points_distributed);
+                const incomingStatus = normalizeEspnStatus(e.status.type.state, e.date);
+                const terminalStatuses = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'];
+                const preserveTerminal = isSettled || (terminalStatuses.includes(existingById?.status) && !terminalStatuses.includes(incomingStatus));
+
                 matchesToUpsert.push({
-                    api_id: espnId,     
-                    espn_id: espnId,    
+                    api_id: espnId,
+                    espn_id: espnId,
                     league: leagueName,
                     home_team: homeName,
                     away_team: awayName,
-                    home_score: parseInt(homeCompetitor.score) || 0,
-                    away_score: parseInt(awayCompetitor.score) || 0,
+                    ...(homeScore !== null && awayScore !== null && !isSettled
+                        ? { home_score: homeScore, away_score: awayScore }
+                        : (!existingById ? { home_score: null, away_score: null } : {})),
                     match_date: e.date,
-                    status: normalizeEspnStatus(e.status.type.state, e.date),
+                    status: preserveTerminal ? existingById.status : incomingStatus,
                     home_logo: homeCompetitor.team.logo || null,
                     away_logo: awayCompetitor.team.logo || null,
                     updated_at: new Date().toISOString()
