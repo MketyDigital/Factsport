@@ -39,12 +39,12 @@ export default async function AdminNewsPage() {
         a.updated_at
       FROM public.editorial_articles a
       LEFT JOIN LATERAL (
-        SELECT snapshot, workflow_status
+        SELECT snapshot, workflow_status, created_at
         FROM public.editorial_article_revisions
         WHERE article_id=a.id AND workflow_status IN ('draft','in_review')
         ORDER BY revision_number DESC LIMIT 1
       ) r ON true
-      ORDER BY a.updated_at DESC
+      ORDER BY GREATEST(a.updated_at, COALESCE(r.created_at, a.updated_at)) DESC
       LIMIT 200
     `);
     return <NewsroomClient initialArticles={articles as any[]} />;
