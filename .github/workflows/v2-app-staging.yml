@@ -150,7 +150,7 @@ jobs:
             "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=$CURSOR_DATE_ENCODED&cursorId=$CURSOR_ID_ENCODED")"
           if [ "$PAGINATION_STATUS" != "200" ] || ! jq -e --arg cursorId "$CURSOR_ID" 'type == "array" and all(.[]; .id != $cursorId)' /tmp/factsport-staging-pagination >/dev/null 2>&1; then
             PAGINATION_CODE="$(jq -r '.error // "non-json"' /tmp/factsport-staging-pagination 2>/dev/null || echo non-json)"
-            PAGINATION_DETAILS="$(jq -r 'if type == "object" then "sqlState=" + (.sqlState // "none") + " class=" + (.errorClass // "none") else "" end' /tmp/factsport-staging-pagination 2>/dev/null || true)"
+            PAGINATION_DETAILS="$(jq -r 'if type == "object" then "sqlState=" + (.sqlState // "none") + " class=" + (.errorClass // "none") + " hint=" + (.errorHint // "none") else "" end' /tmp/factsport-staging-pagination 2>/dev/null || true)"
             echo "::error::Stable timestamp+UUID keyset pagination failed (HTTP $PAGINATION_STATUS; code $PAGINATION_CODE; $PAGINATION_DETAILS)."
             exit 1
           fi
