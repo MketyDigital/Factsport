@@ -9,6 +9,7 @@ const grantsSql = read('db/migrations/0010_factsport_editorial_writer_grants.sql
 const revisionSql = read('db/migrations/0011_factsport_editorial_revision_workflow.sql');
 const legacyMediaSql = read('db/migrations/0012_factsport_editorial_legacy_media_mapping.sql');
 const teamMediaGrants = read('db/migrations/0013_factsport_editorial_team_media_grants.sql');
+const revisionMediaSql = read('db/migrations/0014_factsport_revision_scoped_media.sql');
 const publicAdapter = read('lib/adapters/postgres-editorial.ts');
 const newsListing = read('app/news/page.tsx');
 const newsArticle = read('app/news/[slug]/page.tsx');
@@ -120,7 +121,13 @@ test('editorial media uploads are private, validated, hashed and rights-reviewed
   assert.match(mediaUpload, /isSameOriginRequest/);
   assert.match(mediaActions, /rights_reviewed_by/);
   assert.match(mediaActions, /rights_reviewed_at/);
-  assert.match(mediaActions, /status !== 'draft'/);
-  assert.match(mediaActions, /editorial_article_team_media/);
+  assert.match(mediaActions, /workflow_status='draft'/);
+  assert.match(mediaActions, /editorial_article_revision_media/);
+  assert.match(mediaActions, /is_public=false/);
+  assert.match(actions, /editorial_article_revision_media/);
+  assert.match(actions, /is_public=true/);
+  assert.match(revisionMediaSql, /CREATE TABLE IF NOT EXISTS public\.editorial_article_revision_media/i);
+  assert.match(revisionMediaSql, /public_media_assets[\s\S]*EXISTS \([\s\S]*editorial_articles/i);
+  assert.match(revisionMediaSql, /GRANT SELECT, INSERT, UPDATE, DELETE ON public\.editorial_article_revision_media/i);
   assert.match(ui, /Approve rights & attach/);
 });
