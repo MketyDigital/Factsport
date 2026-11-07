@@ -48,8 +48,8 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
     };
 
     const id = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
-      const actorId = await getActorId(tx, authorization.user.domainUserId);
-      if (!actorId) throw new Error('This administrator has no unique Factsport domain identity mapping. Draft ownership cannot be recorded.');
+      const actorId = authorization.user.domainUserId;
+
       let articleId = input.id || null;
       let currentStatus = 'draft';
       if (articleId) {
@@ -116,8 +116,8 @@ export async function submitEditorialForReview(articleId: string): Promise<Actio
   if (!/^[0-9a-f-]{36}$/i.test(articleId)) return { success: false, error: 'Invalid article identifier.' };
   try {
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
-      const actorId = await getActorId(tx, authorization.user.domainUserId);
-      if (!actorId) throw new Error('This administrator has no unique Factsport domain identity mapping.');
+      const actorId = authorization.user.domainUserId;
+
       const articles = await tx`SELECT id, status FROM public.editorial_articles WHERE id=${articleId}::uuid FOR UPDATE`;
       if (!articles.length || articles[0].status === 'archived') throw new Error('Article is unavailable.');
       const revisions = await tx`
@@ -147,8 +147,8 @@ export async function approveAndPublishEditorial(articleId: string): Promise<Act
   if (!/^[0-9a-f-]{36}$/i.test(articleId)) return { success: false, error: 'Invalid article identifier.' };
   try {
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
-      const actorId = await getActorId(tx, authorization.user.domainUserId);
-      if (!actorId) throw new Error('This administrator has no unique Factsport domain identity mapping. Publishing is blocked.');
+      const actorId = authorization.user.domainUserId;
+
       const articles = await tx`SELECT id, status FROM public.editorial_articles WHERE id=${articleId}::uuid FOR UPDATE`;
       if (!articles.length || articles[0].status === 'archived') throw new Error('Article is unavailable.');
       const revisions = await tx`
