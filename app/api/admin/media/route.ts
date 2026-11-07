@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
     const actorId = await withFactsportEditorialPostgres(sql => getActorId(sql, authorization.user.id));
     const bucket = factsportMediaBucket();
-    await bucket.put(objectKey, bytes, {
+    await bucket.put(objectKey, bytes.buffer as ArrayBuffer, {
       httpMetadata: { contentType: file.type, cacheControl: 'public, max-age=31536000, immutable' },
       customMetadata: { sha256, uploadedBy: actorId },
     });
