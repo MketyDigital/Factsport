@@ -23,7 +23,7 @@ The AdsterraStandardBanner, BettingPromo, FreeTipsBanner, BetOfTheDay and ProBet
 
 ## Private Prediction host boundary
 
-- /vip/upgrade, /how-to-play and the legacy VIP/prize /leaderboard route now require the exact FACTSPORT_PRIVATE_PRODUCT_HOST configured on the private deployment. If unset or accessed from another hostname, the route returns not-found.
+- /vip/upgrade, /how-to-play, the legacy VIP/prize /leaderboard, /dashboard, /login, /register, /forgot-password and /auth/update-password now require the exact FACTSPORT_PRIVATE_PRODUCT_HOST configured on the private deployment. The auth callback also checks the private hostname and validates its post-auth redirect. If unset or accessed from another hostname, the route returns not-found.
 - These routes are noindex; crawler rules exclude them. Public Media navigation no longer links to them.
 - Existing private page implementation and data/settlement behavior are retained; no production memberships, prizes, campaigns or payouts are altered.
 - GET /api/settings now returns only the public Media homepage settings projection.
