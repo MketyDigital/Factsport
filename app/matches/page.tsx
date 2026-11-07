@@ -4,6 +4,7 @@ export const revalidate = 5;
 import { env } from 'cloudflare:workers';
 import Link from 'next/link';
 import { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import MatchesClientView from '@/app/components/MatchesClientView';
 import { listPostgresMatchesWindow, getPostgresTeamForm } from '@/lib/adapters/postgres-matches';
@@ -36,6 +37,7 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
     });
     if (teamFilter) teamFormArray = await getPostgresTeamForm(teamFilter);
   } else {
+    if (process.env.NODE_ENV !== 'development') return notFound();
     // Legacy Supabase remains the verification baseline until the staged
     // feature migration and data contract are approved.
     const { createClient } = await import('@supabase/supabase-js');
