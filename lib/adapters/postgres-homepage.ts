@@ -50,7 +50,7 @@ export async function listPublicMatchHighlights(limit = 5) {
 export async function getPublicHomepageSettings() {
   return withFactsportPostgres(async sql => {
     const rows = await sql`
-      SELECT featured_match_id
+      SELECT featured_match_id, announcement_text, announcement_link, announcement_enabled
       FROM public.public_homepage_settings
       LIMIT 1
     `;
