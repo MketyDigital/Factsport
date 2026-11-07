@@ -22,7 +22,9 @@ CREATE TABLE IF NOT EXISTS public.prediction_participants (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   visitor_token_hash char(64) NOT NULL UNIQUE
     CHECK (visitor_token_hash ~ '^[0-9a-f]{64}$'),
-  contact_id uuid NOT NULL UNIQUE
+  -- Multiple browser identities may share a contact email; email alone must
+  -- never identify or transfer an anonymous participant or claim its history.
+  contact_id uuid NOT NULL
     REFERENCES public.prediction_contacts(id) ON DELETE RESTRICT,
   user_id uuid REFERENCES public.app_users(id) ON DELETE RESTRICT,
   display_name text,
@@ -40,6 +42,8 @@ CREATE TABLE IF NOT EXISTS public.prediction_participants (
 CREATE INDEX IF NOT EXISTS prediction_participants_user_idx
   ON public.prediction_participants (user_id)
   WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS prediction_participants_contact_idx
+  ON public.prediction_participants (contact_id);
 
 CREATE TABLE IF NOT EXISTS public.predictions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
