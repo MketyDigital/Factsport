@@ -307,3 +307,12 @@ This clarification supersedes any earlier wording in AUTH-005 that said free pre
 - Shared match/editorial/homepage adapters use one bounded PostgreSQL client per Worker isolate.
 - **Not complete:** CMS create/edit/review/publish/rollback and RBAC, media upload/rights-review workflow, social outbox, full highlights/standings route parity, public affiliate settings and the Bet of the Day \`pro_analysis\` model remain open.
 - Migrations 0004-0006 are committed but unapplied; no legacy article bodies/media were imported and no production resources/data were changed. These read paths cannot be enabled against staging until migration and role verification pass.
+
+
+## 17. 2026-11-07 competition read-path checkpoint
+
+- Migration 0006 now adds \`matches.season\`, featured match metadata, rights-reviewed match highlights and season/group-aware standings; migration 0007 adds season-aware player goals/assists and a public-only player-stat view.
+- Full \`/highlights\` page has an opt-in PostgreSQL path for league filters, pagination, verified canonical video links and rights-cleared thumbnails.
+- Full \`/standings\` page has an opt-in PostgreSQL path for standings and same-season recent form. The goals/assists leaders widget now calls a validated same-origin API and no longer accesses Supabase directly from the browser.
+- Legacy fallbacks remain on both pages. Provider ingestion, standings/player-stat reconciliation, tie-break parity, media rights for team crests, freshness and live refresh are not yet proven.
+- Migrations 0004-0007 are committed but unapplied. No legacy standings snapshots, scorer rows, match history or highlight URLs have been imported.
