@@ -66,6 +66,8 @@ Migration `0015_factsport_social_event_automation.sql` also seeds the legacy VIP
 
 ## Current status and no-go conditions
 
+See M22 for the implemented pure match-event detector, durable per-channel event outbox schema and separate worker permission model. These are not yet connected to canonical ingestion or live providers.
+
 - V2 schema exists for channel identities, event route defaults, templates, VIP teams/leagues and global automation settings.
 - All default channels and global automation start disabled.
 - The old route source is archived; active V2 route is fail-closed.
