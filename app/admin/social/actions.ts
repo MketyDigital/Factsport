@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
+import { inspectPublicMediaArticle } from '@/lib/public-media-content-policy';
 
 type Result = { success: true; id?: string } | { success: false; error: string };
 
@@ -25,6 +26,8 @@ export async function scheduleSocialPublication(input: {
       if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return { success: false, error: 'Post links must use HTTP or HTTPS.' };
       linkUrl = parsed.toString();
     }
+    const contentPolicy = inspectPublicMediaArticle({ title: content, body_markdown: content, canonical_url: linkUrl });
+    if (!contentPolicy.eligible) return { success: false, error: 'This post contains betting promotion, an affiliate link or private Prediction content and cannot be distributed through public Media channels.' };
     if (input.articleId && !/^[0-9a-f-]{36}$/i.test(input.articleId)) return { success: false, error: 'Invalid linked article.' };
 
     const id = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
