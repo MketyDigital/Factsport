@@ -101,3 +101,10 @@ A route is not complete because it compiles or returns HTTP 200. For every route
 - Extended `GET /api/cache/standings` with an explicit PostgreSQL competition standings view path under `FACTSPORT_COMPETITIONS_BACKEND`; invalid league codes are rejected and errors are sanitized.
 - `LiveStandings` consumes these same-origin APIs and no longer initializes a browser Supabase client.
 - These APIs are implementation slices, not proof of current-season data quality or complete route parity. Staging probes and data-provider reconciliation remain required.
+
+
+## 2026-11-07 match detail API foundation
+
+- `GET /api/match/[id]` now has an independently opt-in `FACTSPORT_MATCH_DETAIL_BACKEND=postgres` branch requiring migration 0008. It resolves canonical or legacy UUID alias and returns the normalized ESPN-enriched public match projection.
+- The V2 projection intentionally omits stream/audio/video URLs, VIP pro-analysis, campaign IDs, affiliate URLs and settlement state. Staging responses are private/no-store.
+- The main server-rendered `/match/[id]` page is not switched. Legacy ID reconciliation, media playback authorization, VIP RBAC, prediction/campaign parity and child-component service contracts remain blockers.
