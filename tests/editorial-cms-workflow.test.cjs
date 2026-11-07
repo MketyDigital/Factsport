@@ -128,6 +128,6 @@ test('editorial media uploads are private, validated, hashed and rights-reviewed
   assert.match(actions, /is_public=true/);
   assert.match(revisionMediaSql, /CREATE TABLE IF NOT EXISTS public\.editorial_article_revision_media/i);
   assert.match(revisionMediaSql, /public_media_assets[\s\S]*EXISTS \([\s\S]*editorial_articles/i);
-  assert.match(revisionMediaSql, /GRANT SELECT, INSERT, UPDATE, DELETE ON public\.editorial_article_revision_media/i);
+  assert.match(revisionMediaSql, /GRANT SELECT, INSERT, UPDATE ON public\.editorial_article_revision_media/i);
   assert.match(ui, /Approve rights & attach/);
 });
