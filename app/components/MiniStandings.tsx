@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { createClient } from '@supabase/supabase-js';
+import { listCurrentCompetitionStandings } from '@/lib/adapters/postgres-homepage';
 import { ChevronRight, BarChart2 } from 'lucide-react';
 
 const LEAGUE_MAP: Record<string, string> = {
@@ -15,15 +16,20 @@ export default async function MiniStandings({ leagueName = 'Premier League' }: {
     if (leagueName === 'Champions League') return null; // UCL format doesn't fit mini well
 
     const leagueCode = LEAGUE_MAP[leagueName] || 'PL'; 
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    let dbStandings: any[] = [];
+    if (process.env.FACTSPORT_MATCHES_BACKEND === 'postgres') {
+        dbStandings = await listCurrentCompetitionStandings(leagueCode);
+    } else {
+        const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+        const result = await supabase
+            .from('standings')
+            .select('team_name, team_short_name, position, played_games, points')
+            .eq('league_code', leagueCode)
+            .order('position', { ascending: true });
+        dbStandings = result.data || [];
+    }
 
-    const { data: dbStandings } = await supabase
-        .from('standings')
-        .select('team_name, team_short_name, position, played_games, points')
-        .eq('league_code', leagueCode)
-        .order('position', { ascending: true });
-
-    if (!dbStandings || dbStandings.length === 0) return null;
+    if (dbStandings.length === 0) return null;
 
     const total = dbStandings.length;
     // Get Top 5 and Bottom 3
