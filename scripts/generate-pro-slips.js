@@ -1,6 +1,6 @@
 // @ts-nocheck
-const { createClient } = require('@supabase/supabase-js');
-const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
+import { createClient } from '@supabase/supabase-js';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
