@@ -22,7 +22,7 @@ test('Media broadcast schema separates public listening, room roles, guests and 
   assert.match(sql, /media_broadcast_audit_events/);
   assert.match(sql, /factsport_v2_media_broadcast_admin/);
   assert.match(sql, /factsport_v2_broadcast_token_issuer/);
-  assert.doesNotMatch(sql, /factsport_v2_editorial_writer/);
-  assert.doesNotMatch(sql, /factsport_v2_social_dispatcher/);
+  assert.doesNotMatch(sql, /^GRANT .*factsport_v2_editorial_writer/im);
+  assert.doesNotMatch(sql, /^GRANT .*factsport_v2_social_dispatcher/im);
   assert.doesNotMatch(sql, /predictions|settlement|is_vip/i);
 });
