@@ -28,7 +28,7 @@ test('homepage settings are server-routed and do not expose the full social sett
   assert.ok(dashboard.includes("fetch('/api/settings')"));
   assert.ok(!dashboard.includes('createClient'));
   assert.ok(!dashboard.includes("from('site_settings')"));
-  assert.ok(settingsRoute.includes("FACTSPORT_HOMEPAGE_BACKEND === 'postgres'") && settingsRoute.includes('getPublicHomepageSettings'));
+  assert.ok(settingsRoute.includes("mediaBackend === 'postgres' && predictionBackend === 'postgres'") && settingsRoute.includes('getPublicHomepageSettings') && settingsRoute.includes('getPublicPredictionAffiliateSettings'));
   assert.ok(settingsRoute.includes('featured_match_id'));
   assert.ok(settingsRoute.includes('featured_match_id:social_config->>featured_match_id'));
   assert.ok(!settingsRoute.includes("select('*')"));
