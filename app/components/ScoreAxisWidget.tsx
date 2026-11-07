@@ -1,12 +1,7 @@
 'use client';
-import { ExternalLink, DollarSign } from 'lucide-react';
-
-const DEFAULT_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599";
-
-export default function ScoreAxisWidget({ matchId, affiliateLink }: { matchId?: string, affiliateLink?: string }) {
+export default function ScoreAxisWidget({ matchId }: { matchId?: string }) {
   if (!matchId) return null;
 
-  const finalLink = affiliateLink || DEFAULT_LINK;
   const isRawId = /^\d+$/.test(matchId.trim());
   let widgetContent = '';
 
@@ -100,26 +95,6 @@ export default function ScoreAxisWidget({ matchId, affiliateLink }: { matchId?: 
         scrolling="yes" // Allow scrolling if list is long
       />
 
-      {/* 🟢 2. MASKING BUTTON (Pins to Bottom) */}
-      {/* Z-Index 50 ensures it sits ON TOP of the fixed footer inside the iframe */}
-      <div className="absolute bottom-0 left-0 w-full bg-white border-t border-slate-100 p-2 flex justify-between items-center z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.1)] h-[60px]">
-          <div className="flex items-center gap-2 pl-2">
-              <div className="bg-green-500 text-white p-1.5 rounded-full animate-pulse">
-                  <DollarSign size={12} />
-              </div>
-              <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-slate-800 uppercase tracking-wide leading-none">Best Odds</span>
-                  <span className="text-[8px] font-bold text-slate-400">Instant Payouts</span>
-              </div>
-          </div>
-          <a 
-              href={finalLink} 
-              target="_blank" 
-              className="bg-[#0a1428] text-white text-[10px] font-black uppercase px-6 py-2.5 rounded-lg flex items-center gap-2 shadow hover:bg-blue-900 transition active:scale-95"
-          >
-              Bet on 1xBet <ExternalLink size={10} />
-          </a>
-      </div>
     </div>
   );
 }
