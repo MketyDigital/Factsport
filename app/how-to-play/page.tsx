@@ -9,11 +9,19 @@ export const metadata: Metadata = {
 };
 
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
+import { notFound } from 'next/navigation';
 import { createClient } from '@/app/lib/supabase/server';
 import Link from 'next/link';
 import { ChevronLeft, Trophy, Target, Star, ShieldAlert, Zap, Flame, Info, CheckCircle } from 'lucide-react';
 
 export default async function HowToPlay() {
+  const configuredHost = (process.env.FACTSPORT_PRIVATE_PRODUCT_HOST || '').trim().toLowerCase();
+  if (!configuredHost || configuredHost.includes('://') || configuredHost.includes('/')) notFound();
+  const requestHeaders = await headers();
+  const requestHost = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').split(',')[0].trim().toLowerCase().split(':')[0];
+  if (requestHost !== configuredHost) notFound();
+
   const supabase = createClient();
   
   // 🟢 DYNAMIC FETCH 1: Monthly Admin Settings
