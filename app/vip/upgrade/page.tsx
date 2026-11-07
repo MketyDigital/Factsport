@@ -155,7 +155,7 @@ export default function VipUpgradePage() {
                 </div>
                 <h1 className="text-4xl font-black text-white uppercase tracking-tighter mb-2 drop-shadow-md">VIP Active</h1>
                 <p className="text-yellow-100 font-bold mb-8 text-sm">
-                    You are officially in the Winners Circle.
+                    Your premium membership is active.
                 </p>
                 <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-5 mb-8 border border-white/10 shadow-inner">
                     <p className="text-[10px] text-yellow-300 uppercase font-black tracking-widest mb-1">Status Valid Until</p>
@@ -207,14 +207,14 @@ export default function VipUpgradePage() {
                             </div>
                         ))}
                     </div>
-                    <span className="text-[10px] font-bold text-yellow-500 uppercase tracking-widest">Join 2,400+ Active VIPs</span>
+                    <span className="text-[10px] font-bold text-yellow-500 uppercase tracking-widest">Premium member access</span>
                 </div>
 
                 <div className="bg-yellow-500 text-black text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest mb-4 shadow-[0_0_15px_rgba(234,179,8,0.5)] flex items-center gap-1.5">
                     <Lock size={12}/> Premium Access
                 </div>
-                <h1 className="text-4xl md:text-5xl font-black uppercase italic tracking-tighter text-white drop-shadow-lg">Join The <span className="text-yellow-500">Winners Circle</span></h1>
-                <p className="text-slate-300 text-sm md:text-base mt-4 max-w-md font-medium leading-relaxed">Stop guessing. Unlock 90%+ win rate betting slips, pro-level AI analysis, and compete for massive monthly cash prizes.</p>
+                <h1 className="text-4xl md:text-5xl font-black uppercase italic tracking-tighter text-white drop-shadow-lg">Explore <span className="text-yellow-500">Premium Access</span></h1>
+                <p className="text-slate-300 text-sm md:text-base mt-4 max-w-md font-medium leading-relaxed">Get access to premium football analysis, deeper match insights and member community features.</p>
             </div>
        </div>
 
@@ -224,29 +224,25 @@ export default function VipUpgradePage() {
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
              <div className="bg-[#0f1c3a] border border-white/5 p-4 md:p-5 rounded-2xl flex flex-col items-center text-center shadow-lg group hover:border-yellow-500/30 transition-colors">
                  <div className="w-10 h-10 bg-yellow-500/10 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><Trophy size={18} className="text-yellow-500"/></div>
-                 <h3 className="text-xs font-black text-white mb-1 tracking-wide">Cash Prizes</h3>
-                 <p className="text-[9px] text-slate-400 font-medium">Climb the Predict & Win leaderboard for real cash payouts.</p>
+                 <h3 className="text-xs font-black text-white mb-1 tracking-wide">Premium Insights</h3>
+                 <p className="text-[9px] text-slate-400 font-medium">Explore enhanced football analysis and member-only editorial insights.</p>
              </div>
              <div className="bg-[#0f1c3a] border border-white/5 p-4 md:p-5 rounded-2xl flex flex-col items-center text-center shadow-lg group hover:border-blue-500/30 transition-colors">
                  <div className="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><MessageCircle size={18} className="text-blue-500"/></div>
                  <h3 className="text-xs font-black text-white mb-1 tracking-wide">VIP Telegram</h3>
-                 <p className="text-[9px] text-slate-400 font-medium">Direct access to our private community of daily winners.</p>
+                 <p className="text-[9px] text-slate-400 font-medium">Connect with other members in our private community.</p>
              </div>
              <div className="bg-[#0f1c3a] border border-white/5 p-4 md:p-5 rounded-2xl flex flex-col items-center text-center shadow-lg group hover:border-purple-500/30 transition-colors">
                  <div className="w-10 h-10 bg-purple-500/10 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><Ticket size={18} className="text-purple-500"/></div>
-                 <h3 className="text-xs font-black text-white mb-1 tracking-wide">Verified Slips</h3>
-                 <p className="text-[9px] text-slate-400 font-medium">High-odds accumulators engineered by experts.</p>
+                 <h3 className="text-xs font-black text-white mb-1 tracking-wide">Match Analysis</h3>
+                 <p className="text-[9px] text-slate-400 font-medium">Detailed pre-match analysis and tactical breakdowns.</p>
              </div>
              <div className="bg-[#0f1c3a] border border-white/5 p-4 md:p-5 rounded-2xl flex flex-col items-center text-center shadow-lg group hover:border-red-500/30 transition-colors">
                  <div className="w-10 h-10 bg-red-500/10 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><TrendingUp size={18} className="text-red-500"/></div>
                  <h3 className="text-xs font-black text-white mb-1 tracking-wide">Pro Analysis</h3>
-                 <p className="text-[9px] text-slate-400 font-medium">Deep AI-driven tactical insights for safe betting.</p>
+                 <p className="text-[9px] text-slate-400 font-medium">AI-assisted tactical insights to help you understand the game.</p>
              </div>
-             <div className="bg-[#0f1c3a] border border-white/5 p-4 md:p-5 rounded-2xl flex flex-col items-center text-center shadow-lg group hover:border-emerald-500/30 transition-colors md:col-span-2">
-                 <div className="w-10 h-10 bg-emerald-500/10 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><Gift size={18} className="text-emerald-500"/></div>
-                 <h3 className="text-xs font-black text-white mb-1 tracking-wide">Merchandise & Trips</h3>
-                 <p className="text-[9px] text-slate-400 font-medium">Win authentic club jerseys, premium gear, and VIP matchday experiences.</p>
-             </div>
+>
         </div>
 
         {hasPending && (
