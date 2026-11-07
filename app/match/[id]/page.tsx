@@ -371,7 +371,7 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
                           <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 flex items-center gap-1 mb-2">
                               <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" /> Match predictions
                           </h3>
-                          <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />
+                          {process.env.NODE_ENV === 'development' && <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />}
                       </div>
                   </div>
               )}
