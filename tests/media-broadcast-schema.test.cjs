@@ -30,7 +30,7 @@ test('Media broadcast schema separates public listening, room roles, guests and 
 
 test('legacy Stream token and guest invite handler is archived and cannot issue V2 tokens', () => {
   const route = read('app/api/stream/token/route.ts');
-  const legacy = read('docs/audit/legacy-source/api-stream-token-route-v1.ts');
+  const legacy = read('docs/audit/legacy-source/api-stream-token-route-v1.ts.txt');
   assert.match(route, /V2_BROADCAST_TOKEN_ISSUER_NOT_PROVISIONED/);
   assert.match(route, /status: 503/);
   assert.doesNotMatch(route, /createClient|ADMIN_EMAILS|user_metadata|STREAM_SECRET_KEY|SignJWT/);
