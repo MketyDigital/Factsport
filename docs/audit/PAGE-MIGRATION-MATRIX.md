@@ -98,3 +98,12 @@ A page is not complete merely because it renders. It must be exercised with real
 ## Read-flag deployment contract
 
 The base \`FACTSPORT_MATCHES_BACKEND\` flag must remain independent of migrations 0004-0007. Editorial, homepage, highlights and competition read paths use separate flags so a partially migrated staging database cannot accidentally query a view/column that is not yet installed.
+
+
+## 2026-11-07 competition page continuation
+
+- `/tournaments` now has a V2 directory implementation with known league destinations and optional current-season labels from the competition directory reader.
+- `/tournaments/[league]` uses the bounded base matches PostgreSQL reader behind the base match flag; the legacy fallback remains.
+- `LiveStandings` no longer queries Supabase from the browser. It reads same-origin competition-match and standings APIs and refreshes periodically.
+- The full `/standings` and `/highlights` pages already have feature-flagged PostgreSQL read implementations, but provider population, staging data verification, full browser parity and operational freshness remain incomplete. No page is declared fully complete.
+- Latest build and isolated verification are pending after corrections to a JSX template literal and promo regression test. Migrations 0004-0007 remain unapplied.
