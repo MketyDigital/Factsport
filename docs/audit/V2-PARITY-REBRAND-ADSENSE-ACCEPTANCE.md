@@ -316,3 +316,12 @@ This clarification supersedes any earlier wording in AUTH-005 that said free pre
 - Full \`/standings\` page has an opt-in PostgreSQL path for standings and same-season recent form. The goals/assists leaders widget now calls a validated same-origin API and no longer accesses Supabase directly from the browser.
 - Legacy fallbacks remain on both pages. Provider ingestion, standings/player-stat reconciliation, tie-break parity, media rights for team crests, freshness and live refresh are not yet proven.
 - Migrations 0004-0007 are committed but unapplied. No legacy standings snapshots, scorer rows, match history or highlight URLs have been imported.
+
+
+## 18. Migration-specific read flags and staging compatibility
+
+- \`FACTSPORT_MATCHES_BACKEND\` controls only the base match reader (0001). Its projection must not depend on the later \`matches.season\` field.
+- \`FACTSPORT_EDITORIAL_BACKEND\` requires 0004-0005.
+- \`FACTSPORT_HOMEPAGE_BACKEND\` and \`FACTSPORT_HIGHLIGHTS_BACKEND\` require 0006.
+- \`FACTSPORT_COMPETITIONS_BACKEND\` requires 0006-0007.
+- A later schema migration being committed is not evidence that it is installed in staging. Each flag must be enabled only after migration application, role verification and a successful read probe.
