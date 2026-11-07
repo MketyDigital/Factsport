@@ -1,5 +1,6 @@
 import { createClient } from '@/app/lib/supabase/client';
 import { fetchEspnDetails } from '@/app/lib/espn';
+import { readVerifiedFullTimeScore } from '@/lib/football-data-score.cjs';
 
 // 🟢 CONFIG
 const API_KEY = process.env.FOOTBALL_DATA_KEY!;
@@ -25,13 +26,15 @@ const normalizeStatus = (rawStatus: string) => {
   return map[status] || status;
 };
 
-const transformMatch = (m: any, leagueName: string) => ({
+const transformMatch = (m: any, leagueName: string) => {
+  const verifiedFullTimeScore = readVerifiedFullTimeScore(m.score);
+  return {
     api_id: m.id, 
     league: leagueName,
     home_team: m.homeTeam.shortName || m.homeTeam.name,
     away_team: m.awayTeam.shortName || m.awayTeam.name,
-    home_score: m.score.fullTime.home ?? 0,
-    away_score: m.score.fullTime.away ?? 0,
+    home_score: verifiedFullTimeScore?.home ?? null,
+    away_score: verifiedFullTimeScore?.away ?? null,
     match_date: m.utcDate,
     status: normalizeStatus(m.status),
     home_logo: m.homeTeam.crest,
@@ -44,7 +47,8 @@ const transformMatch = (m: any, leagueName: string) => ({
     stage: m.stage || null,
     match_group: m.group || null,
     h2h: m.h2h || null
-});
+  };
+};
 
 export async function getLeagueMatches(leagueId: string, leagueName: string, dateFrom: string, dateTo: string) {
   const code = LEAGUE_MAP[leagueName] || leagueId; 
@@ -72,8 +76,8 @@ export async function getLeagueMatches(leagueId: string, leagueName: string, dat
 export interface UnifiedMatchData {
   status: string;
   displayClock: string;
-  home: { name: string; logo: string; score: number | string; id: string };
-  away: { name: string; logo: string; score: number | string; id: string };
+  home: { name: string; logo: string; score: number | string | null; id: string };
+  away: { name: string; logo: string; score: number | string | null; id: string };
   goals: any[];
   commentary: any[];
   stats: any;
@@ -93,8 +97,8 @@ export interface UnifiedMatchData {
   away_team?: string;
   home_logo?: string;
   away_logo?: string;
-  home_score?: number;
-  away_score?: number;
+  home_score?: number | null;
+  away_score?: number | null;
   match_date?: string;
   league?: string;
 }
