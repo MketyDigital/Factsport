@@ -48,7 +48,9 @@ ALTER TABLE public.media_assets
       NOT is_public
       OR (
         rights_status IN ('owned', 'licensed', 'editorial_exception')
-        AND rights_reviewed_at IS NOT NULL
+        AND rights_reviewed_by IS NOT NULL
+        AND rights_reviewed_by IS NOT NULL
+  AND rights_reviewed_at IS NOT NULL
       )
     );
 
