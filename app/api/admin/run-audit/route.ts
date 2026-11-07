@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Monthly prize audit failed:', error);
     return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Monthly prize audit failed',
+      error: 'Monthly prize audit failed. Check the protected workflow logs.'
     }, { status: 500 });
   }
 }
