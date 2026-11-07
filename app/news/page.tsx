@@ -30,7 +30,6 @@ export const metadata: Metadata = {
 };
 
 export default async function NewsListingPage({ searchParams }: { searchParams: { category?: string, page?: string } }) {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   const resolvedParams = await searchParams;
   
   const currentCategory = resolvedParams.category || 'All';
@@ -57,6 +56,7 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
       }));
       count = Number(rows[0]?.total_count ?? 0);
   } else {
+      const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
       let query = supabase.from('news').select('*', { count: 'exact' }).order('created_at', { ascending: false });
       if (currentCategory !== 'All') query = query.eq('category', currentCategory);
       query = query.range(from, to);
