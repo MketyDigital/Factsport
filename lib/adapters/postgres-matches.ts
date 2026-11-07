@@ -126,3 +126,17 @@ export async function listPostgresLeagueResults(league: string, season: string, 
     LIMIT ${limit}
   `;
 }
+
+export async function listPostgresLeagueMatches(league: string, limit = 500) {
+  if (!league || league.length > 100) throw new Error('Invalid league');
+  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new Error('Invalid league match limit');
+  const sql = getFactsportPostgres();
+  return sql`
+    SELECT id, api_id, home_team, away_team, home_score, away_score,
+           match_date, status, home_logo, away_logo, stage, match_group, venue
+    FROM public.matches
+    WHERE league = ${league}
+    ORDER BY match_date ASC, id ASC
+    LIMIT ${limit}
+  `;
+}
