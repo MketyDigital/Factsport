@@ -31,12 +31,7 @@ export async function reviewRightsAndAttachMedia(input: MediaReviewInput) {
 
   try {
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
-      const actors = await tx`
-        SELECT user_id FROM public.external_identities
-        WHERE subject=${authorization.user.domainUserId} ORDER BY created_at DESC LIMIT 2
-      `;
-      if (actors.length !== 1) throw new Error('This administrator has no unique Factsport domain identity mapping.');
-      const actorId = actors[0].user_id as string;
+      const actorId = authorization.user.domainUserId;
 
       const articles = await tx`
         SELECT id, status FROM public.editorial_articles
