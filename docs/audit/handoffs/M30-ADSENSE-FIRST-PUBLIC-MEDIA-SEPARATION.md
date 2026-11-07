@@ -27,7 +27,7 @@ The AdsterraStandardBanner, BettingPromo, FreeTipsBanner, BetOfTheDay and ProBet
 - These routes are noindex; crawler rules exclude them. Public Media navigation no longer links to them.
 - Existing private page implementation and data/settlement behavior are retained; no production memberships, prizes, campaigns or payouts are altered.
 - GET /api/settings now returns only the public Media homepage settings projection.
-- Prediction affiliate settings are served from /api/prediction/settings only when the request host exactly matches the configured private product hostname. The response is private-cache scoped.
+- Prediction affiliate settings are served from /api/prediction/settings only when the request host exactly matches the configured private product hostname. The endpoint is force-dynamic and no-store. Private FreeTipsBanner and BettingPromo components read this endpoint and no longer ship hardcoded affiliate URL/code fallbacks.
 - FACTSPORT_PRIVATE_PRODUCT_HOST must be configured only on the approved private deployment. No DNS/host was invented or changed.
 
 ## Public social distribution boundary
