@@ -248,3 +248,13 @@ The four Hyperdrive resources and the three runtime database roles are mapped in
 3. Continue M1/M2 route/page/component inventory and port the sports lifecycle in order: fixture import → reviewed ESPN linking → fast live read → FT verification → standings → transactional settlement.
 4. Implement the remaining product domains and roles (identity/session, admin RBAC/step-up, editorial/CMS, predictions, VIP/payments, community/chat/MOTM, social outbox, mail and video entitlement) with tests and real staging journeys.
 5. Do not begin production cutover until all P0/P1 items in PRODUCTION-EXECUTION-PLAN.md, backups/restore, shadow comparison, end-to-end journeys and explicit owner go/no-go are complete.
+
+## 2026-11-07 continuation — legacy source hardening and staging verification
+
+- Current source review and active production workflow evidence are recorded in [handoff M07](./handoffs/M07.md); follow-up code and protected staging verification are recorded in [handoff M08](./handoffs/M08.md).
+- Legacy football-data score ingestion no longer fabricates 0–0 from unknown final scores; ESPN-linked live status is protected from the schedule importer, and ESPN cup imports preserve missing scores and settled results.
+- The scheduled and manual monthly prize audit now share one qualification engine using verified final scores, configured thresholds, deterministic ranking, and qualified-only drafts. The monthly reset updates both ordinary and prize-eligible counters.
+- The five legacy automation scripts now parse under the v2 ESM package mode. The Matchmaker v2 endpoint uses POST Bearer authorization instead of a query-string secret.
+- Native Cloudflare build and protected full app staging passed on code head `78a5999986f1a26d2bb1bd84928f2c24726567d1`: [build 42358066708](https://github.com/MketyDigital/Factsport/actions/runs/42358066708), [app staging 42358066680](https://github.com/MketyDigital/Factsport/actions/runs/42358066680). Verified scope includes protected access, Hyperdrive/R2, server-rendered matches, populated matches API, stable timestamp+UUID pagination, private/no-store caching and auth isolation.
+- Main-branch production workflows were inspected and observed passing on 2026-11-07; see M07 for exact run IDs and step-level evidence. No main-branch or production changes were made.
+- This is still a staging foundation, not feature parity. Continue the full data/domain schema, first-five eligibility, transactional settlement, durable live outbox, auth/admin, editorial/media, VIP/payments, community/video, external Worker migration and complete browser journeys before cutover.
