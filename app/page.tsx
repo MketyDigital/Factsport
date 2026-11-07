@@ -57,6 +57,7 @@ async function getHomepageData(leagueFilter: string | undefined) {
   const wideWindowEnd = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
   const usePostgresEditorial = process.env.FACTSPORT_EDITORIAL_BACKEND === 'postgres';
   const usePostgresMatches = process.env.FACTSPORT_MATCHES_BACKEND === 'postgres';
+  const usePostgresHomepage = process.env.FACTSPORT_HOMEPAGE_BACKEND === 'postgres';
 
   let supabase: ReturnType<typeof createClient> | undefined;
   const getSupabase = () => {
@@ -78,11 +79,11 @@ async function getHomepageData(leagueFilter: string | undefined) {
         })))
       : getSupabase().from('news').select('*').order('created_at', { ascending: false }).limit(25)
           .then(result => result.data || []),
-    usePostgresMatches
+    usePostgresHomepage
       ? listPublicMatchHighlights(5)
       : getSupabase().from('matches').select('*').not('video_url', 'is', null).neq('video_url', '').order('match_date', { ascending: false }).limit(5)
           .then(result => result.data || []),
-    usePostgresMatches
+    usePostgresHomepage
       ? listPublicFeaturedMatches({ from: wideWindowStart, to: wideWindowEnd, limit: 10 })
       : getSupabase().from('matches').select('*').eq('is_featured', true).gte('match_date', wideWindowStart).lte('match_date', wideWindowEnd).order('match_date', { ascending: true }).limit(10)
           .then(result => result.data || []),
