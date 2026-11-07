@@ -58,6 +58,7 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
 
     const id = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
       const actorId = await getActorId(tx, authorization.user.id);
+      if (!actorId) throw new Error('This administrator has no unique Factsport domain identity mapping. Draft ownership cannot be recorded.');
       let articleId = input.id || null;
       let currentStatus = 'draft';
       if (articleId) {
@@ -166,7 +167,8 @@ export async function approveAndPublishEditorial(articleId: string): Promise<Act
       \`;
       const revision = revisions[0];
       if (!revision) throw new Error('No editorial revision is awaiting approval.');
-      if (revision.changed_by && revision.changed_by === actorId) throw new Error('A different administrator must approve the article.');
+      if (!revision.changed_by) throw new Error('The revision has no verified author identity. Approval is blocked.');
+      if (revision.changed_by === actorId) throw new Error('A different administrator must approve the article.');
       const snapshot = JSON.parse(revision.snapshot_text);
       await tx\`
         UPDATE public.editorial_articles SET
