@@ -73,7 +73,7 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
         }
         await tx`
           UPDATE public.editorial_article_revisions SET workflow_status='superseded'
-          WHERE article_id=${articleId}::uuid AND workflow_status IN ('draft','in_review')
+          WHERE article_id=${articleId}::uuid AND workflow_status IN ('draft','in_review','approved')
         `;
       } else {
         const rows = await tx`
