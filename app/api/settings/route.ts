@@ -7,7 +7,7 @@ export const revalidate = 300;
 
 export async function GET() {
   try {
-    if (process.env.FACTSPORT_MATCHES_BACKEND === 'postgres') {
+    if (process.env.FACTSPORT_HOMEPAGE_BACKEND === 'postgres') {
       const settings = await getPublicHomepageSettings();
       return NextResponse.json({
         link1x: null,
