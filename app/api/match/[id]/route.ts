@@ -40,6 +40,10 @@ export async function GET(
     }
   }
 
+  if (env.FACTSPORT_ENVIRONMENT === 'staging') {
+    return NextResponse.json({ error: 'V2 match detail reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+  }
+
   try {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     
