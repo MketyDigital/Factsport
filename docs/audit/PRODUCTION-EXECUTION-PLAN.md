@@ -294,3 +294,12 @@ The complete acceptance contract is [V2-PARITY-REBRAND-ADSENSE-ACCEPTANCE.md](./
 - Cause found in source/schema boundary: the base matches projection included \`season\`, a column only created by unapplied migration 0006. Removed \`season\` from the base match projection; kept it only in the current-season results reader.
 - Added migration-specific flags: base matches (0001), editorial (0004-0005), homepage/highlights (0006), competitions/player leaders (0006-0007). This prevents partially migrated staging databases from querying future views.
 - Fresh isolated verification and native build passed on \`40cb46b\`; the protected staging rerun on corrected commit \`ee8e30e\` is pending. The prior keyset pagination 503 has not yet been re-probed after this fix.
+
+## 2026-11-07 verified competition/live-standings slice
+
+- Native Vinext build passed on 37281e9d141b88f0e3f22409fb49d7b045a0956f (run 42382907761).
+- Protected staging passed on that commit (run 42382907988): Worker build/deploy, deny-by-default, authorized /matches page render, stable timestamp+UUID pagination and authentication/cache isolation passed.
+- The first authorized match API request returned a transient 503; the retry returned a populated result and pagination succeeded. Treat the cold-start/transient failure as an operational reliability item, not as an unqualified clean pass.
+- Isolated verification passed on 1afe964c2d0a3a0d71655a4cc95334377a3c100e (run 42383032967), including the engine regression suite, TypeScript, prediction/consent schema contracts and migration inventory.
+- Staging test coverage is still focused on the existing matches endpoint; the new tournament endpoints and feature-flagged standings reads need their own authenticated integration probes once the matching migrations and current-season data are provisioned.
+- No migrations 0004-0007 were applied, no legacy data imported, and no production resources changed.
