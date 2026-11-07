@@ -63,12 +63,14 @@ async function getStandings(leagueName: string) {
     let dbMatches: any[] = [];
     try {
         if (process.env.FACTSPORT_COMPETITIONS_BACKEND === 'postgres') {
-            const results = await Promise.all([
-                listCurrentCompetitionStandings(leagueCode),
-                listPostgresLeagueResults(leagueName, String(dbStandings[0]?.season || ''), 2000),
-            ]);
-            dbStandings = results[0];
-            dbMatches = results[1];
+            dbStandings = await listCurrentCompetitionStandings(leagueCode);
+            if (dbStandings.length > 0) {
+                const currentSeason = String(dbStandings[0].season || '');
+                const sourceLeagueName = String(dbStandings[0].league_name || leagueName);
+                if (currentSeason) {
+                    dbMatches = await listPostgresLeagueResults(sourceLeagueName, currentSeason, 2000);
+                }
+            }
         } else {
             const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
             const [standingsResult, matchesResult] = await Promise.all([
