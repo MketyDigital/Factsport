@@ -180,13 +180,17 @@ export async function getPostgresMatchById(matchId: string) {
   if (!MATCH_UUID_PATTERN.test(matchId)) return null;
   return withFactsportPostgres(async sql => {
     const rows = await sql`
-      SELECT id, api_id, espn_id, league, home_team, away_team,
-             home_score, away_score, match_date, status, home_logo, away_logo,
-             venue, stage, match_group, match_events, stats, lineups,
-             h2h, referees, predictor, source_updated_at
-      FROM public.matches
-      WHERE id = ${matchId}::uuid OR legacy_match_id = ${matchId}::uuid
-      ORDER BY CASE WHEN id = ${matchId}::uuid THEN 0 ELSE 1 END
+      SELECT m.id, m.api_id, m.espn_id, m.league, m.home_team, m.away_team,
+             m.home_score, m.away_score, m.match_date, m.status, m.home_logo, m.away_logo,
+             m.venue, m.stage, m.match_group, m.match_events, m.stats, m.lineups,
+             m.h2h, m.referees, m.predictor, m.source_updated_at, m.display_clock,
+             m.provider_widget_id,
+             mm.video_url, mm.livestream_url, mm.audio_url, mm.media_url, mm.stream_url,
+             mm.media_mode, mm.chat_pin_text, mm.chat_pin_link, mm.attribution_text
+      FROM public.matches m
+      LEFT JOIN public.public_match_media mm ON mm.match_id = m.id
+      WHERE m.id = ${matchId}::uuid OR m.legacy_match_id = ${matchId}::uuid
+      ORDER BY CASE WHEN m.id = ${matchId}::uuid THEN 0 ELSE 1 END
       LIMIT 1
     `;
     return rows[0] ?? null;
