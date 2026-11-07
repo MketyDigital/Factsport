@@ -34,6 +34,8 @@ test('CMS approval and publication require distinct author, reviewer and publish
   assert.match(actions, /'published'/);
   assert.match(actions, /rejectEditorialRevision/);
   assert.match(actions, /review_comment/);
+  assert.match(read('db/migrations/0021_factsport_editorial_review_feedback.sql'), /review_comment text/);
+  assert.match(read('db/migrations/0021_factsport_editorial_review_feedback.sql'), /review_rejected/);
   assert.match(client, /approveEditorialRevision/);
   assert.match(client, /publishApprovedEditorial/);
   assert.match(client, /rejectEditorialRevision/);
@@ -43,6 +45,7 @@ test('CMS approval and publication require distinct author, reviewer and publish
 test('editorial and social mutations append audit events in their transaction', () => {
   assert.match(read('app/admin/social/actions.ts'), /idempotencyKey/);
   assert.match(read('app/admin/social/actions.ts'), /ON CONFLICT \(idempotency_key\) DO NOTHING/);
+  assert.match(read('app/admin/social/SocialClient.tsx'), /crypto\.randomUUID\(\)/);
   for (const file of ['app/admin/news/actions.ts', 'app/admin/news/media-actions.ts', 'app/admin/social/actions.ts']) {
     assert.match(read(file), /media_editorial_audit_events/);
   }
@@ -53,7 +56,7 @@ test('Media admin shell does not expose legacy Prediction or broad user administ
   const home = read('app/admin/page.tsx');
   const matches = read('app/admin/matches/page.tsx');
   const users = read('app/admin/users/page.tsx');
-  assert.match(layout, /authorizeMediaEditorialAction\('read'\)/);
+  assert.match(layout, /authorizeMediaEditorialAction\('workspace'\)/);
   assert.doesNotMatch(layout, /ADMIN_EMAILS|VaultLock|getAuthenticatedAdmin|isAdminVaultUnlocked/);
   assert.doesNotMatch(home, /from ['\"].*(AdminCampaignManager|ApproveButton|ResetMonthButton|CleanupButton|PromoSettingsManager|GameRulesManager|AuditManager)/);
   assert.doesNotMatch(matches, /createClient|supabase|campaigns|pro_analysis/);
