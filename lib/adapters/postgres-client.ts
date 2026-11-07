@@ -1,41 +1,37 @@
 /**
- * One bounded PostgreSQL client per Worker isolate.
- * All server-side domain adapters share this client to respect the five-origin
- * Hyperdrive pool and avoid multiplying connections per request path.
+ * Request-scoped PostgreSQL client for Cloudflare Hyperdrive.
+ * Hyperdrive owns the connection pool. Never cache a postgres.js client in
+ * module scope or reuse it across Worker requests: that can retain stale I/O
+ * contexts after an isolate is reused.
  */
 import 'server-only';
 import postgres from 'postgres';
 import { env } from 'cloudflare:workers';
 
-let client: ReturnType<typeof postgres> | undefined;
+type FactsportSql = ReturnType<typeof postgres>;
 
-export function getFactsportPostgres() {
-  if (client) return client;
-
+export async function withFactsportPostgres<T>(
+  operation: (sql: FactsportSql) => Promise<T> | T
+): Promise<T> {
   const hyperdriveUrl = env?.FACTSPORT_HYPERDRIVE?.connectionString;
   const directUrl = process.env.DATABASE_URL;
+  const connectionString = hyperdriveUrl || directUrl;
+  if (!connectionString) throw new Error('Factsport PostgreSQL connection is not configured');
 
-  if (hyperdriveUrl) {
-    client = postgres(hyperdriveUrl, {
-      max: 1,
-      fetch_types: false,
-      prepare: true,
-      idle_timeout: 5,
-      connect_timeout: 10,
-    });
-  } else if (directUrl) {
-    // Direct TLS is for explicitly configured non-Worker verification only.
-    client = postgres(directUrl, {
-      ssl: 'require',
-      max: 1,
-      fetch_types: false,
-      prepare: true,
-      idle_timeout: 5,
-      connect_timeout: 10,
-    });
-  } else {
-    throw new Error('Factsport PostgreSQL connection is not configured');
+  const sql = postgres(connectionString, {
+    ...(hyperdriveUrl ? {} : { ssl: 'require' as const }),
+    max: 1,
+    fetch_types: false,
+    prepare: true,
+    connect_timeout: 10,
+    idle_timeout: 5,
+  });
+
+  try {
+    return await operation(sql);
+  } finally {
+    // Closing the request-scoped client returns its connection to Hyperdrive's
+    // managed pool; it does not close the underlying pooled database session.
+    await sql.end({ timeout: 1 });
   }
-
-  return client;
 }
