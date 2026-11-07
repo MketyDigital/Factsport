@@ -109,9 +109,9 @@ The staging app's `/api/matches` response previously used `Cache-Control: public
 
 ### P3 — Public site, editorial and media
 
-- [ ] Apply and verify editorial/homepage migrations 0004-0006 on isolated staging only; add ordered migration ledger/checksums before production use.
+- [ ] Apply and verify editorial/homepage/competition migrations 0004-0007 on isolated staging only; add ordered migration ledger/checksums before production use.
 - [ ] Complete homepage PostgreSQL parity: migrate public affiliate/config settings and the Bet of the Day `pro_analysis` projection without exposing private analysis; verify all nested component and 3-second live paths.
-- [ ] Complete full `/highlights` and `/standings` routes, ingestion, editorial CMS commands, media upload/rights-review workflow and admin RBAC.
+- [ ] Verify the new `/highlights` and `/standings` PostgreSQL routes, build provider ingestion for standings/player stats/highlights, complete editorial CMS commands, media upload/rights-review workflow and admin RBAC.
 
 - [ ] Complete route/page/component parity across homepage, news, match center, leagues, standings, highlights, search, static/help pages, SEO and mobile.
 - [ ] Build a real CMS with server-enforced editor/admin roles, drafts, review/publish workflow, revision history, provenance, attribution, source references and audit logs.
@@ -277,3 +277,12 @@ The complete acceptance contract is [V2-PARITY-REBRAND-ADSENSE-ACCEPTANCE.md](./
 - Shared domain adapters now use one bounded PostgreSQL client per Worker isolate.
 - Remaining parity blockers: Bet of the Day's legacy `pro_analysis` model, public affiliate settings, full highlights and standings routes, CMS write/review/publish commands, media ingestion, social outbox, and live/browser journey evidence. No public page is declared complete.
 - New schema/readers are code-only until migrations are reviewed/applied in isolated staging and populated through approved new provider/CMS workflows. No legacy article content or match history has been imported; no production resources changed.
+
+
+## 2026-11-07 competition read-path update
+
+- Added migration 0007 for season-aware current player goals/assists and a public-only statistics view.
+- Full \`/highlights\` now has an opt-in PostgreSQL page path with league filters, pagination, canonical source-video links and approved R2 thumbnails.
+- Full \`/standings\` now has an opt-in PostgreSQL table path, same-season recent form and a same-origin goals/assists leaders API. \`LeagueLeaders\` no longer queries Supabase from the browser.
+- Added explicit \`matches.season\` and a bounded completed-results index to migration 0006; recent form is never computed across seasons.
+- These are read-path implementations, not complete sports operations. Provider jobs, current-season standings/player-stat population, freshness, tie-break parity and actual staging data remain outstanding. Migrations 0004-0007 are unapplied.
