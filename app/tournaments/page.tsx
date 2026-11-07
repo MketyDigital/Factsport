@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, CalendarDays, Trophy } from 'lucide-react';
 import { listCurrentCompetitionDirectory } from '@/lib/adapters/postgres-homepage';
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
 export const metadata: Metadata = {
   title: 'Football Tournaments & Competitions | FactSport',
