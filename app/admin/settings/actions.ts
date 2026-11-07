@@ -26,8 +26,20 @@ export async function saveMediaHomepageAnnouncement(input: { text?: unknown; lin
   const policy = inspectPublicMediaArticle({ title: announcementText, canonical_url: announcementLink });
   if (!policy.eligible) return { success: false, error: 'This announcement contains betting promotion, an affiliate link or private Prediction content.' };
   try {
-    await withFactsportEditorialPostgres(async sql => sql\`\n      INSERT INTO public.homepage_settings (singleton, announcement_text, announcement_link, announcement_enabled, updated_by, updated_at)\n      VALUES (true, \${announcementText || null}, \${announcementLink}, \${enabled}, \${authorization.user.domainUserId}::uuid, now())\n      ON CONFLICT (singleton) DO UPDATE SET\n        announcement_text = EXCLUDED.announcement_text, announcement_link = EXCLUDED.announcement_link,\n        announcement_enabled = EXCLUDED.announcement_enabled, updated_by = EXCLUDED.updated_by, updated_at = now()\n    \`);
-    revalidatePath('/'); revalidatePath('/api/settings');
+    await withFactsportEditorialPostgres(async sql => sql`
+      INSERT INTO public.homepage_settings
+        (singleton, announcement_text, announcement_link, announcement_enabled, updated_by, updated_at)
+      VALUES
+        (true, ${announcementText || null}, ${announcementLink}, ${enabled}, ${authorization.user.domainUserId}::uuid, now())
+      ON CONFLICT (singleton) DO UPDATE SET
+        announcement_text = EXCLUDED.announcement_text,
+        announcement_link = EXCLUDED.announcement_link,
+        announcement_enabled = EXCLUDED.announcement_enabled,
+        updated_by = EXCLUDED.updated_by,
+        updated_at = now()
+    `);
+    revalidatePath('/');
+    revalidatePath('/api/settings');
     return { success: true };
   } catch (error) {
     console.error('Media homepage settings save failed', error);
