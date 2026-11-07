@@ -22,6 +22,7 @@ This slice belongs to the **Media system**. It does not add prediction campaigns
 - Added migration 0014 to preserve revision-specific hero/team-logo choices and constrain the public media view to assets actually attached to approved, published articles.
 - Added migration 0015 with the legacy match-event social route matrix, VIP teams/leagues, first-match fallback, UTC timezone default, text-only image policy and editable channel/template tables. Seeded channels and global automation remain disabled.
 - Added a pure match-event detector and migration 0016 for canonical event identities, per-channel delivery leases and append-only attempt outcomes. Event detection is not yet wired to ingestion and the dispatcher is not active.
+- Added migration 0017 and PostgreSQL read adapters for the legacy Media playback fields, live display clock, provider widget ID and public match pins. Raw playback URLs are isolated to a private server-side projection and remain subject to the 15-minute unlock and rights gate. See M24.
 - Archived the prior Supabase-backed match-event sender verbatim and replaced the active V2 `/api/social` route with an explicit 410 fail-closed response. See M21 for the preserved behavior contract.
 - Archived and disabled the legacy Supabase-backed `/api/live`, `/api/sync-fd`, `/api/matchmaker`, `/api/settle`, `/api/cron/morning-post`, `/api/evening-roundup`, `/api/logos/sync`, `/api/matches/highlights/sync`, monthly reset/audit and legacy admin settings/users routes. See M23 for owner boundaries and replacement gates.
 - Social scheduling is idempotent, uses an outbox record, and is distinct from article publication.
@@ -39,7 +40,7 @@ Provisioning sequence still required:
 2. Create the dedicated editorial role with no superuser, no role inheritance, no database creation, no replication, no bypass-RLS and a bounded connection limit.
 3. Provision a separate Hyperdrive with TLS required, SQL caching disabled and a small origin connection cap.
 4. Verify positive editorial privileges and negative permissions for matches, predictions, settlement, DELETE/TRUNCATE and private user tables.
-5. Apply migrations 0009–0016 in order, after migrations 0004–0005. Create the editorial writer role before applying 0010; apply 0013 after 0012; apply 0014 after 0013; apply 0015 after 0014; create the separate Media automation and social dispatcher roles before applying 0016. Run schema and grant audits.
+5. Apply migrations 0009–0017 in order, after migrations 0004–0005. Create the editorial writer role before applying 0010; apply 0013 after 0012; apply 0014 after 0013; apply 0015 after 0014; create the separate Media automation and social dispatcher roles before applying 0016. Run schema and grant audits.
 6. Add the verified Hyperdrive ID as `FACTSPORT_EDITORIAL_HYPERDRIVE` in the native Cloudflare app config and deploy only to staging.
 7. Complete the V2 authentication/domain-identity bridge and provision explicit administrator mappings before enabling review/publish actions.
 
