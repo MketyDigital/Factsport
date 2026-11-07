@@ -287,3 +287,16 @@ The owner has reconfirmed that **the primary V2 product is the public Factsport 
 The existing page, route, component and data migration matrices remain the source of truth for individual migration scope. Do not mark a page complete merely because its route compiles: require its real content, interactions, loading/error/empty states, mobile behavior, SEO and data freshness to pass staging journeys.
 
 No production resources or legacy data were changed by this priority update.
+
+
+## 2026-11-07 continued implementation — editorial hardening and homepage read models
+
+The implementation remains on \`refactor/factsport-v2\` and follows the media-first priority reset above.
+
+- **Editorial provenance/review:** migration 0005 adds explicit origin values (\`manual\`, \`ai_assisted\`, \`automated\`, \`imported\`, \`unknown\`), original timestamps, SEO/reverification metadata and distinct legacy \`body\`/\`content\` preservation fields. A published article must have an approved review state, identified reviewer and review timestamp. Public media requires a recorded rights review.
+- **Homepage sports read models:** migration 0006 adds featured-match metadata, a safe homepage setting view, season/group-aware standings, and provider-locked YouTube/Vimeo highlights with rights review and optional R2 thumbnails. The public reader receives only narrow views.
+- **Shared DB connection:** match, editorial and homepage adapters now share one bounded PostgreSQL client per Worker isolate (max one client connection), respecting the staging Hyperdrive origin limit.
+- **Public pages:** homepage now has opt-in PostgreSQL reads for the main match window, featured matches and rights-cleared highlights; news/article have opt-in published/reviewed PostgreSQL reads; homepage mini standings can use the new standings view. \`HomeDashboardClient\` no longer queries Supabase directly for featured-match settings.
+- **Editorial security/SEO:** raw article HTML passes through \`rehype-sanitize\`; iframe embeds are restricted to HTTPS YouTube, YouTube-nocookie and Vimeo player hosts. Existing match-widget tokens use a dedicated safe protocol. NewsArticle JSON-LD escapes script-breaking characters; reviewed SEO title/description/canonical and article author are projected.
+- **Known gaps:** the full \`/highlights\` and \`/standings\` routes remain legacy-backed; Bet of the Day's \`pro_analysis\` and public affiliate/config settings need V2 models; CMS writes/review/publish, media ingestion and rights operations are not yet implemented. These are not complete pages.
+- **Migration state:** migrations 0004-0006 and their tests are committed but unapplied. No legacy article bodies, match history or media have been imported. No production resource or data has been changed. Staging migration, role verification, content preservation classification and browser parity remain gates.
