@@ -2,11 +2,11 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
-import { authorizeAdminAction } from '@/app/lib/admin/authorization';
+import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 import NewsroomClient from './NewsroomClient';
 
 export default async function AdminNewsPage() {
-  const authorization = await authorizeAdminAction();
+  const authorization = await authorizeMediaEditorialAction('read');
   if (!authorization.ok) {
     return (
       <main className="mx-auto max-w-3xl rounded-2xl border border-amber-200 bg-amber-50 p-6">
