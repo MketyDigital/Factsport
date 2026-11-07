@@ -6,6 +6,7 @@ import { countPublicMatchHighlights, listPublicHighlightLeagues, listPublicMatch
 import { serializeJsonLd } from '@/lib/seo/json-ld';
 import Link from "next/link";
 import { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { PlayCircle, Calendar, ArrowLeft, Tv, ShieldCheck, Trophy, ArrowRight, ChevronRight, ChevronLeft } from "lucide-react";
 
 const ITEMS_PER_PAGE = 12;
@@ -53,6 +54,7 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
       offset: (currentPage - 1) * ITEMS_PER_PAGE,
     });
   } else {
+    if (process.env.NODE_ENV !== 'development') return notFound();
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     const { data: leagueData } = await supabase
       .from('matches')
