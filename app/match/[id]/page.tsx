@@ -51,7 +51,7 @@ const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET'
 
 const isPostgresMatchDetail = () => process.env.FACTSPORT_MATCH_DETAIL_BACKEND === 'postgres';
 
-const getMatchData = cache(async (id: string) => {
+const getMatchData = cache(async (id: string): Promise<any> => {
     if (isPostgresMatchDetail()) {
         const row = await getPostgresMatchById(id);
         if (!row) return null;
@@ -73,7 +73,7 @@ const getMatchData = cache(async (id: string) => {
     return data;
 });
 
-const getMatchPlayback = cache(async (id: string) => {
+const getMatchPlayback = cache(async (id: string): Promise<any> => {
     if (isPostgresMatchDetail()) return getPostgresMatchPlaybackById(id);
     if (process.env.NODE_ENV !== 'development') return null;
     const match = await getMatchData(id);
