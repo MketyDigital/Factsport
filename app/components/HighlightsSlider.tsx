@@ -18,7 +18,7 @@ export default function HighlightsSlider({ highlights }: { highlights: any[] }) 
             
             <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-4 scrollbar-hide">
                 {highlights.map((item: any) => (
-                    <Link href={`/match/${item.id}`} key={item.highlight_id || item.id} className="snap-center shrink-0 w-[220px] group relative">
+                    <a href={item.canonical_url || `/match/${item.id}`} target={item.canonical_url ? "_blank" : undefined} rel={item.canonical_url ? "noopener noreferrer" : undefined} key={item.highlight_id || item.id} className="snap-center shrink-0 w-[220px] group relative">
                         <div className="relative aspect-video bg-[#0a1428] rounded-xl overflow-hidden shadow-lg border border-slate-200 mb-2 transform transition-transform duration-300 group-hover:-translate-y-1 group-hover:shadow-xl group-hover:border-blue-500/50">
                             
                             {item.thumbnail_url && (
