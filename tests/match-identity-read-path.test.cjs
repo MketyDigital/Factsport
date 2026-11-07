@@ -19,7 +19,8 @@ test('legacy match identity is an additive alias; V2 primary IDs remain canonica
 
 test('PostgreSQL match detail response is a safe public projection', () => {
   const start = adapter.indexOf('export async function getPostgresMatchById');
-  const reader = adapter.slice(start);
+  const end = adapter.indexOf('export async function getPostgresMatchPlaybackById', start);
+  const reader = adapter.slice(start, end > start ? end : undefined);
   assert.ok(start >= 0);
   assert.match(reader, /SELECT m\.id, m\.api_id, m\.espn_id, m\.league/);
   for (const privateField of ['video_url', 'livestream_url', 'audio_url', 'pro_analysis', 'campaign_id', 'affiliate_link', 'points_distributed']) {
