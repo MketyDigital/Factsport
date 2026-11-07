@@ -116,3 +116,10 @@ A route is not complete because it compiles or returns HTTP 200. For every route
 - SecureMatchPlayer and ProBettingSlipLock consume these same-origin APIs. Regression coverage is in tests/match-media-access.test.cjs.
 - Both routes still read legacy Supabase. They are not backed by PostgreSQL and have not been exercised against protected staging. The protected staging workflow currently validates the /matches read path, not /match/[id].
 - Before treating these routes as complete, add signed short-lived playback grants or a controlled media proxy where provider capabilities allow, connect VIP checks to the V2 entitlement service, test all media/status branches and failure modes, and migrate the remaining match-centre service dependencies without changing legacy IDs or prediction references.
+
+### M12 hardening follow-up — 2026-11-07
+
+- Playback status handling now fails closed for unknown pre-kickoff statuses: only an explicit known-live status is treated as live; POSTPONED/CANCELLED/CANCELED returns unavailable rather than opening a stream. Time-based unlock remains available at/after the scheduled 15-minute threshold for other statuses.
+- Relative media paths are kept same-origin instead of being rewritten to the production domain; protocol-relative paths, backslashes and path traversal are rejected. The existing streamio sentinel is preserved. Match-page metadata uses the same explicit live-status allowlist so an unknown status cannot expose a pre-kickoff stream URL through OpenGraph metadata.
+- Final code head `ab3e924f29766f42ad35210ffd75e23892e58896`: isolated verification passed (run 42386252137; 104 engine tests and 5 ingestion tests), native vinext build passed (run 42386252158), and protected staging passed (run 42386252101).
+- Staging continues to verify the protected `/matches` PostgreSQL path and infrastructure boundary only. It does not call `/match/[id]` or the new playback/VIP APIs; those remain source/test/build verified, not runtime verified.

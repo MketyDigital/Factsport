@@ -374,3 +374,7 @@ The acceptance contract prohibits silent removal of monetization. Existing publi
 - Isolated verification (42385395641), native vinext build (42385395567), and protected staging (42385395586) passed on 45d5cd3b4a5fcd39ab33e1eb58bdf47ba40c5ecd.
 - Evidence scope: staging verifies the existing /matches PostgreSQL path, not the new match-detail endpoints. Those are source/test/build verified only and still read legacy Supabase.
 - M11 match-centre migration gate remains OPEN: signed short-lived playback grant or controlled proxy, V2 entitlement/RBAC, canonical/legacy alias population, prediction/campaign parity, ticker/settings API migration, full child-component contracts and browser E2E are outstanding. No DB migration or production change was made.
+
+### M12 verification follow-up — 2026-11-07
+
+The latest match-centre source hardening commit is `ab3e924f29766f42ad35210ffd75e23892e58896`. Unknown match statuses no longer count as live for match-page metadata or playback; postponed/cancelled states do not release a stream. Relative media paths remain same-origin and the existing streamio mode is retained. Isolated verification passed (42386252137: 104 engine tests and 5 ingestion tests), native vinext build passed (42386252158), and protected staging passed (42386252101). The staging workflow still does not exercise the new match-detail endpoints, so match-centre runtime parity remains OPEN.

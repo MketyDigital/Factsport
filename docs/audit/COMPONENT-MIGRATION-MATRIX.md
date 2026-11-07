@@ -55,3 +55,10 @@ See [PAGE-MIGRATION-MATRIX.md](./PAGE-MIGRATION-MATRIX.md) for full page journey
 - MatchHeaderClient and MatchMobileHub receive an explicit public match DTO rather than the full legacy row. Existing child components still rely on legacy match/live/chat/prediction services; no claim of full component parity is made.
 - tests/match-media-access.test.cjs covers the client DTO boundary, server unlock response, audio preservation and server-side VIP check. Isolated verification, native build and protected staging passed on commit 45d5cd3b4a5fcd39ab33e1eb58bdf47ba40c5ecd; staging did not invoke these two new endpoints.
 - Remaining: V2 entitlement integration, short-lived signed playback grant/proxy, same-origin ticker and child-service migrations, and browser-level authorization/media tests.
+
+### M12 hardening follow-up — 2026-11-07
+
+- Playback status handling now fails closed for unknown pre-kickoff statuses: only an explicit known-live status is treated as live; POSTPONED/CANCELLED/CANCELED returns unavailable rather than opening a stream. Time-based unlock remains available at/after the scheduled 15-minute threshold for other statuses.
+- Relative media paths are kept same-origin instead of being rewritten to the production domain; protocol-relative paths, backslashes and path traversal are rejected. The existing streamio sentinel is preserved. Match-page metadata uses the same explicit live-status allowlist so an unknown status cannot expose a pre-kickoff stream URL through OpenGraph metadata.
+- Final code head `ab3e924f29766f42ad35210ffd75e23892e58896`: isolated verification passed (run 42386252137; 104 engine tests and 5 ingestion tests), native vinext build passed (run 42386252158), and protected staging passed (run 42386252101).
+- Staging continues to verify the protected `/matches` PostgreSQL path and infrastructure boundary only. It does not call `/match/[id]` or the new playback/VIP APIs; those remain source/test/build verified, not runtime verified.

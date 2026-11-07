@@ -141,3 +141,10 @@ The base \`FACTSPORT_MATCHES_BACKEND\` flag must remain independent of migration
 - Verification on 45d5cd3b4a5fcd39ab33e1eb58bdf47ba40c5ecd: isolated verification passed (run 42385395641), native vinext build passed (run 42385395567), and protected staging passed (run 42385395586).
 - The protected staging run validates the existing PostgreSQL-backed /matches path, pagination, deny-by-default access, Hyperdrive/R2 health and cache isolation. It does not exercise the new match-detail playback or VIP endpoints; those are source/test/build verified only.
 - This is not match-centre PostgreSQL parity. Remaining blockers include legacy-ID alias population, campaign/prediction parity, V2 entitlement/RBAC integration, signed short-lived playback grant or controlled media proxy, ticker/settings migration, and end-to-end tests for stream unlock, audio/video, finished highlights, VIP/non-VIP and provider failures. No migration was applied and no production resource changed.
+
+### M12 hardening follow-up — 2026-11-07
+
+- Playback status handling now fails closed for unknown pre-kickoff statuses: only an explicit known-live status is treated as live; POSTPONED/CANCELLED/CANCELED returns unavailable rather than opening a stream. Time-based unlock remains available at/after the scheduled 15-minute threshold for other statuses.
+- Relative media paths are kept same-origin instead of being rewritten to the production domain; protocol-relative paths, backslashes and path traversal are rejected. The existing streamio sentinel is preserved. Match-page metadata uses the same explicit live-status allowlist so an unknown status cannot expose a pre-kickoff stream URL through OpenGraph metadata.
+- Final code head `ab3e924f29766f42ad35210ffd75e23892e58896`: isolated verification passed (run 42386252137; 104 engine tests and 5 ingestion tests), native vinext build passed (run 42386252158), and protected staging passed (run 42386252101).
+- Staging continues to verify the protected `/matches` PostgreSQL path and infrastructure boundary only. It does not call `/match/[id]` or the new playback/VIP APIs; those remain source/test/build verified, not runtime verified.
