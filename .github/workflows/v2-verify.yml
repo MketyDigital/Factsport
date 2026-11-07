@@ -57,11 +57,13 @@ jobs:
           test -s db/migrations/0004_factsport_editorial_media.sql
           test -s db/migrations/0005_factsport_editorial_provenance_review.sql
           test -s db/migrations/0006_factsport_homepage_sports_read_models.sql
+          test -s db/migrations/0007_factsport_competition_player_stats.sql
           grep -q "CREATE TABLE IF NOT EXISTS public.editorial_articles" db/migrations/0004_factsport_editorial_media.sql
           grep -q "CREATE OR REPLACE VIEW public.public_editorial_articles" db/migrations/0004_factsport_editorial_media.sql
           grep -q "review_status = 'approved'" db/migrations/0005_factsport_editorial_provenance_review.sql
           grep -q "rights_reviewed_at IS NOT NULL" db/migrations/0005_factsport_editorial_provenance_review.sql
           grep -q "CREATE OR REPLACE VIEW public.public_match_highlights" db/migrations/0006_factsport_homepage_sports_read_models.sql
           grep -q "CREATE OR REPLACE VIEW public.public_competition_standings" db/migrations/0006_factsport_homepage_sports_read_models.sql
+          grep -q "CREATE OR REPLACE VIEW public.public_competition_player_stats" db/migrations/0007_factsport_competition_player_stats.sql
           grep -q "CREATE TABLE IF NOT EXISTS public.predictions" db/migrations/0003_factsport_public_predictions.sql
           echo "Foundation and public-prediction migrations present; live migration NOT executed"
