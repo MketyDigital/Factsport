@@ -24,8 +24,10 @@ test('V2 Media match projection preserves legacy playback and live frontend fiel
   assert.match(migration, /CREATE OR REPLACE VIEW public\.public_match_media/i);
   assert.match(migration, /rights_reviewed_by IS NOT NULL[\s\S]*usage_expires_at IS NULL OR usage_expires_at > now\(\)/i);
   assert.match(migration, /GRANT UPDATE \(display_clock, clock_updated_at\)[\s\S]*factsport_v2_espn_writer/i);
-  assert.match(reader, /LEFT JOIN public\.public_match_media/);
-  assert.match(reader, /LEFT JOIN public\.public_match_pins/);
+  assert.match(reader, /LEFT JOIN public\\.public_match_pins/);
+  const playbackReader = reader.slice(reader.indexOf('export async function getPostgresMatchPlaybackById'));
+  assert.match(playbackReader, /LEFT JOIN public\\.public_match_media/);
+  assert.match(reader, /LEFT JOIN public\\.public_match_pins/);
   assert.match(reader, /display_clock/);
   assert.match(matchData, /getPostgresMatchById/);
   assert.match(matchData, /displayClock: match\.display_clock/);
