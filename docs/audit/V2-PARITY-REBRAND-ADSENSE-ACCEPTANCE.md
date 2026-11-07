@@ -278,3 +278,19 @@ This migration is **not applied** to Azure PostgreSQL. The app's current Hyperdr
 The owner has clarified the public flow: ordinary browsing and prediction selection show no email form. Clicking **Submit Prediction** reveals a form requiring email, prediction details and acceptance of the free-prediction rules/privacy notice. No registered account is created. A privacy-safe display identity appears on the free leaderboard. The private `predict.factsport.com` product continues to require full registration.
 
 The marketing checkbox is separate, optional and unticked by default. Only explicit opt-in creates a pending marketing subscription; declining marketing must not block a free prediction. Consent wording/version, timestamp, source, confirmation and withdrawal are auditable. No promotional mail is sent until the address is confirmed. The database migration now includes `prediction_contacts`, `marketing_subscriptions` and `marketing_consent_events`; it remains unapplied to Azure. This is the recommended compliant implementation: direct-marketing consent must be a genuine choice under the Nigeria NDPA/GAID framework. Final privacy/consent wording and any cross-border email-provider processing require legal review.
+
+## 15. Owner priority confirmation — media platform first (2026-11-07)
+
+The primary delivery target is the complete public Factsport football-media platform at `factsport.com/*`. Free predictions are a supporting feature and must not dominate the V2 delivery sequence. Prioritize the public homepage, editorial/news/CMS, fixtures/results, live scores, match centre, standings, tournaments, highlights/video, SEO, responsive design, performance, accessibility, content operations and all existing sports-provider paths. Complete public media journeys and their PostgreSQL/R2/API foundations before spending substantial effort on anonymous free-prediction UX. Private Predict/VIP/business features remain mandatory for full product parity, not candidates for deletion.
+
+### Repeat free-prediction email behavior
+
+- Maintain exactly one contact row per normalized email address using the unique normalized-email index and a transactional upsert.
+- Same-browser return: reuse the participant identified by its secure first-party HttpOnly cookie; do not ask for email again.
+- Cookie loss/new device: a visitor may enter the email to reuse the existing contact record, but email must never merge participant IDs, prediction histories or registered accounts.
+- Multiple anonymous participant identities may reference one contact record; participant `contact_id` must not be unique. The contact row is the deduplication point for the email list.
+- Marketing subscriptions remain unique by contact, channel and purpose. Only a new affirmative optional opt-in can create/reactivate a subscription; preserve opt-out/withdrawal evidence and do not duplicate confirmation sends.
+- Normalize by trimming and lowercasing only. Do not apply provider-specific Gmail dot/plus transformations that could merge distinct addresses.
+- Keep this lightweight: unique email index, participant contact index, unique subscription key and transactional upsert; no extra identity service.
+
+This clarification supersedes any earlier wording in AUTH-005 that said free predictions collect no email at all. The current owner-approved flow is email at first explicit prediction submission, then reuse/deduplicate as above. Email is not a login or identity-claim key.
