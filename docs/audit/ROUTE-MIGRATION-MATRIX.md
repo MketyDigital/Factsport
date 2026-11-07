@@ -36,7 +36,7 @@ All other routes listed below still import or depend on legacy Supabase, old sec
 | `GET /api/matches` | Legacy Supabase fallback or v2 Postgres when `FACTSPORT_MATCHES_BACKEND=postgres`; 15-row keyset pagination | Public match-list read API | Staging token gate; private/no-store; timestamp+UUID cursor; explicit public DTO projection; bounded league/status filters; production caching only on a safe public projection |
 | `GET/POST /api/matchmaker` | Supabase matches + ESPN scoreboard matching | Provider identity reconciliation service | Exact team/kickoff matching, candidate review, unique provider IDs, no score/settlement writes |
 | `GET /api/og` | Dynamic Open Graph image | Cloudflare image response/static generation | Stable metadata, bounded input, cache and SEO tests |
-| `GET /api/media/[...key]` | New V2 route: PostgreSQL `public_media_assets` rights check + private R2 object read; raster images only. | MediaStore public delivery | Apply 0004-0005; verify R2 binding, rights expiry, content-type/size/ETag/304, cache and denied-object behavior in staging |
+| `GET /api/media/[...key]` | New V2 route: PostgreSQL `public_media_assets` rights check + private R2 object read; raster images only; conditional ETag and 60-second cache TTL so rights revocation is not hidden behind long CDN caching. | MediaStore public delivery | Apply 0004-0005; verify R2 binding, rights expiry, content-type/size/ETag/304, cache and denied-object behavior in staging |
 | `GET /api/settings` | Legacy fallback now selects only affiliate fields and the featured-match JSON path; PostgreSQL branch reads `public_homepage_settings` only. It no longer selects the entire settings row. | Public configuration read model | Migrate approved affiliate config to typed V2 settings; validate PostgREST JSON projection, cache, rate and schema; no social/provider secrets |
 | `GET /api/settle` | Supabase service role + `settle_match_points`; marks points_distributed separately | Transactional settlement job/API | Internal authenticated POST/job runner; single DB transaction + unique ledger; verified FT only; replay/concurrency/correction tests |
 | `POST /api/social` | Supabase socials/site_settings/matches; Buffer, Facebook, Make, Telegram; in-memory Set | Social event dispatcher + transactional outbox | Direct FB/TG preserved; Logic Apps adapter for third-party automation; per-channel idempotency; durable delivery states; no secrets in URLs |
@@ -84,3 +84,12 @@ A route is not complete because it compiles or returns HTTP 200. For every route
 - `GET /api/settings` now has a V2 PostgreSQL branch that returns only the featured-match pointer. The legacy path was narrowed to explicit affiliate fields plus the featured-match JSON projection instead of `select('*')`.
 - Homepage featured-match/highlight and standings data are served by server-only adapters, not direct browser database queries. The full standings and highlights API/page surfaces remain open.
 - Runtime verification requires applying migrations 0004-0006 to isolated staging; none has been applied to Azure yet.
+
+| `GET /api/standings/leaders` | New safe route: explicit legacy `tournament_scorers` projection or PostgreSQL `public_competition_player_stats` view; validates league and goals/assists selector. | Competition player stats | Apply 0007; populate through provider ingestion, reconcile player identity/team/season and verify cache/freshness |
+
+
+## 2026-11-07 competition API update
+
+- Added \`GET /api/standings/leaders?league=...&stat=goals|assists\` with validated parameters and an explicit public response projection. The client toggle no longer queries Supabase directly.
+- The full highlights page uses server-only PostgreSQL pagination/count/league readers and the rights-reviewed public highlight view when the match backend flag is enabled.
+- Standings recent form is read from completed, scored matches scoped to the current competition season; no abandoned/unscored result is used.
