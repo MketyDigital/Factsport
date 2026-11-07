@@ -214,3 +214,44 @@ The owner has chosen to prioritize a clean AdSense-eligible public football-medi
 8. Current V2 source changes remove the betting promotion from the homepage and remove the timed global vignette. The legacy how-to-play page is marked noindex and removed from the sitemap pending redesign; the VIP upgrade route also requires a noindex layout and policy review before it can be considered public editorial inventory.
 9. The explicit Cloudflare production indexing gate is FACTSPORT_INDEXING_ENABLED=true, additionally conditioned on NODE_ENV=production; unset/false means disallow crawling. Do not enable it until sitemap data is migrated from legacy Supabase to the V2 PostgreSQL read model and live robots/sitemap/ads.txt responses are verified.
 10. Remaining mandatory work: audit all betting/promo components and their call sites, campaign/prize settlement and payout code, VIP checkout/renewal/entitlements, affiliate links in content and feeds, page metadata/OG/schema, privacy/consent, editorial provenance, and live Cloudflare responses. This decision does not declare those audits complete.
+
+
+## 11. Owner-confirmed two-experience product separation (2026-11-07)
+
+The owner has clarified that VIP, premium prediction, betting-related and existing prize/business workflows must remain functional. The AdSense decision is therefore a separation of products and advertising surfaces, not deletion of the business system.
+
+### Public Factsport — AdSense-first experience (`factsport.com`)
+
+- Public football editorial, news, fixtures, live scores, match centre, standings, tournaments, highlights and original analysis.
+- Free, non-monetary predictions, scoring, points, statistics and leaderboards may remain available when they do not involve a paid entry, wager, bookmaker odds, betting referral or cash/prize inducement.
+- Public navigation and metadata must accurately describe this editorial/free experience.
+- AdSense is considered only on approved public editorial/informational content pages, after site and account approval, privacy/consent review and live technical checks.
+- No AdSense on authentication, account, private messages, chat, payment, admin, match controls or non-content pages.
+
+### Private Factsport product — preserve existing business functionality
+
+- Preserve VIP membership, premium prediction logic, betting-slip features, affiliate integrations, campaign configuration, existing prize eligibility/settlement workflows and associated admin capabilities as a separate product capability.
+- Preferred isolation is a dedicated private product hostname and independently controlled deployment boundary (ideally a separate registrable domain), e.g. a future `Factsport Club` service. It must not share AdSense code, publisher IDs, ad slots, ads.txt declarations, crawler login credentials or ad-serving configuration.
+- Do not expose betting/promo widgets, bookmaker links, betting odds, cash-prize inducements or premium betting claims in public editorial templates, public metadata, public feeds, public structured data, public sitemap or public landing pages.
+- Access must be enforced server-side using the approved identity adapter and authoritative V2 entitlements/roles. Client-only VIP checks, hidden UI, `noindex`, robots exclusions or obscured content are not authorization controls.
+- Keep private product routes out of public sitemaps and apply noindex where appropriate, but do not treat noindex as a policy workaround or as a substitute for a distinct product boundary.
+- The private product receives no AdSense. Do not configure Google's login-protected crawler access for it. Users and crawlers must not be served different content to conceal the product.
+- Preserve transactional records, active memberships, outstanding obligations, campaign and prize audit trails. No destructive migration or silent cancellation.
+- The business must receive a separate legal and payment-provider review. Paid VIP + cash-prize eligibility and any betting-related functionality may fall within online gambling restrictions or applicable local licensing rules depending on actual mechanics. A separate hostname does not legalize the product or guarantee AdSense approval for the public property.
+
+### Separation architecture and acceptance gates
+
+1. Keep one source repository and shared domain contracts where useful, but split public and private route manifests, app shells, navigation, content queries, deployment configuration and ad configuration.
+2. Create a private product host/deployment only after the owner confirms its hostname/domain and the Cloudflare DNS/Worker ownership boundary. Do not invent or change production DNS as part of this work.
+3. Public route tests must prove that no betting affiliate URL, bookmaker promo, odds/accumulator content, cash-prize inducement or VIP purchase CTA leaks into public routes, metadata, feeds, structured data or server-rendered HTML.
+4. Private route tests must prove unauthenticated access is denied server-side, non-VIP users cannot access VIP entitlements, role checks are server authoritative, and existing prediction/settlement/admin workflows remain functional.
+5. Ad tests must prove zero AdSense script/ad-unit requests on private routes and zero ad placements on private/account/payment/admin/chat/interactive control surfaces.
+6. Cross-surface links must be factual, clearly labelled and reviewed; no affiliate or betting promotion may be routed through a nominally editorial page to evade publisher review.
+7. Google site approval remains an external decision. Separation is a risk-reduction architecture, not a guarantee of approval. Google may consider the actual content and links present on a monetized page and its destination.
+
+### Implementation status
+
+- The first AdSense-first changes already removed the homepage betting banner and global timed promo modal, revised the public metadata, and restricted legacy VIP/prize pages from indexing.
+- The VIP upgrade copy was changed to remove betting-slip, odds and cash-prize sales claims while retaining the underlying route and membership workflow. This is a temporary presentation step, not the final private product separation.
+- The next implementation milestone is to map every public/private route and component call site, preserve the free prediction flow on the public experience, and move premium/business surfaces behind the private host boundary once the hostname and staging access design are confirmed.
+- No private business workflow is approved for deletion. No production host/DNS/Worker change is authorized by this separation decision alone.
