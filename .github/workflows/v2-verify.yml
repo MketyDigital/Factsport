@@ -38,6 +38,8 @@ jobs:
         run: npm run test:engine
       - name: TypeScript static check
         run: npm run typecheck
+      - name: Anonymous prediction and consent schema contract tests
+        run: node --test tests/prediction-schema.test.cjs
       - name: PostgreSQL migration syntax inventory
         run: |
           test -s db/migrations/0001_factsport_core.sql
