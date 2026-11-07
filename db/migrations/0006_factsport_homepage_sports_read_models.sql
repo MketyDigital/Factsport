@@ -63,6 +63,9 @@ CREATE TABLE IF NOT EXISTS public.competition_standings (
   CONSTRAINT competition_standings_results_total
     CHECK (won + draw + lost <= played_games)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS competition_one_current_season_idx
+  ON public.competition_standings (league_code, match_group)
+  WHERE is_current = true;
 CREATE INDEX IF NOT EXISTS competition_standings_current_idx
   ON public.competition_standings (league_code, match_group, position, team_id)
   WHERE is_current = true;
@@ -103,10 +106,14 @@ CREATE TABLE IF NOT EXISTS public.match_highlights (
   CONSTRAINT match_highlight_embed_url CHECK (
     embed_url ~ '^https://(www\.)?(youtube\.com/embed/[A-Za-z0-9_-]{6,64}|youtube-nocookie\.com/embed/[A-Za-z0-9_-]{6,64}|player\.vimeo\.com/video/[0-9]+)([?&][A-Za-z0-9_=%&.-]*)?$'
   ),
+  CONSTRAINT match_highlight_rights_reference CHECK (
+    rights_status NOT IN ('licensed', 'editorial_exception') OR rights_reference IS NOT NULL
+  ),
   CONSTRAINT match_highlight_rights_gate CHECK (
     NOT is_public
     OR (
       rights_status IN ('owned', 'licensed', 'editorial_exception')
+      AND rights_reviewed_by IS NOT NULL
       AND rights_reviewed_at IS NOT NULL
       AND published_at IS NOT NULL
     )
