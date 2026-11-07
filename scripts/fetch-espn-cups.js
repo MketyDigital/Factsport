@@ -89,7 +89,8 @@ async function fetchEspnCups() {
                 .eq('league', leagueName); 
 
             if (fetchErr) {
-                console.error(`   ⚠️ Could not fetch pending matches to verify IDs: ${fetchErr.message}`);
+                console.error(`   ⚠️ Could not fetch existing matches safely: ${fetchErr.message}`);
+                continue;
             }
 
             const matchesToUpsert = [];
@@ -126,7 +127,8 @@ async function fetchEspnCups() {
                 
                 const homeScore = readNonNegativeScore(homeCompetitor.score);
                 const awayScore = readNonNegativeScore(awayCompetitor.score);
-                const existingById = pendingMatches?.find(m => m.api_id === espnId || m.espn_id === espnId);
+                const existingById = pendingMatches?.find(m => m.api_id === espnId || m.espn_id === espnId) ||
+                    pendingMatches?.find(m => m.home_team === homeName && m.away_team === awayName && !m.points_distributed);
                 const isSettled = Boolean(existingById?.points_distributed);
                 const incomingStatus = normalizeEspnStatus(e.status.type.state, e.date);
                 const terminalStatuses = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'];
