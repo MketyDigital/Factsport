@@ -24,6 +24,7 @@ test('public pages do not render betting affiliate widgets or promote private VI
   const publicFiles = [
     'app/page.tsx', 'app/news/page.tsx', 'app/news/[slug]/page.tsx',
     'app/live/page.tsx', 'app/match/[id]/page.tsx',
+    'app/highlights/page.tsx', 'app/standings/page.tsx', 'app/tournaments/page.tsx', 'app/tournaments/[league]/page.tsx',
     'app/components/Footer.tsx', 'app/components/SiteHeader.tsx',
   ];
   for (const file of publicFiles) {
@@ -43,10 +44,13 @@ test('Prediction affiliate settings are not exposed by public Media settings end
 test('VIP and prize campaign surfaces are private-host gated and noindex', () => {
   const vipLayout = read('app/vip/upgrade/layout.tsx');
   const howToPlay = read('app/how-to-play/page.tsx');
+  const leaderboardLayout = read('app/leaderboard/layout.tsx');
   assert.match(vipLayout, /FACTSPORT_PRIVATE_PRODUCT_HOST/);
   assert.match(vipLayout, /notFound\(\)/);
   assert.match(howToPlay, /FACTSPORT_PRIVATE_PRODUCT_HOST/);
   assert.match(howToPlay, /index: false/);
+  assert.match(leaderboardLayout, /FACTSPORT_PRIVATE_PRODUCT_HOST/);
+  assert.match(leaderboardLayout, /index: false/);
 });
 
 test('public social publishing requires public-only channel scope and explicit compliance confirmation', () => {
@@ -67,4 +71,19 @@ test('public SEO stays disabled until the V2 PostgreSQL content and sitemap are 
   assert.match(robots, /FACTSPORT_SITEMAP_BACKEND === 'postgres'/);
   assert.match(sitemap, /FACTSPORT_SITEMAP_BACKEND === 'postgres'/);
   assert.doesNotMatch(sitemap, /@supabase\/supabase-js|createClient/);
+});
+
+test('public CMS publication enforces content policy and records publisher attestation', () => {
+  const policy = read('lib/public-media-content-policy.ts');
+  const actions = read('app/admin/news/actions.ts');
+  const client = read('app/admin/news/NewsroomClient.tsx');
+  const migration = read('db/migrations/0023_factsport_public_editorial_policy_attestation.sql');
+  assert.match(policy, /BOOKMAKER_LINK_HOST/);
+  assert.match(policy, /PROMOTIONAL_COPY/);
+  assert.match(policy, /PRIVATE_PRODUCT_PROMOTION/);
+  assert.match(actions, /inspectPublicMediaArticle\(snapshot\)/);
+  assert.match(actions, /publicContentConfirmed !== true/);
+  assert.match(actions, /public_media_policy_confirmed_by/);
+  assert.match(client, /no bookmaker\/affiliate links, betting promotions/);
+  assert.match(migration, /public_media_policy_confirmed_at/);
 });
