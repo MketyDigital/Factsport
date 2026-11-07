@@ -92,15 +92,26 @@ jobs:
             }
             echo "Factsport staging $path: unauthorized access blocked"
           done
-          HEALTH_STATUS="$(curl --silent --show-error --max-time 30 --retry-all-errors --retry 6 --retry-delay 3 \
-            -o /tmp/factsport-staging-authorized-health -w '%{http_code}' \
-            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
-            "$BASE/api/v2/health")"
-          if [ "$HEALTH_STATUS" != "200" ] || ! jq -e '.ok == true and .databaseReady == true and .mediaBucketReady == true' /tmp/factsport-staging-authorized-health >/dev/null 2>&1; then
+          HEALTH_READY=false
+          HEALTH_STATUS=000
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            HEALTH_STATUS="$(curl --silent --show-error --max-time 30 \
+              -o /tmp/factsport-staging-authorized-health -w '%{http_code}' \
+              -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+              "$BASE/api/v2/health" || true)"
+            if [ "$HEALTH_STATUS" = "200" ] && jq -e '.ok == true and .databaseReady == true and .mediaBucketReady == true' /tmp/factsport-staging-authorized-health >/dev/null 2>&1; then
+              HEALTH_READY=true
+              break
+            fi
+            BODY_CLASS="$(head -c 100 /tmp/factsport-staging-authorized-health 2>/dev/null | tr '\\n' ' ' | tr -cd '[:print:]' || true)"
             CODE="$(jq -r '.error // "non-json"' /tmp/factsport-staging-authorized-health 2>/dev/null || echo non-json)"
-            echo "::error::Authorized staging health check failed: HTTP $HEALTH_STATUS; code $CODE"
+            echo "Authorized staging health probe $attempt: HTTP $HEALTH_STATUS; code $CODE; body=$BODY_CLASS"
+            sleep 4
+          done
+          [ "$HEALTH_READY" = "true" ] || {
+            echo "::error::Authorized staging health check failed after propagation retries: HTTP $HEALTH_STATUS."
             exit 1
-          fi
+          }
           echo "Factsport native vinext app: authorized Hyperdrive and R2 dependency check passed"
 
           MATCH_PAGE_STATUS="$(curl --silent --show-error --max-time 30 \
