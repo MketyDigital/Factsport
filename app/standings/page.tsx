@@ -70,7 +70,7 @@ async function getStandings(leagueName: string) {
                     dbMatches = await listPostgresLeagueResults(sourceLeagueName, currentSeason, 2000);
                 }
             }
-        } else {
+        } else if (process.env.NODE_ENV === 'development') {
             const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
             const [standingsResult, matchesResult] = await Promise.all([
                 supabase.from('standings').select('*').eq('league_code', leagueCode)
@@ -83,6 +83,8 @@ async function getStandings(leagueName: string) {
             if (standingsResult.error) throw standingsResult.error;
             dbStandings = standingsResult.data || [];
             dbMatches = matchesResult.data || [];
+        } else {
+            return { error: 'V2 competition standings are not provisioned.', data: [] };
         }
 
         if (dbStandings.length === 0) {
