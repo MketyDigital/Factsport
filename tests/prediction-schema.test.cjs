@@ -20,6 +20,7 @@ test('prediction rows enforce match ownership, allowed outcomes, score bounds an
   assert.match(sql, /predicted_outcome IN \('home', 'draw', 'away'\)/i);
   assert.match(sql, /prediction_participant_match_unique UNIQUE \(participant_id, match_id\)/i);
   assert.match(sql, /predictions_registered_user_match_unique/i);
+  assert.match(sql, /predicted_home_score IS NOT NULL AND predicted_away_score IS NOT NULL/i);
   assert.match(sql, /predicted_home_score >= 0 AND predicted_away_score >= 0/i);
   assert.match(sql, /locked_at timestamptz NOT NULL/i);
 });
