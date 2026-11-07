@@ -102,7 +102,7 @@ Added tests/adsense-readiness.test.cjs and updated existing monetization/setting
 7. Complete editorial source/rights/provenance and moderation audits, original-content quality review and mobile/accessibility/Core Web Vitals review.
 8. Verify the private host is provisioned separately and server-side access, auth, entitlements, payments, affiliate integrations, VIP and prize workflows still function on that host.
 9. Complete the public free Prediction API/anonymous participant flow against migration 0003 as a separate Prediction-system milestone; do not re-enable the legacy Supabase PredictionBoard on public Media pages.
-10. Apply migrations 0021–0024 only after role, dependency and staging DB verification. Do not apply migrations to production as part of this work.
+10. Apply migrations 0021–0025 only after role, dependency and staging DB verification. Do not apply migrations to production as part of this work.
 
 Public homepage, newsroom, match detail, match list, standings, highlights, live hub and social embed now use V2 PostgreSQL read adapters in production; legacy Supabase fallbacks are development-only. The V2 match page uses the private playback projection, and the social embed no longer forces timed redirects or exposes raw stream URLs. The live studio is gated on its V2 public read model and explicit token-issuer readiness. Legacy user chat is disabled outside development until a moderated V2 chat backend is provisioned. The legacy PredictionBoard is likewise development-only on Media match pages; the V2 public prediction schema exists, but its server API/anonymous participant flow is not yet integrated. The public free prediction feature must be re-enabled only after that separate Prediction service is implemented and tested.
 
@@ -114,3 +114,12 @@ No production DNS, Worker, Supabase data, Cloudflare route, AdSense account, pub
 - Migration 0024 adds Media-owned announcement text, public link and enabled state to the homepage settings projection. Prediction affiliate/payment settings are not part of this projection.
 - Migration 0025 grants only the dedicated editorial writer role access to this Media settings row. The Media admin now has a separate `/admin/settings` editor; it requires publisher/media-admin capability, validates public URLs, screens announcement copy and links with the same public content policy, and never falls back to legacy mixed settings.
 - These migrations remain unapplied until the dedicated editorial role and database binding are provisioned and verified. The announcement editor is source-complete but not runtime-proven.
+
+
+## Latest source and CI evidence
+
+- The public Media homepage no longer renders the legacy betting tips, Bet of the Day or bookmaker promotion widgets. Match hub Pro betting-slip and bookmaker banner UI was removed from the public match experience; the legacy Prediction components and affiliate settings remain separate and are not deleted from the repository.
+- Public editorial publication, public social scheduling and homepage announcement editing share the public Media content-screening policy. Article publication records publisher identity, timestamp and policy version against the exact revision. Social approval is reset when content/channel/link/schedule inputs change.
+- The AdSense policy is fail-closed: no Google ad loader is present; ad rendering requires explicit enablement, actual site approval, a Google publisher ID, exact `factsport.com` host and a CMP-ready consent state. Only public home/news/editorial paths can qualify; match, live, embed, account, private Prediction, admin and API paths are excluded. `public/ads.txt` exists but live-domain delivery and account ownership still require verification.
+- CI for commit `799e35be3ecf5d3abb5e1f4d8ae706ec6493dcf0` passed the Factsport regression suite, TypeScript, native Cloudflare Worker build and staging deployment/deny-by-default smoke checks. This does not prove the editorial database writer, social dispatcher or actual AdSense account/CMP is provisioned.
+- No AdSense ads are enabled. No Google AdSense account, publisher setting, CMP, production domain, production DB or production Worker was changed.
