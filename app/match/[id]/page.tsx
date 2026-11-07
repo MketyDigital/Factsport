@@ -76,7 +76,7 @@ const getMatchData = cache(async (id: string): Promise<any> => {
 const getMatchPlayback = cache(async (id: string): Promise<any> => {
     if (isPostgresMatchDetail()) return getPostgresMatchPlaybackById(id);
     if (process.env.NODE_ENV !== 'development') return null;
-    const match = await getMatchData(id);
+    const match: any = await getMatchData(id);
     if (!match) return null;
     return {
         id: match.id, match_date: match.match_date, status: match.status,
@@ -94,7 +94,7 @@ type Props = {
 export async function generateMetadata({ params, searchParams }: Props, parent: ResolvingMetadata): Promise<Metadata> {
     const resolvedParams = await params;
     const resolvedSearchParams = await searchParams;
-    const [match, playback] = await Promise.all([getMatchData(resolvedParams.id), getMatchPlayback(resolvedParams.id)]);
+    const [match, playback]: [any, any] = await Promise.all([getMatchData(resolvedParams.id), getMatchPlayback(resolvedParams.id)]);
     
     if (!match) return { title: 'Match Not Found | FactSport' };
 
@@ -208,7 +208,7 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
   const resolvedParams = await params;
   if (!resolvedParams?.id) return notFound();
 
-  const [dbData, playback] = await Promise.all([getMatchData(resolvedParams.id), getMatchPlayback(resolvedParams.id)]);
+  const [dbData, playback]: [any, any] = await Promise.all([getMatchData(resolvedParams.id), getMatchPlayback(resolvedParams.id)]);
   if (!dbData) return notFound();
 
   // Only the safe public match projection crosses into client components.
