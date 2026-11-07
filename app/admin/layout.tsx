@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Newspaper, Send, Radio, LogOut } from 'lucide-react';
+import { Newspaper, Send, Radio, Settings, LogOut } from 'lucide-react';
 import { createClient } from '@/app/lib/supabase/server';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 
@@ -32,6 +32,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin/news" className="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-white/10"><Newspaper size={16}/> Newsroom</Link>
             <Link href="/admin/social" className="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-white/10"><Send size={16}/> Social</Link>
             <Link href="/admin/studio" className="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-white/10"><Radio size={16}/> Studio</Link>
+            <Link href="/admin/settings" className="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-white/10"><Settings size={16}/> Settings</Link>
           </nav>
           <Link href="/" className="flex items-center gap-2 text-xs text-slate-300 hover:text-white"><LogOut size={14}/> Exit</Link>
         </div>
