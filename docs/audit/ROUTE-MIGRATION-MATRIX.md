@@ -93,3 +93,11 @@ A route is not complete because it compiles or returns HTTP 200. For every route
 - Added \`GET /api/standings/leaders?league=...&stat=goals|assists\` with validated parameters and an explicit public response projection. The client toggle no longer queries Supabase directly.
 - The full highlights page uses server-only PostgreSQL pagination/count/league readers and the rights-reviewed public highlight view when the match backend flag is enabled.
 - Standings recent form is read from completed, scored matches scoped to the current competition season; no abandoned/unscored result is used.
+
+
+## 2026-11-07 competition read API continuation
+
+- Added `GET /api/competitions/matches?league=...`: allowlisted league, bounded match projection, base-schema PostgreSQL reader under `FACTSPORT_MATCHES_BACKEND`, narrow Supabase fallback.
+- Extended `GET /api/cache/standings` with an explicit PostgreSQL competition standings view path under `FACTSPORT_COMPETITIONS_BACKEND`; invalid league codes are rejected and errors are sanitized.
+- `LiveStandings` consumes these same-origin APIs and no longer initializes a browser Supabase client.
+- These APIs are implementation slices, not proof of current-season data quality or complete route parity. Staging probes and data-provider reconciliation remain required.
