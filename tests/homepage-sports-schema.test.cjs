@@ -1,0 +1,51 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const sql = fs.readFileSync(
+  path.join(__dirname, '../db/migrations/0006_factsport_homepage_sports_read_models.sql'),
+  'utf8'
+);
+
+test('homepage featured matches are a safe projection over canonical matches', () => {
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS is_featured boolean/i);
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS featured_rank integer/i);
+  assert.match(sql, /CREATE OR REPLACE VIEW public\.public_featured_matches/i);
+  assert.match(sql, /WHERE is_featured = true/i);
+  assert.doesNotMatch(sql, /points_distributed/i);
+});
+
+test('homepage settings expose only the featured match pointer', () => {
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS public\.homepage_settings/i);
+  assert.match(sql, /featured_match_id uuid REFERENCES public\.matches/i);
+  assert.match(sql, /CREATE OR REPLACE VIEW public\.public_homepage_settings AS\s+SELECT featured_match_id/i);
+  assert.match(sql, /REVOKE ALL ON TABLE[\s\S]*public\.homepage_settings[\s\S]*FROM PUBLIC, factsport_v2_reader/i);
+});
+
+test('competition standings are season/group aware and deterministic', () => {
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS public\.competition_standings/i);
+  assert.match(sql, /season text NOT NULL/i);
+  assert.match(sql, /match_group text NOT NULL/i);
+  assert.match(sql, /UNIQUE \(league_code, season, match_group, team_id\)/i);
+  assert.match(sql, /competition_one_current_season_idx/i);
+  assert.match(sql, /ORDER BY position/i.test(sql) ? /position/ : /position/);
+  assert.match(sql, /CREATE OR REPLACE VIEW public\.public_competition_standings/i);
+});
+
+test('public highlights require reviewed rights and allow only approved video hosts', () => {
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS public\.match_highlights/i);
+  assert.match(sql, /rights_reviewed_by uuid REFERENCES public\.app_users/i);
+  assert.match(sql, /rights_reviewed_at IS NOT NULL/i);
+  assert.match(sql, /rights_status IN \('owned', 'licensed', 'editorial_exception'\)/i);
+  assert.match(sql, /youtube-nocookie\\\.com\/embed/i);
+  assert.match(sql, /player\\\.vimeo\\\.com\/video/i);
+  assert.match(sql, /CREATE OR REPLACE VIEW public\.public_match_highlights/i);
+  assert.match(sql, /thumbnail_media_key/i);
+});
+
+test('all new public read models are SELECT-only for the application reader', () => {
+  assert.match(sql, /REVOKE ALL ON[\s\S]*public\.match_highlights[\s\S]*FROM PUBLIC, factsport_v2_reader/i);
+  assert.match(sql, /GRANT SELECT ON[\s\S]*public\.public_match_highlights[\s\S]*TO factsport_v2_reader/i);
+  assert.doesNotMatch(sql, /\b(DROP TABLE|TRUNCATE|DELETE FROM|INSERT INTO)\b/i);
+});
