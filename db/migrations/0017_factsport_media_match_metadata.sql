@@ -16,8 +16,6 @@ CREATE TABLE IF NOT EXISTS public.match_media (
   media_url text,
   stream_url text,
   media_mode text CHECK (media_mode IS NULL OR media_mode IN ('audio', 'video')),
-  chat_pin_text text CHECK (chat_pin_text IS NULL OR char_length(chat_pin_text) <= 2000),
-  chat_pin_link text,
   rights_status text NOT NULL DEFAULT 'pending'
     CHECK (rights_status IN ('pending', 'owned', 'licensed', 'editorial_exception', 'rejected', 'expired')),
   rights_reference text,
@@ -63,18 +61,36 @@ CREATE TABLE IF NOT EXISTS public.match_media (
     stream_url IS NULL OR stream_url = 'streamio' OR
     (stream_url ~ '^https?://' AND stream_url !~ '^https?://[^/]*@') OR
     (stream_url ~ '^/' AND stream_url !~ '^//')
-  ),
-  CONSTRAINT match_media_safe_chat_pin_link CHECK (
-    chat_pin_link IS NULL OR
-    (chat_pin_link ~ '^https?://' AND chat_pin_link !~ '^https?://[^/]*@') OR
-    (chat_pin_link ~ '^/' AND chat_pin_link !~ '^//')
   )
 );
+
+CREATE TABLE IF NOT EXISTS public.match_public_pins (
+  match_id uuid PRIMARY KEY REFERENCES public.matches(id) ON DELETE CASCADE,
+  pin_text text CHECK (pin_text IS NULL OR char_length(pin_text) <= 2000),
+  pin_link text CHECK (
+    pin_link IS NULL OR
+    (pin_link ~ '^https?://' AND pin_link !~ '^https?://[^/]*@') OR
+    (pin_link ~ '^/' AND pin_link !~ '^//')
+  ),
+  is_public boolean NOT NULL DEFAULT false,
+  updated_by uuid REFERENCES public.app_users(id) ON DELETE RESTRICT,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE OR REPLACE VIEW public.public_match_pins AS
+SELECT match_id, pin_text, pin_link
+FROM public.match_public_pins
+WHERE is_public = true;
+
+REVOKE ALL ON public.match_public_pins, public.public_match_pins
+  FROM PUBLIC, factsport_v2_reader, factsport_v2_schedule_writer, factsport_v2_espn_writer;
+GRANT SELECT ON public.public_match_pins TO factsport_v2_reader;
+GRANT SELECT, INSERT, UPDATE ON public.match_public_pins TO factsport_v2_editorial_writer;
 
 CREATE OR REPLACE VIEW public.public_match_media AS
 SELECT
   match_id, video_url, livestream_url, audio_url, media_url, stream_url,
-  media_mode, chat_pin_text, chat_pin_link, attribution_text, usage_expires_at
+  media_mode, attribution_text, usage_expires_at
 FROM public.match_media
 WHERE is_public = true
   AND rights_status IN ('owned', 'licensed', 'editorial_exception')
