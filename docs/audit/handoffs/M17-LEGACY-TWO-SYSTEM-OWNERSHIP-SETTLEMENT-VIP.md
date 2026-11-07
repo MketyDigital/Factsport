@@ -126,3 +126,57 @@ V2 requirement: payment request and entitlement are separate states. A verified 
 5. Convert the ownership matrix into V2 API/schema acceptance tests before enabling any legacy replacement flag.
 
 No production endpoints, DNS, secrets, migrations or data were changed by this audit.
+
+
+## 7. Correction after cross-checking existing V2 database audit notes
+
+The statement in section 4.1 that the legacy repository tree contains no SQL source is true only about the **legacy Git repository**. It was incomplete as a statement about available evidence: the V2 branch already contains sanitized, user-supplied database inspection results and function-behavior findings. Do not restart this investigation or treat settlement logic as wholly unknown.
+
+Existing authoritative V2 records reviewed for this correction:
+
+- `docs/audit/DB-001-inventory-and-settlement.md` — sanitized schema inventory and `settle_match_points` behavior.
+- `docs/audit/DB-002-clean-reset-policy.md` — clean-data reset direction plus `protect_profile_stats()` and `secure_predictions()` behavior.
+- `docs/audit/DB-003-functions-and-cron.md` — SQL 12–20 function signatures, supplied function-body findings, trigger wiring, function EXECUTE grants, cron metadata and contradictions.
+- `db/migrations/0003_factsport_public_predictions.sql` — the current V2 *anonymous free-prediction* schema; it is not the private Prediction-system settlement schema and does not by itself provide scoring parity.
+
+### 7.1 Already recorded settlement behavior
+
+DB-001 records that `settle_match_points(target_match_id)`:
+- awards the monthly track 3 points for a correct outcome and an additional 10 for a correct exact score (13 total in the ordinary exact-score case);
+- uses campaign-specific outcome, score, first-scorer, red-card and penalty awards when a campaign applies;
+- uses `is_eligible_for_prize` for separate eligible-point and eligible-score tallies;
+- does not itself select the first five predictions of a day or enforce winner qualification/minimum points;
+- increments campaign leaderboard and profile counters, without an in-function already-settled guard;
+- selects the first `goal` event from JSONB match events, while own-goal, penalty/VAR, event-order and normalization semantics still require validation.
+
+The app route's separate RPC call and `points_distributed` update therefore remain a concurrency/idempotency defect, but the scoring model is not wholly unknown.
+
+### 7.2 Other already recorded SQL findings
+
+- `reset_monthly_leaderboard()` is SECURITY DEFINER, clears only `monthly_points` and `monthly_correct_scores`, has no in-body authorization or period snapshot, and was recorded as executable by anon/authenticated. It does not clear eligible monthly counters.
+- `secure_prediction_insert()` computes the daily eligibility cap (default 5) and kickoff check, but SQL 18/20 found no trigger attached to it. The audited PredictionBoard explicitly inserts `is_eligible_for_prize: false`; therefore the normal audited UI path does not get eligibility assigned by this dormant trigger.
+- The active `user_predictions` trigger is `secure_predictions()` BEFORE INSERT OR UPDATE. Its security checks and limitations are summarized in DB-002/DB-003.
+- `delete_old_matches(months_to_keep)` is SECURITY DEFINER and has a hardcoded admin-email check, but no bounds check on the retention parameter; its cleanup behavior needs a bounded, audited replacement.
+- `is_admin()` checks `profiles.id=auth.uid()` and `role='admin'`; safe search_path and role-write controls remain required.
+- `handle_new_user()` and `handle_verification_update()` are attached to auth.users triggers; signup profile creation and email-verification promotion are therefore DB-verified.
+- `audit_monthly_winners()` selects exact-score predictions using `points_awarded=10`, which conflicts with the 13-point outcome-plus-exact-score settlement behavior. It also differs from app-level audit selection and period/ranking rules.
+- `refresh_group_standings_from_matches()` references `public.group_standings`, which DB-003 records as confirmed absent from the inspected public schema. Preserve the standings capability with a valid Media-system model; do not port this broken function as-is.
+- SQL 15 recorded EXECUTE grants for all 11 public functions to anon and authenticated. This needs explicit least-privilege handling in the target, without assuming every trigger function is independently RPC-callable.
+- Three pg_cron jobs were recorded by name/schedule; their command bodies and exact side effects were not shared. Do not infer their behavior from names alone.
+
+### 7.3 Corrected evidence classification
+
+| Area | Evidence status in V2 notes | Remaining work |
+|---|---|---|
+| Settlement scoring formula and counter targets | Sanitized behavior recorded in DB-001/003 | Translate to tests and target transaction; confirm edge cases/event semantics and correction/reversal behavior |
+| Settlement idempotency/concurrency | Defect identified | Design ledger, lock and atomic updates |
+| Monthly reset | Function body behavior recorded | Period policy, eligible-counter lifecycle, atomic rollover and audit |
+| Prediction daily eligibility | Function behavior and missing trigger recorded | Confirm every producer, correct trigger/server enforcement, concurrency-safe daily cap |
+| Monthly winner qualification | SQL and TypeScript contradictions recorded | Product-owner approved canonical policy and regression fixtures |
+| Account signup/verification | Function behavior and trigger attachments recorded | Reimplement against selected V2 identity provider |
+| Old-match cleanup | Function behavior and unsafe parameter/security properties recorded | Explicit retention policy, bounded dry-run and privileged job |
+| Group standings refresh | Broken dependency confirmed | Media-owned standings schema/provider-first reconciliation |
+| Cron command bodies | Not supplied | Owner-reviewed local inspection with credentials redacted |
+
+This correction supersedes the broad wording in section 4.1. The remaining blocker is **not** that no scoring evidence exists. It is that the existing evidence must be converted into a reviewed, complete target specification and tests, while unresolved edge cases and contradictory business rules are settled. Raw production function bodies and credential-bearing SQL are intentionally not copied into Git.
+
