@@ -13,12 +13,13 @@ The public Factsport Media website is the AdSense-first editorial experience. Ex
 Removed legacy bookmaker banners, betting promo widgets and bonus-code placements from:
 - Public news index and article detail.
 - Live match hub.
-- Public match centre, including the visible ScoreAxis bookmaker CTA and affiliate URL projection.
+- Public match centre, including the visible ScoreAxis bookmaker CTA and affiliate URL projection; removed the Pro Slip tab and its bookmaker content from the public match hub.
+- Public homepage, including the Bet of the Day recommendation and Free Tips banner.
 - Highlights, standings and tournament index/detail.
 - Public header and footer VIP/prize navigation.
 - Public homepage quick-link to the private VIP leaderboard; it now links to sports standings.
 
-The AdsterraStandardBanner, BettingPromo and FreeTipsBanner components remain in source for private-product parity only. No public Media page should mount them. The old timed CustomVignette is not mounted in the public root layout.
+The AdsterraStandardBanner, BettingPromo, FreeTipsBanner, BetOfTheDay and ProBettingSlipLock components remain in source for private-product parity only. No public Media page should mount them. The old timed CustomVignette is not mounted in the public root layout.
 
 ## Private Prediction host boundary
 
@@ -31,7 +32,11 @@ The AdsterraStandardBanner, BettingPromo and FreeTipsBanner components remain in
 
 ## Public social distribution boundary
 
-Migration 0022:
+Migrations 0022–0023:
+- 0022 restricts Media social channels/publications to the public Media surface and records the public-content attestation.
+- 0023 records publisher policy confirmation against the exact editorial revision, including policy version and publisher identity/time.
+
+Migration 0022 details:
 - Restricts media_social_channels.surface_scope to public_media.
 - Restricts media_social_publications.distribution_scope to public_media.
 - Adds the identity and timestamp of the operator confirming a post is suitable for public Media distribution.
@@ -95,5 +100,7 @@ Added tests/adsense-readiness.test.cjs and updated existing monetization/setting
 7. Complete editorial source/rights/provenance and moderation audits, original-content quality review and mobile/accessibility/Core Web Vitals review.
 8. Verify the private host is provisioned separately and server-side access, auth, entitlements, payments, affiliate integrations, VIP and prize workflows still function on that host.
 9. Apply migrations 0021–0023 only after role, dependency and staging DB verification. Do not apply migrations to production as part of this work.
+
+Public homepage, newsroom, match detail, match list, standings, highlights, live hub and social embed now use V2 PostgreSQL read adapters in production; legacy Supabase fallbacks are development-only. The V2 match page uses the private playback projection, and the social embed no longer forces timed redirects or exposes raw stream URLs. The live studio is gated on its V2 public read model and explicit token-issuer readiness. Legacy user chat is disabled outside development until a moderated V2 chat backend is provisioned.
 
 No production DNS, Worker, Supabase data, Cloudflare route, AdSense account, publisher ID, CMP or ad serving configuration was changed. No ads are enabled.
