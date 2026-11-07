@@ -14,14 +14,21 @@ const SAFE_IMAGE_TYPES = new Set([
   'image/avif', 'image/gif', 'image/jpeg', 'image/png', 'image/webp',
 ]);
 
+const MEDIA_CACHE = 'public, max-age=60, s-maxage=60, must-revalidate';
+
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: { key: string[] } }
 ) {
   const key = Array.isArray(context.params?.key) ? context.params.key.join('/') : '';
   const asset = await getPublicMediaAsset(key);
   if (!asset || !SAFE_IMAGE_TYPES.has(asset.content_type)) {
     return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  }
+
+  const knownEtag = asset.sha256 ? '"' + asset.sha256 + '"' : null;
+  if (knownEtag && request.headers.get('if-none-match') === knownEtag) {
+    return new Response(null, { status: 304, headers: { ETag: knownEtag, 'Cache-Control': MEDIA_CACHE } });
   }
 
   const bucket = env.FACTSPORT_MEDIA_BUCKET as {
@@ -36,11 +43,16 @@ export async function GET(
     'Content-Type': asset.content_type,
     'X-Content-Type-Options': 'nosniff',
     'Content-Security-Policy': "default-src 'none'; sandbox",
-    'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800',
+    'Cache-Control': MEDIA_CACHE,
   });
   if (asset.byte_size > 0) headers.set('Content-Length', String(asset.byte_size));
-  if (asset.sha256) headers.set('ETag', `"${asset.sha256}"`);
+  if (knownEtag) headers.set('ETag', knownEtag);
   else if (object.httpEtag) headers.set('ETag', object.httpEtag);
+
+  const responseEtag = headers.get('ETag');
+  if (responseEtag && request.headers.get('if-none-match') === responseEtag) {
+    return new Response(null, { status: 304, headers });
+  }
 
   return new Response(object.body, { status: 200, headers });
 }
