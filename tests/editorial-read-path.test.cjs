@@ -27,6 +27,8 @@ test('R2 media delivery requires a rights-cleared database row and safe raster i
   assert.ok(mediaRoute.includes('X-Content-Type-Options'));
   assert.ok(mediaRoute.includes('Content-Security-Policy'));
   assert.ok(mediaRoute.includes('Cache-Control'));
+  assert.ok(mediaRoute.includes('if-none-match'));
+  assert.ok(mediaRoute.includes('max-age=60, s-maxage=60, must-revalidate'));
   assert.ok(!mediaRoute.includes('image/svg+xml'));
 });
 
