@@ -1,10 +1,8 @@
 'use client';
 import Link from "next/link";
-import { Radio, UserCircle, LayoutDashboard, Newspaper, Calendar, PlayCircle } from "lucide-react";
-import { useAuth } from "@/app/components/AuthProvider"; 
+import { Radio, Newspaper, Calendar, PlayCircle } from "lucide-react";
 
 export default function SiteHeader() {
-  const { user, loading } = useAuth(); 
 
   return (
     <header className="sticky top-0 z-50 bg-[#0a1428] text-white border-b border-white/10 shadow-lg font-sans">
@@ -37,25 +35,7 @@ export default function SiteHeader() {
                 <span className="text-[9px] font-bold uppercase tracking-wider">Videos</span>
             </Link>
 
-            <div className="shrink-0 flex flex-col items-center min-w-[56px]">
-                {loading ? (
-                    // 🟢 UI UPGRADE: Clean pulsing icon instead of broken skeleton boxes
-                    <div className="flex flex-col items-center gap-1 text-slate-500 opacity-60 animate-pulse">
-                        <UserCircle size={18} />
-                        <span className="text-[9px] font-bold uppercase tracking-wider">Auth...</span>
-                    </div>
-                ) : user ? (
-                    <Link href="/dashboard" className="flex flex-col items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors group">
-                        <LayoutDashboard size={18} className="group-hover:scale-110 transition-transform" />
-                        <span className="text-[9px] font-bold uppercase tracking-wider">Account</span>
-                    </Link>
-                ) : (
-                    <Link href="/login" className="flex flex-col items-center gap-1 text-slate-400 hover:text-white transition-colors group">
-                        <UserCircle size={18} className="group-hover:scale-110 transition-transform" />
-                        <span className="text-[9px] font-bold uppercase tracking-wider">Login</span>
-                    </Link>
-                )}
-            </div>
+
         </div>
       </div>
       <style jsx>{`.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}</style>
