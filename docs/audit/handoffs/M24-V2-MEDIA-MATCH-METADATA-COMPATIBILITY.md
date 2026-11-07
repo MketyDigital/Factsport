@@ -28,11 +28,13 @@ These are Media capabilities. Prediction analysis (pro_analysis), paid VIP state
 
 ## Read adapters updated
 
-- getPostgresMatchById now joins the rights-cleared media and public pin views and returns the old frontend-compatible data names.
+- getPostgresMatchById returns the old frontend-compatible non-secret match fields and joins only the public pin view. It deliberately does not select raw video/audio URLs.
+- getPostgresMatchPlaybackById is a separate server-only projection that joins rights-cleared media URLs; only the playback endpoint calls it, then applies the server-side 15-minute unlock and URL safety checks.
 - /api/match-data has a PostgreSQL branch mapping display_clock back to displayClock and provider_widget_id to widget_id, while retaining score/events/lineups/stats and the 5s/60s/3600s cache policy.
 - /api/match/[id]/playback has a PostgreSQL branch that retains the server-side unlock, finished/live selection and URL safety checks.
 - /api/cache/match-widget and /api/match/pin have PostgreSQL branches.
-- These routes fail closed in staging when the PostgreSQL backend flag is absent; they do not silently fall back to legacy Supabase in staging.
+- These routes fail closed in staging when the PostgreSQL backend flag is absent; they do not silently fall back to legacy Supabase in staging. The match detail route also fails closed in staging when its flag is missing.
+- Competition standings/player-leader routes now have explicit PostgreSQL feature flags and staging fail-closed behavior. Player leaders use the V2 season-aware player-stat read model; it must not be enabled until migration 0007 is applied and populated.
 - The existing V2 public /api/matches and competition matches readers remain backed by the V2 PostgreSQL adapter when their backend flag is enabled.
 
 ## Activation gates
