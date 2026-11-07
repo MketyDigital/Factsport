@@ -32,7 +32,7 @@ Provisioning sequence still required:
 2. Create the dedicated editorial role with no superuser, no role inheritance, no database creation, no replication, no bypass-RLS and a bounded connection limit.
 3. Provision a separate Hyperdrive with TLS required, SQL caching disabled and a small origin connection cap.
 4. Verify positive editorial privileges and negative permissions for matches, predictions, settlement, DELETE/TRUNCATE and private user tables.
-5. Apply migrations 0009–0011 in order, after migrations 0004–0005 and after role creation; run schema and grant audits.
+5. Apply migrations 0009–0013 in order, after migrations 0004–0005. Create the role before applying 0010; apply 0013 after 0012. Run schema and grant audits.
 6. Add the verified Hyperdrive ID as `FACTSPORT_EDITORIAL_HYPERDRIVE` in the native Cloudflare app config and deploy only to staging.
 7. Complete the V2 authentication/domain-identity bridge and provision explicit administrator mappings before enabling review/publish actions.
 
@@ -46,7 +46,7 @@ The existing match-event social automation route and its event safety map are no
 
 ## Remaining CMS capabilities
 
-- Rights-aware asset upload, R2 metadata creation, attribution/source capture, expiration and editorial media picker.
+- Rights-aware asset upload, R2 metadata creation, attribution/source capture, expiration and editorial media picker. Team-logo attachment storage and public read-model fields are present; the actual upload/picker workflow remains to be built.
 - Preview rendering that matches the public article renderer, scheduled article publication, revision diff/restore, approval comments and review rejection/change requests.
 - Editorial role matrix (writer, editor, publisher, media admin), audit events and stronger review separation than a single admin flag.
 - Social calendar, per-channel copy variants, media attachments, approval, edit/reschedule, retry/dead-letter UI, delivery receipts and analytics.
