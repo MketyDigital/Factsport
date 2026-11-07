@@ -28,6 +28,7 @@ const getArticleData = cache(async (slug: string) => {
       published_at: article.published_at,
     };
   }
+  if (process.env.NODE_ENV !== 'development') return null;
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   const { data, error } = await supabase.from('news').select('*').eq('slug', slug).single();
   if (error) return null;
@@ -74,7 +75,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
       to: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     });
     matches = rows.filter((match: any) => match.status === 'SCHEDULED').slice(0, 3);
-  } else {
+  } else if (process.env.NODE_ENV === 'development') {
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     const result = await supabase.from('matches').select('*').eq('status', 'SCHEDULED').limit(3);
     matches = result.data || [];
