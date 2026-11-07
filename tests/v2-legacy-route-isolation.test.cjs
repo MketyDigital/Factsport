@@ -7,19 +7,19 @@ const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
 const disabledRoutes = [
-  ['app/api/live/route.ts', 'docs/audit/legacy-source/api-live-route-v1.ts'],
-  ['app/api/sync-fd/route.ts', 'docs/audit/legacy-source/api-sync-fd-route-v1.ts'],
-  ['app/api/matchmaker/route.ts', 'docs/audit/legacy-source/api-matchmaker-route-v1.ts'],
-  ['app/api/settle/route.ts', 'docs/audit/legacy-source/api-settle-route-v1.ts'],
-  ['app/api/social/route.ts', 'docs/audit/legacy-source/api-social-route-v1.ts'],
-  ['app/api/cron/morning-post/route.ts', 'docs/audit/legacy-source/api-cron-morning-post-route-v1.ts'],
-  ['app/api/evening-roundup/route.ts', 'docs/audit/legacy-source/api-evening-roundup-route-v1.ts'],
-  ['app/api/logos/sync/route.ts', 'docs/audit/legacy-source/api-logos-sync-route-v1.ts'],
-  ['app/api/matches/highlights/sync/route.ts', 'docs/audit/legacy-source/api-matches-highlights-sync-route-v1.ts'],
-  ['app/api/admin/reset-monthly/route.ts', 'docs/audit/legacy-source/api-admin-reset-monthly-route-v1.ts'],
-  ['app/api/admin/run-audit/route.ts', 'docs/audit/legacy-source/api-admin-run-audit-route-v1.ts'],
-  ['app/api/admin/settings/route.ts', 'docs/audit/legacy-source/api-admin-settings-route-v1.ts'],
-  ['app/api/admin/users/route.ts', 'docs/audit/legacy-source/api-admin-users-route-v1.ts'],
+  ['app/api/live/route.ts', 'docs/audit/legacy-source/api-live-route-v1.ts.txt'],
+  ['app/api/sync-fd/route.ts', 'docs/audit/legacy-source/api-sync-fd-route-v1.ts.txt'],
+  ['app/api/matchmaker/route.ts', 'docs/audit/legacy-source/api-matchmaker-route-v1.ts.txt'],
+  ['app/api/settle/route.ts', 'docs/audit/legacy-source/api-settle-route-v1.ts.txt'],
+  ['app/api/social/route.ts', 'docs/audit/legacy-source/api-social-route-v1.ts.txt'],
+  ['app/api/cron/morning-post/route.ts', 'docs/audit/legacy-source/api-cron-morning-post-route-v1.ts.txt'],
+  ['app/api/evening-roundup/route.ts', 'docs/audit/legacy-source/api-evening-roundup-route-v1.ts.txt'],
+  ['app/api/logos/sync/route.ts', 'docs/audit/legacy-source/api-logos-sync-route-v1.ts.txt'],
+  ['app/api/matches/highlights/sync/route.ts', 'docs/audit/legacy-source/api-matches-highlights-sync-route-v1.ts.txt'],
+  ['app/api/admin/reset-monthly/route.ts', 'docs/audit/legacy-source/api-admin-reset-monthly-route-v1.ts.txt'],
+  ['app/api/admin/run-audit/route.ts', 'docs/audit/legacy-source/api-admin-run-audit-route-v1.ts.txt'],
+  ['app/api/admin/settings/route.ts', 'docs/audit/legacy-source/api-admin-settings-route-v1.ts.txt'],
+  ['app/api/admin/users/route.ts', 'docs/audit/legacy-source/api-admin-users-route-v1.ts.txt'],
 ];
 
 test('legacy Supabase side-effect endpoints are archived and fail closed in V2', () => {
