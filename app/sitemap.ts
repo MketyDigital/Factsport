@@ -1,56 +1,71 @@
 import { MetadataRoute } from 'next'
-import { createClient } from '@supabase/supabase-js'
+import { listPublicEditorialArticles } from '@/lib/adapters/postgres-editorial'
+import { listPostgresMatchesWindow } from '@/lib/adapters/postgres-matches'
+
+const SITE_URL = 'https://factsport.com'
+
+const STATIC_ROUTES = [
+  ['', 1.0, 'daily'],
+  ['/news', 0.9, 'hourly'],
+  ['/matches', 0.9, 'hourly'],
+  ['/live', 0.9, 'always'],
+  ['/highlights', 0.8, 'daily'],
+  ['/standings', 0.8, 'daily'],
+  ['/tournaments', 0.7, 'daily'],
+  ['/privacy-policy', 0.3, 'yearly'],
+  ['/terms', 0.3, 'yearly'],
+  ['/disclaimer', 0.3, 'yearly'],
+] as const
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  // Sitemap is intentionally fail-closed. Do not query the legacy Supabase
+  // database from the V2 public sitemap or expose a partial mixed data source.
+  const ready =
+    process.env.NODE_ENV === 'production' &&
+    process.env.FACTSPORT_INDEXING_ENABLED === 'true' &&
+    process.env.FACTSPORT_SITEMAP_BACKEND === 'postgres' &&
+    process.env.FACTSPORT_EDITORIAL_BACKEND === 'postgres' &&
+    process.env.FACTSPORT_MATCHES_BACKEND === 'postgres'
 
-  const baseUrl = 'https://factsport.com';
+  if (!ready) return []
 
-  // 1. Fetch the latest 500 matches
-  const { data: matches } = await supabase
-    .from('matches')
-    .select('id, updated_at')
-    .order('match_date', { ascending: false })
-    .limit(500);
+  try {
+    const now = new Date()
+    const from = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+    const to = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
 
-  // 2. Fetch the latest 500 news articles
-  const { data: news } = await supabase
-    .from('news')
-    .select('slug, updated_at')
-    .order('created_at', { ascending: false })
-    .limit(500);
+    const [articles, matches] = await Promise.all([
+      listPublicEditorialArticles({ limit: 50, offset: 0 }),
+      listPostgresMatchesWindow({ from: from.toISOString(), to: to.toISOString() }),
+    ])
 
-  // 3. Build Match URLs
-  const matchUrls = (matches || []).map((match) => ({
-    url: `${baseUrl}/match/${match.id}`,
-    lastModified: match.updated_at ? new Date(match.updated_at) : new Date(),
-    changeFrequency: 'always' as const, 
-    priority: 0.9,
-  }));
+    const staticUrls: MetadataRoute.Sitemap = STATIC_ROUTES.map(([route, priority, changeFrequency]) => ({
+      url: `${SITE_URL}${route}`,
+      changeFrequency,
+      priority,
+    }))
 
-  // 4. Build News URLs
-  const newsUrls = (news || []).map((article) => ({
-    url: `${baseUrl}/news/${article.slug}`,
-    lastModified: article.updated_at ? new Date(article.updated_at) : new Date(),
-    changeFrequency: 'hourly' as const,
-    priority: 0.8,
-  }));
+    const articleUrls: MetadataRoute.Sitemap = articles
+      .filter(article => !!article.slug && !!article.published_at)
+      .map(article => ({
+        url: `${SITE_URL}/news/${encodeURIComponent(article.slug)}`,
+        lastModified: new Date(article.updated_at || article.published_at),
+        changeFrequency: 'weekly',
+        priority: 0.7,
+      }))
 
-  // 5. Core Static Pages
-  const staticPages = [
-    '',
-    '/matches',
-    '/live',
-    '/highlights',
-    '/news',
-    '/standings',
-    '/leaderboard',
-  ].map((route) => ({
-    url: `${baseUrl}${route}`,
-    lastModified: new Date(),
-    changeFrequency: 'hourly' as const,
-    priority: route === '' ? 1.0 : 0.8,
-  }));
+    const matchUrls: MetadataRoute.Sitemap = matches
+      .filter(match => !!match.id && !!match.match_date)
+      .map(match => ({
+        url: `${SITE_URL}/match/${match.id}`,
+        lastModified: new Date(match.updated_at || match.match_date),
+        changeFrequency: 'hourly',
+        priority: 0.6,
+      }))
 
-  return [...staticPages, ...matchUrls, ...newsUrls];
+    return [...staticUrls, ...articleUrls, ...matchUrls]
+  } catch (error) {
+    console.error('V2 public sitemap generation failed closed', error)
+    return []
+  }
 }
