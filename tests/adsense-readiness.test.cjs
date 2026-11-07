@@ -89,3 +89,33 @@ test('public CMS publication enforces content policy and records publisher attes
   assert.match(client, /no bookmaker\/affiliate links, betting promotions/);
   assert.match(migration, /public_media_policy_confirmed_at/);
 });
+
+test('public Media pages use V2 read adapters in production and never fall back to legacy SELECT *', () => {
+  const homepage = read('app/page.tsx');
+  const match = read('app/match/[id]/page.tsx');
+  const live = read('app/live/page.tsx');
+  const matches = read('app/matches/page.tsx');
+  const news = read('app/news/page.tsx');
+  const standings = read('app/standings/page.tsx');
+  assert.match(homepage, /usePostgresEditorial && usePostgresMatches && usePostgresHomepage/);
+  assert.match(match, /getPostgresMatchById/);
+  assert.match(match, /getPostgresMatchPlaybackById/);
+  assert.match(match, /process\.env\.NODE_ENV !== 'development'/);
+  assert.match(live, /listPostgresMatchesWindow/);
+  assert.match(live, /getPublicMediaStudioSettings/);
+  assert.match(matches, /process\.env\.NODE_ENV !== 'development'/);
+  assert.match(news, /process\.env\.NODE_ENV !== 'development'/);
+  assert.match(standings, /else if \(process\.env\.NODE_ENV === 'development'\)/);
+});
+
+test('social embed uses secure playback without timed redirects or forced Telegram popups', () => {
+  const page = read('app/embed/[id]/page.tsx');
+  const client = read('app/components/EmbedPlayerClient.tsx');
+  const robots = read('app/robots.ts');
+  assert.match(page, /getPostgresMatchById/);
+  assert.match(page, /getPostgresMatchPlaybackById/);
+  assert.match(client, /SecureMatchPlayer/);
+  assert.doesNotMatch(client, /setInterval|window\.location\.href|timeLeft|showPopup|telegramSupport/);
+  assert.doesNotMatch(robots, /'\/embed'/);
+  assert.match(page, /index: false/);
+});
