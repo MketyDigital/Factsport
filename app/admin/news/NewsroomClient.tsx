@@ -187,7 +187,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
             <article key={article.id} className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0">
                 <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                  <span>{article.category}</span><span>·</span><span>{article.status.replace('_', ' ')}</span>
+                  <span>{article.category}</span><span>·</span><span>{article.status.replace('_', ' ')}</span>{article.revision_status && <span>· revision {article.revision_status.replace('_', ' ')}</span>}
                   {article.review_status && <span>· {article.review_status}</span>}
                   {article.is_breaking && <span className="text-red-600">Breaking</span>}
                   {article.is_headline && <span className="text-blue-700">Headline</span>}
@@ -197,7 +197,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 <button onClick={() => edit(article)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold">Edit</button>
-                {article.status === 'in_review' && <button disabled={isPending} onClick={() => runAction(approveAndPublishEditorial, article.id, 'Article published.')} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white">Approve & publish</button>}
+                {(article.status === 'in_review' || article.revision_status === 'in_review') && <button disabled={isPending} onClick={() => runAction(approveAndPublishEditorial, article.id, 'Article published.')} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white">Approve & publish</button>}
                 {article.status !== 'archived' && <button disabled={isPending} onClick={() => runAction(archiveEditorialArticle, article.id, 'Article archived.')} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700">Archive</button>}
               </div>
             </article>
