@@ -181,3 +181,14 @@ test('public Media homepage announcements have a separate screened editor and re
   assert.match(publicBar, /announcement_enabled/);
   assert.match(layout, /PublicMediaAnnouncement/);
 });
+
+test('public legal copy describes Media only and does not advertise Prediction or gambling features', () => {
+  const footer = read('app/components/Footer.tsx');
+  const privacy = read('app/privacy-policy/page.tsx');
+  const terms = read('app/terms/page.tsx');
+  const disclaimer = read('app/disclaimer/page.tsx');
+  assert.doesNotMatch(footer, /Gamble Responsibly|18\+/i);
+  assert.match(privacy, /separately operated Prediction product has its own privacy notice/);
+  assert.match(terms, /Prediction entries, premium memberships, payment services and prize campaigns are not part of this public Media service/);
+  assert.match(disclaimer, /Prediction entries, wagering and prize campaigns are not features of the public Media website/);
+});
