@@ -325,3 +325,8 @@ This clarification supersedes any earlier wording in AUTH-005 that said free pre
 - \`FACTSPORT_HOMEPAGE_BACKEND\` and \`FACTSPORT_HIGHLIGHTS_BACKEND\` require 0006.
 - \`FACTSPORT_COMPETITIONS_BACKEND\` requires 0006-0007.
 - A later schema migration being committed is not evidence that it is installed in staging. Each flag must be enabled only after migration application, role verification and a successful read probe.
+
+
+## 19. Protected staging schema-boundary correction
+
+The authorized \`/matches\` page returned HTTP 500 because the base match projection accidentally depended on \`matches.season\` from unapplied migration 0006. The base projection no longer selects that column. Season-specific form/results queries remain behind the separate \`FACTSPORT_COMPETITIONS_BACKEND\` flag. Editorial, homepage, highlights and competition flags are now independent; do not enable them until their migrations and reader grants are applied. A corrected staging rerun is pending; the previous keyset pagination 503 remains to be rechecked.
