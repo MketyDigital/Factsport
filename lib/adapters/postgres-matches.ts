@@ -168,3 +168,27 @@ export async function listPostgresLeagueMatches(league: string, limit = 500) {
     LIMIT ${limit}
   `);
 }
+
+
+/**
+ * Resolve either the canonical V2 match UUID or an imported legacy Supabase
+ * UUID alias. The returned id is always the canonical V2 matches.id value.
+ * Requires migration 0008; do not enable its route flag before that migration
+ * and its reader grant are present in the target database.
+ */
+export async function getPostgresMatchById(matchId: string) {
+  if (!MATCH_UUID_PATTERN.test(matchId)) return null;
+  return withFactsportPostgres(async sql => {
+    const rows = await sql`
+      SELECT id, api_id, espn_id, league, home_team, away_team,
+             home_score, away_score, match_date, status, home_logo, away_logo,
+             venue, stage, match_group, match_events, stats, lineups,
+             h2h, referees, predictor, source_updated_at
+      FROM public.matches
+      WHERE id = ${matchId}::uuid OR legacy_match_id = ${matchId}::uuid
+      ORDER BY CASE WHEN id = ${matchId}::uuid THEN 0 ELSE 1 END
+      LIMIT 1
+    `;
+    return rows[0] ?? null;
+  });
+}
