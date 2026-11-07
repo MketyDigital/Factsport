@@ -55,7 +55,7 @@ export default function HighlightsSlider({ highlights }: { highlights: any[] }) 
                         <h4 className="text-xs font-black text-slate-800 leading-tight truncate group-hover:text-blue-600 transition">
                             {item.title || <>{item.home_team} <span className="text-slate-400 font-medium mx-0.5">vs</span> {item.away_team}</>}
                         </h4>
-                    </Link>
+                    </a>
                 ))}
             </div>
         </div>
