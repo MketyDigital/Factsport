@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS public.media_social_channels (
   account_label text,
   is_enabled boolean NOT NULL DEFAULT false,
   settings jsonb NOT NULL DEFAULT '{}'::jsonb
-    CHECK (jsonb_typeof(settings) = 'object'),
+    CHECK (jsonb_typeof(settings) = 'object')
+    CHECK (NOT (settings ?| ARRAY['access_token', 'refresh_token', 'token', 'secret', 'password', 'api_key'])),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT social_channel_key_format CHECK (channel_key ~ '^[a-z0-9][a-z0-9_-]{1,63}$'),
@@ -43,6 +44,8 @@ CREATE TABLE IF NOT EXISTS public.media_social_publications (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT social_publication_content_length CHECK (char_length(content_text) BETWEEN 1 AND 10000),
   CONSTRAINT social_publication_link_length CHECK (link_url IS NULL OR char_length(link_url) <= 2048),
+  CONSTRAINT social_publication_link_protocol CHECK (link_url IS NULL OR link_url ~ '^https?://'),
+  CONSTRAINT social_publication_provider_url_protocol CHECK (provider_post_url IS NULL OR provider_post_url ~ '^https?://'),
   CONSTRAINT social_publication_schedule CHECK (
     (status <> 'scheduled' OR scheduled_at IS NOT NULL)
   ),
