@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { env } from 'cloudflare:workers';
-import { getPostgresMatchById } from '@/lib/adapters/postgres-matches';
+import { getPostgresMatchPlaybackById } from '@/lib/adapters/postgres-matches';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -48,7 +48,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   const backend = env.FACTSPORT_MATCH_DETAIL_BACKEND ?? process.env.FACTSPORT_MATCH_DETAIL_BACKEND;
   if (backend === 'postgres') {
     try {
-      const match = await getPostgresMatchById(id);
+      const match = await getPostgresMatchPlaybackById(id);
       if (!match) return NextResponse.json({ status: 'unavailable' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
       const status = String(match.status || '').toUpperCase();
       const isFinished = FINISHED.has(status);
