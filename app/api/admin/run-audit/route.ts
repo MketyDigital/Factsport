@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { getSupabaseAdmin } from '@/app/lib/supabase/admin';
 import { isCronRequest } from '@/app/lib/admin/authorization';
+import { isVerifiedExactScorePrediction } from '@/lib/prize-qualification.cjs';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
             .from('profiles')
             .select('id, full_name, is_vip, eligible_monthly_points, eligible_monthly_correct_scores')
             .order('eligible_monthly_points', { ascending: false })
-            .limit(15);
+            .limit(100);
 
         if (!topUsers) return NextResponse.json({ message: "No users found" });
 
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
             // Fetch their eligible predictions for the TARGET month
             const { data: preds } = await supabase
                 .from('user_predictions')
-                .select(`predicted_home_score, predicted_away_score, points_awarded, created_at, match:matches(league)`)
+                 .select(`predicted_home_score, predicted_away_score, points_awarded, created_at, match:matches(league,status,home_score,away_score)`)
                 .eq('user_id', user.id)
                 .eq('is_eligible_for_prize', true)
                 .gte('created_at', firstDayOfPreviousMonth.toISOString())
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
 
             // 🟢 FIXED: Tell TypeScript this is an array of 'any' to stop the build error
             const predictions: any[] = preds || [];
-            const exactScores = predictions.filter(p => p.points_awarded === 10);
+            const exactScores = predictions.filter(isVerifiedExactScorePrediction);
             
             // --- THE CHAMPION'S CHECKLIST MATH ---
             
@@ -100,7 +101,9 @@ export async function POST(request: Request) {
                 is_passed: isFullyQualified
             };
 
-            // Draft the winner
+            // Only qualified candidates receive a rank or prize draft.
+            if (!isFullyQualified) continue;
+
             draftWinners.push({
                 month_year: targetMonthYear,
                 user_id: user.id,
