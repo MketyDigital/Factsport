@@ -16,7 +16,7 @@ const matchesAdapter = read('lib/adapters/postgres-matches.ts');
 const editorialAdapter = read('lib/adapters/postgres-editorial.ts');
 
 test('homepage uses PostgreSQL views for featured matches and rights-cleared highlights', () => {
-  assert.ok(home.includes("FACTSPORT_MATCHES_BACKEND === 'postgres'"));
+  assert.ok(home.includes("FACTSPORT_HOMEPAGE_BACKEND === 'postgres'"));
   assert.ok(home.includes('listPublicMatchHighlights(5)'));
   assert.ok(home.includes('listPublicFeaturedMatches'));
   assert.ok(home.includes('listPostgresMatchesWindow'));
@@ -28,7 +28,7 @@ test('homepage settings are server-routed and do not expose the full social sett
   assert.ok(dashboard.includes("fetch('/api/settings')"));
   assert.ok(!dashboard.includes('createClient'));
   assert.ok(!dashboard.includes("from('site_settings')"));
-  assert.ok(settingsRoute.includes('getPublicHomepageSettings'));
+  assert.ok(settingsRoute.includes("FACTSPORT_HOMEPAGE_BACKEND === 'postgres'") && settingsRoute.includes('getPublicHomepageSettings'));
   assert.ok(settingsRoute.includes('featured_match_id'));
   assert.ok(settingsRoute.includes('featured_match_id:social_config->>featured_match_id'));
   assert.ok(!settingsRoute.includes("select('*')"));
@@ -36,7 +36,7 @@ test('homepage settings are server-routed and do not expose the full social sett
 
 test('mini standings has a PostgreSQL season-aware read path', () => {
   assert.ok(standings.includes('listCurrentCompetitionStandings'));
-  assert.ok(standings.includes("FACTSPORT_MATCHES_BACKEND === 'postgres'"));
+  assert.ok(standings.includes("FACTSPORT_COMPETITIONS_BACKEND === 'postgres'"));
 });
 
 test('highlight cards use public R2 thumbnails and stable highlight identifiers', () => {
@@ -61,7 +61,7 @@ test('domain adapters share one bounded Hyperdrive client per Worker isolate', (
 });
 
 test('full highlights page supports PostgreSQL pagination and rights-cleared source links', () => {
-  assert.ok(highlightsPage.includes("FACTSPORT_MATCHES_BACKEND === 'postgres'"));
+  assert.ok(highlightsPage.includes("FACTSPORT_HIGHLIGHTS_BACKEND === 'postgres'"));
   assert.ok(highlightsPage.includes('listPublicHighlightLeagues'));
   assert.ok(highlightsPage.includes('countPublicMatchHighlights'));
   assert.ok(highlightsPage.includes('listPublicMatchHighlightsPage'));
