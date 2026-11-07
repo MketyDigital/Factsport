@@ -19,7 +19,7 @@ export async function listPublicFeaturedMatches(input: { from: string; to: strin
     SELECT id, league, home_team, away_team, home_score, away_score,
            match_date, status, home_logo, away_logo, venue, stage,
            match_group, espn_id, source, source_updated_at, version,
-           is_featured, featured_rank
+           is_featured, featured_rank, season
     FROM public.public_featured_matches
     WHERE match_date >= ${from.toISOString()} AND match_date <= ${to.toISOString()}
     ORDER BY featured_rank ASC, match_date ASC, id ASC
