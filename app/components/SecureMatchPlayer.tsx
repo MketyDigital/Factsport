@@ -10,6 +10,7 @@ type Playback = {
   mediaUrl?: string;
   mode?: 'video' | 'audio';
   isFinished?: boolean;
+  audioUrl?: string | null;
 };
 
 export default function SecureMatchPlayer(props: {
@@ -82,8 +83,9 @@ export default function SecureMatchPlayer(props: {
         isFinished={playback.isFinished === true}
         homeTeam={props.homeTeam}
         awayTeam={props.awayTeam}
-        homeLogo={props.homeLogo}
-        awayLogo={props.awayLogo}
+        homeLogo={props.homeLogo || undefined}
+        awayLogo={props.awayLogo || undefined}
+        audioUrl={playback.audioUrl}
         announcement={props.announcement}
       />
     );
