@@ -53,7 +53,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       }, { headers: { 'Cache-Control': 'private, no-store, max-age=0', Vary: 'Cookie' } });
     }
 
-    const videoSource = isFinished ? match.video_url : (match.livestream_url || match.video_url);
+    const videoSource = isFinished ? match.video_url : match.livestream_url;
     const audioSource = isFinished ? null : match.audio_url;
     const videoUrl = safePlaybackUrl(videoSource);
     const audioUrl = safePlaybackUrl(audioSource);
