@@ -124,3 +124,10 @@ The base \`FACTSPORT_MATCHES_BACKEND\` flag must remain independent of migration
 - Protected staging passed (run 42383870331): deny-by-default, Hyperdrive/R2 health, /matches initial render, timestamp+UUID cursor pagination without duplicate row, and auth/cache isolation all passed. The pagination 503 did not reproduce after the lifecycle change.
 - Continue monitoring transient database errors; a successful rerun is not a guarantee against future infrastructure failures.
 - Main /match/[id] remains a legacy path until canonical legacy-ID crosswalk, prediction/campaign parity, server-authorized stream grants, VIP analysis RBAC, ticker and settings reads are complete. See M11.
+
+## 2026-11-07 canonical/legacy match identity foundation
+
+- Added migration 0008: nullable unique legacy Supabase UUID alias; V2 matches.id remains canonical and no existing foreign key is rewritten.
+- Added a bounded reader that resolves canonical or legacy UUID and returns the canonical V2 ID.
+- Added an independently gated /api/match/[id] PostgreSQL API path with a public projection that excludes stream URLs, audio/video links, pro_analysis, campaign IDs, affiliate URLs and settlement state.
+- Migration 0008 is not applied and no aliases are populated. The main /match/[id] page remains on its legacy path pending approved ID reconciliation and stream/prediction/VIP parity.
