@@ -11,11 +11,10 @@ export function toPlainText(value: string | null | undefined, maxLength = 160): 
   if (!value) return '';
   return value
     .replace(/<[^>]*>/g, ' ')
-    .replace(/!\\[([^\\]]*)\\]\\([^)]*\\)/g, '$1')
-    .replace(/\\[([^\\]]+)\\]\\([^)]*\\)/g, '$1')
-    .replace(/\\[[^\\]]+\\]\\([^)]*\\)/g, ' ')
-    .replace(/(^|\\s)[#>*_~`]+/g, '$1')
-    .replace(/\\s+/g, ' ')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/(^|\s)[#>*_~\`]+/g, '$1')
+    .replace(/\s+/g, ' ')
     .trim()
     .slice(0, maxLength);
 }
