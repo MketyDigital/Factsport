@@ -3,6 +3,7 @@ export const revalidate = 180;
 
 import { createClient } from '@supabase/supabase-js';
 import { getPublicEditorialArticle } from '@/lib/adapters/postgres-editorial';
+import { serializeJsonLd, toPlainText } from '@/lib/seo/json-ld';
 import { listPostgresMatchesWindow } from '@/lib/adapters/postgres-matches'; 
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
@@ -25,7 +26,8 @@ const getArticleData = cache(async (slug: string) => {
       image_url: article.hero_media_key ? `/api/media/${article.hero_media_key}` : null,
       team_1_logo: null,
       team_2_logo: null,
-      created_at: article.published_at,
+      created_at: article.original_created_at || article.published_at,
+      published_at: article.published_at,
     };
   }
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
@@ -41,19 +43,20 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     if (!article) return { title: 'Article Not Found | FactSport' };
 
     return {
-        title: `${article.title} | FactSport`,
-        description: article.body?.substring(0, 160) + '...',
+        title: `${article.seo_title || article.title} | FactSport`,
+        description: article.seo_description || article.excerpt || toPlainText(article.body, 160),
+        alternates: article.canonical_url ? { canonical: article.canonical_url } : undefined,
         openGraph: {
-            title: article.title,
-            description: article.body?.substring(0, 160) + '...',
+            title: article.seo_title || article.title,
+            description: article.seo_description || article.excerpt || toPlainText(article.body, 160),
             type: 'article',
-            publishedTime: new Date(article.created_at).toISOString(),
+            publishedTime: new Date(article.published_at || article.created_at).toISOString(),
             images: [article.image_url || '/logo.png'],
         },
         twitter: {
             card: 'summary_large_image',
-            title: article.title,
-            description: article.body?.substring(0, 160) + '...',
+            title: article.seo_title || article.title,
+            description: article.seo_description || article.excerpt || toPlainText(article.body, 160),
             images: [article.image_url || '/logo.png'],
         }
     };
@@ -84,11 +87,11 @@ export default async function ArticlePage({ params }: { params: { slug: string }
       "@type": "NewsArticle",
       "headline": article.title,
       "image": [article.image_url || "https://factsport.com/logo.png"],
-      "datePublished": new Date(article.created_at).toISOString(),
+      "datePublished": new Date(article.published_at || article.created_at).toISOString(),
       "dateModified": new Date(article.updated_at || article.created_at).toISOString(),
-      "author": [{"@type": "Person", "name": "FactSport Desk"}],
+      "author": [{"@type": "Person", "name": article.author_display_name || 'FactSport Desk'}],
       "publisher": {"@type": "Organization", "name": "FactSport", "logo": {"@type": "ImageObject", "url": "https://factsport.com/logo.png"}},
-      "description": article.body?.substring(0, 160) + '...'
+      "description": article.seo_description || article.excerpt || toPlainText(article.body, 160)
   };
 
   const content = article.body || article.content || '';
@@ -98,7 +101,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
 
   return (
     <div className="min-h-screen bg-white pb-24 font-sans text-slate-900 selection:bg-blue-200">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
       
       <div className="relative h-[60vh] min-h-[400px] w-full bg-[#0a1428] overflow-hidden group border-b-8 border-blue-600">
         <NewsArtwork 
