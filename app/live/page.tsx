@@ -2,7 +2,10 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic'; 
 export const fetchCache = 'force-no-store'; 
 
-import { createClient } from '@supabase/supabase-js'; 
+import { createClient } from '@supabase/supabase-js';
+import { notFound } from 'next/navigation';
+import { listPostgresMatchesWindow } from '@/lib/adapters/postgres-matches';
+import { getPublicMediaStudioSettings } from '@/lib/adapters/postgres-homepage';
 import Link from 'next/link';
 import { Metadata } from 'next';
 import { ChevronLeft, Radio, MessageCircle, Trophy, Sparkles, Activity, ShieldCheck, ArrowRight } from 'lucide-react';
@@ -24,23 +27,43 @@ const LIVE_TOURNAMENTS_METADATA = [
 ];
 
 export default async function LiveMediaPage() {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  const matchesBackend = process.env.FACTSPORT_MATCHES_BACKEND === 'postgres';
+  const studioBackend = process.env.FACTSPORT_BROADCAST_BACKEND === 'postgres';
+  if (process.env.NODE_ENV !== 'development' && (!matchesBackend || !studioBackend)) return notFound();
 
   const now = new Date();
-  const lookBack = new Date(now.getTime() - (24 * 60 * 60 * 1000)).toISOString(); 
-  const lookForward = new Date(now.getTime() + (48 * 60 * 60 * 1000)).toISOString(); 
+  const lookBack = new Date(now.getTime() - (24 * 60 * 60 * 1000)).toISOString();
+  const lookForward = new Date(now.getTime() + (48 * 60 * 60 * 1000)).toISOString();
 
-  const { data: matches } = await supabase
-    .from('matches')
-    .select('*')
-    .not('status', 'in', '("FT","FINISHED","AET","PEN","AWARDED","ABD")')
-    .gt('match_date', lookBack)
-    .lt('match_date', lookForward)
-    .order('match_date', { ascending: true });
+  let matches: any[] = [];
+  let studioData: any = null;
 
-  const { data: studioData } = await supabase.from('global_studio').select('*').eq('id', 1).single();
+  if (matchesBackend && studioBackend) {
+    const [rows, studio] = await Promise.all([
+      listPostgresMatchesWindow({ from: lookBack, to: lookForward }),
+      getPublicMediaStudioSettings(),
+    ]);
+    matches = rows
+      .filter((match: any) => !['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(String(match.status || '').toUpperCase()))
+      .map((match: any) => ({ ...match, displayClock: match.display_clock || '' }));
+    studioData = studio;
+  } else if (process.env.NODE_ENV === 'development') {
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const [matchesResult, studioResult] = await Promise.all([
+      supabase.from('matches').select('id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, video_url, livestream_url, audio_url, venue, displayClock')
+        .not('status', 'in', '("FT","FINISHED","AET","PEN","AWARDED","ABD")')
+        .gt('match_date', lookBack).lt('match_date', lookForward)
+        .order('match_date', { ascending: true }),
+      supabase.from('global_studio').select('is_active, video_url, audio_url, title').eq('id', 1).single(),
+    ]);
+    matches = matchesResult.data || [];
+    studioData = studioResult.data || null;
+  }
 
-  const isStudioActive = studioData?.is_active === true || studioData?.is_active === 'true';
+  const isStudioActive =
+    studioData?.is_active === true &&
+    studioData?.public_listening_enabled !== false &&
+    (process.env.FACTSPORT_BROADCAST_TOKEN_ISSUER_READY === 'true' || process.env.NODE_ENV === 'development');
   const globalMediaUrl = studioData?.video_url || studioData?.audio_url || null;
   const studioTitle = studioData?.title || "Goal Rush Studio";
 
