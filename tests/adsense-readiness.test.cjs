@@ -164,3 +164,20 @@ test('legacy user-generated chat is not exposed in production Media surfaces', (
   assert.match(match, /chatEnabled=\{process\.env\.NODE_ENV === 'development'\}/);
   assert.match(live, /process\.env\.NODE_ENV === 'development' \? <div/);
 });
+
+test('public Media homepage announcements have a separate screened editor and render path', () => {
+  const action = read('app/admin/settings/actions.ts');
+  const page = read('app/admin/settings/page.tsx');
+  const client = read('app/admin/settings/MediaSettingsClient.tsx');
+  const migration = read('db/migrations/0025_factsport_media_homepage_settings_grants.sql');
+  const publicBar = read('app/components/PublicMediaAnnouncement.tsx');
+  const layout = read('app/layout.tsx');
+  assert.match(action, /authorizeMediaEditorialAction\('publish'\)/);
+  assert.match(action, /inspectPublicMediaArticle/);
+  assert.match(action, /ON CONFLICT \(singleton\) DO UPDATE/);
+  assert.match(page, /withFactsportEditorialPostgres/);
+  assert.match(client, /Prediction affiliate links, promo codes/);
+  assert.match(migration, /factsport_v2_editorial_writer/);
+  assert.match(publicBar, /announcement_enabled/);
+  assert.match(layout, /PublicMediaAnnouncement/);
+});
