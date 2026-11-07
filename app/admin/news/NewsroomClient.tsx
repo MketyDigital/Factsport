@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import {
-  archiveEditorialArticle, approveEditorialRevision, publishApprovedEditorial, saveEditorialDraft,
+  archiveEditorialArticle, approveEditorialRevision, rejectEditorialRevision, publishApprovedEditorial, saveEditorialDraft,
   submitEditorialForReview,
 } from './actions';
 import { reviewRightsAndAttachMedia } from './media-actions';
@@ -20,6 +20,7 @@ type Article = {
   status: string;
   review_status: string;
   revision_status: string | null;
+  review_comment?: string | null;
   is_headline: boolean;
   is_breaking: boolean;
   seo_title: string | null;
@@ -47,6 +48,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [message, setMessage] = useState('');
+  const [reviewComment, setReviewComment] = useState('');
   const [isPending, startTransition] = useTransition();
   const [mediaPending, startMediaTransition] = useTransition();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -242,6 +244,9 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
         <aside className="space-y-4">
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
             <h3 className="font-black text-amber-950">Publishing safeguards</h3>
+            <label className="mt-3 block text-xs font-bold text-amber-900">Review feedback / publisher note
+              <textarea value={reviewComment} onChange={e => setReviewComment(e.target.value)} maxLength={2000} rows={3} placeholder="Explain requested changes or leave a note for the audit trail…" className="mt-1 w-full rounded-lg border border-amber-300 bg-white p-2 text-sm font-normal text-slate-800" />
+            </label>
             <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-amber-900">
               <li>Saving always creates or updates a draft.</li>
               <li>Publishing requires a separate review approval.</li>
@@ -278,7 +283,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                   {article.is_breaking && <span className="text-red-600">Breaking</span>}
                   {article.is_headline && <span className="text-blue-700">Headline</span>}
                 </div>
-                <h3 className="truncate font-bold text-slate-900">{article.title}</h3>
+                <h3 className="truncate font-bold text-slate-900">{article.title}</h3>{article.revision_status === 'rejected' && article.review_comment && <p className="mt-1 text-xs text-amber-800">Review feedback: {article.review_comment}</p>}
                 <p className="mt-1 truncate text-xs text-slate-500">/{article.slug} · Updated {new Date(article.updated_at).toLocaleString()}</p>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
