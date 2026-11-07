@@ -6,7 +6,6 @@ import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { Metadata } from 'next';
 import { ChevronLeft, Radio, MessageCircle, Trophy, Sparkles, Activity, ShieldCheck, ArrowRight } from 'lucide-react';
-import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import FactSportMediaRoom from '@/app/components/FactSportMediaRoom'; 
 import FanZoneChat from '@/app/components/FanZoneChat'; 
 import LiveMediaClient from '@/app/components/LiveMediaClient'; 
@@ -75,7 +74,6 @@ export default async function LiveMediaPage() {
       </div>
 
       <div className="p-4 space-y-6 max-w-7xl mx-auto mt-4">
-        <AdsterraStandardBanner />
 
         {isStudioActive && globalMediaUrl && (
             <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
