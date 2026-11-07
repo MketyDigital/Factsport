@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { env } from 'cloudflare:workers';
 import { createClient } from '@/app/lib/supabase/server';
 
 export const runtime = 'edge';
@@ -9,6 +10,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const id = params?.id || '';
   if (!UUID.test(id)) return NextResponse.json({ hasAnalysis: false }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
+  if (env.FACTSPORT_ENVIRONMENT === 'staging') {
+    return NextResponse.json({ error: 'V2 Prediction analysis reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+  }
 
   try {
     const supabase = createClient();
