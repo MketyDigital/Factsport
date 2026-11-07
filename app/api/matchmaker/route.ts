@@ -6,6 +6,7 @@ export const fetchCache = 'force-no-store';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { ESPN_LEAGUES } from '@/app/lib/espn';
+import { isCronRequest } from '@/app/lib/admin/authorization';
 
 // 1. THE EXHAUSTIVE DICTIONARY
 const getCanonicalName = (rawName: string) => {
@@ -139,8 +140,7 @@ async function fetchEspnLive(espnCode: string, daysPast: number, daysFuture: num
 
 // 3. THE MASTER MATCHMAKER
 async function runMatchmaker(request: Request) {
-  const url = new URL(request.url);
-  if (url.searchParams.get('key') !== process.env.CRON_KEY) {
+  if (request.method !== 'POST' || !(await isCronRequest(request))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -284,5 +284,4 @@ async function runMatchmaker(request: Request) {
   }
 }
 
-export async function GET(request: Request) { return runMatchmaker(request); }
 export async function POST(request: Request) { return runMatchmaker(request); }
