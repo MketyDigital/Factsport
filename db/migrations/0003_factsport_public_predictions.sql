@@ -1,16 +1,37 @@
--- Factsport V2 anonymous/public prediction foundation.
+-- Factsport V2 public free predictions with optional email marketing opt-in.
 -- Apply only to isolated factsport_v2 after 0001_factsport_core.sql.
 -- No legacy data is copied; no production database is touched.
 BEGIN;
+
+-- Email is collected only after a visitor explicitly chooses "Submit Prediction".
+-- It is a contact detail for the free leaderboard/prediction workflow, not an account.
+CREATE TABLE IF NOT EXISTS public.prediction_contacts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email_address text NOT NULL,
+  email_normalized text NOT NULL UNIQUE,
+  email_verified_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT prediction_contact_email_length CHECK (
+    char_length(email_address) BETWEEN 3 AND 254 AND
+    char_length(email_normalized) BETWEEN 3 AND 254
+  )
+);
 
 CREATE TABLE IF NOT EXISTS public.prediction_participants (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   visitor_token_hash char(64) NOT NULL UNIQUE
     CHECK (visitor_token_hash ~ '^[0-9a-f]{64}$'),
+  contact_id uuid NOT NULL UNIQUE
+    REFERENCES public.prediction_contacts(id) ON DELETE RESTRICT,
   user_id uuid REFERENCES public.app_users(id) ON DELETE RESTRICT,
+  display_name text,
   created_at timestamptz NOT NULL DEFAULT now(),
   last_seen_at timestamptz NOT NULL DEFAULT now(),
   linked_at timestamptz,
+  CONSTRAINT participant_display_name_length CHECK (
+    display_name IS NULL OR char_length(display_name) BETWEEN 2 AND 40
+  ),
   CONSTRAINT participant_link_timestamp CHECK (
     (user_id IS NULL AND linked_at IS NULL) OR
     (user_id IS NOT NULL AND linked_at IS NOT NULL)
@@ -24,9 +45,6 @@ CREATE TABLE IF NOT EXISTS public.predictions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   participant_id uuid NOT NULL
     REFERENCES public.prediction_participants(id) ON DELETE RESTRICT,
-  -- Set only when the prediction is safely associated with a registered user.
-  -- Kept nullable so a same-match claim conflict can be preserved without
-  -- overwriting the account's existing prediction.
   user_id uuid REFERENCES public.app_users(id) ON DELETE RESTRICT,
   match_id uuid NOT NULL REFERENCES public.matches(id) ON DELETE RESTRICT,
   predicted_outcome text NOT NULL
@@ -62,9 +80,51 @@ CREATE INDEX IF NOT EXISTS predictions_user_submitted_idx
   ON public.predictions (user_id, submitted_at DESC)
   WHERE user_id IS NOT NULL;
 
--- Preserve every anonymous-to-account association attempt and any same-match
--- conflict. Conflicting prediction rows remain intact and are not silently
--- overwritten or made prize-eligible.
+-- A marketing subscription is a distinct purpose, never inferred from the
+-- required email used to submit a prediction. Only explicit opt-in creates
+-- a pending subscription; a separate confirmation may activate it.
+CREATE TABLE IF NOT EXISTS public.marketing_subscriptions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  contact_id uuid NOT NULL REFERENCES public.prediction_contacts(id) ON DELETE RESTRICT,
+  channel text NOT NULL CHECK (channel = 'email'),
+  purpose text NOT NULL CHECK (purpose = 'factsport_updates_and_offers'),
+  status text NOT NULL DEFAULT 'pending_confirmation'
+    CHECK (status IN ('pending_confirmation', 'subscribed', 'unsubscribed')),
+  consent_version text NOT NULL,
+  consent_text text NOT NULL,
+  source text NOT NULL DEFAULT 'public_prediction_submission',
+  consented_at timestamptz NOT NULL DEFAULT now(),
+  confirmed_at timestamptz,
+  withdrawn_at timestamptz,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT marketing_subscription_contact_purpose_unique
+    UNIQUE (contact_id, channel, purpose),
+  CONSTRAINT marketing_subscription_status_timestamps CHECK (
+    (status = 'pending_confirmation' AND confirmed_at IS NULL AND withdrawn_at IS NULL) OR
+    (status = 'subscribed' AND confirmed_at IS NOT NULL AND withdrawn_at IS NULL) OR
+    (status = 'unsubscribed' AND withdrawn_at IS NOT NULL)
+  )
+);
+CREATE INDEX IF NOT EXISTS marketing_subscriptions_status_idx
+  ON public.marketing_subscriptions (status, consented_at DESC);
+
+-- Append-only evidence of opt-in, confirmation and withdrawal; retain enough
+-- evidence to honour withdrawals and demonstrate exactly what was agreed.
+CREATE TABLE IF NOT EXISTS public.marketing_consent_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  subscription_id uuid NOT NULL
+    REFERENCES public.marketing_subscriptions(id) ON DELETE RESTRICT,
+  event_type text NOT NULL
+    CHECK (event_type IN ('opt_in', 'confirmation', 'withdrawal')),
+  consent_version text NOT NULL,
+  consent_text text NOT NULL,
+  source text NOT NULL,
+  occurred_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS marketing_consent_events_subscription_idx
+  ON public.marketing_consent_events (subscription_id, occurred_at DESC);
+
+-- Preserve every anonymous-to-account association attempt and same-match conflict.
 CREATE TABLE IF NOT EXISTS public.prediction_participant_claims (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   participant_id uuid NOT NULL
@@ -93,12 +153,14 @@ CREATE TABLE IF NOT EXISTS public.prediction_claim_conflicts (
     UNIQUE (user_id, match_id, anonymous_prediction_id)
 );
 
--- No browser/public role receives direct access. The dedicated API runtime
--- role and exact column/table grants are provisioned separately and verified
--- before this schema is used by application code.
+-- No browser/public role receives direct access. Dedicated API roles and exact
+-- column/table grants are provisioned and verified separately.
 REVOKE ALL ON TABLE
+  public.prediction_contacts,
   public.prediction_participants,
   public.predictions,
+  public.marketing_subscriptions,
+  public.marketing_consent_events,
   public.prediction_participant_claims,
   public.prediction_claim_conflicts
 FROM PUBLIC;
