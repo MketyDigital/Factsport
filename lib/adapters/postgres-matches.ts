@@ -4,38 +4,8 @@
  * are not switched by this adapter.
  */
 import 'server-only';
-import postgres from 'postgres';
-import { env } from 'cloudflare:workers';
+import { getFactsportPostgres } from '@/lib/adapters/postgres-client';
 import { getTeamSearchVariations } from '@/app/lib/teamAliases';
-
-let client: ReturnType<typeof postgres> | undefined;
-
-// Explicit public DTO projection: never expose internal settlement flags or future columns by default.
-const MATCH_SELECT = 'id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, venue, stage, match_group, match_events, stats, lineups, h2h, referees, predictor, source, source_updated_at, version, created_at, updated_at';
-
-function db() {
-  if (!client) {
-    // vinext/Workers resolves credentials from the secure, server-only Hyperdrive
-    // binding. Do not copy or expose its connection string.
-    const cloudflareUrl = env?.FACTSPORT_HYPERDRIVE?.connectionString;
-    const directUrl = process.env.DATABASE_URL;
-    if (cloudflareUrl) {
-      client = postgres(cloudflareUrl, {
-        max: 1, fetch_types: false, prepare: true,
-        idle_timeout: 5, connect_timeout: 10,
-      });
-    } else if (directUrl) {
-      // Azure direct TLS fallback for approved non-Worker verification only.
-      client = postgres(directUrl, {
-        ssl: 'require', max: 3, idle_timeout: 20, connect_timeout: 10,
-      });
-    } else {
-      throw new Error('Factsport PostgreSQL connection is not configured');
-    }
-  }
-  return client;
-}
-
 
 const MATCH_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -53,7 +23,7 @@ export async function listPostgresMatchesWindow(input: {
   if (!Number.isFinite(from.valueOf()) || !Number.isFinite(to.valueOf()) || from >= to) {
     throw new Error('Invalid match window');
   }
-  const sql = db();
+  const sql = getFactsportPostgres();
   if (input.teamFilter) {
     const patterns = teamPatterns(input.teamFilter);
     return sql`
@@ -74,7 +44,7 @@ export async function listPostgresMatchesWindow(input: {
 export async function getPostgresTeamForm(teamName: string) {
   const patterns = teamPatterns(teamName);
   const variations = getTeamSearchVariations(teamName).map(value => value.toLowerCase());
-  const sql = db();
+  const sql = getFactsportPostgres();
   const rows = await sql`
     SELECT home_team, away_team, home_score, away_score
     FROM public.matches
@@ -109,7 +79,7 @@ export async function listPostgresMatches(input: {
   const date = new Date(input.cursor);
   if (!Number.isFinite(date.valueOf())) throw new Error('Invalid cursor');
   if (input.cursorId && !MATCH_UUID_PATTERN.test(input.cursorId)) throw new Error('Invalid cursor id');
-  const sql = db();
+  const sql = getFactsportPostgres();
   const cursor = date.toISOString();
 
   if (input.type === 'results') {
