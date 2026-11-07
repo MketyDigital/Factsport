@@ -92,6 +92,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
         isHeadline: form.isHeadline, isBreaking: form.isBreaking,
       });
       if (!result.success) { setMessage(result.error); return; }
+      if (!result.data) { setMessage('Draft save returned no article identifier.'); return; }
       setMessage('Draft saved. Reload the newsroom to see the updated record.');
       setForm(current => ({ ...current, id: result.data.id }));
     });
@@ -193,7 +194,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                       rightsReference, attributionText, altText: assetAltText,
                       usageExpiresAt: usageExpiresAt ? new Date(usageExpiresAt).toISOString() : undefined,
                     });
-                    if (!result.success) { setMessage(result.error); return; }
+                    if (!result.success) { setMessage(result.error || 'Media rights review failed.'); return; }
                     setUploadedAsset(null);
                     setMessage('Rights review recorded and media attached to the draft.');
                     window.location.reload();
