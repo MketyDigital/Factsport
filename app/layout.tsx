@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { headers } from "next/headers";
 import "./globals.css";
 import AuthProvider from "@/app/components/AuthProvider";
 import Footer from '@/app/components/Footer'; 
@@ -58,8 +59,53 @@ export const viewport: Viewport = {
   userScalable: true,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  const requestHeaders = await headers();
+  const configuredPrivateHost = (process.env.FACTSPORT_PRIVATE_PRODUCT_HOST || '').trim().toLowerCase();
+  const requestHost = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '')
+    .split(',')[0].trim().toLowerCase().split(':')[0];
+  const isPrivateProductHost = !!configuredPrivateHost && requestHost === configuredPrivateHost;
+
+  const publicMediaShell = (
+    <div className="flex flex-col min-h-screen">
+      <SiteHeader />
+      <main className="flex-grow">{children}</main>
+      <Footer />
+      <StickyAffiliateBanner />
+    </div>
+  );
+
+  const application = isPrivateProductHost
+    ? children
+    : process.env.NODE_ENV === 'development'
+      ? <AuthProvider>{publicMediaShell}</AuthProvider>
+      : publicMediaShell;
+
+  return (
+    <html lang="en">
+      <head></head>
+      <body className={`${inter.className} bg-[#F0F2F5] text-slate-900`}>
+        {isPrivateProductHost ? application : <GlobalMediaProvider>{application}</GlobalMediaProvider>}
+        {!isPrivateProductHost && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                if ('serviceWorker' in navigator) {
+                  window.addEventListener('load', function() {
+                    navigator.serviceWorker.register('/sw.js');
+                  });
+                }
+              `,
+            }}
+          />
+        )}
+      </body>
+    </html>
+  );
 }: Readonly<{
   children: React.ReactNode;
 }>) {
