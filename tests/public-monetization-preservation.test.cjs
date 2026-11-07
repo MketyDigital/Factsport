@@ -10,6 +10,8 @@ test('AdSense-first public Media surfaces do not render betting affiliate widget
   const publicFiles = [
     'app/page.tsx', 'app/news/page.tsx', 'app/news/[slug]/page.tsx',
     'app/live/page.tsx', 'app/match/[id]/page.tsx',
+    'app/highlights/page.tsx', 'app/standings/page.tsx',
+    'app/tournaments/page.tsx', 'app/tournaments/[league]/page.tsx',
     'app/components/Footer.tsx', 'app/components/SiteHeader.tsx',
   ];
   for (const file of publicFiles) {
@@ -31,4 +33,14 @@ test('public editorial surfaces do not contain unsolicited timed promotional pop
   const header = read('app/components/SiteHeader.tsx');
   assert.doesNotMatch(layout, /CustomVignette/);
   assert.doesNotMatch(header, /CustomVignette/);
+});
+
+test('legacy VIP prize leaderboard is private and not part of public navigation', () => {
+  const layout = read('app/leaderboard/layout.tsx');
+  const footer = read('app/components/Footer.tsx');
+  const home = read('app/page.tsx');
+  assert.match(layout, /FACTSPORT_PRIVATE_PRODUCT_HOST/);
+  assert.match(layout, /index: false/);
+  assert.doesNotMatch(footer, /href="\/leaderboard"|href="\/how-to-play"|href="\/vip\/upgrade"/);
+  assert.doesNotMatch(home, /href="\/leaderboard"/);
 });
