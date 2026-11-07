@@ -5,6 +5,7 @@ import {
   archiveEditorialArticle, approveAndPublishEditorial, saveEditorialDraft,
   submitEditorialForReview,
 } from './actions';
+import { reviewRightsAndAttachMedia } from './media-actions';
 
 type Article = {
   id: string;
@@ -47,6 +48,15 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const [statusFilter, setStatusFilter] = useState('all');
   const [message, setMessage] = useState('');
   const [isPending, startTransition] = useTransition();
+  const [mediaPending, startMediaTransition] = useTransition();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadedAsset, setUploadedAsset] = useState<{ id: string; object_key: string; rights_status: string } | null>(null);
+  const [assetAltText, setAssetAltText] = useState('');
+  const [rightsStatus, setRightsStatus] = useState<'owned' | 'licensed' | 'editorial_exception'>('owned');
+  const [rightsReference, setRightsReference] = useState('');
+  const [attributionText, setAttributionText] = useState('');
+  const [usageExpiresAt, setUsageExpiresAt] = useState('');
+  const [placement, setPlacement] = useState<'hero' | 'team_1' | 'team_2'>('hero');
 
   const filtered = useMemo(() => articles.filter(article => {
     const matchesSearch = !search || article.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -128,6 +138,71 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
             <label className="text-xs font-bold text-slate-600">Team 2 / away-side name
               <input value={form.team2Name} onChange={e => setForm({ ...form, team2Name: e.target.value })} maxLength={120} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
             </label>
+            <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <h3 className="font-black text-slate-800">Rights-aware media library</h3>
+              <p className="mt-1 text-xs text-slate-500">Upload JPEG, PNG or WebP files to private R2 storage. Every image stays private until its rights are reviewed and it is attached to a draft.</p>
+              {!form.id ? <p className="mt-3 text-sm font-semibold text-amber-800">Save the article draft first to attach media.</p> : <>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <label className="text-xs font-bold text-slate-600">Image file
+                    <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setSelectedFile(e.target.files?.[0] || null)} className="mt-1 block w-full text-xs" />
+                  </label>
+                  <label className="text-xs font-bold text-slate-600">Image alt text
+                    <input value={assetAltText} onChange={e => setAssetAltText(e.target.value)} maxLength={500} className="mt-1 w-full rounded-xl border border-slate-200 p-2 text-sm" />
+                  </label>
+                </div>
+                <button disabled={mediaPending || !selectedFile} onClick={() => startMediaTransition(async () => {
+                  const data = new FormData();
+                  data.append('file', selectedFile!);
+                  data.append('altText', assetAltText);
+                  const response = await fetch('/api/admin/media', { method: 'POST', body: data });
+                  const json = await response.json();
+                  if (!response.ok || !json.success) { setMessage(json.error || 'Image upload failed.'); return; }
+                  setUploadedAsset(json.asset);
+                  setSelectedFile(null);
+                  setMessage('Image uploaded privately. Complete the rights review before attaching it.');
+                })} className="mt-3 rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-bold disabled:opacity-50">
+                  {mediaPending ? 'Uploading…' : 'Upload image'}
+                </button>
+                {uploadedAsset && <div className="mt-4 rounded-xl border border-blue-200 bg-white p-3">
+                  <p className="text-xs font-bold text-slate-800">Uploaded asset: {uploadedAsset.object_key}</p>
+                  <p className="mt-1 text-xs text-amber-700">Rights state: pending review</p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <label className="text-xs font-bold text-slate-600">Placement
+                      <select value={placement} onChange={e => setPlacement(e.target.value as typeof placement)} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm">
+                        <option value="hero">Article hero image</option><option value="team_1">Team 1 logo</option><option value="team_2">Team 2 logo</option>
+                      </select>
+                    </label>
+                    <label className="text-xs font-bold text-slate-600">Rights status
+                      <select value={rightsStatus} onChange={e => setRightsStatus(e.target.value as typeof rightsStatus)} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm">
+                        <option value="owned">Owned by FactSport</option><option value="licensed">Licensed</option><option value="editorial_exception">Editorial exception</option>
+                      </select>
+                    </label>
+                    <label className="text-xs font-bold text-slate-600 md:col-span-2">Rights reference (required for licensed / exception)
+                      <input value={rightsReference} onChange={e => setRightsReference(e.target.value)} maxLength={2048} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
+                    </label>
+                    <label className="text-xs font-bold text-slate-600">Attribution
+                      <input value={attributionText} onChange={e => setAttributionText(e.target.value)} maxLength={500} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
+                    </label>
+                    <label className="text-xs font-bold text-slate-600">Usage expires (optional)
+                      <input type="datetime-local" value={usageExpiresAt} onChange={e => setUsageExpiresAt(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
+                    </label>
+                  </div>
+                  <button disabled={mediaPending} onClick={() => startMediaTransition(async () => {
+                    const result = await reviewRightsAndAttachMedia({
+                      articleId: form.id!, assetId: uploadedAsset.id, placement, rightsStatus,
+                      rightsReference, attributionText, altText: assetAltText,
+                      usageExpiresAt: usageExpiresAt ? new Date(usageExpiresAt).toISOString() : undefined,
+                    });
+                    if (!result.success) { setMessage(result.error); return; }
+                    setUploadedAsset(null);
+                    setMessage('Rights review recorded and media attached to the draft.');
+                    window.location.reload();
+                  })} className="mt-3 rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                    {mediaPending ? 'Reviewing…' : 'Approve rights & attach'}
+                  </button>
+                </div>}
+              </>}
+            </div>
             <label className="md:col-span-2 text-xs font-bold text-slate-600">Excerpt / social preview
               <textarea value={form.excerpt} onChange={e => setForm({ ...form, excerpt: e.target.value })} maxLength={500} rows={2} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
             </label>
