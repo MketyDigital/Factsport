@@ -42,7 +42,7 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
     const slug = cleanText(input?.slug, 180);
     const body = typeof input?.bodyMarkdown === 'string' ? input.bodyMarkdown : '';
     const category = cleanText(input?.category, 80) || 'Football';
-    const tags = Array.isArray(input?.tags) ? [...new Set(input.tags.map(tag => cleanText(tag, 48)).filter(Boolean))].slice(0, 24) : [];
+    const tags = Array.isArray(input?.tags) ? Array.from(new Set(input.tags.map(tag => cleanText(tag, 48)).filter(Boolean))).slice(0, 24) : [];
     if (title.length < 5) return { success: false, error: 'Headline must contain at least 5 characters.' };
     if (!validSlug(slug)) return { success: false, error: 'Use a lowercase, hyphen-separated article slug.' };
     if (body.length > 100000) return { success: false, error: 'Article body is too large.' };
