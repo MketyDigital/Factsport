@@ -82,6 +82,7 @@ export default function Footer() {
                 <li><Link href="/privacy-policy" className="hover:text-white transition">Privacy Policy</Link></li>
                 <li><Link href="/disclaimer" className="hover:text-white transition">Disclaimer</Link></li>
                 <li><Link href="/about" className="hover:text-white transition">About FactSport</Link></li>
+                <li><Link href="/contact" className="hover:text-white transition">Contact</Link></li>
                 <li><Link href="/editorial-standards" className="hover:text-white transition">Editorial Standards</Link></li>
                 <li><Link href="/advertising-policy" className="hover:text-white transition">Advertising Policy</Link></li>
                 <li className="text-red-500 font-bold mt-3 border-t border-white/5 pt-2">18+ Gamble Responsibly</li>
