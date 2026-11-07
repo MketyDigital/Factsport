@@ -76,6 +76,7 @@ export default function ProBettingSlipLock({ matchId, homeTeam, awayTeam, status
                 <div className="p-4 text-center flex flex-col items-center">
                     {isLoading ? <Loader2 className="w-8 h-8 text-yellow-500 animate-spin mb-2" /> : <Lock className="w-8 h-8 text-yellow-500 mb-2" />}
                     <h4 className="font-black text-slate-900 uppercase tracking-tighter text-xs mb-1">Pro Analysis Locked</h4>
+                    <p className="text-[8px] font-bold text-slate-500 mb-1">{homeTeam} vs {awayTeam}</p>
                     <p className="text-[9px] text-slate-600 font-bold mb-3 max-w-[220px]">Unlock the primary bet and tactical data with VIP access.</p>
                     <div className="flex flex-row gap-2 w-full max-w-[260px]">
                         <Link href="/vip/upgrade" className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-600 text-black py-2 rounded text-[9px] font-black uppercase tracking-widest shadow-sm flex items-center justify-center gap-1"><Lock size={10} /> Unlock</Link>
