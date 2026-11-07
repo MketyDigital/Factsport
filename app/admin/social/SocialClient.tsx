@@ -20,6 +20,11 @@ export default function SocialClient({ channels, publications }: { channels: Cha
   const [idempotencyKey, setIdempotencyKey] = useState('');
   const [publicContentConfirmed, setPublicContentConfirmed] = useState(false);
 
+  function invalidatePublicApproval() {
+    setPublicContentConfirmed(false);
+    setIdempotencyKey('');
+  }
+
   function schedule() {
     startTransition(async () => {
       if (!scheduledAt) { setMessage('Choose a publishing date and time.'); return; }
@@ -45,22 +50,22 @@ export default function SocialClient({ channels, publications }: { channels: Cha
           <p className="mt-1 text-sm text-slate-500">Create a public Media post without changing article publication status. Private Prediction channels use a separate system.</p>
           <div className="mt-4 space-y-4">
             <label className="block text-xs font-bold text-slate-600">Destination channel
-              <select value={channelId} onChange={e => setChannelId(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm">
+              <select value={channelId} onChange={e => { setChannelId(e.target.value); invalidatePublicApproval(); }} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm">
                 {channels.map(channel => <option key={channel.id} value={channel.id}>{channel.display_name} · {channel.provider}</option>)}
               </select>
             </label>
             <label className="block text-xs font-bold text-slate-600">Post copy
-              <textarea value={contentText} onChange={e => setContentText(e.target.value)} rows={6} maxLength={10000} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" placeholder="Write channel-specific copy…" />
+              <textarea value={contentText} onChange={e => { setContentText(e.target.value); invalidatePublicApproval(); }} rows={6} maxLength={10000} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" placeholder="Write channel-specific copy…" />
               <span className="mt-1 block text-right font-normal">{contentText.length}/10000</span>
             </label>
             <label className="block text-xs font-bold text-slate-600">Published article ID (optional)
-              <input value={articleId} onChange={e => setArticleId(e.target.value)} placeholder="UUID of an approved published article" className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
+              <input value={articleId} onChange={e => { setArticleId(e.target.value); invalidatePublicApproval(); }} placeholder="UUID of an approved published article" className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
             </label>
             <label className="block text-xs font-bold text-slate-600">Link URL (optional)
-              <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} placeholder="https://factsport.com/…" className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
+              <input value={linkUrl} onChange={e => { setLinkUrl(e.target.value); invalidatePublicApproval(); }} placeholder="https://factsport.com/…" className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
             </label>
             <label className="block text-xs font-bold text-slate-600">Schedule (your local time)
-              <input type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
+              <input type="datetime-local" value={scheduledAt} onChange={e => { setScheduledAt(e.target.value); invalidatePublicApproval(); }} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
             </label>
             <label className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
               <input type="checkbox" checked={publicContentConfirmed} onChange={e => setPublicContentConfirmed(e.target.checked)} className="mt-1" />
