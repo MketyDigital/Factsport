@@ -18,8 +18,8 @@ import MiniStandings from '@/app/components/MiniStandings';
 import HomeDashboardClient from '@/app/components/HomeDashboardClient'; 
 
 export const metadata: Metadata = {
-  title: 'FactSport | Live Football, Sport News & Predictions',
-  description: 'The #1 Platform for sports | football predictions, live scores, and breaking news.',
+  title: 'FactSport | Football News, Live Scores & Match Analysis',
+  description: 'Football news, live scores, fixtures, match analysis and highlights from leagues around the world.',
 };
 
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
@@ -58,6 +58,12 @@ async function getHomepageData(leagueFilter: string | undefined) {
   const usePostgresEditorial = process.env.FACTSPORT_EDITORIAL_BACKEND === 'postgres';
   const usePostgresMatches = process.env.FACTSPORT_MATCHES_BACKEND === 'postgres';
   const usePostgresHomepage = process.env.FACTSPORT_HOMEPAGE_BACKEND === 'postgres';
+
+  if (process.env.NODE_ENV !== 'development' && !(usePostgresEditorial && usePostgresMatches && usePostgresHomepage)) {
+    // Production Media must never fall back to legacy SELECT * projections,
+    // which can include Prediction-only fields and affiliate settings.
+    return { matches: [], news: [], highlights: [], featuredMatches: [] };
+  }
 
   let supabase: ReturnType<typeof createClient> | undefined;
   const getSupabase = () => {
