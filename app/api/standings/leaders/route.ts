@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
   try {
     let leaders: any[];
-    if (process.env.FACTSPORT_MATCHES_BACKEND === 'postgres') {
+    if (process.env.FACTSPORT_COMPETITIONS_BACKEND === 'postgres') {
       const rows = await listCurrentCompetitionPlayerLeaders(league, stat, 5);
       leaders = rows.map((row: any) => ({
         name: row.player_name,
