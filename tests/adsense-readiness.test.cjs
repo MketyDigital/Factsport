@@ -30,7 +30,7 @@ test('public pages do not render betting affiliate widgets or promote private VI
   ];
   for (const file of publicFiles) {
     const source = read(file);
-    assert.doesNotMatch(source, /AdsterraStandardBanner|BettingPromo|FreeTipsBanner|affiliateLink|refpa\d+\.com|Melbet|1xBet|Predict & Win|VIP Upgrade/i, file);
+    assert.doesNotMatch(source, /AdsterraStandardBanner|BettingPromo|FreeTipsBanner|BetOfTheDay|ProBettingSlipLock|affiliateLink|refpa\d+\.com|Melbet|1xBet|Predict & Win|VIP Upgrade/i, file);
   }
 });
 
