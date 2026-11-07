@@ -262,3 +262,28 @@ The four Hyperdrive resources and the three runtime database roles are mapped in
 
 ## 2026-11-07 — parity, rebrand and AdSense acceptance contract
 The governing acceptance addendum is [V2-PARITY-REBRAND-ADSENSE-ACCEPTANCE.md](./V2-PARITY-REBRAND-ADSENSE-ACCEPTANCE.md). It supplements M1/M8/M10 and the route/page/component matrices. No existing feature, logic, integration, brand asset or monetization capability may be silently removed. The full responsive redesign must retain the existing Factsport logo, favicon/app-icon files, navy/red/neutral brand identity, and Lucide icon language unless the owner approves a brand change. AdSense is a formal release gate: verify the live ads.txt/account, review sportsbook affiliate and VIP/prize mechanics against current Google publisher restrictions, correct Cloudflare robots/sitemap behavior, keep Google ads away from interactive/private surfaces, and do not claim acceptance until Google's site status is Ready. The addendum records the current 1xBet promotional surfaces, timed modal, VIP-prize eligibility copy, existing ads.txt seller record, absence of an AdSense code implementation in inspected source, and Vercel-dependent robots logic as items to remediate/review.
+
+
+## 2026-11-07 owner priority reset — public football media first
+
+The owner has reconfirmed that **the primary V2 product is the public Factsport football-media platform at `factsport.com/*`**. Free predictions are a supporting feature, not the main delivery focus. All engineering work remains on `refactor/factsport-v2` through cutover readiness.
+
+### Priority order
+1. **Public media and sports core (P0):** homepage/editorial experience, news and article publishing, fixtures/results, live scores, match centre, standings, tournaments, highlights/video, SEO/metadata, mobile UX, performance and accessibility. Preserve ESPN live path, football-data fixture coverage, arbitration and every existing sports/media capability.
+2. **Editorial and operations platform (P0):** CMS author/review/publish, media ingestion and rights/provenance, admin/RBAC, settings, reliable schedules/jobs, social publishing/outbox, observability and content safety.
+3. **Shared platform foundations (P0):** complete PostgreSQL domain/read models, R2 MediaStore, server APIs, provider adapters, identity/security boundaries and removal of runtime Supabase dependencies from migrated surfaces.
+4. **Private Predict/business system (P1):** registered account, VIP entitlements, premium predictions, campaigns, payments, prizes, betting slips and admin workflows; preserve full feature parity and isolate from public AdSense surfaces.
+5. **Public free predictions (P2 supporting feature):** implement after core public media journeys are stable. This feature must not displace media/CMS/live work.
+6. **Cutover readiness:** complete all parity, data, security, restore, shadow comparison, SEO/AdSense and operational gates before explicit production go/no-go.
+
+### Returning free-prediction email deduplication
+- Keep one `prediction_contacts` row per normalized email using its unique constraint and transactional upsert; email normalization must be deterministic (trim whitespace and lowercase; do not apply provider-specific dot/plus rewriting).
+- On the same browser, a valid first-party HttpOnly participant cookie identifies the existing participant so repeat predictions do not ask for or resubmit email.
+- On another browser/device or after cookie loss, email entry may resolve/reuse the contact row, but must not merge participant identities, prediction histories or account ownership. Do not use email as an authentication or claim key.
+- Allow more than one participant identity to reference one contact where necessary; the database must not enforce unique contact_id on participants. A single normalized contact row prevents duplicate email-list entries.
+- Keep one marketing subscription per contact/channel/purpose. Repeated opt-ins must not create duplicate subscriptions or resend confirmation indiscriminately; withdrawn/unsubscribed state must not be silently reactivated without a new explicit opt-in event. Marketing remains optional and distinct from prediction participation.
+- Keep database cost low: indexed unique normalized email, indexed participant contact foreign key, unique subscription key and transactional upserts; no separate email-identity service or duplicate contact table.
+
+The existing page, route, component and data migration matrices remain the source of truth for individual migration scope. Do not mark a page complete merely because its route compiles: require its real content, interactions, loading/error/empty states, mobile behavior, SEO and data freshness to pass staging journeys.
+
+No production resources or legacy data were changed by this priority update.
