@@ -10,18 +10,20 @@
 
 Factsport has exactly two user states:
 
-1. **Public visitor (anonymous):** may browse the public media product and submit free predictions without registration, login, email address or email verification.
+1. **Public visitor / free participant:** may browse the public media product without registration. Only after choosing **Submit Prediction** does the site reveal a form requiring an email address, prediction details and acceptance of the free-prediction rules/privacy notice. This creates no account and invokes no authentication provider.
 2. **Registered Predict member:** has one central Factsport account, registered and managed through `predict.factsport.com`. The same account/identity is used for any authenticated Factsport experience.
 
-There is no intermediate email-identified participant account. The public prediction form must not require or request an email address.
+There is no intermediate email-only account. Email is a contact detail for the free-prediction/leaderboard workflow, not a login credential or account. The form is hidden until the visitor clicks Submit Prediction.
 
-The prediction form is not a newsletter signup. Do not collect an email address for marketing through prediction submission. If Factsport later offers newsletters or product updates, that must be a separate optional signup with a clear, unbundled consent and unsubscribe mechanism.
+The email-marketing purpose is separate from the email needed to administer a prediction. The form includes a separate, optional, unticked marketing opt-in. Only an affirmative opt-in creates a marketing subscription. Declining marketing must not block a valid free prediction. Consent text/version, timestamp and source are recorded, and withdrawal/unsubscribe is honoured. A marketing opt-in is initially pending confirmation; no promotional email is sent until the address completes the confirmation flow.
 
 ## 2. Public prediction experience
 
-- Public match pages and free prediction submission work without authentication.
-- Anonymous identity is a first-party pseudonymous browser participant, not an account and not an email identity.
+- Public match pages, fixtures and free prediction viewing work without authentication or an email prompt.
+- The prediction submission form appears only after an explicit click on **Submit Prediction**.
+- Email is required on that form and is used to identify the free-prediction contact/leaderboard participant; it does not create an account and is never used as a password or authentication factor.
 - Use a cryptographically random, opaque visitor token in a Secure, HttpOnly cookie scoped to `.factsport.com` when cross-subdomain continuity is required. Store only a one-way hash of the token in PostgreSQL. Never trust a client-supplied participant ID.
+- Associate the participant with a normalized contact email. Use a privacy-safe display name or generated pseudonym on the public leaderboard; never expose email addresses.
 - The cookie is for prediction continuity and abuse controls; it must not be used as a cross-site advertising identifier.
 - Prediction submissions go through a server-side API/Worker. Never permit direct browser writes to prediction tables or expose database/service-role credentials.
 - The server validates the match exists, prediction is still open using authoritative server time, outcome/score bounds, duplicate rules, campaign rules and request limits. Enforce uniqueness/idempotency in PostgreSQL as well as in application logic.
@@ -59,14 +61,16 @@ The V2 PostgreSQL design must support:
 - prediction records linked to a participant and match, with outcome, optional exact score, custom-market snapshot, submission timestamp, lock/campaign snapshot and settlement/points state;
 - database uniqueness for one allowed submission per participant/match and idempotent retries;
 - auditable participant-claim/conflict events;
-- separate marketing-consent records only if/when a newsletter feature is implemented.
+- prediction contact records containing the email required at submission, separate from registered user identity;
+- separate optional marketing subscription state and append-only consent evidence (purpose, channel, exact wording/version, timestamp, source, confirmation and withdrawal).
 
 The server-side prediction API must:
 - issue/rotate the anonymous cookie safely;
 - validate same-origin/CSRF and rate limits;
 - reject malformed UUIDs, unsupported outcomes, invalid scores, closed matches and duplicate/replay attempts;
 - use the database as the final authority for kickoff lock and uniqueness;
-- avoid email, authentication-provider calls or account creation on the anonymous prediction path;
+- collect a syntactically valid email only when the visitor explicitly opens the Submit Prediction form; never call an authentication provider or create an account on this path;
+- record marketing subscription only when a separate, optional and unticked marketing checkbox is affirmatively selected;
 - expose only the current visitor's own prediction state and safe public aggregate/leaderboard data.
 
 Do not implement browser-side direct writes, trust a client clock, or use an email address as an anonymous identity key.
@@ -86,8 +90,9 @@ Do not implement browser-side direct writes, trust a client clock, or use an ema
 ## 8. Explicit non-goals and safety gates
 
 - No second email-only user type.
-- No email field in the public prediction form.
-- No marketing opt-in bundled into predictions.
+- No email prompt during browsing; email is required only when the visitor opens Submit Prediction.
+- No automatic marketing subscription from merely submitting a prediction.
+- No compulsory marketing consent as a condition of free participation.
 - No anonymous prize entitlement by default.
 - No auto-linking by email.
 - No deletion, reset or silent reassignment of legacy predictions, users, VIP memberships, subscriptions, payments, prize records or settlement history.
@@ -96,8 +101,11 @@ Do not implement browser-side direct writes, trust a client clock, or use an ema
 
 ## 9. Acceptance criteria
 
-- An unauthenticated visitor can submit a valid free prediction without email or registration.
-- No anonymous prediction path creates an Entra/Supabase account or invokes the identity provider.
+- An unauthenticated visitor can browse without an email prompt; clicking Submit Prediction reveals the form.
+- The revealed form requires an email and prediction details, but creates no Entra/Supabase account and invokes no identity provider.
+- The marketing checkbox is optional and unticked by default; declining it does not block prediction submission.
+- Only an affirmative marketing opt-in creates a pending marketing subscription; consent evidence and withdrawals are auditable.
+- Marketing sends are blocked until the subscription confirmation flow is completed.
 - Duplicate/replayed submissions and post-kickoff writes are rejected server-side and by database constraints.
 - Visitor identity is opaque, first-party, HttpOnly/Secure, hashed at rest and not exposed to the browser as a database key.
 - Registering on Predict in the same browser can safely claim eligible anonymous history without email matching or overwriting conflicts.
@@ -109,10 +117,19 @@ Do not implement browser-side direct writes, trust a client clock, or use an ema
 
 ## 10. First implementation slice (2026-11-07)
 
-- Added `db/migrations/0003_factsport_public_predictions.sql` with pseudonymous visitor participants, prediction rows, claim audit events and explicit same-match conflict records.
-- Anonymous participant identity is represented by a 256-bit lowercase SHA-256 token hash; no email field, marketing field or direct public database grant is introduced.
+- Added `db/migrations/0003_factsport_public_predictions.sql` with prediction contacts, pseudonymous visitor participants, prediction rows, claim audit events and explicit same-match conflict records.
+- Email is stored as a prediction contact after the user opens Submit Prediction and submits the form; it is not an account identity. The migration adds a separate marketing subscription and append-only consent-event ledger. Marketing status defaults to pending confirmation and is never inferred from the presence of an email.
 - Predictions have database-level participant/match uniqueness, registered-user/match uniqueness, allowed-outcome checks, paired nonnegative score checks, kickoff lock timestamp, campaign snapshot and default `is_eligible_for_prize = false`.
 - Claim conflicts have explicit records so a same-match collision cannot silently overwrite either prediction.
-- Added `tests/prediction-schema.test.cjs` and wired it into the isolated V2 verification workflow.
+- Added `tests/prediction-schema.test.cjs` and wired it into the isolated V2 verification workflow. Tests cover email-contact/account separation and independent marketing consent records.
 - **Not yet applied to Azure PostgreSQL.** The migration is checked in only. The current Hyperdrive application runtime is read-only; the dedicated prediction API writer role/Hyperdrive, API route, visitor cookie, claim transaction and PredictionBoard migration must be implemented and verified before enabling public submissions.
 - No production database, DNS, Worker route, identity provider or legacy Supabase record was changed.
+
+
+## 11. Owner clarification — submit-triggered email capture (2026-11-07)
+
+The owner clarified the exact UX: no email form during ordinary browsing. A visitor sees the free prediction controls; only when they click **Submit Prediction** does the form reveal the required email field, required acceptance of the free-prediction rules/privacy notice, and a separate optional unticked marketing checkbox. Submitting a valid free prediction places the participant on the free leaderboard using a privacy-safe display identity. The email is not an account and is not a login credential. The separate Predict product still requires full registration.
+
+**Marketing safeguard:** do not make direct-marketing consent compulsory for free participation. Nigeria's data-protection framework and current guidance require specific consent for direct marketing; consent must be a genuine, informed choice and withdrawal must be respected. The optional marketing checkbox should say exactly what Factsport emails will be sent. A separate pending-confirmation subscription and auditable opt-in/confirmation/withdrawal events are in the schema. No marketing email is sent before confirmation. Declining marketing does not prevent prediction submission. See current NDPC/NDPA sources recorded in the project discussion; legal review of final copy and cross-border email-provider processing remains required.
+
+The V2 schema migration was revised before application (it has not been applied to Azure). The public PredictionBoard remains legacy Supabase-backed and login-gated until the new API, writer role and staging tests are ready.
