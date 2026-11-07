@@ -1,17 +1,15 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { MessageCircle, BarChart2, Zap, BrainCircuit, Table } from 'lucide-react';
+import { MessageCircle, BarChart2, Zap, Table } from 'lucide-react';
 import FanZoneChat from '@/app/components/FanZoneChat';
 import StatsLineupsTabs from '@/app/components/StatsLineupsTabs';
-import ProBettingSlipLock from '@/app/components/ProBettingSlipLock';
-import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 import LiveStandings from '@/app/components/LiveStandings';
 import WinProbability from '@/app/components/WinProbability';
 import MOTMVoteWidget from '@/app/components/MOTMVoteWidget'; 
 import { useMatchLive } from '@/app/providers/MatchLiveProvider';
 
 export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
-    const [activeTab, setActiveTab] = useState<'chat' | 'stats' | 'pro' | 'table'>('stats');
+    const [activeTab, setActiveTab] = useState<'chat' | 'stats' | 'table'>('stats');
     const liveData = useMatchLive();
 
     const currentStatus = (liveData?.status || '').toUpperCase();
@@ -23,7 +21,7 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
     const isUniversallyFinished = isFinished || minutesToKick < -240;
 
     useEffect(() => {
-        if (isUniversallyFinished && (activeTab === 'table' || activeTab === 'pro')) {
+        if (isUniversallyFinished && activeTab === 'table') {
             setActiveTab('stats');
         }
     }, [isUniversallyFinished, activeTab]);
@@ -56,7 +54,6 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
                     </button>
                 )}
 
-                {/* 🟢 Post-Match Purge: Destroy the Pro slip tab */}
                 {!isUniversallyFinished && (
                     <button onClick={() => setActiveTab('pro')} className={`flex-1 py-3 px-3 min-w-max text-[10px] md:text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${activeTab === 'pro' ? 'text-yellow-600 border-b-2 border-yellow-500 bg-yellow-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
                         <BrainCircuit size={14} className={activeTab === 'pro' ? 'text-yellow-500' : ''}/> Pro Slip
@@ -71,10 +68,6 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
             </div>
 
             <div className="bg-[#F0F2F5] relative min-h-[300px]">
-                <div className="w-full bg-white border-b border-slate-200 py-1 sticky top-[46px] z-30">
-                    <AdsterraStandardBanner />
-                </div>
-                
                 {activeTab === 'chat' && (
                     <div className="p-2 md:p-4 bg-white flex flex-col h-full">
                         <MOTMVoteWidget matchId={matchId} lineups={liveData?.lineups} />
@@ -90,7 +83,6 @@ export default function MatchMobileHub({ matchId, espnId, dbData }: any) {
                     </div>
                 )}
                 
-                {activeTab === 'pro' && <div className="p-3 md:p-6 bg-slate-900"><ProBettingSlipLock matchId={matchId} homeTeam={dbData.home_team} awayTeam={dbData.away_team} status={dbData.status} /></div>}
             </div>
         </div>
     );
