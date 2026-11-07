@@ -63,12 +63,15 @@ test('editorial lifecycle requires review before publication and records revisio
   assert.ok(actions.includes("status='in_review'"));
   assert.ok(actions.includes("status='published'"));
   assert.ok(actions.includes('editorial_article_revisions'));
-  assert.ok(actions.includes('A different administrator must review and approve the revision.'));
+  assert.ok(actions.includes('A different authorized editor must review the revision.'));
+  assert.ok(actions.includes('workflow_status=\'approved\''));
+  assert.ok(actions.includes('publishApprovedEditorial'));
   assert.ok(actions.includes('reviewed_by'));
   assert.ok(actions.includes('reviewed_at'));
   assert.ok(ui.includes('Save draft'));
   assert.ok(ui.includes('Submit for review'));
-  assert.ok(ui.includes('Approve & publish'));
+  assert.ok(ui.includes('Approve revision'));
+  assert.ok(ui.includes('Publish approved'));
 });
 
 test('CMS does not publish social content as articles or merge Prediction responsibilities', () => {
@@ -110,7 +113,8 @@ test('social scheduling is attributed and cancellation cannot race an active del
   assert.match(socialActions, /media_social_outbox/i);
   assert.match(socialActions, /FOR UPDATE/i);
   assert.match(socialActions, /already being delivered or has completed/i);
-  assert.match(socialActions, /unique Factsport domain identity mapping/i);
+  assert.match(socialActions, /authorizeMediaEditorialAction\('social'\)/);
+  assert.match(socialActions, /authorization\.user\.domainUserId/);
 });
 
 
