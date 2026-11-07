@@ -17,6 +17,8 @@ const socialActions = read('app/admin/social/actions.ts');
 const page = read('app/admin/news/page.tsx');
 const adapter = read('lib/adapters/postgres-client.ts');
 const ui = read('app/admin/news/NewsroomClient.tsx');
+const mediaUpload = read('app/api/admin/media/route.ts');
+const mediaActions = read('app/admin/news/media-actions.ts');
 
 test('social publishing is a separate durable Media workflow', () => {
   assert.match(socialSql, /CREATE TABLE IF NOT EXISTS public\.media_social_channels/i);
@@ -103,4 +105,21 @@ test('social scheduling is attributed and cancellation cannot race an active del
   assert.match(socialActions, /FOR UPDATE/i);
   assert.match(socialActions, /already being delivered or has completed/i);
   assert.match(socialActions, /unique Factsport domain identity mapping/i);
+});
+
+
+test('editorial media uploads are private, validated, hashed and rights-reviewed before attachment', () => {
+  assert.match(mediaUpload, /MAX_BYTES = 8 \* 1024 \* 1024/i);
+  assert.match(mediaUpload, /image\/jpeg.*image\/png.*image\/webp/i);
+  assert.match(mediaUpload, /validImageSignature/i);
+  assert.match(mediaUpload, /SHA-256/i);
+  assert.match(mediaUpload, /factsportMediaBucket/);
+  assert.match(mediaUpload, /rights_status, is_public, uploaded_by/i);
+  assert.match(mediaUpload, /'pending', false/i);
+  assert.match(mediaUpload, /isSameOriginRequest/);
+  assert.match(mediaActions, /rights_reviewed_by/);
+  assert.match(mediaActions, /rights_reviewed_at/);
+  assert.match(mediaActions, /status !== 'draft'/);
+  assert.match(mediaActions, /editorial_article_team_media/);
+  assert.match(ui, /Approve rights & attach/);
 });
