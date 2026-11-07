@@ -69,7 +69,6 @@ export default function Footer() {
             <ul className="space-y-2 text-xs">
                 <li><Link href="/matches" className="hover:text-white transition">Matches</Link></li>
                 <li><Link href="/news" className="hover:text-white transition">News</Link></li>
-                <li><Link href="/leaderboard" className="hover:text-white transition">Leaderboard</Link></li>
             </ul>
         </div>
 
@@ -77,7 +76,6 @@ export default function Footer() {
         <div>
             <h3 className="text-white text-xs font-bold uppercase tracking-widest mb-4">Legal</h3>
             <ul className="space-y-2 text-xs">
-                <li><Link href="/how-to-play" className="hover:text-white transition">How to Play</Link></li>
                 <li><Link href="/terms" className="hover:text-white transition">Terms & Conditions</Link></li>
                 <li><Link href="/privacy-policy" className="hover:text-white transition">Privacy Policy</Link></li>
                 <li><Link href="/disclaimer" className="hover:text-white transition">Disclaimer</Link></li>
