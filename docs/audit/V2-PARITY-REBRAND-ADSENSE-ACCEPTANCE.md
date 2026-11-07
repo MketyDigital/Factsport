@@ -255,3 +255,12 @@ The owner has clarified that VIP, premium prediction, betting-related and existi
 - The VIP upgrade copy was changed to remove betting-slip, odds and cash-prize sales claims while retaining the underlying route and membership workflow. This is a temporary presentation step, not the final private product separation.
 - The next implementation milestone is to map every public/private route and component call site, preserve the free prediction flow on the public experience, and move premium/business surfaces behind the private host boundary once the hostname and staging access design are confirmed.
 - No private business workflow is approved for deletion. No production host/DNS/Worker change is authorized by this separation decision alone.
+
+
+## 12. Owner-approved identity and anonymous prediction model (AUTH-005)
+
+The owner has confirmed exactly two user states: (1) anonymous public visitors who can submit free predictions without registration, email or verification; and (2) registered Predict members whose single canonical Factsport account is managed through `predict.factsport.com`. There is no intermediate email-identified participant state. The public prediction form must not collect email. Newsletter/product marketing, if later introduced, requires a separate optional consent flow and is not bundled with predictions.
+
+The public prediction path must use a first-party opaque anonymous participant cookie and a server-side API/Worker; persist only a one-way token hash, enforce kickoff/duplicate/idempotency/rate-limit rules server-side and in PostgreSQL, and never expose direct browser writes. Same-browser anonymous history may be claimed after Predict registration using the protected cookie, never email matching; conflicts must preserve original records. Anonymous predictions are not automatically prize-eligible. Entra External ID remains the Day 1 registered-account adapter, subject to staging verification. Full implementation contract and acceptance criteria: `docs/audit/AUTH-005-public-anonymous-predictions-single-predict-account.md`.
+
+The legacy `PredictionBoard` currently redirects unauthenticated visitors to `/login` and writes directly to Supabase `user_predictions`. Removing that redirect alone is unsafe and insufficient. Replace the direct write path only after the V2 participant schema, dedicated least-privilege prediction API role, server-side API and staging tests are in place. Existing campaign scoring, bonus markets, settlement, user records, VIP entitlements and prize audit history must be preserved.
