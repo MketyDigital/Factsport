@@ -163,3 +163,16 @@ export async function listCurrentCompetitionPlayerLeaders(
     LIMIT ${limit}
   `;
 }
+
+export async function listCurrentCompetitionDirectory() {
+  const sql = getFactsportPostgres();
+  return sql`
+    SELECT league_code, league_name, season,
+           count(DISTINCT team_id)::integer AS team_count,
+           count(DISTINCT match_group)::integer AS group_count,
+           max(source_updated_at) AS source_updated_at
+    FROM public.public_competition_standings
+    GROUP BY league_code, league_name, season
+    ORDER BY league_name ASC, season DESC
+  `;
+}
