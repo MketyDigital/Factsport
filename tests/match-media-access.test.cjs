@@ -24,6 +24,10 @@ test('match page does not serialize raw stream or VIP analysis data into client 
 test('playback endpoint withholds media URLs until the server-side 15-minute unlock', () => {
   assert.match(playback, /select\('match_date, status, video_url, livestream_url, audio_url'\)/);
   assert.match(playback, /Date\.now\(\) < unlockAt/);
+  assert.match(playback, /const isLive = LIVE\.has\(status\)/);
+  assert.doesNotMatch(playback, /!SCHEDULED\.has\(status\) && !isFinished/);
+  assert.match(playback, /UNAVAILABLE\.has\(status\)/);
+  assert.match(playback, /trimmed\.startsWith\('\/'\)/);
   const lockedBranch = playback.slice(playback.indexOf("status: 'locked'"), playback.indexOf('const videoSource'));
   assert.doesNotMatch(lockedBranch, /mediaUrl\s*:|videoUrl\s*:|audioUrl\s*:/);
   assert.match(playback, /safePlaybackUrl/);

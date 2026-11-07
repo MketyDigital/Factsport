@@ -6,19 +6,33 @@ export const dynamic = 'force-dynamic';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FINISHED = new Set(['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD']);
-const SCHEDULED = new Set(['SCHEDULED', 'PRE', 'UPCOMING', 'TBD', 'DELAYED']);
-const LIVE = new Set(['LIVE', '1H', '2H', 'HT', 'ET', 'P', 'IN_PLAY', 'PAUSED']);
+const SCHEDULED = new Set(['SCHEDULED', 'PRE', 'PRE_MATCH', 'UPCOMING', 'TBD', 'DELAYED', 'TIMED']);
+const LIVE = new Set(['LIVE', '1H', '2H', 'HT', 'HALFTIME', 'HALF TIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES', 'IN_PLAY', 'IN PLAY', 'PAUSED', 'SUSPENDED']);
+const UNAVAILABLE = new Set(['POSTPONED', 'CANCELLED', 'CANCELED']);
 
 function safePlaybackUrl(value: unknown): string | null {
   if (typeof value !== 'string' || !value.trim()) return null;
   if (value.trim() === 'streamio') return 'streamio';
+  const trimmed = value.trim();
+  if (trimmed.startsWith('/')) {
+    if (trimmed.startsWith('//') || trimmed.includes(String.fromCharCode(92))) return null;
+    const rawPath = trimmed.split(/[?#]/, 1)[0];
+    if (rawPath.split('/').some(segment => segment === '..')) return null;
+    try {
+      const relative = new URL(trimmed, 'https://factsport.invalid');
+      if (relative.origin !== 'https://factsport.invalid') return null;
+      return `${relative.pathname}${relative.search}${relative.hash}`;
+    } catch {
+      return null;
+    }
+  }
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://factsport.com';
-    const url = new URL(value.trim(), baseUrl);
+    const url = new URL(trimmed);
     if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return null;
     const host = url.hostname.toLowerCase();
-    if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.local')) return null;
-    if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) return null;
+    const normalizedHost = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+    if (normalizedHost === 'localhost' || normalizedHost === '127.0.0.1' || normalizedHost === '0.0.0.0' || normalizedHost === '::1' || normalizedHost.startsWith('fc') || normalizedHost.startsWith('fe80:') || normalizedHost.endsWith('.local') || normalizedHost.endsWith('.internal')) return null;
+    if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(normalizedHost)) return null;
     return url.toString();
   } catch {
     return null;
@@ -41,7 +55,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
     const status = String(match.status || '').toUpperCase();
     const isFinished = FINISHED.has(status);
-    const isLive = LIVE.has(status) || (!SCHEDULED.has(status) && !isFinished);
+    const isLive = LIVE.has(status);
+    if (UNAVAILABLE.has(status)) return NextResponse.json({ status: 'unavailable' }, { headers: { 'Cache-Control': 'private, no-store, max-age=0', Vary: 'Cookie' } });
     const matchTime = new Date(match.match_date).getTime();
     if (!Number.isFinite(matchTime)) return NextResponse.json({ status: 'unavailable' }, { status: 422, headers: { 'Cache-Control': 'no-store' } });
 
