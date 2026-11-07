@@ -62,7 +62,7 @@ async function getStandings(leagueName: string) {
     let dbStandings: any[] = [];
     let dbMatches: any[] = [];
     try {
-        if (process.env.FACTSPORT_MATCHES_BACKEND === 'postgres') {
+        if (process.env.FACTSPORT_COMPETITIONS_BACKEND === 'postgres') {
             const results = await Promise.all([
                 listCurrentCompetitionStandings(leagueCode),
                 listPostgresLeagueResults(leagueName, String(dbStandings[0]?.season || ''), 2000),
