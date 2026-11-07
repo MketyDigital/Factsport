@@ -4,7 +4,7 @@ const SITE_URL = 'https://factsport.com'
 const PRIVATE_PATHS = [
   '/admin', '/api', '/dashboard', '/login', '/register', '/account',
   '/auth', '/vip', '/predict', '/payment', '/checkout', '/chat',
-  '/studio', '/settings', '/embed',
+  '/studio', '/settings', '/embed', '/how-to-play',
 ]
 
 export default function robots(): MetadataRoute.Robots {
@@ -15,7 +15,8 @@ export default function robots(): MetadataRoute.Robots {
     process.env.FACTSPORT_INDEXING_ENABLED === 'true' &&
     process.env.NODE_ENV === 'production' &&
     process.env.FACTSPORT_EDITORIAL_BACKEND === 'postgres' &&
-    process.env.FACTSPORT_MATCHES_BACKEND === 'postgres'
+    process.env.FACTSPORT_MATCHES_BACKEND === 'postgres' &&
+    process.env.FACTSPORT_SITEMAP_BACKEND === 'postgres'
 
   if (!indexingEnabled) {
     return { rules: { userAgent: '*', disallow: '/' } }
