@@ -68,6 +68,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   }), [articles, search, statusFilter]);
 
   function edit(article: Article) {
+    setPublicPolicyConfirmed(current => ({ ...current, [article.id]: false }));
     setForm({
       id: article.id, title: article.title, slug: article.slug, excerpt: article.excerpt || '',
       bodyMarkdown: article.body_markdown, category: article.category, team1Name: article.team_1_name || '', team2Name: article.team_2_name || '', tagsText: (article.tags || []).join(', '),
@@ -97,6 +98,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
       if (!result.success) { setMessage(result.error); return; }
       if (!result.data) { setMessage('Draft save returned no article identifier.'); return; }
       const savedArticleId = result.data.id;
+      setPublicPolicyConfirmed(current => ({ ...current, [savedArticleId]: false }));
       setMessage('Draft saved. Reload the newsroom to see the updated record.');
       setForm(current => ({ ...current, id: savedArticleId }));
     });
