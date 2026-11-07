@@ -358,3 +358,11 @@ The acceptance contract prohibits silent removal of monetization. Existing publi
 - Protected staging passed (run 42383870331): deny-by-default, Hyperdrive/R2 health, /matches initial render, timestamp+UUID cursor pagination without duplicate row, and auth/cache isolation all passed. The pagination 503 did not reproduce after the lifecycle change.
 - Continue monitoring transient database errors; a successful rerun is not a guarantee against future infrastructure failures.
 - Main /match/[id] remains a legacy path until canonical legacy-ID crosswalk, prediction/campaign parity, server-authorized stream grants, VIP analysis RBAC, ticker and settings reads are complete. See M11.
+
+
+## 2026-11-07 match identity foundation
+
+- Added migration 0008 with a nullable unique legacy match UUID alias while preserving canonical V2 matches.id.
+- Added getPostgresMatchById() to resolve either V2 or legacy UUID and return the canonical V2 match ID.
+- Added a separately gated PostgreSQL branch to GET /api/match/[id] with a narrow public DTO. Media URLs, campaign IDs, pro-analysis, affiliate links and settlement fields are excluded.
+- The main /match/[id] page remains legacy-backed. Do not enable FACTSPORT_MATCH_DETAIL_BACKEND until the alias is populated through approved reconciliation and the separate stream entitlement, VIP analysis, campaign/prediction and ticker/settings contracts are complete.
