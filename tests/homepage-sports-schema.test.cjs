@@ -29,7 +29,7 @@ test('competition standings are season/group aware and deterministic', () => {
   assert.match(sql, /match_group text NOT NULL/i);
   assert.match(sql, /UNIQUE \(league_code, season, match_group, team_id\)/i);
   assert.match(sql, /competition_one_current_season_idx/i);
-  assert.match(sql, /ORDER BY position/i.test(sql) ? /position/ : /position/);
+  assert.match(sql, /position integer NOT NULL/i);
   assert.match(sql, /CREATE OR REPLACE VIEW public\.public_competition_standings/i);
 });
 
