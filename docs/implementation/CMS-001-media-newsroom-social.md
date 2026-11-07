@@ -23,6 +23,7 @@ This slice belongs to the **Media system**. It does not add prediction campaigns
 - Added migration 0015 with the legacy match-event social route matrix, VIP teams/leagues, first-match fallback, UTC timezone default, text-only image policy and editable channel/template tables. Seeded channels and global automation remain disabled.
 - Added a pure match-event detector and migration 0016 for canonical event identities, per-channel delivery leases and append-only attempt outcomes. Event detection is not yet wired to ingestion and the dispatcher is not active.
 - Archived the prior Supabase-backed match-event sender verbatim and replaced the active V2 `/api/social` route with an explicit 410 fail-closed response. See M21 for the preserved behavior contract.
+- Archived and disabled the legacy Supabase-backed `/api/live`, `/api/sync-fd`, `/api/matchmaker`, `/api/settle`, `/api/cron/morning-post`, `/api/evening-roundup`, `/api/logos/sync`, `/api/matches/highlights/sync`, monthly reset/audit and legacy admin settings/users routes. See M23 for owner boundaries and replacement gates.
 - Social scheduling is idempotent, uses an outbox record, and is distinct from article publication.
 - Added migration 0010 with a dedicated editorial writer's minimum table/column grants. The role is explicitly denied match, prediction and other writer responsibilities.
 - Added static regression coverage for workflow boundaries and database grants.
@@ -42,7 +43,7 @@ Provisioning sequence still required:
 6. Add the verified Hyperdrive ID as `FACTSPORT_EDITORIAL_HYPERDRIVE` in the native Cloudflare app config and deploy only to staging.
 7. Complete the V2 authentication/domain-identity bridge and provision explicit administrator mappings before enabling review/publish actions.
 
-The CMS intentionally fails closed while this binding is absent. It does not fall back to `getSupabaseAdmin`, `DATABASE_URL`, the public reader, the schedule writer, the ESPN writer or the legacy `news` table.
+The CMS intentionally fails closed while this binding is absent. Legacy Supabase side-effect routes are also disabled in V2; their source is archived and the replacement workflows remain separate implementation gates. It does not fall back to `getSupabaseAdmin`, `DATABASE_URL`, the public reader, the schedule writer, the ESPN writer or the legacy `news` table.
 
 ## Social delivery boundary — not yet connected to providers
 
