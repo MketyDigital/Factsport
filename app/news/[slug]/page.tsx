@@ -24,8 +24,8 @@ const getArticleData = cache(async (slug: string) => {
       body: article.body_markdown,
       content: article.body_markdown,
       image_url: article.hero_media_key ? `/api/media/${article.hero_media_key}` : null,
-      team_1_logo: null,
-      team_2_logo: null,
+      team_1_logo: article.team_1_logo_key ? `/api/media/${article.team_1_logo_key}` : null,
+      team_2_logo: article.team_2_logo_key ? `/api/media/${article.team_2_logo_key}` : null,
       created_at: article.original_created_at || article.published_at,
       published_at: article.published_at,
     };
