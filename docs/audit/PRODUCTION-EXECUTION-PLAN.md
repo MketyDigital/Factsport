@@ -109,6 +109,10 @@ The staging app's `/api/matches` response previously used `Cache-Control: public
 
 ### P3 — Public site, editorial and media
 
+- [ ] Apply and verify editorial/homepage migrations 0004-0006 on isolated staging only; add ordered migration ledger/checksums before production use.
+- [ ] Complete homepage PostgreSQL parity: migrate public affiliate/config settings and the Bet of the Day `pro_analysis` projection without exposing private analysis; verify all nested component and 3-second live paths.
+- [ ] Complete full `/highlights` and `/standings` routes, ingestion, editorial CMS commands, media upload/rights-review workflow and admin RBAC.
+
 - [ ] Complete route/page/component parity across homepage, news, match center, leagues, standings, highlights, search, static/help pages, SEO and mobile.
 - [ ] Build a real CMS with server-enforced editor/admin roles, drafts, review/publish workflow, revision history, provenance, attribution, source references and audit logs.
 - [ ] Preserve human-authored editorial content and stable slugs only after private provenance and rights review. Legacy news has 366 rows: 167 known daily-briefing patterns, 120 known matchday-roundup patterns, 37 suspected additional roundup patterns, and 42 editorial candidates; none of the last 79 are proven manual solely by metadata.
@@ -263,3 +267,13 @@ Use [DATA-MIGRATION-MATRIX.md](./DATA-MIGRATION-MATRIX.md) as the authority for 
 
 ## 2026-11-07 parity, redesign and monetization gate
 The complete acceptance contract is [V2-PARITY-REBRAND-ADSENSE-ACCEPTANCE.md](./V2-PARITY-REBRAND-ADSENSE-ACCEPTANCE.md). Apply it to P3 (public site/editorial/media), P4/P5 (identity/gameplay/VIP), P6/P7 (community/integrations) and P8/P9 (compliance/release). It is mandatory that the modernized frontend preserve every existing page journey and component capability while adopting the approved responsive visual system. Existing logo, favicon, app icon, colors and icon language remain unchanged unless explicitly approved. AdSense readiness is a release gate, not an assumption: existing sportsbook affiliate promos and VIP prize eligibility need substantive policy/legal review; no Google ad code should load on private, chat, payment, account, admin or interaction-heavy surfaces; live Cloudflare robots/sitemap and ads.txt must be verified; and actual Google site approval must be “Ready”. The current `robots.ts` Vercel environment dependency is a specific Cloudflare crawlability defect to fix and test. No monetization or product mechanics are to be silently removed.
+
+
+## 2026-11-07 implementation status — editorial and homepage read-model slice
+
+- Committed additive migrations 0004-0006 for editorial/media, provenance/human review, featured matches, public highlights and season/group-aware standings. None is applied to Azure PostgreSQL.
+- Public news and article pages have opt-in PostgreSQL readers; article metadata now uses reviewed SEO/canonical/author fields. Raw HTML is sanitized and embedded video hosts are allowlisted.
+- Homepage now has opt-in PostgreSQL readers for news, match window, featured matches and rights-reviewed highlights. MiniStandings has a PostgreSQL path. HomeDashboardClient no longer queries Supabase directly for featured-match settings; `/api/settings` exposes a narrow server-side setting projection.
+- Shared domain adapters now use one bounded PostgreSQL client per Worker isolate.
+- Remaining parity blockers: Bet of the Day's legacy `pro_analysis` model, public affiliate settings, full highlights and standings routes, CMS write/review/publish commands, media ingestion, social outbox, and live/browser journey evidence. No public page is declared complete.
+- New schema/readers are code-only until migrations are reviewed/applied in isolated staging and populated through approved new provider/CMS workflows. No legacy article content or match history has been imported; no production resources changed.
