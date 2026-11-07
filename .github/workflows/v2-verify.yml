@@ -15,6 +15,7 @@ on:
       - 'scripts/generate-factsport-bootstrap.cjs'
       - 'db/migrations/**'
       - 'scripts/check-postgres.cjs'
+      - 'tests/**'
       - 'package.json'
       - '.github/workflows/v2-verify.yml'
 
@@ -41,4 +42,6 @@ jobs:
         run: |
           test -s db/migrations/0001_factsport_core.sql
           grep -q "CREATE TABLE IF NOT EXISTS public.matches" db/migrations/0001_factsport_core.sql
-          echo "Schema file present; live migration NOT executed"
+          test -s db/migrations/0003_factsport_public_predictions.sql
+          grep -q "CREATE TABLE IF NOT EXISTS public.predictions" db/migrations/0003_factsport_public_predictions.sql
+          echo "Foundation and public-prediction migrations present; live migration NOT executed"
