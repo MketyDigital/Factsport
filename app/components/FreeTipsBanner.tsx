@@ -6,26 +6,23 @@ import { Copy, CheckCircle, ExternalLink, Lock, Zap } from 'lucide-react';
 export default function FreeTipsBanner() {
   const [copied1x, setCopied1x] = useState(false);
   const [copiedMel, setCopiedMel] = useState(false);
-  const PROMO_CODE = "FACTSPORT";
-
-  const [globalLinks, setGlobalLinks] = useState({
-      link1x: "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599",
-      linkMel: "https://refpa54566.com/L?tag=d_1181253m_45415c_&site=1181253&ad=45415"
-  });
-  const [bookingCodes, setBookingCodes] = useState({ code1x: "A8J92", codeMel: "7X2MM" });
+  const [globalLinks, setGlobalLinks] = useState({ link1x: '', linkMel: '' });
+  const [bookingCodes, setBookingCodes] = useState({ code1x: '', codeMel: '' });
 
   useEffect(() => {
       const fetchData = async () => {
           try {
-              const res = await fetch('/api/settings');
+              const res = await fetch('/api/prediction/settings', { cache: 'no-store' });
               if (!res.ok) return;
               const data = await res.json();
-              setGlobalLinks({ link1x: data.link1x || globalLinks.link1x, linkMel: data.linkMel || globalLinks.linkMel });
-              setBookingCodes({ code1x: data.code1x || bookingCodes.code1x, codeMel: data.codeMel || bookingCodes.codeMel });
+              setGlobalLinks({ link1x: data.link1x || '', linkMel: data.linkMel || '' });
+              setBookingCodes({ code1x: data.code1x || '', codeMel: data.codeMel || '' });
           } catch (e) {}
       };
       fetchData();
   }, []);
+
+  if (!globalLinks.link1x && !globalLinks.linkMel) return null;
 
   const copyToClipboard = (code: string, type: '1x' | 'mel') => {
     navigator.clipboard.writeText(code);
@@ -43,7 +40,7 @@ export default function FreeTipsBanner() {
             <Zap className="text-yellow-400 fill-yellow-400" size={10} /> Daily Free Codes
         </h3>
         <p className="text-slate-400 text-[7px] md:text-[8px] leading-tight">
-          Promo: <span className="text-white font-black bg-white/10 px-1 py-0.5 rounded shadow-sm">{PROMO_CODE}</span>
+          Partner offers are optional
         </p>
       </div>
 
