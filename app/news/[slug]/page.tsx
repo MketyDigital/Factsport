@@ -1,7 +1,8 @@
 export const runtime = 'edge';
 export const revalidate = 180; 
 
-import { createClient } from '@supabase/supabase-js'; 
+import { createClient } from '@supabase/supabase-js';
+import { getPublicEditorialArticle } from '@/lib/adapters/postgres-editorial'; 
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { cache } from 'react'; 
@@ -13,6 +14,19 @@ import BettingPromo from '@/app/components/BettingPromo';
 import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
 const getArticleData = cache(async (slug: string) => {
+  if (process.env.FACTSPORT_EDITORIAL_BACKEND === 'postgres') {
+    const article = await getPublicEditorialArticle(slug);
+    if (!article) return null;
+    return {
+      ...article,
+      body: article.body_markdown,
+      content: article.body_markdown,
+      image_url: article.hero_media_key ? `/api/media/${article.hero_media_key}` : null,
+      team_1_logo: null,
+      team_2_logo: null,
+      created_at: article.published_at,
+    };
+  }
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   const { data, error } = await supabase.from('news').select('*').eq('slug', slug).single();
   if (error) return null;
