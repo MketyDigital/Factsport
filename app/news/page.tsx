@@ -8,8 +8,6 @@ import Link from 'next/link';
 import { Metadata } from 'next';
 import { Calendar, ChevronRight, Zap, Trophy, Youtube, Newspaper, ArrowRight, Flame, Radio, BarChart2, ChevronLeft } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
-import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
-import BettingPromo from '@/app/components/BettingPromo';
 
 const CATEGORIES = ['All', 'Football', 'Transfers', 'Sports Update', 'Champions League', 'Euros', 'World Cup', 'AFCON', 'Copa America'];
 const ITEMS_PER_PAGE = 12;
@@ -98,9 +96,6 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
              </h1>
              <p className="text-slate-400 font-medium tracking-wide mt-2 mb-6 text-sm max-w-md">Breaking stories, tactical Football analysis, and the latest from the world of Sport.</p>
              
-             <div className="mt-2">
-                 <AdsterraStandardBanner />
-             </div>
         </div>
       </div>
 
@@ -120,10 +115,6 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
       </div>
 
       <div className="px-4 mt-6 relative z-20 max-w-7xl mx-auto">
-
-        <div className="mb-8 w-full max-w-3xl mx-auto overflow-hidden rounded-xl bg-white border border-slate-200 shadow-sm max-h-[90px]">
-            <BettingPromo affiliateLink={null} />
-        </div>
 
         {featured && (
             <Link href={`/news/${featured.slug}`} className="block group mb-8">
@@ -165,12 +156,6 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
                     </div>
                 </Link>
             ))}
-
-            {rest.length > 0 && (
-                <div className="col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-4 my-2 border-y border-slate-200 py-4">
-                    <AdsterraStandardBanner />
-                </div>
-            )}
 
             {secondHalf.map((item) => (
                 <Link key={item.id} href={`/news/${item.slug}`} className="group bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col h-full">
@@ -217,9 +202,6 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
             </div>
         )}
 
-        <div className="mt-12 mb-4">
-            <AdsterraStandardBanner />
-        </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 mt-8 mb-8">
