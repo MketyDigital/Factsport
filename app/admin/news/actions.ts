@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
+import { inspectPublicMediaArticle, PUBLIC_MEDIA_POLICY_VERSION } from '@/lib/public-media-content-policy';
 
 type EditorialInput = {
   id?: string; title: string; slug: string; excerpt?: string; bodyMarkdown: string;
@@ -234,10 +235,11 @@ export async function rejectEditorialRevision(articleId: string, comment: string
   }
 }
 
-export async function publishApprovedEditorial(articleId: string): Promise<ActionResult> {
+export async function publishApprovedEditorial(articleId: string, publicContentConfirmed: boolean): Promise<ActionResult> {
   const authorization = await authorizeMediaEditorialAction('publish');
   if (!authorization.ok) return { success: false, error: authorization.error };
   if (!/^[0-9a-f-]{36}$/i.test(articleId)) return { success: false, error: 'Invalid article identifier.' };
+  if (publicContentConfirmed !== true) return { success: false, error: 'Confirm the public Media content policy before publishing.' };
   try {
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
       const actorId = authorization.user.domainUserId;
@@ -257,6 +259,8 @@ export async function publishApprovedEditorial(articleId: string): Promise<Actio
         throw new Error('Publishing requires a publisher distinct from the author, submitter and reviewer.');
       }
       const snapshot = JSON.parse(revision.snapshot_text);
+      const contentPolicy = inspectPublicMediaArticle(snapshot);
+      if (!contentPolicy.eligible) throw new Error('This revision contains betting promotion, affiliate links or private Prediction content and cannot be published on public Media.');
       const revisionMedia = await tx`
         SELECT placement, media_id, remove_media
         FROM public.editorial_article_revision_media
@@ -310,12 +314,17 @@ export async function publishApprovedEditorial(articleId: string): Promise<Actio
         }
       }
       await tx`
-        UPDATE public.editorial_article_revisions SET workflow_status='published', published_at=now()
+        UPDATE public.editorial_article_revisions SET
+          workflow_status='published', published_at=now(),
+          public_media_policy_confirmed_by=${actorId}::uuid,
+          public_media_policy_confirmed_at=now(),
+          public_media_policy_version=${PUBLIC_MEDIA_POLICY_VERSION}
         WHERE id=${revision.id}::uuid
       `;
       await tx`
-        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, article_id, revision_id)
-        VALUES (${actorId}::uuid, 'published', ${articleId}::uuid, ${revision.id}::uuid)
+        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, article_id, revision_id, details)
+        VALUES (${actorId}::uuid, 'published', ${articleId}::uuid, ${revision.id}::uuid,
+          ${JSON.stringify({ publicMediaPolicyVersion: PUBLIC_MEDIA_POLICY_VERSION, publicContentConfirmed: true })}::jsonb)
       `;
     }));
     revalidateEditorial(); return { success: true };
