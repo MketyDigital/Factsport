@@ -10,7 +10,7 @@ A source scan of the 54 files under `app/components/` identified the following d
 | `AuthProvider.tsx` | Browser Supabase client; `profiles` | Identity/session adapter | Replace with provider-neutral session context backed by validated first-party session; internal UUID and server roles |
 | `FanZoneChat.tsx` | Browser Supabase client; `matches` | Community/chat service | Same-origin authenticated API, server-derived identity, moderation, durable message store, rate limits |
 | `PredictionBoard.tsx` | Browser Supabase client; `matches`, `campaigns`, `user_predictions` | Prediction/gameplay service | Server-authoritative validation, atomic first-five/lock rules, scoring ledger, replay/concurrency tests |
-| `HomeDashboardClient.tsx` | Browser Supabase client; `site_settings` | Public config/read model | Explicit safe config projection, cache and validation; no secret settings exposed |
+| `HomeDashboardClient.tsx` | Direct browser Supabase removed; featured match now fetched from same-origin `/api/settings`. API has a PostgreSQL safe-view branch; legacy fallback projects only the needed settings fields. | Public config/read model | Migrate affiliate/public config to typed V2 settings; verify settings cache and no social/provider secret exposure |
 | `SignOutButton.tsx` | Browser Supabase auth client | Identity/session adapter | Server session revoke + cookie clear; test refresh-token/session invalidation |
 | `ApproveButton.tsx` | Browser Supabase client; `subscriptions`, `profiles` | VIP entitlement/admin command | Remove client writes; server RBAC, step-up, entitlement ledger and audit |
 | `AuditManager.tsx` | Browser Supabase client; `monthly_winners`, `profiles` | Prize audit/admin service | Server-only approval, qualification snapshot, deterministic rank/ties, immutable audit |
@@ -20,7 +20,7 @@ A source scan of the 54 files under `app/components/` identified the following d
 | `ProBettingSlipLock.tsx` | Browser Supabase client; `profiles` | VIP/entitlement service | Query server-side entitlements; client display only, no authority |
 | `LeagueLeaders.tsx` | Supabase public client; `tournament_scorers` | Sports stats read model | Port scorers schema/provider source, stable season/competition identity, cache |
 | `LiveStandings.tsx` | Supabase public client; `matches` | Live standings domain | Port match read adapter, deterministic table calculation, 3s cache boundary |
-| `MiniStandings.tsx` | Supabase public client; `standings` | Standings read model | Port season/group-aware standings and freshness metadata |
+| `MiniStandings.tsx` | Opt-in PostgreSQL read path via `public_competition_standings`; Supabase fallback remains when match backend flag is unset. | Standings read model | Apply migration 0006, verify provider ingestion, freshness, season/group sorting and empty states; remove fallback after parity |
 
 ## Component-level rules
 
@@ -31,3 +31,12 @@ A source scan of the 54 files under `app/components/` identified the following d
 - Component tests must cover loading, empty, error, stale data, unauthorized and responsive/mobile states.
 
 See [PAGE-MIGRATION-MATRIX.md](./PAGE-MIGRATION-MATRIX.md) for full page journeys and [ROUTE-MIGRATION-MATRIX.md](./ROUTE-MIGRATION-MATRIX.md) for API/service ownership.
+
+
+## 2026-11-07 continuation — editorial and homepage component paths
+
+- `HighlightsSlider.tsx`: homepage data can now come from the rights-reviewed `public_match_highlights` view; cards render optional R2 thumbnail URLs and use highlight IDs for stable keys. The full highlights page/player journey is not migrated.
+- `MarkdownRenderer.tsx`: raw article HTML is passed through `rehype-sanitize`; iframe embeds are restricted to HTTPS YouTube, YouTube-nocookie and Vimeo player hosts. Existing `[MATCH_WIDGET:id]` tokens are converted to a custom allowlisted link protocol so the widget still renders without trusting arbitrary HTML IDs.
+- `HomeDashboardClient.tsx`: direct browser database access removed for homepage featured-match settings; the component uses a same-origin server API.
+- `MiniStandings.tsx`: opt-in PostgreSQL standings reader added; full standings route, LiveStandings and LeagueLeaders remain outstanding.
+- These paths require migrations 0004-0006 to be applied in isolated staging before they can be runtime-verified. No migration or production change has been executed.
