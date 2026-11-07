@@ -7,7 +7,6 @@ import { serializeJsonLd } from '@/lib/seo/json-ld';
 import Link from "next/link";
 import { Metadata } from 'next';
 import { PlayCircle, Calendar, ArrowLeft, Tv, ShieldCheck, Trophy, ArrowRight, ChevronRight, ChevronLeft } from "lucide-react";
-import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
 const ITEMS_PER_PAGE = 12;
 
@@ -130,9 +129,6 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
 
       <div className="max-w-7xl mx-auto px-4 mt-6">
         
-        {/* Top Banner */}
-
-        <AdsterraStandardBanner />
         {safeHighlights.length > 0 ? (
             <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
@@ -236,26 +232,6 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
                     </div>
                 )}
 
-                 {/* Reserved editorial ad slot: no bookmaker affiliate creative */}
-                 <div className="mt-8">
-                     <AdsterraStandardBanner />
-                 </div>
-
-                <div className="mt-10 max-w-3xl mx-auto bg-[#0f1c3a] rounded-2xl p-4 md:p-5 border border-yellow-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500 opacity-10 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
-                    <div className="flex items-center gap-4 relative z-10">
-                        <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(234,179,8,0.4)]">
-                            <Trophy size={24} className="text-black fill-black" />
-                        </div>
-                        <div>
-                            <h3 className="font-black text-lg uppercase italic text-white leading-tight tracking-tighter">Predict & <span className="text-yellow-500">Win Prizes</span></h3>
-                            <p className="text-xs text-slate-400 font-bold mt-0.5">Join the leaderboard for fantastic rewards.</p>
-                        </div>
-                    </div>
-                    <Link href="/vip/upgrade" className="relative z-10 w-full sm:w-auto shrink-0 bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition flex items-center justify-center gap-2 active:scale-95 shadow-md">
-                        Play Now <ArrowRight size={14}/>
-                    </Link>
-                </div>
             </>
         ) : (
             <div className="flex flex-col items-center justify-center py-24 bg-white/5 rounded-3xl border border-white/10 border-dashed shadow-2xl mx-4 backdrop-blur-sm mt-6">
