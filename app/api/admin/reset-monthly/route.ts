@@ -16,7 +16,12 @@ export async function POST(request: Request) {
     }
     const supabase = getSupabaseAdmin();
     const { error } = await supabase.from('profiles')
-      .update({ monthly_points: 0, monthly_correct_scores: 0 })
+      .update({
+        monthly_points: 0,
+        monthly_correct_scores: 0,
+        eligible_monthly_points: 0,
+        eligible_monthly_correct_scores: 0,
+      })
       .gt('id', '00000000-0000-0000-0000-000000000000');
     if (error) throw error;
     return NextResponse.json({ success: true, message: 'New month started. Monthly scores reset.' });
