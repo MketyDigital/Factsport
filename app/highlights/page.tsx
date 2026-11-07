@@ -1,7 +1,9 @@
 export const runtime = 'edge';
 export const revalidate = 60;
 
-import { createClient } from '@supabase/supabase-js'; 
+import { createClient } from '@supabase/supabase-js';
+import { countPublicMatchHighlights, listPublicHighlightLeagues, listPublicMatchHighlightsPage } from '@/lib/adapters/postgres-homepage';
+import { serializeJsonLd } from '@/lib/seo/json-ld';
 import Link from "next/link";
 import { Metadata } from 'next';
 import { PlayCircle, Calendar, ArrowLeft, Tv, ShieldCheck, Trophy, ArrowRight, ChevronRight, ChevronLeft } from "lucide-react";
@@ -26,40 +28,55 @@ export const metadata: Metadata = {
 };
 
 export default async function HighlightsPage({ searchParams }: { searchParams: { league?: string, page?: string } }) {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   const resolvedParams = await searchParams;
-  
-  const currentLeague = resolvedParams.league || 'All';
-  const currentPage = parseInt(resolvedParams.page || '1');
+  const rawLeague = resolvedParams.league || 'All';
+  const currentLeague = rawLeague.length <= 80 ? rawLeague : 'All';
+  const parsedPage = Number.parseInt(resolvedParams.page || '1', 10);
+  const requestedPage = Number.isFinite(parsedPage) ? Math.min(417, Math.max(1, parsedPage)) : 1;
+  const usePostgres = process.env.FACTSPORT_MATCHES_BACKEND === 'postgres';
 
-  const from = (currentPage - 1) * ITEMS_PER_PAGE;
-  const to = from + ITEMS_PER_PAGE - 1;
+  let currentPage = requestedPage;
+  let totalPages = 1;
+  let dynamicLeagues: string[] = ['All'];
+  let safeHighlights: any[] = [];
 
-  const { data: leagueData } = await supabase
-    .from('matches')
-    .select('league')
-    .not('video_url', 'is', null)
-    .neq('video_url', '');
+  if (usePostgres) {
+    const [leagues, count] = await Promise.all([
+      listPublicHighlightLeagues(),
+      countPublicMatchHighlights(currentLeague),
+    ]);
+    dynamicLeagues = ['All', ...leagues];
+    totalPages = Math.max(1, Math.ceil(count / ITEMS_PER_PAGE));
+    currentPage = Math.min(requestedPage, totalPages);
+    safeHighlights = await listPublicMatchHighlightsPage({
+      league: currentLeague,
+      limit: ITEMS_PER_PAGE,
+      offset: (currentPage - 1) * ITEMS_PER_PAGE,
+    });
+  } else {
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const { data: leagueData } = await supabase
+      .from('matches')
+      .select('league')
+      .not('video_url', 'is', null)
+      .neq('video_url', '');
 
-  const uniqueLeagues = Array.from(new Set((leagueData || []).map(m => m.league))).filter(Boolean).sort();
-  const dynamicLeagues = ['All', ...uniqueLeagues];
+    const uniqueLeagues = Array.from(new Set((leagueData || []).map((m: any) => m.league))).filter(Boolean).sort();
+    dynamicLeagues = ['All', ...uniqueLeagues];
 
-  let query = supabase
-    .from('matches')
-    .select('*', { count: 'exact' })
-    .not('video_url', 'is', null)
-    .neq('video_url', '') 
-    .order('match_date', { ascending: false });
+    let query = supabase
+      .from('matches')
+      .select('*', { count: 'exact' })
+      .not('video_url', 'is', null)
+      .neq('video_url', '')
+      .order('match_date', { ascending: false });
 
-  if (currentLeague !== 'All') {
-      query = query.ilike('league', `%${currentLeague}%`);
+    if (currentLeague !== 'All') query = query.ilike('league', '%' + currentLeague + '%');
+    query = query.range((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE - 1);
+    const result = await query;
+    safeHighlights = result.data || [];
+    totalPages = result.count ? Math.ceil(result.count / ITEMS_PER_PAGE) : 1;
   }
-
-  query = query.range(from, to);
-
-  const { data: highlights, count } = await query;
-  const safeHighlights = highlights || [];
-  const totalPages = count ? Math.ceil(count / ITEMS_PER_PAGE) : 1;
 
   const midIndex = Math.floor(safeHighlights.length / 2);
   const firstHalf = safeHighlights.slice(0, midIndex);
@@ -75,7 +92,7 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
 
   return (
     <div className="min-h-screen bg-[#0a1428] text-white font-sans pb-16 overflow-x-hidden selection:bg-red-500">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
       
       <div className="bg-[#0f1c3a] border-b border-white/10 sticky top-0 z-40 shadow-2xl backdrop-blur-lg">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -120,9 +137,10 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
             <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
                     {firstHalf.map((item) => (
-                        <Link href={`/match/${item.id}`} key={item.id} className="group flex flex-col bg-slate-900 rounded-2xl shadow-xl border border-slate-800 overflow-hidden hover:shadow-2xl hover:border-blue-500/50 transition-all duration-500 hover:-translate-y-1">
+                        <Link href={item.canonical_url || `/match/${item.id}`} target={item.canonical_url ? "_blank" : undefined} rel={item.canonical_url ? "noopener noreferrer" : undefined} key={item.highlight_id || item.id} className="group flex flex-col bg-slate-900 rounded-2xl shadow-xl border border-slate-800 overflow-hidden hover:shadow-2xl hover:border-blue-500/50 transition-all duration-500 hover:-translate-y-1">
                             <div className="relative aspect-video bg-black overflow-hidden border-b border-slate-800">
-                                <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 group-hover:scale-110 transition-transform duration-700 ease-out"></div>
+                                {item.thumbnail_url && <img src={item.thumbnail_url} alt={item.title || `${item.home_team} vs ${item.away_team}`} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />}
+                                <div className="absolute inset-0 bg-gradient-to-tr from-slate-900/90 via-slate-900/50 to-slate-800/30 group-hover:scale-110 transition-transform duration-700 ease-out"></div>
                                 <div className="absolute inset-0 flex items-center justify-center gap-6 opacity-90 group-hover:opacity-50 transition-opacity duration-500">
                                     <div className="w-12 h-12 md:w-16 md:h-16 flex items-center justify-center">
                                         {item.home_logo ? <img src={item.home_logo} alt={item.home_team} className="w-full h-full object-contain drop-shadow-2xl"/> : <span className="text-white text-xs font-bold">{item.home_team.substring(0,3)}</span>}
@@ -147,7 +165,7 @@ export default async function HighlightsPage({ searchParams }: { searchParams: {
                                 )}
                             </div>
                             <div className="p-4 md:p-5 flex flex-col flex-1 justify-between gap-4 bg-slate-900">
-                                <h2 className="text-sm md:text-base font-black text-white leading-snug group-hover:text-blue-400 transition-colors line-clamp-2">{item.home_team} vs {item.away_team}</h2>
+                                <h2 className="text-sm md:text-base font-black text-white leading-snug group-hover:text-blue-400 transition-colors line-clamp-2">{item.title || `${item.home_team} vs ${item.away_team}`}</h2>
                                 <div className="flex items-center justify-between border-t border-slate-800 pt-3 mt-auto">
                                     <div className="flex items-center gap-1.5 text-slate-400"><Calendar size={12} /><span className="text-[10px] font-bold uppercase tracking-widest">{new Date(item.match_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span></div>
                                     <span className="text-[10px] font-black text-slate-300 group-hover:text-red-400 flex items-center gap-1 transition-colors uppercase tracking-widest">Play <PlayCircle size={10}/></span>
