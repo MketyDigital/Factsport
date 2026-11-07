@@ -3,6 +3,7 @@ export const revalidate = 60; // 🟢 Cache for exactly 60 seconds
 
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { env } from 'cloudflare:workers';
 import { listCurrentCompetitionStandings } from '@/lib/adapters/postgres-homepage';
 
 export async function GET(request: Request) {
@@ -13,7 +14,9 @@ export async function GET(request: Request) {
     if (!leagueCode || !allowed.has(leagueCode)) return NextResponse.json({ error: 'Invalid league code' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
 
     try {
-        const data = process.env.FACTSPORT_COMPETITIONS_BACKEND === 'postgres'
+        const backend = env.FACTSPORT_COMPETITIONS_BACKEND ?? process.env.FACTSPORT_COMPETITIONS_BACKEND;
+        if (backend !== 'postgres' && env.FACTSPORT_ENVIRONMENT === 'staging') return NextResponse.json({ error: 'V2 standings reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+        const data = backend === 'postgres'
             ? await listCurrentCompetitionStandings(leagueCode)
             : await (async () => {
                 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
