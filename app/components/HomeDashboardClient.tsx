@@ -4,8 +4,6 @@ import Link from "next/link";
 import { ArrowRight, TrendingUp, Calendar, Info, BarChart2 } from "lucide-react";
 import HeroMatchCards from '@/app/components/HeroMatchCards'; 
 import CompactMatchRow from '@/app/components/CompactMatchRow';
-import BetOfTheDay from '@/app/components/BetOfTheDay'; 
-import FreeTipsBanner from '@/app/components/FreeTipsBanner';
 
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
@@ -127,52 +125,6 @@ export default function HomeDashboardClient({
         if (computedHero.length === 0) computedHero = todayMedia.slice(0, 5); 
         computedHero = computedHero.slice(0, 5);
 
-        // ---------------------------------------------------------------------
-        // 🟢 THE STRICT SYNC FIX: BET OF THE DAY LOGIC
-        // This math is now 100% identical to the Telegram Node.js background script
-        // ---------------------------------------------------------------------
-        let computedBetMatch = null;
-        const allLocalTodayMatches = globalMatches.filter(m => {
-            const t = new Date(m.match_date).getTime();
-            return t >= startOfLocalDay && t <= endOfLocalDay;
-        });
-
-        const analyzedMatches = allLocalTodayMatches.filter(m => {
-            if (!m.pro_analysis) return false;
-            if (typeof m.pro_analysis === 'object' && Object.keys(m.pro_analysis).length === 0) return false;
-            if (typeof m.pro_analysis === 'string' && m.pro_analysis.trim() === '') return false;
-            return true; 
-        });
-
-        if (analyzedMatches.length > 0) {
-            if (featuredMatchId) {
-                computedBetMatch = analyzedMatches.find(m => String(m.id) === String(featuredMatchId));
-            }
-
-            if (!computedBetMatch) {
-                const giants = ['Arsenal','Chelsea','Liverpool','Man City','Man United','Real Madrid','Barcelona', 'Bayern', 'Juventus', 'PSG', 'Inter', 'AC Milan', 'Atletico'];
-                
-                const sortedSlips = [...analyzedMatches].sort((a, b) => {
-                    const aHomeGiant = giants.some(t => a.home_team?.includes(t));
-                    const aAwayGiant = giants.some(t => a.away_team?.includes(t));
-                    const aScore = (aHomeGiant ? 1 : 0) + (aAwayGiant ? 1 : 0);
-
-                    const bHomeGiant = giants.some(t => b.home_team?.includes(t));
-                    const bAwayGiant = giants.some(t => b.away_team?.includes(t));
-                    const bScore = (bHomeGiant ? 1 : 0) + (bAwayGiant ? 1 : 0);
-
-                    if (bScore !== aScore) return bScore - aScore; 
-
-                    const aTime = new Date(a.match_date).getTime();
-                    const bTime = new Date(b.match_date).getTime();
-                    return bTime - aTime; 
-                });
-
-                computedBetMatch = sortedSlips[0];
-            }
-        }
-        // ---------------------------------------------------------------------
-
         let remainingMatches = displayPool.filter(m => !computedHero.some(h => h.id === m.id));
         
         if (remainingMatches.length === 0 && displayPool.length > 0) {
@@ -186,7 +138,7 @@ export default function HomeDashboardClient({
             grouped[dateKey].push(m);
         });
 
-        setLocalData({ heroMatches: computedHero, betMatch: computedBetMatch, groupedMatches: grouped, fallbackTriggered });
+        setLocalData({ heroMatches: computedHero, groupedMatches: grouped, fallbackTriggered });
     }, [globalMatches, featuredMatches, selectedLeague, featuredMatchId]); 
 
     if (!localData) return <div className="w-full h-96 animate-pulse bg-slate-200/50 rounded-2xl max-w-6xl mx-auto mt-8"></div>;
@@ -225,8 +177,6 @@ export default function HomeDashboardClient({
 
                 <div className="px-2 md:px-4 py-0 flex flex-col lg:flex-row gap-4 mt-2">
                     <div className="flex-1 space-y-3">
-                        <FreeTipsBanner />
-
                         {leagueTab === 'matches' ? (
                             <>
                                 {selectedLeague && localData.fallbackTriggered && (
@@ -272,7 +222,6 @@ export default function HomeDashboardClient({
                 </div>
             </section>
 
-            {localData.betMatch && <div className="px-3 md:px-4"><BetOfTheDay initialMatch={localData.betMatch} /></div>}
         </>
     );
 }
