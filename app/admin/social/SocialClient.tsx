@@ -17,17 +17,20 @@ export default function SocialClient({ channels, publications }: { channels: Cha
   const [scheduledAt, setScheduledAt] = useState('');
   const [message, setMessage] = useState('');
   const [pending, startTransition] = useTransition();
+  const [idempotencyKey, setIdempotencyKey] = useState('');
 
   function schedule() {
     startTransition(async () => {
       if (!scheduledAt) { setMessage('Choose a publishing date and time.'); return; }
+      const requestKey = idempotencyKey || crypto.randomUUID();
+      if (!idempotencyKey) setIdempotencyKey(requestKey);
       const result = await scheduleSocialPublication({
         channelId, contentText, articleId: articleId.trim() || undefined,
-        linkUrl, scheduledAt: new Date(scheduledAt).toISOString(),
+        linkUrl, scheduledAt: new Date(scheduledAt).toISOString(), idempotencyKey: requestKey,
       });
       if (!result.success) { setMessage(result.error); return; }
       setMessage('Social post scheduled and placed in the durable outbox. Delivery awaits the dedicated channel dispatcher.');
-      setContentText(''); setArticleId(''); setLinkUrl(''); setScheduledAt('');
+      setContentText(''); setArticleId(''); setLinkUrl(''); setScheduledAt(''); setIdempotencyKey('');
       window.location.reload();
     });
   }
