@@ -2,7 +2,8 @@ export const runtime = 'edge';
 export const revalidate = 3; 
 
 import { createClient } from '@supabase/supabase-js';
-import { listPublicEditorialArticles } from '@/lib/adapters/postgres-editorial'; 
+import { listPublicEditorialArticles } from '@/lib/adapters/postgres-editorial';
+import { listPostgresMatchesWindow } from '@/lib/adapters/postgres-matches'; 
 import Link from "next/link";
 import { Metadata } from 'next';
 import { ArrowRight, Youtube, Newspaper, Award, Trophy } from "lucide-react";
@@ -75,7 +76,15 @@ async function getHomepageData(leagueFilter: string | undefined) {
     supabase.from('matches').select('*').eq('is_featured', true).gte('match_date', wideWindowStart).lte('match_date', wideWindowEnd).order('match_date', { ascending: true }).limit(10)
   ]);
 
-  if (leagueFilter) {
+  if (process.env.FACTSPORT_MATCHES_BACKEND === 'postgres') {
+      const rows = await listPostgresMatchesWindow({
+          from: wideWindowStart,
+          to: wideWindowEnd,
+      });
+      matches = sortMatches(leagueFilter
+          ? rows.filter((match: any) => String(match.league || '').toLowerCase().includes(leagueFilter.toLowerCase()))
+          : rows);
+  } else if (leagueFilter) {
       const nowStr = new Date().toISOString();
       const [{ data: upcoming }, { data: past }] = await Promise.all([
           supabase.from('matches').select('*').ilike('league', `%${leagueFilter}%`).gte('match_date', nowStr).order('match_date', { ascending: true }).limit(5),
