@@ -18,10 +18,19 @@ export default function HighlightsSlider({ highlights }: { highlights: any[] }) 
             
             <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-4 scrollbar-hide">
                 {highlights.map((item: any) => (
-                    <Link href={`/match/${item.id}`} key={item.id} className="snap-center shrink-0 w-[220px] group relative">
+                    <Link href={`/match/${item.id}`} key={item.highlight_id || item.id} className="snap-center shrink-0 w-[220px] group relative">
                         <div className="relative aspect-video bg-[#0a1428] rounded-xl overflow-hidden shadow-lg border border-slate-200 mb-2 transform transition-transform duration-300 group-hover:-translate-y-1 group-hover:shadow-xl group-hover:border-blue-500/50">
                             
-                            <div className="absolute inset-0 flex items-center justify-between px-6 opacity-80 group-hover:opacity-40 transition duration-500 bg-gradient-to-tr from-slate-900 to-slate-800">
+                            {item.thumbnail_url && (
+                                <img
+                                    src={item.thumbnail_url}
+                                    alt={item.title || `${item.home_team} vs ${item.away_team}`}
+                                    loading="lazy"
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                />
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-tr from-slate-950/90 via-slate-900/45 to-slate-800/30"></div>
+                            <div className="absolute inset-0 flex items-center justify-between px-6 opacity-80 group-hover:opacity-40 transition duration-500">
                                 <div className="w-12 h-12 flex items-center justify-center">
                                     {item.home_logo ? <img src={item.home_logo} className="w-full h-full object-contain drop-shadow-md"/> : <div className="w-8 h-8 bg-white/10 rounded-full"></div>}
                                 </div>
@@ -44,7 +53,7 @@ export default function HighlightsSlider({ highlights }: { highlights: any[] }) 
                         
                         {/* 🔥 Full Team Names Restored & Truncated safely */}
                         <h4 className="text-xs font-black text-slate-800 leading-tight truncate group-hover:text-blue-600 transition">
-                            {item.home_team} <span className="text-slate-400 font-medium mx-0.5">vs</span> {item.away_team}
+                            {item.title || <>{item.home_team} <span className="text-slate-400 font-medium mx-0.5">vs</span> {item.away_team}</>}
                         </h4>
                     </Link>
                 ))}
