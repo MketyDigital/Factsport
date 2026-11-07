@@ -61,6 +61,7 @@ test('public social publishing requires public-only channel scope and explicit c
   assert.match(migration, /public_content_confirmed_by/);
   assert.match(action, /surface_scope='public_media'/);
   assert.match(action, /publicContentConfirmed !== true/);
+  assert.match(action, /inspectPublicMediaArticle/);
   assert.match(client, /no bookmaker or betting-affiliate promotion/);
 });
 
