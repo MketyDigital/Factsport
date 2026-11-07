@@ -92,13 +92,18 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
       }
 
       const revisions = await tx`SELECT COALESCE(MAX(revision_number), 0)::integer AS current FROM public.editorial_article_revisions WHERE article_id=${articleId}::uuid`;
-      await tx`
+      const newRevision = await tx`
         INSERT INTO public.editorial_article_revisions
           (article_id, revision_number, snapshot, changed_by, change_note, workflow_status)
         VALUES (
           ${articleId}::uuid, ${Number(revisions[0].current) + 1},
           ${JSON.stringify(snapshot)}::jsonb, ${actorId}::uuid, 'Editorial revision saved', 'draft'
-        )
+        ) RETURNING id
+      `;
+      await tx`
+        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, article_id, revision_id, details)
+        VALUES (${actorId}::uuid, 'draft_saved', ${articleId}::uuid, ${newRevision[0].id}::uuid,
+          ${JSON.stringify({ title: snapshot.title, slug: snapshot.slug })}::jsonb)
       `;
       return articleId!;
     }));
@@ -134,6 +139,10 @@ export async function submitEditorialForReview(articleId: string): Promise<Actio
       if (articles[0].status !== 'published') {
         await tx`UPDATE public.editorial_articles SET status='in_review', review_status='pending', updated_at=now() WHERE id=${articleId}::uuid`;
       }
+      await tx`
+        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, article_id, revision_id)
+        VALUES (${actorId}::uuid, 'submitted_for_review', ${articleId}::uuid, ${revisions[0].id}::uuid)
+      `;
     }));
     revalidateEditorial(); return { success: true };
   } catch (error) {
@@ -141,33 +150,84 @@ export async function submitEditorialForReview(articleId: string): Promise<Actio
   }
 }
 
-export async function approveAndPublishEditorial(articleId: string): Promise<ActionResult> {
+export async function approveEditorialRevision(articleId: string): Promise<ActionResult> {
+  const authorization = await authorizeMediaEditorialAction('review');
+  if (!authorization.ok) return { success: false, error: authorization.error };
+  if (!/^[0-9a-f-]{36}$/i.test(articleId)) return { success: false, error: 'Invalid article identifier.' };
+  try {
+    await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+      const actorId = authorization.user.domainUserId;
+      const articles = await tx`SELECT id, status FROM public.editorial_articles WHERE id=${articleId}::uuid FOR UPDATE`;
+      if (!articles.length || articles[0].status === 'archived') throw new Error('Article is unavailable.');
+      const revisions = await tx`
+        SELECT id, changed_by, submitted_by FROM public.editorial_article_revisions
+        WHERE article_id=${articleId}::uuid AND workflow_status='in_review'
+        ORDER BY revision_number DESC LIMIT 1 FOR UPDATE
+      `;
+      const revision = revisions[0];
+      if (!revision) throw new Error('No editorial revision is awaiting review.');
+      if (!revision.changed_by || revision.changed_by === actorId || revision.submitted_by === actorId) {
+        throw new Error('A different authorized editor must review the revision.');
+      }
+      await tx`
+        UPDATE public.editorial_article_revisions SET
+          workflow_status='approved', reviewed_by=${actorId}::uuid, reviewed_at=now()
+        WHERE id=${revision.id}::uuid
+      `;
+      await tx`
+        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, article_id, revision_id)
+        VALUES (${actorId}::uuid, 'review_approved', ${articleId}::uuid, ${revision.id}::uuid)
+      `;
+    }));
+    revalidateEditorial(); return { success: true };
+  } catch (error) {
+    console.error('Editorial review approval failed', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to approve revision.' };
+  }
+}
+
+export async function publishApprovedEditorial(articleId: string): Promise<ActionResult> {
   const authorization = await authorizeMediaEditorialAction('publish');
   if (!authorization.ok) return { success: false, error: authorization.error };
   if (!/^[0-9a-f-]{36}$/i.test(articleId)) return { success: false, error: 'Invalid article identifier.' };
   try {
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
       const actorId = authorization.user.domainUserId;
-
       const articles = await tx`SELECT id, status FROM public.editorial_articles WHERE id=${articleId}::uuid FOR UPDATE`;
       if (!articles.length || articles[0].status === 'archived') throw new Error('Article is unavailable.');
       const revisions = await tx`
-        SELECT id, changed_by, submitted_by, snapshot::text AS snapshot_text
+        SELECT id, changed_by, submitted_by, reviewed_by, snapshot::text AS snapshot_text
         FROM public.editorial_article_revisions
-        WHERE article_id=${articleId}::uuid AND workflow_status='in_review'
+        WHERE article_id=${articleId}::uuid AND workflow_status='approved'
         ORDER BY revision_number DESC LIMIT 1 FOR UPDATE
       `;
       const revision = revisions[0];
-      if (!revision) throw new Error('No editorial revision is awaiting approval.');
-      if (!revision.changed_by) throw new Error('The revision has no verified author identity. Approval is blocked.');
-      if (revision.changed_by === actorId || revision.submitted_by === actorId) throw new Error('A different administrator must review and approve the revision.');
+      if (!revision) throw new Error('No approved editorial revision is ready to publish.');
+      if (!revision.changed_by || !revision.reviewed_by ||
+          revision.changed_by === actorId || revision.submitted_by === actorId ||
+          revision.reviewed_by === actorId) {
+        throw new Error('Publishing requires a publisher distinct from the author, submitter and reviewer.');
+      }
       const snapshot = JSON.parse(revision.snapshot_text);
       const revisionMedia = await tx`
         SELECT placement, media_id, remove_media
         FROM public.editorial_article_revision_media
-        WHERE revision_id=${revision.id}::uuid
-        FOR UPDATE
+        WHERE revision_id=${revision.id}::uuid FOR UPDATE
       `;
+      for (const attachment of revisionMedia) {
+        const mediaId = attachment.media_id as string | null;
+        if (mediaId && !attachment.remove_media) {
+          const approvedAsset = await tx`
+            SELECT id FROM public.media_assets
+            WHERE id=${mediaId}::uuid AND media_kind='image'
+              AND rights_status IN ('owned', 'licensed', 'editorial_exception')
+              AND rights_reviewed_by IS NOT NULL AND rights_reviewed_at IS NOT NULL
+              AND (usage_expires_at IS NULL OR usage_expires_at > now())
+            FOR SHARE
+          `;
+          if (!approvedAsset.length) throw new Error('A revision image no longer has valid rights approval. Publishing is blocked.');
+        }
+      }
       await tx`
         UPDATE public.editorial_articles SET
           title=${snapshot.title}, slug=${snapshot.slug}, excerpt=${snapshot.excerpt},
@@ -176,44 +236,25 @@ export async function approveAndPublishEditorial(articleId: string): Promise<Act
           seo_title=${snapshot.seo_title}, seo_description=${snapshot.seo_description},
           canonical_url=${snapshot.canonical_url}, author_display_name=${snapshot.author_display_name},
           is_headline=${snapshot.is_headline}, is_breaking=${snapshot.is_breaking},
-          status='published', review_status='approved', reviewed_by=${actorId}::uuid,
+          status='published', review_status='approved', reviewed_by=${revision.reviewed_by}::uuid,
           reviewed_at=now(), published_at=COALESCE(published_at, now()),
           updated_by=${actorId}::uuid, updated_at=now()
         WHERE id=${articleId}::uuid
       `;
       for (const attachment of revisionMedia) {
         const mediaId = attachment.media_id as string | null;
-        if (mediaId) {
-          const approvedAsset = await tx`
-            SELECT id FROM public.media_assets
-            WHERE id=${mediaId}::uuid
-              AND media_kind='image'
-              AND rights_status IN ('owned', 'licensed', 'editorial_exception')
-              AND rights_reviewed_by IS NOT NULL AND rights_reviewed_at IS NOT NULL
-              AND (usage_expires_at IS NULL OR usage_expires_at > now())
-            FOR SHARE
-          `;
-          if (!approvedAsset.length) throw new Error('A revision image no longer has valid rights approval. Publishing is blocked.');
-        }
-
         if (attachment.placement === 'hero') {
           await tx`DELETE FROM public.editorial_article_media WHERE article_id=${articleId}::uuid AND placement='hero'`;
           if (mediaId && !attachment.remove_media) {
-            await tx`
-              INSERT INTO public.editorial_article_media (article_id, media_id, placement, position)
-              VALUES (${articleId}::uuid, ${mediaId}::uuid, 'hero', 0)
-            `;
+            await tx`INSERT INTO public.editorial_article_media (article_id, media_id, placement, position)
+              VALUES (${articleId}::uuid, ${mediaId}::uuid, 'hero', 0)`;
           }
         } else {
-          await tx`
-            DELETE FROM public.editorial_article_team_media
-            WHERE article_id=${articleId}::uuid AND team_side=${attachment.placement}
-          `;
+          await tx`DELETE FROM public.editorial_article_team_media
+            WHERE article_id=${articleId}::uuid AND team_side=${attachment.placement}`;
           if (mediaId && !attachment.remove_media) {
-            await tx`
-              INSERT INTO public.editorial_article_team_media (article_id, team_side, media_id)
-              VALUES (${articleId}::uuid, ${attachment.placement}, ${mediaId}::uuid)
-            `;
+            await tx`INSERT INTO public.editorial_article_team_media (article_id, team_side, media_id)
+              VALUES (${articleId}::uuid, ${attachment.placement}, ${mediaId}::uuid)`;
           }
         }
         if (mediaId && !attachment.remove_media) {
@@ -221,9 +262,12 @@ export async function approveAndPublishEditorial(articleId: string): Promise<Act
         }
       }
       await tx`
-        UPDATE public.editorial_article_revisions SET
-          workflow_status='published', reviewed_by=${actorId}::uuid, reviewed_at=now(), published_at=now()
+        UPDATE public.editorial_article_revisions SET workflow_status='published', published_at=now()
         WHERE id=${revision.id}::uuid
+      `;
+      await tx`
+        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, article_id, revision_id)
+        VALUES (${actorId}::uuid, 'published', ${articleId}::uuid, ${revision.id}::uuid)
       `;
     }));
     revalidateEditorial(); return { success: true };
@@ -238,11 +282,18 @@ export async function archiveEditorialArticle(articleId: string): Promise<Action
   if (!authorization.ok) return { success: false, error: authorization.error };
   if (!/^[0-9a-f-]{36}$/i.test(articleId)) return { success: false, error: 'Invalid article identifier.' };
   try {
-    const changed = await withFactsportEditorialPostgres(async sql => sql`
-      UPDATE public.editorial_articles SET status='archived', updated_at=now()
-      WHERE id=${articleId}::uuid AND status <> 'archived' RETURNING id
-    `);
-    if (!changed.length) return { success: false, error: 'Article was not found or is already archived.' };
+    await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+      const actorId = authorization.user.domainUserId;
+      const changed = await tx`
+        UPDATE public.editorial_articles SET status='archived', updated_by=${actorId}::uuid, updated_at=now()
+        WHERE id=${articleId}::uuid AND status <> 'archived' RETURNING id
+      `;
+      if (!changed.length) throw new Error('Article was not found or is already archived.');
+      await tx`
+        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, article_id)
+        VALUES (${actorId}::uuid, 'archived', ${articleId}::uuid)
+      `;
+    }));
     revalidateEditorial(); return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unable to archive article.' };
