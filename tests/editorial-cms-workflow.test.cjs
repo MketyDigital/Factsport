@@ -13,6 +13,7 @@ const publicAdapter = read('lib/adapters/postgres-editorial.ts');
 const newsListing = read('app/news/page.tsx');
 const newsArticle = read('app/news/[slug]/page.tsx');
 const actions = read('app/admin/news/actions.ts');
+const socialActions = read('app/admin/social/actions.ts');
 const page = read('app/admin/news/page.tsx');
 const adapter = read('lib/adapters/postgres-client.ts');
 const ui = read('app/admin/news/NewsroomClient.tsx');
@@ -93,4 +94,13 @@ test('legacy match-story team names and logos map to rights-cleared V2 media ass
   assert.match(publicAdapter, /team_1_logo_key, team_2_logo_key/i);
   assert.match(newsListing, /row\.team_1_logo_key/);
   assert.match(newsArticle, /article\.team_1_logo_key/);
+});
+
+
+test('social scheduling is attributed and cancellation cannot race an active delivery', () => {
+  assert.match(socialActions, /idempotency_key, created_by, updated_by/i);
+  assert.match(socialActions, /media_social_outbox/i);
+  assert.match(socialActions, /FOR UPDATE/i);
+  assert.match(socialActions, /already being delivered or has completed/i);
+  assert.match(socialActions, /unique Factsport domain identity mapping/i);
 });
