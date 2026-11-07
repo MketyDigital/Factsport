@@ -242,7 +242,6 @@ export default function VipUpgradePage() {
                  <h3 className="text-xs font-black text-white mb-1 tracking-wide">Pro Analysis</h3>
                  <p className="text-[9px] text-slate-400 font-medium">AI-assisted tactical insights to help you understand the game.</p>
              </div>
->
         </div>
 
         {hasPending && (
