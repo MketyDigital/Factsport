@@ -1,4 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 // Config
 const API_KEY = process.env.FOOTBALL_DATA_KEY;
