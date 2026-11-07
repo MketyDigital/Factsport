@@ -37,7 +37,7 @@ Migration 0022:
 - Adds the identity and timestamp of the operator confirming a post is suitable for public Media distribution.
 - Adds a database check requiring confirmation for scheduled, queued, publishing or published posts.
 
-The Social composer requires an explicit attestation that the post contains no bookmaker/affiliate promotion, bonus code, wagering CTA, paid-prize inducement or private Prediction details. The server action checks the public channel scope and stores confirmation and audit data in the same transaction. The Prediction product must use a separate social service, channels and credentials; it cannot reuse the Media public channel table.
+The Social composer requires an explicit attestation that the post contains no bookmaker/affiliate promotion, bonus code, wagering CTA, paid-prize inducement or private Prediction details. The server action also screens post text and links using the public editorial content policy, checks the public channel scope and stores confirmation and audit data in the same transaction. The Prediction product must use a separate social service, channels and credentials; it cannot reuse the Media public channel table.
 
 ## Public publisher transparency
 
@@ -80,7 +80,8 @@ Added tests/adsense-readiness.test.cjs and updated existing monetization/setting
 - public settings API cannot return Prediction affiliate links;
 - private settings endpoint is host gated;
 - VIP/prize routes are private host gated;
-- public social scheduling is scope-limited and requires a content attestation;
+- public social scheduling is scope-limited, screens copy/links and requires a content attestation;
+- public CMS publishing screens content and requires a revision-specific publisher attestation;
 - public indexing and sitemap are V2 PostgreSQL gated.
 
 ## Remaining acceptance blockers
