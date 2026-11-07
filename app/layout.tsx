@@ -5,7 +5,6 @@ import AuthProvider from "@/app/components/AuthProvider";
 import Footer from '@/app/components/Footer'; 
 import SiteHeader from '@/app/components/SiteHeader'; 
 import StickyAffiliateBanner from '@/app/components/StickyAffiliateBanner'; 
-import CustomVignette from '@/app/components/CustomVignette'; 
 import { GlobalMediaProvider } from '@/app/providers/GlobalMediaProvider'; 
 
 export const runtime = 'edge';
@@ -14,8 +13,8 @@ const inter = Inter({ subsets: ["latin"] });
 
 // 1. METADATA
 export const metadata: Metadata = {
-  title: "FactSport | Live Football, Sport News, Predict & Win",
-  description: "The #1 Platform for sports updates, predictions, live scores, analysis and breaking news. Join VIP to win monthly prizes.",
+  title: "FactSport | Live Football, Sports News & Analysis",
+  description: "Football news, live scores, fixtures, match analysis and highlights from leagues around the world.",
   metadataBase: new URL('https://factsport.com'), 
   
   manifest: '/manifest.json',
@@ -33,8 +32,8 @@ export const metadata: Metadata = {
   },
 
   openGraph: {
-    title: "FactSport - Live Football, Sport News, Predict & Win",
-    description: "Latest Sport Updates, Livescores, Watch Football highlights, Live Radio Commentary, Analysis, Predict and win monthly prizes.",
+    title: "FactSport - Live Football, Sports News & Analysis",
+    description: "Latest football news, live scores, fixtures, match highlights and independent match analysis.",
     siteName: 'FactSport',
     locale: 'en_US',
     type: 'website',
@@ -55,8 +54,8 @@ export const viewport: Viewport = {
   themeColor: '#0a1428',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1, 
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export default function RootLayout({
@@ -84,9 +83,6 @@ export default function RootLayout({
                     
                     <Footer />
                 </div>
-
-                {/* 🟢 MOVED INSIDE: The Custom Vignette now has access to useAuth! */}
-                <CustomVignette />
 
                 {/* 🟢 MOVED INSIDE: Safe in case it ever needs user data later */}
                 <StickyAffiliateBanner />
