@@ -107,3 +107,10 @@ Added tests/adsense-readiness.test.cjs and updated existing monetization/setting
 Public homepage, newsroom, match detail, match list, standings, highlights, live hub and social embed now use V2 PostgreSQL read adapters in production; legacy Supabase fallbacks are development-only. The V2 match page uses the private playback projection, and the social embed no longer forces timed redirects or exposes raw stream URLs. The live studio is gated on its V2 public read model and explicit token-issuer readiness. Legacy user chat is disabled outside development until a moderated V2 chat backend is provisioned. The legacy PredictionBoard is likewise development-only on Media match pages; the V2 public prediction schema exists, but its server API/anonymous participant flow is not yet integrated. The public free prediction feature must be re-enabled only after that separate Prediction service is implemented and tested.
 
 No production DNS, Worker, Supabase data, Cloudflare route, AdSense account, publisher ID, CMP or ad serving configuration was changed. No ads are enabled.
+
+
+## Media homepage announcements
+
+- Migration 0024 adds Media-owned announcement text, public link and enabled state to the homepage settings projection. Prediction affiliate/payment settings are not part of this projection.
+- Migration 0025 grants only the dedicated editorial writer role access to this Media settings row. The Media admin now has a separate `/admin/settings` editor; it requires publisher/media-admin capability, validates public URLs, screens announcement copy and links with the same public content policy, and never falls back to legacy mixed settings.
+- These migrations remain unapplied until the dedicated editorial role and database binding are provisioned and verified. The announcement editor is source-complete but not runtime-proven.
