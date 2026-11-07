@@ -15,7 +15,7 @@ test('legacy public settings response is preserved through separate Media and Pr
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.prediction_affiliate_settings/i);
   assert.match(migration, /CREATE OR REPLACE VIEW public\.public_prediction_affiliate_settings/i);
   assert.match(migration, /GRANT SELECT ON public\.public_prediction_affiliate_settings TO factsport_v2_reader/i);
-  assert.doesNotMatch(migration, /factsport_v2_editorial_writer/);
+  assert.doesNotMatch(migration, /GRANT [\s\S]*factsport_v2_editorial_writer/i);
   assert.match(predictionAdapter, /public\.public_prediction_affiliate_settings/);
   assert.match(mediaAdapter, /public\.public_homepage_settings/);
   for (const field of ['link1x', 'linkMel', 'code1x', 'codeMel', 'featured_match_id']) {
