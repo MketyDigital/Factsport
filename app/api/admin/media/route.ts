@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     const actorId = authorization.user.domainUserId;
     const bucket = factsportMediaBucket();
     await bucket.put(objectKey, bytes.buffer as ArrayBuffer, {
-      httpMetadata: { contentType: file.type, cacheControl: 'public, max-age=31536000, immutable' },
+      httpMetadata: { contentType: file.type, cacheControl: 'private, no-store' },
       customMetadata: { sha256, uploadedBy: actorId },
     });
 
