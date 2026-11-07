@@ -189,3 +189,28 @@ This contract does not authorize:
 - enabling AdSense before owner account status and Google policy readiness are confirmed.
 
 All such work remains staging-only or requires explicit owner approval as stated in the governing roadmap.
+
+
+## 10. Owner-confirmed Day 1 adapters and AdSense-first product decision (2026-11-07)
+
+### Day 1 platform adapters
+
+- **Identity:** Microsoft Entra ID is the Day 1 identity adapter. Keep the provider-neutral auth port, and prove real staging sign-in, callback validation, session lifecycle, logout, role/privilege mapping, recovery and failure behavior before declaring auth complete.
+- **Automation:** Azure Logic Apps is the Day 1 durable-job adapter. Preserve durable execution, idempotency keys, bounded retries, dead-letter/failed-run visibility, and exactly one owner for each scheduled job. Test actual staging runs, retries and duplicate delivery; a configured workflow alone is not completion evidence.
+- **Social:** Preserve direct Facebook and Telegram integrations. Support Logic Apps as the Day 1 orchestration adapter and Mkety/Cloudflare workflows as the platform-native integration path. Keep credentials server-side and verify retries, rate limits, deduplication and audit trails.
+- **Brand:** Green is not part of the core Factsport brand palette. The current affiliate green is confined to affiliate promotional treatment and must not be promoted into the rebrand's primary design tokens.
+
+### AdSense-first public product decision
+
+The owner has chosen to prioritize a clean AdSense-eligible public football-media experience. This is a risk-reduction target, not a promise of Google approval.
+
+1. Remove betting operator banners, bookmaker bonus codes, betting affiliate calls-to-action and associated promotional widgets from the public V2 experience. Do not reintroduce them in metadata, feeds, structured data, editorial templates, navigation or public landing pages.
+2. Remove unsolicited timed promotional popups and pop-under behavior from the public experience.
+3. Retain the underlying affiliate integration capability only as dormant/non-public capability; no betting campaign is enabled on the AdSense-first public site.
+4. Suspend public promotion of VIP cash prizes, paid-entry competitions and betting-slip benefits until the actual financial, eligibility, prize funding, chance/skill, legal and Google policy mechanics have been audited. A disclaimer or a noindex tag is not a substitute for changing underlying behavior.
+5. Free, non-monetary football predictions, points, statistics and editorial analysis may remain, provided they do not direct users to wagering, quote bookmaker odds, encourage staking or imply cash rewards.
+6. A paid VIP subscription may return to public promotion only after it is a clearly described subscription for non-gambling benefits and has no paid-entry contest, wagering or cash-prize dependency. Preserve records and existing obligations; do not erase or silently cancel them.
+7. No AdSense code until Google site/account approval is confirmed and the site-wide audit, consent/privacy requirements, ads.txt and crawlability checks pass. Eligible ad units must be clearly labelled and separated from navigation, buttons, match controls and other interactive content. Never place units in chat, email, account, payment, admin or private communications.
+8. Current V2 source changes remove the betting promotion from the homepage and remove the timed global vignette. The legacy how-to-play page is marked noindex and removed from the sitemap pending redesign; the VIP upgrade route also requires a noindex layout and policy review before it can be considered public editorial inventory.
+9. The explicit Cloudflare production indexing gate is FACTSPORT_INDEXING_ENABLED=true, additionally conditioned on NODE_ENV=production; unset/false means disallow crawling. Do not enable it until sitemap data is migrated from legacy Supabase to the V2 PostgreSQL read model and live robots/sitemap/ads.txt responses are verified.
+10. Remaining mandatory work: audit all betting/promo components and their call sites, campaign/prize settlement and payout code, VIP checkout/renewal/entitlements, affiliate links in content and feeds, page metadata/OG/schema, privacy/consent, editorial provenance, and live Cloudflare responses. This decision does not declare those audits complete.
