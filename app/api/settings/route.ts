@@ -14,6 +14,9 @@ export async function GET() {
       const mediaSettings = await getPublicHomepageSettings();
       return NextResponse.json({
         featured_match_id: mediaSettings?.featured_match_id ? String(mediaSettings.featured_match_id) : null,
+        announcement_text: mediaSettings?.announcement_text ?? null,
+        announcement_link: mediaSettings?.announcement_link ?? null,
+        announcement_enabled: mediaSettings?.announcement_enabled === true,
       }, {
         headers: {
           'Cache-Control': env.FACTSPORT_ENVIRONMENT === 'staging'
@@ -31,12 +34,12 @@ export async function GET() {
     const supabase = createClient();
     const { data: settings } = await supabase
       .from('site_settings')
-      .select('featured_match_id:social_config->>featured_match_id')
+      .select('announcement_text, announcement_link, announcement_enabled, featured_match_id:social_config->>featured_match_id')
       .eq('id', 1)
       .single();
 
     return NextResponse.json(
-      { featured_match_id: settings?.featured_match_id || null },
+      { featured_match_id: settings?.featured_match_id || null, announcement_text: settings?.announcement_text || null, announcement_link: settings?.announcement_link || null, announcement_enabled: settings?.announcement_enabled === true },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch {
