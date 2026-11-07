@@ -18,7 +18,7 @@ A source scan of the 54 files under `app/components/` identified the following d
 | `PromoSettingsManager.tsx` | Browser Supabase client; `site_settings` | Affiliate/promo settings service | Safe field allowlist, server-only write, URL validation and change audit |
 | `SocialSettingsManager.tsx` | Browser Supabase client; `site_settings`, `matches` | Social integration settings | Encrypt secrets, server-only adapters, event routing policy, no secret exposure |
 | `ProBettingSlipLock.tsx` | Browser Supabase client; `profiles` | VIP/entitlement service | Query server-side entitlements; client display only, no authority |
-| `LeagueLeaders.tsx` | Supabase public client; `tournament_scorers` | Sports stats read model | Port scorers schema/provider source, stable season/competition identity, cache |
+| `LeagueLeaders.tsx` | Direct browser Supabase removed; calls same-origin `/api/standings/leaders`. API has narrow legacy projection and PostgreSQL `public_competition_player_stats` reader. | Sports stats read model | Apply 0007; add provider ingestion/reconciliation, verify season/player identity, current-season uniqueness and cache/freshness |
 | `LiveStandings.tsx` | Supabase public client; `matches` | Live standings domain | Port match read adapter, deterministic table calculation, 3s cache boundary |
 | `MiniStandings.tsx` | Opt-in PostgreSQL read path via `public_competition_standings`; Supabase fallback remains when match backend flag is unset. | Standings read model | Apply migration 0006, verify provider ingestion, freshness, season/group sorting and empty states; remove fallback after parity |
 
@@ -35,8 +35,15 @@ See [PAGE-MIGRATION-MATRIX.md](./PAGE-MIGRATION-MATRIX.md) for full page journey
 
 ## 2026-11-07 continuation — editorial and homepage component paths
 
-- `HighlightsSlider.tsx`: homepage data can now come from the rights-reviewed `public_match_highlights` view; cards render optional R2 thumbnail URLs and use highlight IDs for stable keys. The full highlights page/player journey is not migrated.
+- `HighlightsSlider.tsx`: homepage data can come from rights-reviewed `public_match_highlights`; cards render R2 thumbnails and link to the verified source-video URL when using V2 data. Full `/highlights` page also has a PostgreSQL paginated path.
 - `MarkdownRenderer.tsx`: raw article HTML is passed through `rehype-sanitize`; iframe embeds are restricted to HTTPS YouTube, YouTube-nocookie and Vimeo player hosts. Existing `[MATCH_WIDGET:id]` tokens are converted to a custom allowlisted link protocol so the widget still renders without trusting arbitrary HTML IDs.
 - `HomeDashboardClient.tsx`: direct browser database access removed for homepage featured-match settings; the component uses a same-origin server API.
-- `MiniStandings.tsx`: opt-in PostgreSQL standings reader added; full standings route, LiveStandings and LeagueLeaders remain outstanding.
+- `MiniStandings.tsx`: opt-in PostgreSQL standings reader added. Full `/standings` table and `LeagueLeaders` now have PostgreSQL read paths; `LiveStandings` and tournament/round surfaces remain outstanding.
 - These paths require migrations 0004-0006 to be applied in isolated staging before they can be runtime-verified. No migration or production change has been executed.
+
+
+## 2026-11-07 competition component update
+
+- \`LeagueLeaders.tsx\` no longer creates a browser Supabase client; its goals/assists toggle requests a validated same-origin API.
+- \`/standings\` reads the current season/group projection and computes form from season-scoped completed matches. \`/highlights\` has a PostgreSQL paginated listing and verified source links.
+- All paths are opt-in until migrations 0004-0007 are applied and provider ingestion supplies current-season standings/scorers/highlights.
