@@ -2,7 +2,7 @@ export const runtime = 'edge';
 
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, Newspaper, LogOut, Ticket, Users, Radio } from 'lucide-react';
+import { LayoutDashboard, Newspaper, LogOut, Ticket, Users, Radio, Send } from 'lucide-react';
 import VaultLock from './VaultLock';
 import { getAuthenticatedAdmin, isAdminVaultUnlocked } from '@/app/lib/admin/authorization';
 
@@ -23,6 +23,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <nav className="flex-1 p-4 space-y-2">
             <Link href="/admin" className="flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl text-sm font-bold transition"><LayoutDashboard size={18} /> Overview</Link>
             <Link href="/admin/news" className="flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl text-sm font-bold transition"><Newspaper size={18} /> News Editor</Link>
+            <Link href="/admin/social" className="flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl text-sm font-bold transition"><Send size={18} /> Social Publishing</Link>
             <Link href="/admin/matches" className="flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl text-sm font-bold transition"><Ticket size={18} /> Match Manager</Link>
             <Link href="/admin/users" className="flex items-center gap-3 px-4 py-3 hover:bg-white/10 rounded-xl text-sm font-bold transition"><Users size={18} /> User Directory</Link>
             {/* 🟢 NEW: Live Studio Link */}
@@ -43,6 +44,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="flex justify-between gap-2 overflow-x-auto scrollbar-hide pb-1">
             <Link href="/admin" className="flex-1 bg-white/5 py-2 px-3 rounded-lg text-[10px] font-bold text-center border border-white/10 whitespace-nowrap">Dash</Link>
             <Link href="/admin/news" className="flex-1 bg-white/5 py-2 px-3 rounded-lg text-[10px] font-bold text-center border border-white/10 whitespace-nowrap">News</Link>
+            <Link href="/admin/social" className="flex-1 bg-white/5 py-2 px-3 rounded-lg text-[10px] font-bold text-center border border-white/10 whitespace-nowrap">Social</Link>
             <Link href="/admin/matches" className="flex-1 bg-white/5 py-2 px-3 rounded-lg text-[10px] font-bold text-center border border-white/10 whitespace-nowrap">Matches</Link>
             <Link href="/admin/users" className="flex-1 bg-white/5 py-2 px-3 rounded-lg text-[10px] font-bold text-center border border-white/10 whitespace-nowrap">Users</Link>
             {/* 🟢 NEW: Mobile Studio Link */}
