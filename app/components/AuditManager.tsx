@@ -66,7 +66,7 @@ export default function AuditManager() {
         try {
             const response = await triggerAuditAction();
             if (response.success) {
-                alert(response.message || 'Monthly audit completed.');
+                alert('Monthly audit completed.');
                 fetchDrafts();
             } else {
                 alert("Error: " + response.error);
