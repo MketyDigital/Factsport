@@ -168,6 +168,7 @@ async function run() {
 
           const verifiedFullTimeScore = readVerifiedFullTimeScore(m.score);
           const isEspnLinked = Boolean(existing?.espn_id);
+          const scoreToWrite = !isEspnLinked || finalStatus === 'FT' ? verifiedFullTimeScore : null;
           const safeStatus = finalStatus === 'FT' && !verifiedFullTimeScore
             ? (existing?.status || 'SCHEDULED')
             : finalStatus;
@@ -177,9 +178,9 @@ async function run() {
             league: league.name,
             home_team: m.homeTeam.shortName || m.homeTeam.name,
             away_team: m.awayTeam.shortName || m.awayTeam.name,
-            ...(verifiedFullTimeScore ? {
-              home_score: verifiedFullTimeScore.home,
-              away_score: verifiedFullTimeScore.away,
+            ...(scoreToWrite ? {
+              home_score: scoreToWrite.home,
+              away_score: scoreToWrite.away,
             } : (!existing ? { home_score: null, away_score: null } : {})),
             match_date: m.utcDate,
             // The schedule importer never supersedes the linked ESPN live engine.
