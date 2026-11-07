@@ -6,7 +6,7 @@ import { authorizeAdminAction } from '@/app/lib/admin/authorization';
 
 type EditorialInput = {
   id?: string; title: string; slug: string; excerpt?: string; bodyMarkdown: string;
-  category: string; tags?: string[]; seoTitle?: string; seoDescription?: string;
+  category: string; team1Name?: string; team2Name?: string; tags?: string[]; seoTitle?: string; seoDescription?: string;
   canonicalUrl?: string; authorDisplayName?: string; isHeadline?: boolean; isBreaking?: boolean;
 };
 type ActionResult<T = undefined> = { success: true; data?: T } | { success: false; error: string };
@@ -49,7 +49,8 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
 
     const snapshot = {
       title, slug, excerpt: cleanText(input.excerpt, 500) || null, body_markdown: body,
-      category, tags, seo_title: cleanText(input.seoTitle, 240) || null,
+      category, team_1_name: cleanText(input.team1Name, 120) || null,
+      team_2_name: cleanText(input.team2Name, 120) || null, tags, seo_title: cleanText(input.seoTitle, 240) || null,
       seo_description: cleanText(input.seoDescription, 320) || null,
       canonical_url: safeHttpUrl(input.canonicalUrl),
       author_display_name: cleanText(input.authorDisplayName, 120) || 'FactSport Desk',
@@ -86,7 +87,7 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
       } else {
         const rows = await tx\`
           INSERT INTO public.editorial_articles (
-            title, slug, excerpt, body_markdown, category, tags, seo_title, seo_description,
+            title, slug, excerpt, body_markdown, category, team_1_name, team_2_name, tags, seo_title, seo_description,
             canonical_url, author_display_name, is_headline, is_breaking, status, review_status,
             origin, created_by, updated_by
           ) VALUES (
