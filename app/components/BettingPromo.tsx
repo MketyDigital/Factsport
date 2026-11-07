@@ -5,27 +5,19 @@ import { Copy, ExternalLink, CheckCircle, Gift } from 'lucide-react';
 export default function BettingPromo({ affiliateLink }: { affiliateLink: string | null }) {
   const [copied, setCopied] = useState(false);
   
-  // 🟢 CONSTANT: Affiliate Promo Code is permanently locked
-  const PROMO_CODE = "FACTSPORT";
-
-  // 🟢 DYNAMIC: Affiliate Links fetched from the highly-cached API
-  const [links, setLinks] = useState({
-      link1x: "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599",
-      linkMel: "https://refpa54566.com/L?tag=d_1181253m_45415c_&site=1181253&ad=45415"
-  });
+  const [links, setLinks] = useState({ link1x: '', linkMel: '' });
+  const [promoCode, setPromoCode] = useState('');
 
   useEffect(() => {
       const fetchSettings = async () => {
           try {
               // 🟢 ZERO DATABASE COST: Fetching from the cached Vercel Edge
-              const res = await fetch('/api/settings');
+              const res = await fetch('/api/prediction/settings', { cache: 'no-store' });
               if (!res.ok) return;
               const data = await res.json();
               
-              setLinks({
-                  link1x: data.link1x || links.link1x,
-                  linkMel: data.linkMel || links.linkMel
-              });
+              setLinks({ link1x: data.link1x || '', linkMel: data.linkMel || '' });
+              setPromoCode(data.codeMel || '');
           } catch (e) {
               console.error("Failed to load promo settings", e);
           }
@@ -35,6 +27,7 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
 
   // 🟢 Changed default fallback to Melbet
   const targetLink = affiliateLink || links.linkMel;
+  if (!targetLink || !promoCode) return null;
 
   const copyCode = () => {
       navigator.clipboard.writeText(PROMO_CODE);
@@ -57,7 +50,7 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
                      Melbet <Gift size={10} className="text-yellow-500" />
                  </div>
                  <div className="text-yellow-500 text-[9px] font-bold mt-0.5 uppercase tracking-wider">
-                     300% Welcome Bonus
+                     Partner offer
                  </div>
              </div>
         </div>
@@ -71,7 +64,7 @@ export default function BettingPromo({ affiliateLink }: { affiliateLink: string 
                  title="Copy Promo Code"
              >
                  <span className="text-[9px] text-slate-400 uppercase font-bold hidden sm:block">Code:</span>
-                 <span className="text-xs text-white font-mono font-black tracking-wide">{PROMO_CODE}</span>
+                 <span className="text-xs text-white font-mono font-black tracking-wide">{promoCode}</span>
                  {copied ? <CheckCircle size={14} className="text-green-500"/> : <Copy size={14} className="text-slate-500"/>}
              </button>
 
