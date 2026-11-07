@@ -134,7 +134,8 @@ SELECT
   m.home_logo, m.away_logo, h.provider, h.title, h.description,
   h.canonical_url, h.embed_url, h.published_at,
   thumbnail.object_key AS thumbnail_media_key,
-  h.attribution_text
+  h.attribution_text,
+  m.match_date, m.home_score, m.away_score
 FROM public.match_highlights h
 JOIN public.matches m ON m.id = h.match_id
 LEFT JOIN LATERAL (
