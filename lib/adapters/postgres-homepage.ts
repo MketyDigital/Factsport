@@ -69,3 +69,68 @@ export async function listCurrentCompetitionStandings(leagueCode: string) {
     ORDER BY match_group ASC, position ASC, team_id ASC
   `;
 }
+
+export async function listPublicHighlightLeagues() {
+  const sql = getFactsportPostgres();
+  const rows = await sql`
+    SELECT DISTINCT league
+    FROM public.public_match_highlights
+    WHERE league IS NOT NULL AND length(league) <= 100
+    ORDER BY league ASC
+  `;
+  return rows.map((row: any) => String(row.league));
+}
+
+export async function countPublicMatchHighlights(league?: string | null) {
+  const normalizedLeague = league && league !== 'All' ? league.trim() : null;
+  if (normalizedLeague && normalizedLeague.length > 80) throw new Error('Invalid highlight league');
+  const sql = getFactsportPostgres();
+  const rows = normalizedLeague
+    ? await sql`
+        SELECT count(*)::integer AS total_count
+        FROM public.public_match_highlights
+        WHERE league ILIKE ${'%' + normalizedLeague + '%'}
+      `
+    : await sql`
+        SELECT count(*)::integer AS total_count
+        FROM public.public_match_highlights
+      `;
+  return Number(rows[0]?.total_count ?? 0);
+}
+
+export async function listPublicMatchHighlightsPage(input: {
+  league?: string | null; limit?: number; offset?: number;
+}) {
+  const limit = input.limit ?? 12;
+  const offset = input.offset ?? 0;
+  const league = input.league && input.league !== 'All' ? input.league.trim() : null;
+  if (league && league.length > 80) throw new Error('Invalid highlight league');
+  if (!Number.isInteger(limit) || limit < 1 || limit > 50) throw new Error('Invalid highlight page size');
+  if (!Number.isInteger(offset) || offset < 0 || offset > 5000) throw new Error('Invalid highlight offset');
+  const sql = getFactsportPostgres();
+  const rows = league
+    ? await sql`
+        SELECT highlight_id, match_id, league, home_team, away_team,
+               home_logo, away_logo, home_score, away_score, match_date,
+               provider, title, description, canonical_url, embed_url,
+               published_at, thumbnail_media_key, attribution_text
+        FROM public.public_match_highlights
+        WHERE league ILIKE ${'%' + league + '%'}
+        ORDER BY published_at DESC, highlight_id DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `
+    : await sql`
+        SELECT highlight_id, match_id, league, home_team, away_team,
+               home_logo, away_logo, home_score, away_score, match_date,
+               provider, title, description, canonical_url, embed_url,
+               published_at, thumbnail_media_key, attribution_text
+        FROM public.public_match_highlights
+        ORDER BY published_at DESC, highlight_id DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+  return rows.map((row: any) => ({
+    ...row,
+    id: row.match_id,
+    thumbnail_url: row.thumbnail_media_key ? `/api/media/${row.thumbnail_media_key}` : null,
+  }));
+}
