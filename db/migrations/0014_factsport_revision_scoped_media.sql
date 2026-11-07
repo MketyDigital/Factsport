@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.editorial_article_revision_media (
 
 REVOKE ALL ON public.editorial_article_revision_media
   FROM PUBLIC, factsport_v2_reader, factsport_v2_schedule_writer, factsport_v2_espn_writer;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.editorial_article_revision_media
+GRANT SELECT, INSERT, UPDATE ON public.editorial_article_revision_media
   TO factsport_v2_editorial_writer;
 
 -- Public media is only discoverable when attached to an approved, published article.
