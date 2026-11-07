@@ -4,6 +4,7 @@ export const revalidate = 15;
 import { createClient } from '@supabase/supabase-js'; 
 import { Trophy, Star, Crown, History, TrendingUp, Calendar, Send, ExternalLink, ArrowRight, Zap, Target } from 'lucide-react';
 import Link from 'next/link';
+import AdsterraStandardBanner from '@/app/components/AdsterraStandardBanner';
 
 export const metadata = {
   title: 'Prediction Leaderboard & Winners | FactSport',
@@ -165,6 +166,7 @@ export default async function LeaderboardPage() {
         </div>
 
 
+        <AdsterraStandardBanner />
         <div className="flex items-end justify-center gap-2 mt-6 mb-4 max-w-lg mx-auto h-[320px]">
             <div className="w-1/3 flex justify-center">{renderPodiumCard(second, 2, 'border-slate-400/30 shadow-[0_-5px_20px_rgba(148,163,184,0.1)]', 'h-[240px]')}</div>
             <div className="w-1/3 flex justify-center z-10">{renderPodiumCard(first, 1, 'border-yellow-500/50 shadow-[0_-5px_30px_rgba(234,179,8,0.2)]', 'h-[300px]')}</div>
@@ -339,6 +341,7 @@ export default async function LeaderboardPage() {
         </div>
 
         <div className="mt-8">
+            <AdsterraStandardBanner />
         </div>
     </div>
   );
