@@ -155,5 +155,5 @@ test('root layout has one valid document shell after public/private split', () =
   const rootLayout = read('app/layout.tsx');
   assert.equal((rootLayout.match(/export default async function RootLayout/g) || []).length, 1);
   assert.equal((rootLayout.match(/<html lang="en">/g) || []).length, 1);
-  assert.equal((rootLayout.match(/<\\/html>/g) || []).length, 1);
+  assert.equal(rootLayout.split('</html>').length - 1, 1);
 });
