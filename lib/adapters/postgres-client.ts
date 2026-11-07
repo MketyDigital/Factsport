@@ -7,6 +7,7 @@ import postgres from 'postgres';
 import { env } from 'cloudflare:workers';
 
 type FactsportSql = ReturnType<typeof postgres>;
+type HyperdriveBinding = { connectionString: string };
 
 async function withConnection<T>(connectionString: string | undefined, operation: (sql: FactsportSql) => Promise<T> | T, label: string) {
   if (!connectionString) throw new Error(`${label} PostgreSQL binding is not configured`);
@@ -21,17 +22,18 @@ async function withConnection<T>(connectionString: string | undefined, operation
 }
 
 export function withFactsportPostgres<T>(operation: (sql: FactsportSql) => Promise<T> | T): Promise<T> {
-  const hyperdriveUrl = env?.FACTSPORT_HYPERDRIVE?.connectionString;
+  const bindings = env as unknown as Record<string, HyperdriveBinding | undefined>;
+  const hyperdriveUrl = bindings.FACTSPORT_HYPERDRIVE?.connectionString;
   const directUrl = hyperdriveUrl ? undefined : process.env.DATABASE_URL;
   return withConnection(hyperdriveUrl || directUrl, operation, 'Factsport reader');
 }
 
 /**
  * Privileged Media CMS writer. This must be a distinct Hyperdrive binding
- * backed by factsport_v2_editorial_writer, never the read-only public binding.
+ * backed by factsport_v2_editorial_writer, never the public or sports writer.
  * There is deliberately no DATABASE_URL or Supabase service-role fallback.
  */
 export function withFactsportEditorialPostgres<T>(operation: (sql: FactsportSql) => Promise<T> | T): Promise<T> {
-  const connectionString = env?.FACTSPORT_EDITORIAL_HYPERDRIVE?.connectionString;
-  return withConnection(connectionString, operation, 'Factsport editorial writer');
+  const bindings = env as unknown as Record<string, HyperdriveBinding | undefined>;
+  return withConnection(bindings.FACTSPORT_EDITORIAL_HYPERDRIVE?.connectionString, operation, 'Factsport editorial writer');
 }
