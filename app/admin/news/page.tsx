@@ -41,7 +41,7 @@ export default async function AdminNewsPage() {
       LEFT JOIN LATERAL (
         SELECT snapshot, workflow_status, created_at
         FROM public.editorial_article_revisions
-        WHERE article_id=a.id AND workflow_status IN ('draft','in_review')
+        WHERE article_id=a.id AND workflow_status IN ('draft','in_review','approved')
         ORDER BY revision_number DESC LIMIT 1
       ) r ON true
       ORDER BY GREATEST(a.updated_at, COALESCE(r.created_at, a.updated_at)) DESC
