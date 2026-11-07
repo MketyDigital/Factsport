@@ -93,6 +93,6 @@ Added tests/adsense-readiness.test.cjs and updated existing monetization/setting
 6. Complete privacy/legal review of controller identity, contact details, retention, cross-border processing, user-generated content, video embeds and all external data/media providers.
 7. Complete editorial source/rights/provenance and moderation audits, original-content quality review and mobile/accessibility/Core Web Vitals review.
 8. Verify the private host is provisioned separately and server-side access, auth, entitlements, payments, affiliate integrations, VIP and prize workflows still function on that host.
-9. Apply migrations 0021 and 0022 only after role, dependency and staging DB verification. Do not apply migrations to production as part of this work.
+9. Apply migrations 0021–0023 only after role, dependency and staging DB verification. Do not apply migrations to production as part of this work.
 
 No production DNS, Worker, Supabase data, Cloudflare route, AdSense account, publisher ID, CMP or ad serving configuration was changed. No ads are enabled.
