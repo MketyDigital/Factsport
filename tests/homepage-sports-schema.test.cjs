@@ -38,8 +38,8 @@ test('public highlights require reviewed rights and allow only approved video ho
   assert.match(sql, /rights_reviewed_by uuid REFERENCES public\.app_users/i);
   assert.match(sql, /rights_reviewed_at IS NOT NULL/i);
   assert.match(sql, /rights_status IN \('owned', 'licensed', 'editorial_exception'\)/i);
-  assert.match(sql, /youtube-nocookie\\\.com\/embed/i);
-  assert.match(sql, /player\\\.vimeo\\\.com\/video/i);
+  assert.ok(sql.includes('youtube-nocookie\\.com/embed'));
+  assert.ok(sql.includes('player\\.vimeo\\.com/video'));
   assert.match(sql, /CREATE OR REPLACE VIEW public\.public_match_highlights/i);
   assert.match(sql, /thumbnail_media_key/i);
 });
