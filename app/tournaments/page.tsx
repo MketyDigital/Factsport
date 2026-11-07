@@ -66,7 +66,7 @@ export default async function TournamentsPage() {
             return (
               <Link
                 key={competition.code}
-                href={\`/tournaments/\${encodeURIComponent(competition.name)}\`}
+                href={`/tournaments/${encodeURIComponent(competition.name)}`}
                 className="group bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-lg hover:border-blue-300 transition-all"
               >
                 <div className="flex items-start justify-between gap-4">
