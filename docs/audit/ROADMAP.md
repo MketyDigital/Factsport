@@ -309,3 +309,16 @@ The implementation remains on \`refactor/factsport-v2\` and follows the media-fi
 - Full \`/standings\` page now supports opt-in PostgreSQL standings, same-season completed-match form and a goals/assists leaders API. \`LeagueLeaders\` no longer queries Supabase directly in the browser.
 - Added \`matches.season\` and a bounded final-results index; form calculations are isolated to the selected current season.
 - No current-season rows are imported or fabricated. Migrations 0004-0007 are committed but unapplied. Provider ingestion, stats reconciliation, tie-break parity, team-crest rights mapping, live refresh and staging data evidence remain required.
+
+
+### Migration-specific public read flags
+
+Keep each read path disabled until its exact schema and reader grants are applied in isolated staging:
+
+- \`FACTSPORT_MATCHES_BACKEND=postgres\`: base matches read model from migration 0001 only; must not select season or newer homepage/competition views.
+- \`FACTSPORT_EDITORIAL_BACKEND=postgres\`: reviewed articles and rights-cleared media; requires 0004-0005.
+- \`FACTSPORT_HOMEPAGE_BACKEND=postgres\`: featured matches and safe homepage settings; requires 0006.
+- \`FACTSPORT_HIGHLIGHTS_BACKEND=postgres\`: full highlights page and reviewed video metadata; requires 0006.
+- \`FACTSPORT_COMPETITIONS_BACKEND=postgres\`: standings, same-season form and player leaders; requires 0006-0007.
+
+Do not use one broad match flag to activate later schema surfaces. This separation was added after protected staging correctly exposed that the base match reader must remain compatible with the base schema while 0006 is still unapplied.
