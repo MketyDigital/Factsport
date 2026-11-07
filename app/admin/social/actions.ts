@@ -26,7 +26,7 @@ export async function scheduleSocialPublication(input: {
     if (input.articleId && !/^[0-9a-f-]{36}$/i.test(input.articleId)) return { success: false, error: 'Invalid linked article.' };
 
     const id = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
-      const actorId = await getActorId(tx, authorization.user.domainUserId);
+      const actorId = authorization.user.domainUserId;
       const channels = await tx`SELECT id FROM public.media_social_channels WHERE id=${input.channelId}::uuid AND is_enabled=true FOR SHARE`;
       if (!channels.length) throw new Error('This social channel is not enabled for publishing.');
       if (input.articleId) {
@@ -67,7 +67,7 @@ export async function cancelSocialPublication(publicationId: string): Promise<Re
   if (!/^[0-9a-f-]{36}$/i.test(publicationId)) return { success: false, error: 'Invalid social post identifier.' };
   try {
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
-      const actorId = await getActorId(tx, authorization.user.domainUserId);
+      const actorId = authorization.user.domainUserId;
       const outbox = await tx`
         SELECT id, status FROM public.media_social_outbox
         WHERE publication_id=${publicationId}::uuid FOR UPDATE
