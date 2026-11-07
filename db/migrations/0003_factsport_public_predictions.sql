@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS public.predictions (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT prediction_scores_pair CHECK (
     (predicted_home_score IS NULL AND predicted_away_score IS NULL) OR
-    (predicted_home_score >= 0 AND predicted_away_score >= 0)
+    (predicted_home_score IS NOT NULL AND predicted_away_score IS NOT NULL AND
+     predicted_home_score >= 0 AND predicted_away_score >= 0)
   ),
   CONSTRAINT prediction_participant_match_unique UNIQUE (participant_id, match_id)
 );
