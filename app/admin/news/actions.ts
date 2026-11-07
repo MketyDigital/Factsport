@@ -150,10 +150,11 @@ export async function submitEditorialForReview(articleId: string): Promise<Actio
   }
 }
 
-export async function approveEditorialRevision(articleId: string): Promise<ActionResult> {
+export async function approveEditorialRevision(articleId: string, comment?: string): Promise<ActionResult> {
   const authorization = await authorizeMediaEditorialAction('review');
   if (!authorization.ok) return { success: false, error: authorization.error };
   if (!/^[0-9a-f-]{36}$/i.test(articleId)) return { success: false, error: 'Invalid article identifier.' };
+  const reviewComment = typeof comment === 'string' ? comment.trim().slice(0, 2000) : '';
   try {
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
       const actorId = authorization.user.domainUserId;
@@ -171,18 +172,65 @@ export async function approveEditorialRevision(articleId: string): Promise<Actio
       }
       await tx`
         UPDATE public.editorial_article_revisions SET
-          workflow_status='approved', reviewed_by=${actorId}::uuid, reviewed_at=now()
+          workflow_status='approved', reviewed_by=${actorId}::uuid, reviewed_at=now(), review_comment=${reviewComment || null}
         WHERE id=${revision.id}::uuid
       `;
       await tx`
-        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, article_id, revision_id)
-        VALUES (${actorId}::uuid, 'review_approved', ${articleId}::uuid, ${revision.id}::uuid)
+        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, article_id, revision_id, details)
+        VALUES (${actorId}::uuid, 'review_approved', ${articleId}::uuid, ${revision.id}::uuid,
+          ${JSON.stringify({ comment: reviewComment || null })}::jsonb)
       `;
     }));
     revalidateEditorial(); return { success: true };
   } catch (error) {
     console.error('Editorial review approval failed', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unable to approve revision.' };
+  }
+}
+
+export async function rejectEditorialRevision(articleId: string, comment: string): Promise<ActionResult> {
+  const authorization = await authorizeMediaEditorialAction('review');
+  if (!authorization.ok) return { success: false, error: authorization.error };
+  if (!/^[0-9a-f-]{36}$/i.test(articleId)) return { success: false, error: 'Invalid article identifier.' };
+  const reviewComment = typeof comment === 'string' ? comment.trim().slice(0, 2000) : '';
+  if (reviewComment.length < 5) return { success: false, error: 'Add a review note explaining the requested changes (at least 5 characters).' };
+  try {
+    await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+      const actorId = authorization.user.domainUserId;
+      const articles = await tx`SELECT id, status FROM public.editorial_articles WHERE id=${articleId}::uuid FOR UPDATE`;
+      if (!articles.length || articles[0].status === 'archived') throw new Error('Article is unavailable.');
+      const revisions = await tx`
+        SELECT id, changed_by, submitted_by FROM public.editorial_article_revisions
+        WHERE article_id=${articleId}::uuid AND workflow_status='in_review'
+        ORDER BY revision_number DESC LIMIT 1 FOR UPDATE
+      `;
+      const revision = revisions[0];
+      if (!revision) throw new Error('No editorial revision is awaiting review.');
+      if (!revision.changed_by || revision.changed_by === actorId || revision.submitted_by === actorId) {
+        throw new Error('A different authorized editor must review the revision.');
+      }
+      await tx`
+        UPDATE public.editorial_article_revisions SET
+          workflow_status='rejected', reviewed_by=${actorId}::uuid,
+          reviewed_at=now(), review_comment=${reviewComment}
+        WHERE id=${revision.id}::uuid
+      `;
+      if (articles[0].status !== 'published') {
+        await tx`
+          UPDATE public.editorial_articles SET status='draft', review_status='rejected',
+            reviewed_by=${actorId}::uuid, reviewed_at=now(), updated_at=now()
+          WHERE id=${articleId}::uuid
+        `;
+      }
+      await tx`
+        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, article_id, revision_id, details)
+        VALUES (${actorId}::uuid, 'review_rejected', ${articleId}::uuid, ${revision.id}::uuid,
+          ${JSON.stringify({ comment: reviewComment })}::jsonb)
+      `;
+    }));
+    revalidateEditorial(); return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to reject revision.' };
   }
 }
 
