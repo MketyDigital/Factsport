@@ -1,7 +1,8 @@
 export const runtime = 'edge';
 export const revalidate = 180;
 
-import { createClient } from '@supabase/supabase-js'; 
+import { createClient } from '@supabase/supabase-js';
+import { listPublicEditorialArticles } from '@/lib/adapters/postgres-editorial'; 
 import Link from 'next/link';
 import { Metadata } from 'next';
 import { Calendar, ChevronRight, Zap, Trophy, Youtube, Newspaper, ArrowRight, Flame, Radio, BarChart2, ChevronLeft } from 'lucide-react';
@@ -38,18 +39,37 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
   const from = (currentPage - 1) * ITEMS_PER_PAGE;
   const to = from + ITEMS_PER_PAGE - 1;
 
-  let query = supabase.from('news').select('*', { count: 'exact' }).order('created_at', { ascending: false });
-  if (currentCategory !== 'All') {
-      query = query.eq('category', currentCategory);
+  let news: any[] = [];
+  let count: number | null = null;
+  if (process.env.FACTSPORT_EDITORIAL_BACKEND === 'postgres') {
+      const rows = await listPublicEditorialArticles({
+          category: currentCategory,
+          limit: ITEMS_PER_PAGE,
+          offset: from,
+      });
+      news = rows.map((row: any) => ({
+          ...row,
+          body: row.excerpt || row.body_markdown,
+          image_url: row.hero_media_key ? `/api/media/${row.hero_media_key}` : null,
+          team_1_logo: null,
+          team_2_logo: null,
+          created_at: row.published_at,
+      }));
+      count = Number(rows[0]?.total_count ?? 0);
+  } else {
+      let query = supabase.from('news').select('*', { count: 'exact' }).order('created_at', { ascending: false });
+      if (currentCategory !== 'All') query = query.eq('category', currentCategory);
+      query = query.range(from, to);
+      const result = await query;
+      news = result.data || [];
+      count = result.count;
   }
-  query = query.range(from, to);
 
-  const { data: news, count } = await query;
   const totalPages = count ? Math.ceil(count / ITEMS_PER_PAGE) : 1;
 
   const isFirstPage = currentPage === 1;
-  const featured = isFirstPage ? (news?.find(n => n.is_headline) || news?.[0]) : null;
-  const rest = featured ? (news?.filter(n => n.id !== featured.id) || []) : (news || []);
+  const featured = isFirstPage ? (news.find(n => n.is_headline) || news[0]) : null;
+  const rest = featured ? (news.filter(n => n.id !== featured.id) || []) : news;
 
   const midIndex = Math.floor(rest.length / 2);
   const firstHalf = rest.slice(0, midIndex);
