@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   try {
     let leaders: any[];
     const backend = env.FACTSPORT_COMPETITIONS_BACKEND ?? process.env.FACTSPORT_COMPETITIONS_BACKEND;
-    if (backend !== 'postgres' && env.FACTSPORT_ENVIRONMENT === 'staging') return NextResponse.json({ error: 'V2 player statistics reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+    if (backend !== 'postgres' && (env.FACTSPORT_ENVIRONMENT === 'staging' || env.FACTSPORT_ENVIRONMENT === 'production')) return NextResponse.json({ error: 'V2 player statistics reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     if (backend === 'postgres') {
       const rows = await listCurrentCompetitionPlayerLeaders(league, stat, 5);
       leaders = rows.map((row: any) => ({
