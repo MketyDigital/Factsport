@@ -88,3 +88,11 @@ Reader access is SELECT-only on the narrowly projected public views. Editorial w
 The homepage read model is intentionally not a substitute for the full CMS or sports ingestion workflows. Migration 0006 creates the target shapes; provider jobs, CMS commands, admin/RBAC and actual staging data validation remain separate deliverables.
 
 
+
+
+## 2026-11-07 match identity alias migration
+
+- Added unapplied migration 0008 with nullable unique legacy Supabase match UUID alias. It does not rewrite the V2 canonical matches.id primary key or alter any prediction foreign key.
+- Added a PostgreSQL reader that resolves either the canonical V2 UUID or the legacy alias and always returns the canonical V2 ID.
+- Added an independently gated same-origin match detail API branch using only public match fields. It deliberately excludes raw stream URLs, audio/video links, pro_analysis, campaign_id, affiliate links and settlement flags.
+- No legacy IDs have been imported or mapped yet. Migration 0008 remains unapplied; alias population requires an approved, reconciled import/crosswalk.
