@@ -15,6 +15,9 @@ const STATIC_ROUTES = [
   ['/privacy-policy', 0.3, 'yearly'],
   ['/terms', 0.3, 'yearly'],
   ['/disclaimer', 0.3, 'yearly'],
+  ['/about', 0.4, 'yearly'],
+  ['/editorial-standards', 0.4, 'yearly'],
+  ['/advertising-policy', 0.3, 'yearly'],
 ] as const
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
