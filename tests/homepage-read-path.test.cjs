@@ -50,18 +50,22 @@ test('highlight cards use public R2 thumbnails and stable highlight identifiers'
   assert.ok(homepageAdapter.includes('FROM public.public_homepage_settings'));
 });
 
-test('domain adapters share one bounded Hyperdrive client per Worker isolate', () => {
+test('domain adapters use request-scoped Hyperdrive clients and prepared static SQL', () => {
+  assert.ok(dbClient.includes('withFactsportPostgres'));
   assert.ok(dbClient.includes('max: 1'));
   assert.ok(dbClient.includes('FACTSPORT_HYPERDRIVE'));
-  assert.ok(matchesAdapter.includes('getFactsportPostgres'));
-  assert.ok(editorialAdapter.includes('getFactsportPostgres'));
-  assert.ok(homepageAdapter.includes('getFactsportPostgres'));
-  assert.ok(!matchesAdapter.includes('let client: ReturnType<typeof postgres>'));
-  assert.ok(!editorialAdapter.includes('let client: ReturnType<typeof postgres>'));
-  const baseMatchProjection = matchesAdapter.match(/const MATCH_SELECT = '([^']+)'/)?.[1] || '';
-  assert.ok(baseMatchProjection.length > 0);
-  assert.ok(!baseMatchProjection.includes('season'));
+  assert.ok(dbClient.includes('await sql.end({ timeout: 1 })'));
+  assert.ok(!dbClient.includes('let client: ReturnType<typeof postgres>'));
+  for (const adapter of [matchesAdapter, editorialAdapter, homepageAdapter]) {
+    assert.ok(adapter.includes('withFactsportPostgres'));
+    assert.ok(!adapter.includes('getFactsportPostgres'));
+    assert.ok(!adapter.includes('sql.unsafe('));
+  }
+  const baseWindow = matchesAdapter.slice(matchesAdapter.indexOf('export async function listPostgresMatchesWindow'), matchesAdapter.indexOf('export async function getPostgresTeamForm'));
+  assert.ok(baseWindow.includes('FROM public.matches'));
+  assert.ok(!baseWindow.includes('season'));
   assert.ok(matchesAdapter.includes('AND season ='));
+  assert.ok(matchesAdapter.includes('::timestamptz'));
 });
 
 test('full highlights page supports PostgreSQL pagination and rights-cleared source links', () => {
