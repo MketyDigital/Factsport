@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { authorizeAdminAction, isSameOriginRequest } from '@/app/lib/admin/authorization';
+import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
+import { isSameOriginRequest } from '@/app/lib/admin/authorization';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 import { factsportMediaBucket } from '@/lib/adapters/factsport-cloudflare-bindings';
 
@@ -7,15 +8,6 @@ export const runtime = 'edge';
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-
-async function getActorId(sql: any, authId: string): Promise<string> {
-  const rows = await sql`
-    SELECT user_id FROM public.external_identities
-    WHERE subject=${authId} ORDER BY created_at DESC LIMIT 2
-  `;
-  if (rows.length !== 1) throw new Error('This administrator has no unique Factsport domain identity mapping.');
-  return rows[0].user_id as string;
-}
 
 function validImageSignature(type: string, bytes: Uint8Array) {
   if (type === 'image/png') return bytes.length >= 8 &&
@@ -29,7 +21,7 @@ function validImageSignature(type: string, bytes: Uint8Array) {
 }
 
 export async function POST(request: Request) {
-  const authorization = await authorizeAdminAction();
+  const authorization = await authorizeMediaEditorialAction('media');
   if (!authorization.ok) return NextResponse.json({ error: authorization.error }, { status: authorization.status });
   if (!isSameOriginRequest(request)) return NextResponse.json({ error: 'Same-origin request required.' }, { status: 403 });
 
@@ -48,7 +40,7 @@ export async function POST(request: Request) {
     const sha256 = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join('');
     objectKey = `editorial/${crypto.randomUUID().replace(/-/g, '')}`;
 
-    const actorId = await withFactsportEditorialPostgres(sql => getActorId(sql, authorization.user.id));
+    const actorId = authorization.user.domainUserId;
     const bucket = factsportMediaBucket();
     await bucket.put(objectKey, bytes.buffer as ArrayBuffer, {
       httpMetadata: { contentType: file.type, cacheControl: 'public, max-age=31536000, immutable' },
@@ -64,6 +56,13 @@ export async function POST(request: Request) {
           ${objectKey}, 'image', ${file.type}, ${file.size}, ${sha256},
           ${altText || null}, 'pending', false, ${actorId}::uuid
         ) RETURNING id, object_key, rights_status
+      `;
+      await sql`
+        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, details)
+        VALUES (
+          ${actorId}::uuid, 'media_uploaded',
+          ${JSON.stringify({ assetId: rows[0].id, objectKey, contentType: file.type, byteSize: file.size, sha256 })}::jsonb
+        )
       `;
       return rows[0];
     });
