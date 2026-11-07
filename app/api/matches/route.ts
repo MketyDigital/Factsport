@@ -42,9 +42,16 @@ export async function GET(request: Request) {
                     ? String((error as { code?: unknown }).code || '') : '';
                 const sqlState = /^[A-Z0-9]{5}$/.test(raw) ? raw : 'none';
                 const errorClass = error instanceof Error ? error.name : 'Unknown';
+                const message = error instanceof Error ? error.message.toLowerCase() : '';
+                const errorHint = /invalid cursor|invalid league/.test(message) ? 'input_validation'
+                    : /connection|socket|timeout|terminated|closed/.test(message) ? 'connection'
+                    : /prepared statement/.test(message) ? 'prepared_statement'
+                    : /does not exist|undefined column|relation/.test(message) ? 'schema'
+                    : /uuid|timestamp/.test(message) ? 'cursor_or_timestamp'
+                    : 'query_failed';
                 return NextResponse.json({
                     error: 'Match data temporarily unavailable',
-                    sqlState, errorClass,
+                    sqlState, errorClass, errorHint,
                 }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
             }
             return NextResponse.json({ error: 'Match data temporarily unavailable' }, { status: 503 });
