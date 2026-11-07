@@ -28,7 +28,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="font-bold text-xl text-slate-900 mb-3 flex items-center gap-2"><Eye size={20} /> 1. Information and purposes</h2>
-            <p>Depending on the feature used, information may include account and authentication details, prediction or feature submissions, support correspondence, security and diagnostic data, and technical information such as browser, device, IP address and request logs.</p>
+            <p>For the public Media website, information may include technical details such as browser, device, IP address and request logs, support correspondence, and information voluntarily provided through a public Media feature. The public Media site does not operate Prediction entries, prize campaigns or payment accounts. Any separately operated Prediction product has its own privacy notice and processing purposes.</p>
             <p>We use information to operate and secure the service, provide requested features, prevent abuse, maintain records, respond to requests and meet legal obligations. We do not treat a visit to the public media site as consent to marketing.</p>
           </section>
 
@@ -48,7 +48,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="font-bold text-xl text-slate-900 mb-3">4. Public display and user-generated information</h2>
-            <p>Some public features, such as leaderboards or submitted content, may display information according to the rules shown for that feature. Do not submit sensitive personal information in public fields. Private account, payment and communication data must not be included in public editorial pages.</p>
+            <p>Public Media pages display editorial content, sports information, match data and media. Do not submit sensitive personal information in public fields or comments. Private account, payment, prediction and communication data must not be included in public editorial pages.</p>
           </section>
 
           <section>
