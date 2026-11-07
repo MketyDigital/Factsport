@@ -6,7 +6,7 @@ import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 export type MediaEditorialCapability = 'workspace' | 'read' | 'draft' | 'review' | 'publish' | 'archive' | 'media' | 'social';
 export type MediaEditorialAuthorization =
   | { ok: true; user: { id: string; domainUserId: string; roles: string[] } }
-  | { ok: false; status: 401 | 403; error: string };
+  | { ok: false; status: 401 | 403 | 503; error: string };
 
 const allowedRoles: Record<MediaEditorialCapability, string[]> = {
   workspace: ['writer', 'editor', 'publisher', 'social_manager', 'media_admin'],
