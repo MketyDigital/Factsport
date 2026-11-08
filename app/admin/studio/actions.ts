@@ -128,7 +128,7 @@ export async function createBroadcastInvite(input: {
     let binary = ''; for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
     const token = btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
-    let hex = ''; for (const byte of new Uint8Array(digest)) hex += byte.toString(16).padStart(2, '0');
+    let hex = ''; const digestBytes = new Uint8Array(digest); for (let i = 0; i < digestBytes.length; i += 1) hex += digestBytes[i].toString(16).padStart(2, '0');
     const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000).toISOString();
     const invite = await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
       const rooms = await tx`SELECT id FROM public.media_broadcast_rooms WHERE id=${input.roomId}::uuid FOR SHARE`;
