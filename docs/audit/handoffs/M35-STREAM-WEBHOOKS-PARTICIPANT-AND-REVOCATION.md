@@ -14,7 +14,8 @@ Status: source implementation committed; Stream webhook endpoint/configuration a
 - Webhook processing updates `media_broadcast_participants` and audit events for participant join/leave, permission requests, mic permission changes, mute, member removal, session end, live start/end and recording start/stop.
 - If a participant joins with a missing, expired or revoked token identity, the webhook blocks that Stream user from the `audio_room`. Provider failures leave the webhook receipt unprocessed so Stream retry can retry the block.
 - Revoking a guest invite marks every associated token identity revoked and attempts an immediate Stream `BlockUser` call for each issued guest identity. If immediate provider blocking fails, the UI receives a warning and the webhook blocks any later rejoin.
-- The webhook and token issuer use the separate broadcast token-issuer Hyperdrive/database identity. The broadcast admin can revoke token identities but cannot issue tokens.
+- Added a live-participant section to `/admin/studio`, showing webhook-backed presence, room, identity class, role, microphone state and timestamps without exposing email addresses. Media admins can block a participant; this revokes the token identity, revokes a guest invite when applicable, calls Stream `BlockUser`, and updates participant presence only after provider blocking succeeds.
+- The webhook and token issuer use the separate broadcast token-issuer Hyperdrive/database identity. The broadcast admin can read participant presence and update only `left_at`, `last_seen_at` and `mic_enabled`; it cannot issue tokens.
 
 ## External configuration required
 
@@ -34,4 +35,4 @@ Status: source implementation committed; Stream webhook endpoint/configuration a
 
 ## Validation
 
-CI is running on the current branch. No actual Stream webhook, token issuance, participant update, invite revocation or production room activation has been executed.
+Isolated regression verification passed on commit `a2ada291fdddbe208c7ddfb53b26ffd644bc8694` (run `42494347600`). Native Worker build passed on commit `22c0da6fae921a4f53c3ab7beb333fea5303f132` (run `42494317705`). The latest participant-admin changes are running through CI; no actual Stream webhook, token issuance, participant update, invite revocation or production room activation has been executed.
