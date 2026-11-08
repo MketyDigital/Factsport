@@ -50,3 +50,8 @@ M18 verified the global Goal Rush studio and match-specific broadcast rooms:
 ## Validation boundary
 
 Migration 0019 is source-checked only. It has not been applied; the two broadcast roles and Hyperdrive bindings do not exist; StreamIO secrets have not been created; no tokens, invites or broadcasts were issued. Production studio and rooms remain untouched.
+
+
+## M33 broadcast admin implementation update
+
+The dedicated Media broadcast admin UI and server mutations are now implemented in source under the Entra-backed `broadcast` capability and separate `FACTSPORT_BROADCAST_ADMIN_HYPERDRIVE`. It supports studio settings, inactive match-room creation, room shutdown/settings, hashed invite creation/revocation and room host/moderator/caller role grants. Migration `0028_factsport_broadcast_admin_audit_and_role_history.sql` fixes role re-grant history and adds audit actions. Activation and call-ins are deliberately rejected until the separate Stream token issuer exists; invite redemption and participant controls are not yet active. See `M33-BROADCAST-ADMIN-CONTROL-PLANE.md`.
