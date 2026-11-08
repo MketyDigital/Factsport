@@ -39,3 +39,8 @@ Static source regression was added. GitHub Actions validation is running for the
 ## M33 broadcast admin implementation update
 
 The dedicated Media broadcast admin UI and server mutations are now implemented in source under the Entra-backed `broadcast` capability and separate `FACTSPORT_BROADCAST_ADMIN_HYPERDRIVE`. It supports studio settings, inactive match-room creation, room shutdown/settings, hashed invite creation/revocation and room host/moderator/caller role grants. Migration `0028_factsport_broadcast_admin_audit_and_role_history.sql` fixes role re-grant history and adds audit actions. Activation and call-ins are deliberately rejected until the separate Stream token issuer exists; invite redemption and participant controls are not yet active. See `M33-BROADCAST-ADMIN-CONTROL-PLANE.md`.
+
+
+## M34 token issuer update
+
+Studio settings and role administration now use the distinct broadcast-admin adapter; client token requests use the distinct broadcast-token-issuer adapter. The old Supabase writer and `/api/stream/token` path are not restored. Token issuance and guest redemption fail closed until the dedicated database binding, Stream secrets and readiness flag are provisioned. See M33 and M34.
