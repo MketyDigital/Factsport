@@ -39,6 +39,7 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
     const [role, setRole] = useState<string>('anonymous');
     const [isConnecting, setIsConnecting] = useState(false);
     const [isWaitingForHost, setIsWaitingForHost] = useState(false);
+    const [canRequestCallIn, setCanRequestCallIn] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     
     const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -54,6 +55,7 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
         setVideoUrl(null);
         setIsConnecting(false);
         setIsWaitingForHost(false);
+        setCanRequestCallIn(false);
     };
 
     const tuneInVideo = (matchId: string, url: string) => {
@@ -92,6 +94,7 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
             if (!res.ok) throw new Error(data.error || "Connection refused.");
             
             setRole(data.role);
+            setCanRequestCallIn(data.canRequestCallIn === true);
             setMediaType('audio');
 
             const myClient = new StreamVideoClient({
@@ -136,7 +139,7 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => { return () => { if (pollRef.current) clearInterval(pollRef.current); stopMedia(); }; }, []);
 
     return (
-        <MediaContext.Provider value={{ activeMatchId, mediaType, videoUrl, client, call, role, isConnecting, isWaitingForHost, errorMsg, isPageActive, setIsPageActive, tuneInAudio, tuneInVideo, stopMedia }}>
+        <MediaContext.Provider value={{ activeMatchId, mediaType, videoUrl, client, call, role, isConnecting, isWaitingForHost, canRequestCallIn, errorMsg, isPageActive, setIsPageActive, tuneInAudio, tuneInVideo, stopMedia }}>
             {children}
             {client && call && mediaType === 'audio' && !isWaitingForHost && (
                 <div className="fixed w-[1px] h-[1px] opacity-0 pointer-events-none overflow-hidden -left-[9999px] z-[-1]">
