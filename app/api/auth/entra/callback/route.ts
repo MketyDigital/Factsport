@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const error = url.searchParams.get('error');
   if (error) {
-    const response = NextResponse.redirect(new URL('/login?error=identity-provider-error', url.origin));
+    const response = NextResponse.redirect(new URL('/media-login?error=identity-provider-error', url.origin));
     response.cookies.set(entraCookieNames.state, '', { ...entraCookieOptions.state, maxAge: 0 });
     response.headers.set('Cache-Control', 'no-store');
     return response;
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     return response;
   } catch (error) {
     console.error('Entra callback rejected', error);
-    const response = NextResponse.redirect(new URL('/login?error=identity-callback-failed', url.origin));
+    const response = NextResponse.redirect(new URL('/media-login?error=identity-callback-failed', url.origin));
     response.cookies.set(entraCookieNames.state, '', { ...entraCookieOptions.state, maxAge: 0 });
     response.cookies.set(entraCookieNames.session, '', { ...entraCookieOptions.session, maxAge: 0 });
     response.headers.set('Cache-Control', 'no-store');
