@@ -15,7 +15,7 @@ Status: source implementation committed; Stream webhook endpoint/configuration a
 - If a participant joins with a missing, expired or revoked token identity, the webhook blocks that Stream user from the `audio_room`. Provider failures leave the webhook receipt unprocessed so Stream retry can retry the block.
 - Revoking a guest invite marks every associated token identity revoked and attempts an immediate Stream `BlockUser` call for each issued guest identity. If immediate provider blocking fails, the UI receives a warning and the webhook blocks any later rejoin.
 - Added a live-participant section to `/admin/studio`, showing webhook-backed presence, room, identity class, role, microphone state and timestamps without exposing email addresses. Media admins can block a participant; this revokes the token identity, revokes a guest invite when applicable, calls Stream `BlockUser`, and updates participant presence only after provider blocking succeeds.
-- The webhook and token issuer use the separate broadcast token-issuer Hyperdrive/database identity. The broadcast admin can read participant presence and update only `left_at`, `last_seen_at` and `mic_enabled`; it cannot issue tokens.
+- The webhook and token issuer use the separate broadcast token-issuer Hyperdrive/database identity. The broadcast admin can read participant presence and update only `left_at`, `last_seen_at` and `mic_enabled`; it cannot issue tokens. Its only participant updates are limited to `left_at`, `last_seen_at`, `mic_enabled` and `role_key` columns.
 
 ## External configuration required
 
