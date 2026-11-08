@@ -64,7 +64,6 @@ export async function reviewRightsAndAttachMedia(input: MediaReviewInput) {
           usage_expires_at=${expiry ? expiry.toISOString() : null}::timestamptz,
           rights_reviewed_by=${actorId}::uuid,
           rights_reviewed_at=now(),
-          is_public=false,
           updated_at=now()
         WHERE id=${input.assetId}::uuid
       `;
