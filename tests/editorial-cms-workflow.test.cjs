@@ -191,3 +191,17 @@ test('public Media publisher attestations are enforced and legacy rows are recon
   assert.match(enforcement, /VALIDATE CONSTRAINT editorial_revision_published_requires_public_media_attestation/);
   assert.doesNotMatch(enforcement, /UPDATE public\.media_social_publications|UPDATE public\.editorial_article_revisions/);
 });
+
+
+test('editorial asset previews require Media authorization and remain private and no-store', () => {
+  const preview = read('app/api/admin/media/[id]/route.ts');
+  const newsroom = read('app/admin/news/NewsroomClient.tsx');
+  assert.match(preview, /authorizeMediaEditorialAction\('media'\)/);
+  assert.match(preview, /FACTSPORT_EDITORIAL_HYPERDRIVE|withFactsportEditorialPostgres/);
+  assert.match(preview, /factsportMediaBucket\(\)\.get/);
+  assert.match(preview, /private, no-store/);
+  assert.match(preview, /X-Content-Type-Options/);
+  assert.match(preview, /PREVIEW_TYPES/);
+  assert.match(newsroom, /\/api\/admin\/media\//);
+  assert.doesNotMatch(preview, /public, max-age|public_media_assets/);
+});
