@@ -205,3 +205,21 @@ test('editorial asset previews require Media authorization and remain private an
   assert.match(newsroom, /\/api\/admin\/media\//);
   assert.doesNotMatch(preview, /public, max-age|public_media_assets/);
 });
+
+
+test('Media library is role-protected, paginated and exposes only private asset metadata', () => {
+  const route = read('app/api/admin/media/route.ts');
+  const page = read('app/admin/media/page.tsx');
+  const client = read('app/admin/media/MediaLibraryClient.tsx');
+  const layout = read('app/admin/layout.tsx');
+  assert.match(route, /export async function GET/);
+  assert.match(route, /authorizeMediaEditorialAction\('media'\)/);
+  assert.match(route, /LIMIT \$\{limit \+ 1\} OFFSET \$\{offset\}/);
+  assert.match(route, /Cache-Control': 'private, no-store/);
+  assert.match(page, /authorizeMediaEditorialAction\('media'\)/);
+  assert.match(client, /\/api\/admin\/media\?/);
+  assert.match(client, /Load more assets/);
+  assert.match(client, /rights_reference/);
+  assert.match(layout, /href="\/admin\/media"/);
+  assert.doesNotMatch(route, /public_media_assets|SUPABASE_SERVICE_ROLE_KEY/);
+});
