@@ -106,7 +106,7 @@ export async function POST(request: Request) {
       }
 
       const rooms = callId ? await tx`
-        SELECT id, room_name FROM public.media_broadcast_rooms WHERE room_name=${callId} LIMIT 1
+        SELECT id, room_name, callin_enabled FROM public.media_broadcast_rooms WHERE room_name=${callId} LIMIT 1
       ` : [];
       if (!rooms.length) {
         await tx`UPDATE public.media_broadcast_webhook_events SET processed_at=now() WHERE webhook_id=${webhookId}`;
@@ -154,7 +154,7 @@ export async function POST(request: Request) {
           WHERE room_id=${roomId}::uuid AND stream_user_id=${incomingUserId} AND left_at IS NULL
           LIMIT 1
         `;
-        if (participants.length && participants[0].role_key === 'caller') {
+        if (participants.length && participants[0].role_key === 'caller' && rooms[0].callin_enabled) {
           await audit(tx, roomId, 'callin_requested', participants[0].id as string, { streamUserId: incomingUserId });
         }
       } else if (eventType === 'call.permissions_updated' && incomingUserId) {
