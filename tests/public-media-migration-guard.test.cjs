@@ -8,12 +8,12 @@ const migrationDir = path.join(root, 'db/migrations');
 const readMigration = name => fs.readFileSync(path.join(migrationDir, name), 'utf8');
 
 test('V2 migration inventory remains contiguous through the public Media policy boundary', () => {
-  const files = fs.readdirSync(migrationDir).filter(name => /^\\d{4}_.+\\.sql$/.test(name));
+  const files = fs.readdirSync(migrationDir).filter(name => /^[0-9]{4}_/.test(name) && name.endsWith('.sql'));
   for (let number = 1; number <= 26; number += 1) {
     const prefix = String(number).padStart(4, '0');
-    const matches = files.filter(name => name.startsWith(prefix + '_'));
-    assert.equal(matches.length, 1, `expected exactly one migration for ${prefix}`);
-    assert.ok(fs.statSync(path.join(migrationDir, matches[0])).size > 0, `${matches[0]} must not be empty`);
+    const matches = files.filter(name => name.slice(0, 5) === prefix + '_');
+    assert.equal(matches.length, 1, 'expected exactly one migration for ' + prefix);
+    assert.ok(fs.statSync(path.join(migrationDir, matches[0])).size > 0, matches[0] + ' must not be empty');
   }
   const prefixes = files.map(name => name.slice(0, 4));
   assert.equal(new Set(prefixes).size, prefixes.length, 'migration sequence numbers must be unique');
@@ -23,25 +23,26 @@ test('public homepage announcements expose only the Media-owned public projectio
   const migration = readMigration('0024_factsport_media_public_announcements.sql');
   const grants = readMigration('0025_factsport_media_homepage_settings_grants.sql');
 
-  assert.match(migration, /ADD COLUMN IF NOT EXISTS announcement_text text/);
-  assert.match(migration, /announcement_text IS NULL OR char_length\\(announcement_text\\) <= 280/);
-  assert.match(migration, /announcement_link IS NULL OR announcement_link ~ '\\^https\\?:\\/\\/'/);
-  assert.match(migration, /CREATE OR REPLACE VIEW public\\.public_homepage_settings/);
-  assert.match(migration, /SELECT featured_match_id, announcement_text, announcement_link, announcement_enabled/);
-  assert.match(grants, /GRANT SELECT, INSERT, UPDATE ON public\\.homepage_settings TO factsport_v2_editorial_writer/);
-  assert.match(grants, /REVOKE ALL ON public\\.homepage_settings FROM PUBLIC, factsport_v2_reader, factsport_v2_schedule_writer, factsport_v2_espn_writer/);
+  assert.ok(migration.includes('ADD COLUMN IF NOT EXISTS announcement_text text'));
+  assert.ok(migration.includes('announcement_text IS NULL OR char_length(announcement_text) <= 280'));
+  assert.ok(migration.includes("announcement_link IS NULL OR announcement_link ~ '^https?://'"));
+  assert.ok(migration.includes('CREATE OR REPLACE VIEW public.public_homepage_settings'));
+  assert.ok(migration.includes('SELECT featured_match_id, announcement_text, announcement_link, announcement_enabled'));
+  assert.ok(grants.includes('GRANT SELECT, INSERT, UPDATE ON public.homepage_settings TO factsport_v2_editorial_writer'));
+  assert.ok(grants.includes('REVOKE ALL ON public.homepage_settings FROM PUBLIC, factsport_v2_reader, factsport_v2_schedule_writer, factsport_v2_espn_writer'));
 });
 
 test('public Media attestation enforcement fails closed and never rewrites existing records', () => {
   const migration = readMigration('0026_factsport_public_media_attestation_enforcement.sql');
+  const executableLines = migration.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('--'));
 
-  assert.match(migration, /MEDIA_ATTESTATION_RECONCILIATION_REQUIRED/);
-  assert.match(migration, /EDITORIAL_ATTESTATION_RECONCILIATION_REQUIRED/);
-  assert.match(migration, /RAISE EXCEPTION/);
+  assert.ok(migration.includes('MEDIA_ATTESTATION_RECONCILIATION_REQUIRED'));
+  assert.ok(migration.includes('EDITORIAL_ATTESTATION_RECONCILIATION_REQUIRED'));
+  assert.ok(migration.includes('RAISE EXCEPTION'));
   assert.ok(migration.indexOf('DO $$') < migration.indexOf('VALIDATE CONSTRAINT'));
-  assert.match(migration, /VALIDATE CONSTRAINT media_social_publications_public_delivery_requires_confirmation/);
-  assert.match(migration, /ADD CONSTRAINT editorial_revision_published_requires_public_media_attestation/);
-  assert.doesNotMatch(migration, /^\\s*(INSERT INTO|UPDATE|DELETE FROM|TRUNCATE|DROP TABLE)\\b/im);
-  assert.match(migration, /^BEGIN;/);
-  assert.match(migration, /COMMIT;\\s*$/);
+  assert.ok(migration.includes('VALIDATE CONSTRAINT media_social_publications_public_delivery_requires_confirmation'));
+  assert.ok(migration.includes('ADD CONSTRAINT editorial_revision_published_requires_public_media_attestation'));
+  assert.ok(!executableLines.some(line => /^(INSERT INTO|UPDATE|DELETE FROM|TRUNCATE|DROP TABLE)/i.test(line)));
+  assert.ok(migration.startsWith('BEGIN;'));
+  assert.ok(migration.trim().endsWith('COMMIT;'));
 });
