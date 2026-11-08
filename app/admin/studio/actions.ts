@@ -48,6 +48,7 @@ async function blockRevokedStreamUsers(roomName: string, userIds: string[]): Pro
 async function setStreamCallMemberRole(roomName: string, userId: string, role: string): Promise<string | null> {
   const config = getFactsportBroadcastRuntimeConfig();
   if (!config) return 'Factsport role was saved, but Stream credentials are not provisioned; provider role will apply after configuration.';
+  if (role === 'moderator' && !config.moderatorRoleReady) return 'Moderator role was saved in Factsport, but the Stream moderator role is not configured yet.';
   try {
     const issuedAt = Math.floor(Date.now() / 1000) - 1;
     const serverToken = await new SignJWT({ server: true })
