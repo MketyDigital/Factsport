@@ -30,6 +30,7 @@ test('broadcast token issuer is same-origin, room-scoped and derives every ident
   assert.match(adapter, /FACTSPORT_BROADCAST_TOKEN_HYPERDRIVE/);
   assert.match(adapter, /STREAM_API_SECRET/);
   assert.match(adapter, /FACTSPORT_BROADCAST_TOKEN_ISSUER_READY/);
+  assert.match(adapter, /anonymousSecretValid/);
   assert.match(client, /\/api\/studio\/token/);
   assert.match(client, /url\.hash/);
   assert.match(client, /window\.location\.href/);
