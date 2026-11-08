@@ -51,3 +51,34 @@ export function withFactsportBroadcastAdminPostgres<T>(operation: (sql: Factspor
     'Factsport broadcast administrator',
   );
 }
+
+
+/** Separate token-issuer identity: no studio settings, role grants or editorial writes. */
+export function withFactsportBroadcastTokenIssuerPostgres<T>(operation: (sql: FactsportSql) => Promise<T> | T): Promise<T> {
+  const bindings = env as unknown as Record<string, HyperdriveBinding | undefined>;
+  return withConnection(
+    bindings.FACTSPORT_BROADCAST_TOKEN_HYPERDRIVE?.connectionString,
+    operation,
+    'Factsport broadcast token issuer',
+  );
+}
+
+export type FactsportBroadcastRuntimeConfig = {
+  apiKey: string;
+  apiSecret: string;
+  anonymousSessionSecret: string;
+  moderatorRoleReady: boolean;
+  issuerReady: boolean;
+};
+
+export function getFactsportBroadcastRuntimeConfig(): FactsportBroadcastRuntimeConfig | null {
+  const bindings = env as unknown as Record<string, unknown>;
+  const apiKey = typeof bindings.STREAM_API_KEY === 'string' ? bindings.STREAM_API_KEY.trim() : '';
+  const apiSecret = typeof bindings.STREAM_API_SECRET === 'string' ? bindings.STREAM_API_SECRET : '';
+  const anonymousSessionSecret = typeof bindings.FACTSPORT_BROADCAST_ANON_SECRET === 'string'
+    ? bindings.FACTSPORT_BROADCAST_ANON_SECRET : '';
+  const issuerReady = bindings.FACTSPORT_BROADCAST_TOKEN_ISSUER_READY === 'true';
+  const moderatorRoleReady = bindings.FACTSPORT_STREAM_MODERATOR_ROLE_READY === 'true';
+  if (!apiKey || !apiSecret || !anonymousSessionSecret || !issuerReady) return null;
+  return { apiKey, apiSecret, anonymousSessionSecret, moderatorRoleReady, issuerReady };
+}
