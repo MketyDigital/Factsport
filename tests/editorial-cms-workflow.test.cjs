@@ -281,3 +281,22 @@ test('public article pages do not carry Prediction prize acquisition promotions'
   assert.match(article, /Follow fixtures, live scores and match coverage/);
   assert.doesNotMatch(article, /Win Amazing Prizes|Start Predicting|Think You.*Know Football/);
 });
+
+
+test('editorial revision history is role-protected and restore creates a new draft without rewriting live publication', () => {
+  const route = read('app/api/admin/news/[id]/revisions/route.ts');
+  const actions = read('app/admin/news/actions.ts');
+  const client = read('app/admin/news/NewsroomClient.tsx');
+  assert.match(route, /authorizeMediaEditorialAction\('read'\)/);
+  assert.match(route, /ORDER BY revision_number DESC/);
+  assert.match(route, /LIMIT 50/);
+  assert.match(route, /private, no-store/);
+  assert.match(actions, /export async function restoreEditorialRevision/);
+  assert.match(actions, /Restored from revision #/);
+  assert.match(actions, /INSERT INTO public\.editorial_article_revision_media/);
+  assert.match(actions, /workflow_status='draft'/);
+  assert.match(actions, /if \(articles\[0\]\.status !== 'published'\)/);
+  assert.match(client, /Revision history/);
+  assert.match(client, /Restore as new draft/);
+  assert.match(client, /live published article has not been changed/);
+});
