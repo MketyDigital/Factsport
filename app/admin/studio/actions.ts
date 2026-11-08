@@ -15,7 +15,8 @@ const unavailable = (): Result => ({
 
 async function blockRevokedStreamUsers(roomName: string, userIds: string[]): Promise<string | null> {
   const config = getFactsportBroadcastRuntimeConfig();
-  if (!config || userIds.length === 0) return null;
+  if (userIds.length === 0) return null;
+  if (!config) return 'Invite was revoked in Factsport, but Stream credentials are unavailable to block existing guest sessions.';
   try {
     const issuedAt = Math.floor(Date.now() / 1000) - 1;
     const serverToken = await new SignJWT({ server: true })
