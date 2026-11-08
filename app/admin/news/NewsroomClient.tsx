@@ -69,7 +69,8 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const [rightsReference, setRightsReference] = useState('');
   const [attributionText, setAttributionText] = useState('');
   const [usageExpiresAt, setUsageExpiresAt] = useState('');
-  const [placement, setPlacement] = useState<'hero' | 'team_1' | 'team_2'>('hero');
+  const [placement, setPlacement] = useState<'hero' | 'team_1' | 'team_2' | 'inline'>('hero');
+  const [mediaPosition, setMediaPosition] = useState(0);
 
   const filtered = useMemo(() => articles.filter(article => {
     const matchesSearch = !search || article.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -230,9 +231,12 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <label className="text-xs font-bold text-slate-600">Placement
                       <select value={placement} onChange={e => setPlacement(e.target.value as typeof placement)} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm">
-                        <option value="hero">Article hero image</option><option value="team_1">Team 1 logo</option><option value="team_2">Team 2 logo</option>
+                        <option value="hero">Article hero image</option><option value="team_1">Team 1 logo</option><option value="team_2">Team 2 logo</option><option value="inline">Inline article gallery</option>
                       </select>
                     </label>
+                    {placement === 'inline' && <label className="text-xs font-bold text-slate-600">Gallery order (0–100)
+                      <input type="number" min={0} max={100} step={1} value={mediaPosition} onChange={event => setMediaPosition(Number(event.target.value))} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
+                    </label>}
                     <label className="text-xs font-bold text-slate-600">Rights status
                       <select value={rightsStatus} onChange={e => setRightsStatus(e.target.value as typeof rightsStatus)} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm">
                         <option value="owned">Owned by FactSport</option><option value="licensed">Licensed</option><option value="editorial_exception">Editorial exception</option>
@@ -250,7 +254,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                   </div>
                   <button disabled={mediaPending} onClick={() => startMediaTransition(async () => {
                     const result = await reviewRightsAndAttachMedia({
-                      articleId: form.id!, assetId: uploadedAsset.id, placement, rightsStatus,
+                      articleId: form.id!, assetId: uploadedAsset.id, placement, position: mediaPosition, rightsStatus,
                       rightsReference, attributionText, altText: assetAltText,
                       usageExpiresAt: usageExpiresAt ? new Date(usageExpiresAt).toISOString() : undefined,
                     });
