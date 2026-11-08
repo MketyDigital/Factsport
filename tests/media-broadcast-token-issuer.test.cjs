@@ -88,6 +88,6 @@ test('Stream webhooks are signature-verified, gzip-aware, idempotent and reconci
   assert.doesNotMatch(route, /INSERT INTO public\.media_broadcast_webhook_events[^;]*payload/);
   assert.match(migration, /media_broadcast_token_identities/);
   assert.match(migration, /media_broadcast_webhook_events/);
-  assert.match(migration, /GRANT SELECT, INSERT ON public\.media_broadcast_webhook_events/);
+  assert.match(migration, /GRANT SELECT, INSERT, UPDATE ON public\.media_broadcast_webhook_events/);
   assert.match(migration, /invite_id uuid REFERENCES public\.media_broadcast_invites/);
 });
