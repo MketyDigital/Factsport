@@ -68,3 +68,35 @@ test('Media admin shell does not expose legacy Prediction or broad user administ
   assert.doesNotMatch(matches, /createClient|supabase|campaigns|pro_analysis/);
   assert.doesNotMatch(users, /SUPABASE_SERVICE_ROLE_KEY|select\('\*'\)|ADMIN_EMAILS/);
 });
+
+
+test('Entra External ID Media login uses discovery, PKCE, nonce, encrypted state and verified issuer-subject mapping', () => {
+  const identity = read('lib/auth/entra-external.ts');
+  const start = read('app/api/auth/entra/start/route.ts');
+  const callback = read('app/api/auth/entra/callback/route.ts');
+  const logout = read('app/api/auth/entra/logout/route.ts');
+  const login = read('app/media-login/page.tsx');
+  const authorization = read('app/lib/admin/v2-editorial-authorization.ts');
+  const middleware = read('middleware.ts');
+  assert.match(identity, /ENTRA_EXTERNAL_DISCOVERY_URL/);
+  assert.match(identity, /ENTRA_EXTERNAL_ISSUER/);
+  assert.match(identity, /ENTRA_EXTERNAL_CLIENT_ID/);
+  assert.match(identity, /ENTRA_EXTERNAL_REDIRECT_URI/);
+  assert.match(identity, /code_challenge_method: 'S256'/);
+  assert.match(identity, /nonce/);
+  assert.match(identity, /jwtDecrypt/);
+  assert.match(identity, /createRemoteJWKSet/);
+  assert.match(identity, /algorithms: \['RS256'\]/);
+  assert.match(identity, /issuer: metadata\.issuer/);
+  assert.match(identity, /audience: clientId/);
+  assert.match(identity, /WHERE issuer = \$\{issuer\} AND subject = \$\{subject\}/);
+  assert.match(identity, /FACTSPORT_AUTH_SESSION_SECRET/);
+  assert.match(start, /createEntraAuthorization/);
+  assert.match(callback, /completeEntraCallback/);
+  assert.match(callback, /entraCookieNames\.session/);
+  assert.match(logout, /maxAge: 0/);
+  assert.match(login, /\/api\/auth\/entra\/start/);
+  assert.match(authorization, /readFactsportEntraSession/);
+  assert.doesNotMatch(authorization, /createClient\(|supabase\.auth/);
+  assert.match(middleware, /hasEntraMediaSession/);
+});
