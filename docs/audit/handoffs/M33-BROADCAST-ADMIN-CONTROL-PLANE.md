@@ -42,3 +42,8 @@ Status: source implementation committed; CI checks in progress; database roles/m
 ## M34 follow-up
 
 The replacement Stream token issuer and room-scoped guest redemption are now implemented in source. It uses the separate token-issuer Hyperdrive, server-only Stream secrets, four-hour client tokens, anonymous listener sessions, 24-hour reusable hashed guest invites, room-scoped host/moderator/caller grants, and privacy-preserving rate limits. See `M34-STREAM-TOKEN-ISSUER-AND-GUEST-REDEMPTION.md`. Real provider configuration and E2E remain mandatory; studio activation stays fail-closed until those bindings/secrets are present.
+
+
+## Role lifecycle hardening
+
+- Revoking a host or moderator demotes the existing Stream call member to `user`; if demotion cannot be confirmed, the system attempts a fail-closed room block and marks the token identity revoked. Regranting a role unblocks the Stream user (when previously blocked) and applies the new room role. Caller revocation removes the Factsport caller grant and changes the token identity to listener. The admin UI surfaces provider warnings rather than claiming the Stream operation succeeded.
