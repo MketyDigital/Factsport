@@ -161,3 +161,8 @@ The active Media admin login remains blocked on the identity migration: middlewa
 | `GET /api/admin/news/[id]/revisions` | Returns bounded latest-50 editorial revision history and snapshots for side-by-side comparison. | Entra session + Media read capability; private/no-store; no public draft exposure. |
 
 Guest invitation tokens are passed in URL fragments and submitted in the POST body, never in query strings. The retired `/api/stream/token` endpoint is no longer called by the Media client.
+
+
+## M35 webhook and revocation update
+
+The signed Stream webhook endpoint now verifies raw-body HMAC, handles gzip payloads and idempotent `X-Webhook-Id` retries, and reconciles participant presence, call-in/mic events and room lifecycle audit. Guest invite revocation now marks issued token identities revoked, attempts Stream `BlockUser`, and webhook-rejects any later rejoin. Migration `0030_factsport_broadcast_token_identity_and_webhooks.sql` adds identity and webhook ledgers. See `M35-STREAM-WEBHOOKS-PARTICIPANT-AND-REVOCATION.md`; actual Stream webhook configuration and staging E2E remain open.
