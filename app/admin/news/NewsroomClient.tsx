@@ -172,7 +172,8 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                 </button>
                 {uploadedAsset && <div className="mt-4 rounded-xl border border-blue-200 bg-white p-3">
                   <p className="text-xs font-bold text-slate-800">Uploaded asset: {uploadedAsset.object_key}</p>
-                  <p className="mt-1 text-xs text-amber-700">Rights state: pending review</p>
+                  <img src={"/api/admin/media/" + encodeURIComponent(uploadedAsset.id)} alt={assetAltText || "Private editorial media preview"} className="mt-3 max-h-56 w-auto max-w-full rounded-lg border border-slate-200 object-contain" />
+                  <p className="mt-1 text-xs text-amber-700">Private preview · Rights state: pending review</p>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <label className="text-xs font-bold text-slate-600">Placement
                       <select value={placement} onChange={e => setPlacement(e.target.value as typeof placement)} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm">
