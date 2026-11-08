@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
-import { withFactsportBroadcastAdminPostgres } from '@/lib/adapters/postgres-client';
+import { isFactsportBroadcastTokenIssuerReady, withFactsportBroadcastAdminPostgres } from '@/lib/adapters/postgres-client';
 
 type Result = { success: true; data?: Record<string, unknown> } | { success: false; error: string; code?: string };
 const unavailable = (): Result => ({
@@ -40,7 +40,7 @@ export async function updateStudioSettings(input: {
     const videoUrl = safeMediaUrl(input.videoUrl);
     const isActive = input.isActive === true;
     const callinEnabled = input.callinEnabled === true;
-    if (isActive || callinEnabled) return { success: false, error: 'The Stream token issuer is not provisioned. Public studio activation and call-ins remain disabled.' };
+    if ((isActive || callinEnabled) && !isFactsportBroadcastTokenIssuerReady()) return { success: false, error: 'The Stream token issuer is not provisioned. Public studio activation and call-ins remain disabled.' };
     const publicListeningEnabled = input.publicListeningEnabled === true;
     await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
       const rooms = await tx`
@@ -90,7 +90,7 @@ export async function updateBroadcastRoom(input: {
       if (!rooms.length) throw new Error('Broadcast room not found.');
       const active = input.isActive === true;
       const callinEnabled = input.callinEnabled === true;
-      if (active || callinEnabled) throw new Error('The Stream token issuer is not provisioned. Room activation and call-ins remain disabled.');
+      if ((active || callinEnabled) && !isFactsportBroadcastTokenIssuerReady()) throw new Error('The Stream token issuer is not provisioned. Room activation and call-ins remain disabled.');
       await tx`
         UPDATE public.media_broadcast_rooms SET
           is_active=${active}, public_listening_enabled=${input.publicListeningEnabled === true},
