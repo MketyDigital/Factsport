@@ -62,6 +62,26 @@ async function anonymousIdentity(roomId: string, cookieValue: string | undefined
   return { subject, cookie };
 }
 
+
+async function consumeRateLimit(tx: any, bucketHash: string, maxPerMinute: number): Promise<boolean> {
+  const rows = await tx`
+    INSERT INTO public.media_broadcast_token_rate_limits (bucket_hash, window_started_at, request_count)
+    VALUES (${bucketHash}, now(), 1)
+    ON CONFLICT (bucket_hash) DO UPDATE SET
+      request_count = CASE
+        WHEN public.media_broadcast_token_rate_limits.window_started_at <= now() - interval '1 minute' THEN 1
+        ELSE public.media_broadcast_token_rate_limits.request_count + 1
+      END,
+      window_started_at = CASE
+        WHEN public.media_broadcast_token_rate_limits.window_started_at <= now() - interval '1 minute' THEN now()
+        ELSE public.media_broadcast_token_rate_limits.window_started_at
+      END,
+      updated_at = now()
+    RETURNING request_count
+  `;
+  return Number(rows[0]?.request_count || 0) <= maxPerMinute;
+}
+
 async function streamRequest(apiKey: string, serverToken: string, path: string, body: unknown) {
   const response = await fetch(`${STREAM_API_BASE}${path}${path.includes('?') ? '&' : '?'}api_key=${encodeURIComponent(apiKey)}`, {
     method: 'POST',
@@ -108,8 +128,13 @@ export async function POST(request: Request) {
     const cookieStore = cookies();
     const entraSession = await readFactsportEntraSession(cookieStore.get(entraCookieNames.session)?.value);
     const anonCookieValue = cookieStore.get(ANON_COOKIE)?.value;
+    const connectingIp = request.headers.get('cf-connecting-ip') || 'unknown';
+    const ipBucketHash = await sha256Hex('ip:' + connectingIp + ':' + config.anonymousSessionSecret);
+    const inviteTokenHash = inviteToken ? await sha256Hex(inviteToken) : '';
 
     const identity = await withFactsportBroadcastTokenIssuerPostgres(async sql => sql.begin(async tx => {
+      if (!await consumeRateLimit(tx, ipBucketHash, 30)) return { rateLimited: true as const };
+
       const rooms = await tx`
         SELECT id, room_name, scope_key, scope_type, match_id, is_active,
                public_listening_enabled, callin_enabled
@@ -123,7 +148,9 @@ export async function POST(request: Request) {
       if (!room.is_active) throw new BroadcastIssueError('This broadcast is not currently active.', 403);
 
       if (inviteToken) {
-        const tokenHash = await sha256Hex(inviteToken);
+        const inviteRateHash = await sha256Hex('invite:' + inviteTokenHash + ':' + config.anonymousSessionSecret);
+        if (!await consumeRateLimit(tx, inviteRateHash, 6)) return { rateLimited: true as const };
+        const tokenHash = inviteTokenHash;
         const invites = await tx`
           SELECT id, invited_label, max_uses, use_count, expires_at, revoked_at
           FROM public.media_broadcast_invites
@@ -156,6 +183,8 @@ export async function POST(request: Request) {
       }
 
       if (entraSession) {
+        const userRateHash = await sha256Hex('user:' + entraSession.internalUserId + ':' + config.anonymousSessionSecret);
+        if (!await consumeRateLimit(tx, userRateHash, 12)) return { rateLimited: true as const };
         const grants = await tx`
           SELECT role_key FROM public.media_broadcast_room_roles
           WHERE room_id=${room.id}::uuid AND user_id=${entraSession.internalUserId}::uuid
@@ -180,6 +209,8 @@ export async function POST(request: Request) {
 
       if (!room.public_listening_enabled) throw new BroadcastIssueError('Public listening is disabled for this room.', 403);
       const anonymous = await anonymousIdentity(room.id, anonCookieValue, anonSecret);
+      const anonymousRateHash = await sha256Hex('anonymous:' + anonymous.subject + ':' + config.anonymousSessionSecret);
+      if (!await consumeRateLimit(tx, anonymousRateHash, 12)) return { rateLimited: true as const };
       return {
         room, identityKind: 'anonymous' as const, subject: anonymous.subject,
         userId: 'factsport-anon-' + anonymous.subject.replace(/-/g, ''),
@@ -187,6 +218,8 @@ export async function POST(request: Request) {
         canRequestCallIn: false, createCall: false, anonymousCookie: anonymous.cookie,
       };
     }));
+
+    if ('rateLimited' in identity && identity.rateLimited) throw new BroadcastIssueError('Too many broadcast token requests. Try again shortly.', 429);
 
     const issuedAt = Math.floor(Date.now() / 1000) - 1;
     const serverToken = await new SignJWT({ server: true })
