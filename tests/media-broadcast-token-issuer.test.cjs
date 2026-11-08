@@ -83,11 +83,24 @@ test('Stream webhooks are signature-verified, gzip-aware, idempotent and reconci
   assert.match(route, /call\.permissions_updated/);
   assert.match(route, /call\.user_muted/);
   assert.match(route, /call\.member_removed/);
-  assert.match(route, /removeStreamMember/);
+  assert.match(route, /blockStreamUser/);
+  assert.match(route, /\/block\?api_key/);
   assert.match(route, /processed_at/);
   assert.doesNotMatch(route, /INSERT INTO public\.media_broadcast_webhook_events[^;]*payload/);
   assert.match(migration, /media_broadcast_token_identities/);
   assert.match(migration, /media_broadcast_webhook_events/);
   assert.match(migration, /GRANT SELECT, INSERT, UPDATE ON public\.media_broadcast_webhook_events/);
   assert.match(migration, /invite_id uuid REFERENCES public\.media_broadcast_invites/);
+});
+
+
+test('revoking a guest invite revokes issued token identities and blocks their Stream users', () => {
+  const actions = read('app/admin/studio/actions.ts');
+  const webhook = read('app/api/webhooks/stream/route.ts');
+  assert.match(actions, /UPDATE public\.media_broadcast_token_identities SET revoked_at=now\(\)/);
+  assert.match(actions, /blockRevokedStreamUsers/);
+  assert.match(actions, /\/block\?api_key/);
+  assert.match(webhook, /missing_or_revoked_token_identity/);
+  assert.match(webhook, /blockStreamUser/);
+  assert.match(webhook, /removeUserId/);
 });
