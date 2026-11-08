@@ -222,8 +222,10 @@ export async function POST(request: Request) {
           VALUES (${room.id}::uuid, ${streamUserId}, 'authenticated', ${entraSession.internalUserId}::uuid, ${roleKey}, ${identityExpiresAt}::timestamptz)
           ON CONFLICT (room_id, stream_user_id) DO UPDATE SET
             identity_kind='authenticated', user_id=EXCLUDED.user_id, role_key=EXCLUDED.role_key,
-            invite_id=NULL, issued_at=now(), expires_at=EXCLUDED.expires_at, revoked_at=NULL
+            invite_id=NULL, issued_at=now(), expires_at=EXCLUDED.expires_at
+          RETURNING revoked_at
         `;
+        if (tokenIdentity[0]?.revoked_at) throw new BroadcastIssueError('This Factsport account is blocked from this broadcast room.', 403);
         return {
           room, identityKind: 'authenticated' as const, subject: entraSession.internalUserId,
           userId: streamUserId,
@@ -242,8 +244,10 @@ export async function POST(request: Request) {
         VALUES (${room.id}::uuid, ${anonymousUserId}, 'anonymous', 'listener', ${identityExpiresAt}::timestamptz)
         ON CONFLICT (room_id, stream_user_id) DO UPDATE SET
           identity_kind='anonymous', user_id=NULL, role_key='listener', invite_id=NULL,
-          issued_at=now(), expires_at=EXCLUDED.expires_at, revoked_at=NULL
+          issued_at=now(), expires_at=EXCLUDED.expires_at
+        RETURNING revoked_at
       `;
+      if (tokenIdentity[0]?.revoked_at) throw new BroadcastIssueError('This anonymous listener session is blocked from the broadcast room.', 403);
       return {
         room, identityKind: 'anonymous' as const, subject: anonymous.subject,
         userId: anonymousUserId,
