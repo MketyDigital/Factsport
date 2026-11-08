@@ -44,3 +44,8 @@ The dedicated Media broadcast admin UI and server mutations are now implemented 
 ## M34 token issuer update
 
 Studio settings and role administration now use the distinct broadcast-admin adapter; client token requests use the distinct broadcast-token-issuer adapter. The old Supabase writer and `/api/stream/token` path are not restored. Token issuance and guest redemption fail closed until the dedicated database binding, Stream secrets and readiness flag are provisioned. See M33 and M34.
+
+
+## M35 webhook and revocation update
+
+The signed Stream webhook endpoint now verifies raw-body HMAC, handles gzip payloads and idempotent `X-Webhook-Id` retries, and reconciles participant presence, call-in/mic events and room lifecycle audit. Guest invite revocation now marks issued token identities revoked, attempts Stream `BlockUser`, and webhook-rejects any later rejoin. Migration `0030_factsport_broadcast_token_identity_and_webhooks.sql` adds identity and webhook ledgers. See `M35-STREAM-WEBHOOKS-PARTICIPANT-AND-REVOCATION.md`; actual Stream webhook configuration and staging E2E remain open.
