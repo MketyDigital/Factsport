@@ -5,7 +5,7 @@ import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 
 type MediaReviewInput = {
-  articleId: string; assetId: string; placement: 'hero' | 'team_1' | 'team_2';
+  articleId: string; assetId: string; placement: 'hero' | 'team_1' | 'team_2' | 'inline'; position?: number;
   rightsStatus: 'owned' | 'licensed' | 'editorial_exception';
   rightsReference?: string; attributionText?: string; altText?: string; usageExpiresAt?: string;
 };
@@ -16,9 +16,13 @@ export async function reviewRightsAndAttachMedia(input: MediaReviewInput) {
   if (!/^[0-9a-f-]{36}$/i.test(input?.articleId || '') || !/^[0-9a-f-]{36}$/i.test(input?.assetId || '')) {
     return { success: false, error: 'Invalid article or media asset identifier.' };
   }
-  if (!['hero', 'team_1', 'team_2'].includes(input.placement) ||
+  if (!['hero', 'team_1', 'team_2', 'inline'].includes(input.placement) ||
       !['owned', 'licensed', 'editorial_exception'].includes(input.rightsStatus)) {
     return { success: false, error: 'Invalid media placement or rights status.' };
+  }
+  const position = input.placement === 'inline' && Number.isInteger(input.position) ? Math.max(0, Math.min(input.position!, 100)) : 0;
+  if (input.placement === 'inline' && (!Number.isInteger(input.position) || input.position! < 0 || input.position! > 100)) {
+    return { success: false, error: 'Inline media position must be a whole number from 0 to 100.' };
   }
   const rightsReference = typeof input.rightsReference === 'string' ? input.rightsReference.trim().slice(0, 2048) : '';
   if (input.rightsStatus !== 'owned' && !rightsReference) {
@@ -70,9 +74,9 @@ export async function reviewRightsAndAttachMedia(input: MediaReviewInput) {
 
       await tx`
         INSERT INTO public.editorial_article_revision_media
-          (revision_id, placement, media_id, remove_media, updated_at)
-        VALUES (${revisions[0].id}::uuid, ${input.placement}, ${input.assetId}::uuid, false, now())
-        ON CONFLICT (revision_id, placement) DO UPDATE SET
+          (revision_id, placement, position, media_id, remove_media, updated_at)
+        VALUES (${revisions[0].id}::uuid, ${input.placement}, ${position}, ${input.assetId}::uuid, false, now())
+        ON CONFLICT (revision_id, placement, position) DO UPDATE SET
           media_id=EXCLUDED.media_id, remove_media=false, updated_at=now()
       `;
       await tx`
