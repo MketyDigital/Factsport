@@ -185,7 +185,11 @@ export async function createBroadcastInvite(input: {
         VALUES (${input.roomId}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'invite_created',
           ${JSON.stringify({ inviteId: rows[0].id, expiresAt, maxUses })}::jsonb)
       `;
-      return { ...rows[0], scope_type: rooms[0].scope_type, match_id: rooms[0].match_id };
+      return {
+        id: rows[0].id as string, expires_at: rows[0].expires_at,
+        max_uses: rows[0].max_uses, scope_type: rooms[0].scope_type,
+        match_id: rooms[0].match_id,
+      };
     }));
     revalidatePath('/admin/studio');
     return { success: true, data: {
