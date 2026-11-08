@@ -573,18 +573,21 @@ export async function revokeBroadcastRole(roleId: string): Promise<Result> {
       };
     }));
     let warning: string | null = null;
+    const blockedUserIds: string[] = [];
     if (revoked.roomName && ['host', 'moderator'].includes(revoked.role)) {
       for (const streamUserId of revoked.streamUserIds) {
-        warning = await demoteStreamCallMember(revoked.roomName, streamUserId);
-        if (warning) {
+        const demotionWarning = await setStreamCallMemberRole(revoked.roomName, streamUserId, 'user');
+        if (demotionWarning) {
           const blockWarning = await blockRevokedStreamUsers(revoked.roomName, [streamUserId]);
+          await withFactsportBroadcastAdminPostgres(async sql => sql`
+            UPDATE public.media_broadcast_token_identities SET revoked_at=now()
+            WHERE room_id=${revoked.roomId}::uuid AND stream_user_id=${streamUserId}
+          `);
           if (!blockWarning) {
-            await withFactsportBroadcastAdminPostgres(async sql => sql`
-              UPDATE public.media_broadcast_token_identities SET revoked_at=now()
-              WHERE room_id=${revoked.roomId}::uuid AND stream_user_id=${streamUserId}
-            `);
+            blockedUserIds.push(streamUserId);
+            warning = 'Stream role demotion failed; the affected user was blocked from the room to fail closed.';
           } else {
-            warning = warning + ' ' + blockWarning;
+            warning = demotionWarning + ' ' + blockWarning;
           }
         }
       }
@@ -596,6 +599,25 @@ export async function revokeBroadcastRole(roleId: string): Promise<Result> {
           AND stream_user_id = ANY(${revoked.streamUserIds}::text[])
           AND left_at IS NULL
       `);
+    }
+    if (blockedUserIds.length) {
+      await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
+        const removed = await tx`
+          UPDATE public.media_broadcast_participants
+          SET left_at=now(), last_seen_at=now(), mic_enabled=false
+          WHERE room_id=${revoked.roomId}::uuid
+            AND stream_user_id = ANY(${blockedUserIds}::text[])
+            AND left_at IS NULL
+          RETURNING id, stream_user_id
+        `;
+        for (const participant of removed) {
+          await tx`
+            INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, participant_id, details)
+            VALUES (${revoked.roomId}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'participant_removed',
+              ${participant.id}::uuid, ${JSON.stringify({ streamUserId: participant.stream_user_id, source: 'role_revocation_fallback_block' })}::jsonb)
+          `;
+        }
+      }));
     }
     revalidatePath('/admin/studio');
     return { success: true, data: warning ? { warning } : {} };
