@@ -60,7 +60,7 @@ test('broadcast admin exposes webhook-backed participants and can revoke their r
   assert.match(actions, /blockBroadcastParticipant/);
   assert.match(actions, /UPDATE public\.media_broadcast_token_identities SET revoked_at/);
   assert.match(actions, /blockRevokedStreamUsers/);
-  assert.match(migration, /GRANT UPDATE \(left_at, last_seen_at, mic_enabled\)/);
+  assert.match(migration, /GRANT UPDATE \(left_at, last_seen_at, mic_enabled, role_key\)/);
 });
 
 
