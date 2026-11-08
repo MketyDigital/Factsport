@@ -166,7 +166,10 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   // 🛡️ SECURITY CHECK FOR ADMIN ROUTES
-  if (pathname.startsWith('/admin')) {
+  // Entra cookie presence bypasses only this legacy Supabase/email gate.
+  // Media layouts, pages and every mutation decrypt and verify the session.
+  const hasEntraMediaSession = Boolean(request.cookies.get('__Host-factsport_media_session')?.value);
+  if (pathname.startsWith('/admin') && !hasEntraMediaSession) {
     
     // 1. If not logged in -> Send to Login
     if (!user) {
