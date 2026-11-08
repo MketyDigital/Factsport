@@ -34,24 +34,24 @@ async function verifySignature(payload: Uint8Array, signature: string, secret: s
 }
 
 
-async function removeStreamMember(apiKey: string, apiSecret: string, roomName: string, userId: string) {
+async function blockStreamUser(apiKey: string, apiSecret: string, roomName: string, userId: string) {
   const issuedAt = Math.floor(Date.now() / 1000) - 1;
   const serverToken = await new SignJWT({ server: true })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setIssuedAt(issuedAt)
     .setExpirationTime(issuedAt + 5 * 60)
     .sign(new TextEncoder().encode(apiSecret));
-  const url = `https://video.stream-io-api.com/api/v2/video/call/audio_room/${encodeURIComponent(roomName)}/members?api_key=${encodeURIComponent(apiKey)}`;
+  const url = `https://video.stream-io-api.com/api/v2/video/call/audio_room/${encodeURIComponent(roomName)}/block?api_key=${encodeURIComponent(apiKey)}`;
   const response = await fetch(url, {
     method: 'POST',
     headers: { Authorization: serverToken, 'stream-auth-type': 'jwt', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ remove_members: [userId] }),
+    body: JSON.stringify({ user_id: userId }),
     cache: 'no-store',
     signal: AbortSignal.timeout(5000),
   });
   if (!response.ok && response.status !== 404) {
-    console.error('Stream rejected revoked participant removal', { status: response.status });
-    throw new Error('Unable to remove a revoked participant from the Stream room.');
+    console.error('Stream rejected revoked participant block', { status: response.status });
+    throw new Error('Unable to block a revoked participant from the Stream room.');
   }
 }
 
@@ -228,7 +228,7 @@ export async function POST(request: Request) {
     }));
 
     if ('removeUserId' in result && result.removeUserId && result.roomName) {
-      await removeStreamMember(config.apiKey, config.apiSecret, result.roomName, result.removeUserId);
+      await blockStreamUser(config.apiKey, config.apiSecret, result.roomName, result.removeUserId);
       await withFactsportBroadcastTokenIssuerPostgres(async sql => sql.begin(async tx => {
         const rooms = await tx`SELECT id FROM public.media_broadcast_rooms WHERE room_name=${result.roomName} LIMIT 1`;
         if (rooms.length) await audit(tx, rooms[0].id as string, 'participant_removed', null, {
