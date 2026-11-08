@@ -70,13 +70,21 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
         await stopMedia(); 
 
         try {
-            const urlParams = new URLSearchParams(window.location.search);
-            const guestToken = urlParams.get('guest');
-            
-            let apiUrl = '/api/stream/token?match_id=' + matchId;
-            if (guestToken) apiUrl += '&guest=' + guestToken;
-            
-            const res = await fetch(apiUrl);
+            const url = new URL(window.location.href);
+            const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+            const guestToken = hashParams.get('guest');
+            if (guestToken) {
+                url.hash = '';
+                window.history.replaceState({}, '', url.toString());
+            }
+
+            const res = await fetch('/api/studio/token', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roomKey: matchId, inviteToken: guestToken || undefined }),
+                cache: 'no-store',
+            });
             const text = await res.text();
             let data;
             try { data = JSON.parse(text); } catch(e) { throw new Error("Server temporarily unavailable. Reconnecting..."); }
@@ -89,7 +97,7 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
             const myClient = new StreamVideoClient({
                 apiKey: data.apiKey, user: { id: data.userId, name: data.username, image: data.image }, token: data.token,
             });
-            const myCall = myClient.call('audio_room', matchId);
+            const myCall = myClient.call('audio_room', data.roomName || matchId);
 
             const tryJoin = async () => {
                 try {
