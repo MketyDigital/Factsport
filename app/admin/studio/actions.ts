@@ -321,7 +321,7 @@ export async function blockBroadcastParticipant(input: { roomId: string; streamU
         WHERE p.room_id=${input.roomId}::uuid
           AND p.stream_user_id=${input.streamUserId}
           AND p.left_at IS NULL
-        LIMIT 1 FOR UPDATE OF p
+        LIMIT 1
       `;
       if (!rows.length) throw new Error('Active participant not found.');
       const participant = rows[0];
@@ -346,15 +346,38 @@ export async function blockBroadcastParticipant(input: { roomId: string; streamU
           WHERE room_id=${participant.room_id}::uuid AND stream_user_id=${participant.stream_user_id}
         `;
       }
-      await tx`
-        INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, participant_id, details)
-        VALUES (${participant.room_id}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'participant_removed',
-          ${participant.id}::uuid,
-          ${JSON.stringify({ streamUserId: participant.stream_user_id, identityKind: participant.identity_kind, inviteRevoked: Boolean(participant.invite_id) })}::jsonb)
-      `;
-      return { roomName: participant.room_name as string, userIds };
+      if (participant.invite_id) {
+        await tx`
+          INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, details)
+          VALUES (${participant.room_id}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'invite_revoked',
+            ${JSON.stringify({ inviteId: participant.invite_id, source: 'participant_block' })}::jsonb)
+        `;
+      }
+      return {
+        roomName: participant.room_name as string, roomId: participant.room_id as string,
+        participantId: participant.id as string, streamUserId: participant.stream_user_id as string,
+        identityKind: participant.identity_kind as string, userIds,
+      };
     }));
     const warning = await blockRevokedStreamUsers(target.roomName, target.userIds);
+    if (!warning) {
+      await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
+        const removed = await tx`
+          UPDATE public.media_broadcast_participants
+          SET left_at=now(), last_seen_at=now(), mic_enabled=false
+          WHERE id=${target.participantId}::uuid AND left_at IS NULL
+          RETURNING id
+        `;
+        if (removed.length) {
+          await tx`
+            INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, participant_id, details)
+            VALUES (${target.roomId}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'participant_removed',
+              ${target.participantId}::uuid,
+              ${JSON.stringify({ streamUserId: target.streamUserId, identityKind: target.identityKind })}::jsonb)
+          `;
+        }
+      }));
+    }
     revalidatePath('/admin/studio');
     return { success: true, data: warning ? { warning } : {} };
   } catch (error) {
