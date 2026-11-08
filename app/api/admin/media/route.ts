@@ -20,6 +20,57 @@ function validImageSignature(type: string, bytes: Uint8Array) {
   return false;
 }
 
+export async function GET(request: Request) {
+  const authorization = await authorizeMediaEditorialAction('media');
+  if (!authorization.ok) {
+    return NextResponse.json({ error: authorization.error }, {
+      status: authorization.status,
+      headers: { 'Cache-Control': 'private, no-store' },
+    });
+  }
+
+  const url = new URL(request.url);
+  const query = (url.searchParams.get('q') || '').trim().replace(/[%_\\]/g, '').slice(0, 100);
+  const requestedStatus = url.searchParams.get('status') || 'all';
+  const allowedStatuses = new Set(['all', 'pending', 'owned', 'licensed', 'editorial_exception', 'rejected', 'expired']);
+  const status = allowedStatuses.has(requestedStatus) ? requestedStatus : 'all';
+  const rawOffset = Number(url.searchParams.get('offset') || '0');
+  const offset = Number.isInteger(rawOffset) ? Math.max(0, Math.min(rawOffset, 5000)) : 0;
+  const limit = 50;
+
+  try {
+    const assets = await withFactsportEditorialPostgres(async sql => sql`
+      SELECT id, object_key, media_kind, content_type, byte_size, sha256,
+             width, height, alt_text, rights_status, rights_reference,
+             attribution_text, usage_expires_at, is_public, uploaded_by,
+             created_at, updated_at
+      FROM public.media_assets
+      WHERE media_kind = 'image'
+        AND (${status} = 'all' OR rights_status = ${status})
+        AND (
+          ${query} = ''
+          OR object_key ILIKE ${'%' + query + '%'}
+          OR COALESCE(alt_text, '') ILIKE ${'%' + query + '%'}
+          OR COALESCE(attribution_text, '') ILIKE ${'%' + query + '%'}
+        )
+      ORDER BY created_at DESC, id DESC
+      LIMIT ${limit + 1} OFFSET ${offset}
+    `);
+    const hasMore = assets.length > limit;
+    return NextResponse.json({
+      success: true,
+      assets: assets.slice(0, limit),
+      page: { offset, limit, hasMore, nextOffset: hasMore ? offset + limit : null },
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
+  } catch (error) {
+    console.error('Editorial media library unavailable', error);
+    return NextResponse.json({ error: 'Editorial media library is not connected.' }, {
+      status: 503,
+      headers: { 'Cache-Control': 'private, no-store' },
+    });
+  }
+}
+
 export async function POST(request: Request) {
   const authorization = await authorizeMediaEditorialAction('media');
   if (!authorization.ok) return NextResponse.json({ error: authorization.error }, { status: authorization.status });
