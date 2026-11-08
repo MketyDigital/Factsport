@@ -138,6 +138,9 @@ export async function completeEntraCallback(input: {
   stateCookie: string | undefined;
 }) {
   if (!input.stateCookie || !input.code || !input.state) throw new Error('Missing OIDC callback state');
+  if (input.code.length > 8192 || input.state.length > 512 || input.stateCookie.length > 16384) {
+    throw new Error('OIDC callback parameters exceed the accepted size limits');
+  }
   const { payload } = await jwtDecrypt(input.stateCookie, sessionKey(), { clockTolerance: 5 });
   const stored = payload as JWTPayload & EntraState;
   if (typeof stored.state !== 'string' || stored.state !== input.state ||
