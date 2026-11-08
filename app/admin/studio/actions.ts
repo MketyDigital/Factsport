@@ -45,35 +45,6 @@ async function blockRevokedStreamUsers(roomName: string, userIds: string[]): Pro
 }
 
 
-async function demoteStreamCallMember(roomName: string, userId: string): Promise<string | null> {
-  const config = getFactsportBroadcastRuntimeConfig();
-  if (!config) return 'Factsport role was revoked, but Stream credentials are unavailable to demote the active call member.';
-  try {
-    const issuedAt = Math.floor(Date.now() / 1000) - 1;
-    const serverToken = await new SignJWT({ server: true })
-      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
-      .setIssuedAt(issuedAt)
-      .setExpirationTime(issuedAt + 5 * 60)
-      .sign(new TextEncoder().encode(config.apiSecret));
-    const response = await fetch(
-      `https://video.stream-io-api.com/api/v2/video/call/audio_room/${encodeURIComponent(roomName)}/members?api_key=${encodeURIComponent(config.apiKey)}`,
-      {
-        method: 'POST',
-        headers: { Authorization: serverToken, 'stream-auth-type': 'jwt', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ update_members: [{ user_id: userId, role: 'user' }] }),
-        cache: 'no-store',
-        signal: AbortSignal.timeout(5000),
-      },
-    );
-    if (!response.ok && response.status !== 404) return 'Factsport role was revoked, but Stream could not confirm the member demotion.';
-    return null;
-  } catch (error) {
-    console.error('Stream member demotion failed', error);
-    return 'Factsport role was revoked, but Stream could not confirm the member demotion.';
-  }
-}
-
-
 async function setStreamCallMemberRole(roomName: string, userId: string, role: string): Promise<string | null> {
   const config = getFactsportBroadcastRuntimeConfig();
   if (!config) return 'Factsport role was saved, but Stream credentials are not provisioned; provider role will apply after configuration.';
