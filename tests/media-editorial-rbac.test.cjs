@@ -16,9 +16,8 @@ test('Media editorial authorization is domain-owned and capability-specific', ()
   assert.match(auth, /external_identities/);
   assert.ok(auth.includes('WHERE issuer = ${identity!.issuer}'));
   assert.ok(auth.includes('AND subject = ${identity!.subject}'));
-  assert.match(auth, /getSession\(\)/);
-  assert.match(auth, /payload\.iss/);
-  assert.match(auth, /payload\.sub/);
+  assert.match(auth, /readFactsportEntraSession/);
+  assert.ok(auth.includes('AND user_id = ${internalUserId!}::uuid'));
   assert.doesNotMatch(auth, /WHERE subject = \$\{authUser\.id\}/);
   assert.match(auth, /media_editorial_memberships/);
   assert.match(auth, /writer/);
