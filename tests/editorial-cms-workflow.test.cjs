@@ -248,3 +248,10 @@ test('editorial composer can reuse only rights-approved, non-expired media asset
   assert.match(client, /reviewRightsAndAttachMedia/);
   assert.match(api, /authorizeMediaEditorialAction\('media'\)/);
 });
+
+
+test('reusing an approved asset in a new revision does not unpublish its existing public attachment', () => {
+  const mediaActions = read('app/admin/news/media-actions.ts');
+  assert.match(mediaActions, /INSERT INTO public\.editorial_article_revision_media/);
+  assert.doesNotMatch(mediaActions, /is_public=false/);
+});
