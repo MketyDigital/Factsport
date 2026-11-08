@@ -37,3 +37,17 @@ export function withFactsportEditorialPostgres<T>(operation: (sql: FactsportSql)
   const bindings = env as unknown as Record<string, HyperdriveBinding | undefined>;
   return withConnection(bindings.FACTSPORT_EDITORIAL_HYPERDRIVE?.connectionString, operation, 'Factsport editorial writer');
 }
+
+
+/**
+ * Dedicated Stream/broadcast administration identity. It cannot be substituted
+ * with the editorial writer, public reader, or Prediction database connection.
+ */
+export function withFactsportBroadcastAdminPostgres<T>(operation: (sql: FactsportSql) => Promise<T> | T): Promise<T> {
+  const bindings = env as unknown as Record<string, HyperdriveBinding | undefined>;
+  return withConnection(
+    bindings.FACTSPORT_BROADCAST_ADMIN_HYPERDRIVE?.connectionString,
+    operation,
+    'Factsport broadcast administrator',
+  );
+}
