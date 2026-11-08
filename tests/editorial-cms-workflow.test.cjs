@@ -180,3 +180,14 @@ test('match-event fan-out has a durable Media outbox and a separate provider dis
   assert.doesNotMatch(socialOutboxSql, /GRANT .* ON public\.predictions/i);
   assert.doesNotMatch(socialOutboxSql, /GRANT .* ON public\.settlement/i);
 });
+
+
+test('public Media publisher attestations are enforced and legacy rows are reconciled before validation', () => {
+  const enforcement = read('db/migrations/0026_factsport_public_media_attestation_enforcement.sql');
+  assert.match(enforcement, /MEDIA_ATTESTATION_RECONCILIATION_REQUIRED/);
+  assert.match(enforcement, /EDITORIAL_ATTESTATION_RECONCILIATION_REQUIRED/);
+  assert.match(enforcement, /VALIDATE CONSTRAINT media_social_publications_public_delivery_requires_confirmation/);
+  assert.match(enforcement, /editorial_revision_published_requires_public_media_attestation/);
+  assert.match(enforcement, /VALIDATE CONSTRAINT editorial_revision_published_requires_public_media_attestation/);
+  assert.doesNotMatch(enforcement, /UPDATE public\.media_social_publications|UPDATE public\.editorial_article_revisions/);
+});
