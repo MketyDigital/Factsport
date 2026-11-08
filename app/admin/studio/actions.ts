@@ -44,6 +44,35 @@ async function blockRevokedStreamUsers(roomName: string, userIds: string[]): Pro
   }
 }
 
+
+async function demoteStreamCallMember(roomName: string, userId: string): Promise<string | null> {
+  const config = getFactsportBroadcastRuntimeConfig();
+  if (!config) return 'Factsport role was revoked, but Stream credentials are unavailable to demote the active call member.';
+  try {
+    const issuedAt = Math.floor(Date.now() / 1000) - 1;
+    const serverToken = await new SignJWT({ server: true })
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+      .setIssuedAt(issuedAt)
+      .setExpirationTime(issuedAt + 5 * 60)
+      .sign(new TextEncoder().encode(config.apiSecret));
+    const response = await fetch(
+      `https://video.stream-io-api.com/api/v2/video/call/audio_room/${encodeURIComponent(roomName)}/members?api_key=${encodeURIComponent(config.apiKey)}`,
+      {
+        method: 'POST',
+        headers: { Authorization: serverToken, 'stream-auth-type': 'jwt', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ update_members: [{ user_id: userId, role: 'user' }] }),
+        cache: 'no-store',
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+    if (!response.ok && response.status !== 404) return 'Factsport role was revoked, but Stream could not confirm the member demotion.';
+    return null;
+  } catch (error) {
+    console.error('Stream member demotion failed', error);
+    return 'Factsport role was revoked, but Stream could not confirm the member demotion.';
+  }
+}
+
 function safeMediaUrl(value: unknown): string | null {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value !== 'string') throw new Error('Broadcast media URL must be text.');
@@ -439,20 +468,57 @@ export async function revokeBroadcastRole(roleId: string): Promise<Result> {
   if (!authorization.ok) return { success: false, error: authorization.error, code: 'MEDIA_BROADCAST_FORBIDDEN' };
   if (!uuid(roleId)) return { success: false, error: 'Invalid broadcast role grant.' };
   try {
-    await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
+    const revoked = await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
       const rows = await tx`
         UPDATE public.media_broadcast_room_roles SET revoked_at=now()
         WHERE id=${roleId}::uuid AND revoked_at IS NULL RETURNING room_id, user_id, role_key
       `;
       if (!rows.length) throw new Error('Broadcast role was not found or is already revoked.');
+      const room = await tx`SELECT room_name FROM public.media_broadcast_rooms WHERE id=${rows[0].room_id}::uuid LIMIT 1`;
+      const identities = await tx`
+        UPDATE public.media_broadcast_token_identities SET role_key='listener'
+        WHERE room_id=${rows[0].room_id}::uuid AND user_id=${rows[0].user_id}::uuid
+          AND identity_kind='authenticated' AND revoked_at IS NULL
+        RETURNING stream_user_id
+      `;
       await tx`
         INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, details)
         VALUES (${rows[0].room_id}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'role_revoked',
           ${JSON.stringify({ targetUserId: rows[0].user_id, role: rows[0].role_key })}::jsonb)
       `;
+      return {
+        roomId: rows[0].room_id as string, roomName: room[0]?.room_name as string | undefined,
+        userId: rows[0].user_id as string, role: rows[0].role_key as string,
+        streamUserIds: identities.map(item => String(item.stream_user_id)),
+      };
     }));
+    let warning: string | null = null;
+    if (revoked.roomName && ['host', 'moderator'].includes(revoked.role)) {
+      for (const streamUserId of revoked.streamUserIds) {
+        warning = await demoteStreamCallMember(revoked.roomName, streamUserId);
+        if (warning) {
+          const blockWarning = await blockRevokedStreamUsers(revoked.roomName, [streamUserId]);
+          if (!blockWarning) {
+            await withFactsportBroadcastAdminPostgres(async sql => sql`
+              UPDATE public.media_broadcast_token_identities SET revoked_at=now()
+              WHERE room_id=${revoked.roomId}::uuid AND stream_user_id=${streamUserId}
+            `);
+          } else {
+            warning = warning + ' ' + blockWarning;
+          }
+        }
+      }
+    }
+    if (revoked.streamUserIds.length) {
+      await withFactsportBroadcastAdminPostgres(async sql => sql`
+        UPDATE public.media_broadcast_participants SET role_key='listener'
+        WHERE room_id=${revoked.roomId}::uuid
+          AND stream_user_id = ANY(${revoked.streamUserIds}::text[])
+          AND left_at IS NULL
+      `);
+    }
     revalidatePath('/admin/studio');
-    return { success: true };
+    return { success: true, data: warning ? { warning } : {} };
   } catch (error) {
     console.error('Broadcast role revocation failed', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unable to revoke broadcast role.' };
