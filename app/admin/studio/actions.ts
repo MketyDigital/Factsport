@@ -115,6 +115,41 @@ export async function updateBroadcastRoom(input: {
   }
 }
 
+
+export async function createMatchBroadcastRoom(matchId: string): Promise<Result> {
+  const authorization = await authorizeMediaEditorialAction('broadcast');
+  if (!authorization.ok) return { success: false, error: authorization.error, code: 'MEDIA_BROADCAST_FORBIDDEN' };
+  if (!uuid(matchId)) return { success: false, error: 'Enter a valid canonical Factsport match UUID.' };
+  try {
+    const room = await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
+      const scopeKey = 'match:' + matchId;
+      const roomName = 'match-' + matchId.replace(/-/g, '');
+      const rows = await tx`
+        INSERT INTO public.media_broadcast_rooms
+          (scope_key, room_name, scope_type, match_id, is_active, public_listening_enabled, callin_enabled, created_by, updated_by)
+        VALUES (
+          ${scopeKey}, ${roomName}, 'match', ${matchId}::uuid, false, true, false,
+          ${authorization.user.domainUserId}::uuid, ${authorization.user.domainUserId}::uuid
+        )
+        ON CONFLICT (match_id) WHERE scope_type='match' DO NOTHING
+        RETURNING id, room_name
+      `;
+      if (!rows.length) throw new Error('A broadcast room already exists for this match.');
+      await tx`
+        INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, details)
+        VALUES (${rows[0].id}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'room_created',
+          ${JSON.stringify({ scopeKey, matchId })}::jsonb)
+      `;
+      return rows[0];
+    }));
+    revalidatePath('/admin/studio');
+    return { success: true, data: { id: room.id, roomName: room.room_name } };
+  } catch (error) {
+    console.error('Match broadcast room creation failed', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to create match room.' };
+  }
+}
+
 export async function createBroadcastInvite(input: {
   roomId: string; label?: string; expiresInHours?: number; maxUses?: number | null;
 }): Promise<Result> {
