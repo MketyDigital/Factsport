@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import {
-  archiveEditorialArticle, approveEditorialRevision, rejectEditorialRevision, publishApprovedEditorial, saveEditorialDraft,
+  archiveEditorialArticle, approveEditorialRevision, rejectEditorialRevision, publishApprovedEditorial, restoreEditorialRevision, saveEditorialDraft,
   submitEditorialForReview,
 } from './actions';
 import { reviewRightsAndAttachMedia } from './media-actions';
@@ -11,6 +11,11 @@ import MarkdownRenderer from '@/app/components/MarkdownRenderer';
 type ReusableMediaAsset = {
   id: string; object_key: string; rights_status: string; rights_reference: string | null;
   attribution_text: string | null; alt_text: string | null; usage_expires_at: string | null;
+};
+
+type RevisionRecord = {
+  id: string; revision_number: number; workflow_status: string; change_note: string | null;
+  review_comment: string | null; created_at: string; snapshot: Record<string, any>;
 };
 
 type Article = {
@@ -55,6 +60,10 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const [statusFilter, setStatusFilter] = useState('all');
   const [message, setMessage] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [historyArticleId, setHistoryArticleId] = useState<string | null>(null);
+  const [historyRecords, setHistoryRecords] = useState<RevisionRecord[]>([]);
+  const [historySelectedId, setHistorySelectedId] = useState<string | null>(null);
+  const [historyPending, setHistoryPending] = useState(false);
   const [reviewComment, setReviewComment] = useState('');
   const [publicPolicyConfirmed, setPublicPolicyConfirmed] = useState<Record<string, boolean>>({});
   const [isPending, startTransition] = useTransition();
@@ -77,6 +86,28 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
       article.slug.includes(search.toLowerCase());
     return matchesSearch && (statusFilter === 'all' || article.status === statusFilter);
   }), [articles, search, statusFilter]);
+
+  async function openRevisionHistory(articleId: string) {
+    setHistoryArticleId(articleId); setHistoryRecords([]); setHistorySelectedId(null); setHistoryPending(true);
+    try {
+      const response = await fetch('/api/admin/news/' + encodeURIComponent(articleId) + '/revisions', { cache: 'no-store', credentials: 'same-origin' });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Revision history unavailable.');
+      setHistoryRecords(data.revisions || []);
+      if (data.revisions?.[0]) setHistorySelectedId(data.revisions[0].id);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to load revision history.');
+      setHistoryArticleId(null);
+    } finally { setHistoryPending(false); }
+  }
+
+  function restoreRevision(articleId: string, revisionId: string) {
+    startTransition(async () => {
+      const result = await restoreEditorialRevision(articleId, revisionId);
+      setMessage(result.success ? 'Revision restored as a new draft. The live published article has not been changed.' : result.error || 'Revision restore failed.');
+      if (result.success) window.location.reload();
+    });
+  }
 
   function edit(article: Article) {
     setPublicPolicyConfirmed(current => ({ ...current, [article.id]: false }));
@@ -346,6 +377,37 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
         </aside>
       </section>
 
+      {historyArticleId && <section className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><p className="text-[10px] font-black uppercase tracking-[.18em] text-blue-700">Editorial audit trail</p><h2 className="mt-1 text-lg font-black">Revision history</h2></div>
+          <button type="button" onClick={() => { setHistoryArticleId(null); setHistoryRecords([]); setHistorySelectedId(null); }} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold">Close history</button>
+        </div>
+        {historyPending && <p className="mt-4 text-sm text-slate-500">Loading revisions…</p>}
+        {!historyPending && historyRecords.length === 0 && <p className="mt-4 text-sm text-slate-500">No revision records found.</p>}
+        <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(220px,.7fr)_minmax(0,1.3fr)]">
+          <div className="space-y-2">
+            {historyRecords.map(revision => <div key={revision.id} className={historySelectedId === revision.id ? 'rounded-xl border border-blue-300 bg-blue-50 p-3' : 'rounded-xl border border-slate-200 p-3'}>
+              <button type="button" onClick={() => setHistorySelectedId(revision.id)} className="w-full text-left">
+                <span className="flex items-center justify-between gap-2 text-xs font-black text-slate-800"><span>Revision {revision.revision_number}</span><span className="uppercase text-slate-500">{revision.workflow_status.replace('_', ' ')}</span></span>
+                <span className="mt-1 block text-[11px] text-slate-500">{new Date(revision.created_at).toLocaleString()}</span>
+                {revision.change_note && <span className="mt-1 block text-[11px] text-slate-600">{revision.change_note}</span>}
+                {revision.review_comment && <span className="mt-1 block text-[11px] text-amber-800">Review: {revision.review_comment}</span>}
+              </button>
+              <button type="button" disabled={isPending} onClick={() => restoreRevision(historyArticleId, revision.id)} className="mt-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-bold disabled:opacity-50">Restore as new draft</button>
+            </div>)}
+          </div>
+          {(() => {
+            const selected = historyRecords.find(item => item.id === historySelectedId);
+            const current = articles.find(item => item.id === historyArticleId);
+            if (!selected) return <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Choose a revision to compare its saved snapshot.</p>;
+            return <div className="grid gap-3 xl:grid-cols-2">
+              <div className="min-w-0 rounded-xl border border-slate-200 p-3"><h3 className="mb-2 text-xs font-black uppercase text-slate-600">Current newsroom version</h3><p className="font-bold text-slate-900">{current?.title || 'Current article'}</p><pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs text-slate-600">{current?.body_markdown || ''}</pre></div>
+              <div className="min-w-0 rounded-xl border border-blue-200 bg-blue-50/40 p-3"><h3 className="mb-2 text-xs font-black uppercase text-blue-800">Selected revision {selected.revision_number}</h3><p className="font-bold text-slate-900">{String(selected.snapshot.title || '')}</p><pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs text-slate-600">{String(selected.snapshot.body_markdown || '')}</pre></div>
+            </div>;
+          })()}
+        </div>
+      </section>}
+
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 md:flex-row">
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search headline or slug…" className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm" />
@@ -368,6 +430,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 <button onClick={() => edit(article)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold">Edit</button>
+                <button onClick={() => void openRevisionHistory(article.id)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold">History</button>
                 {article.revision_status === 'in_review' && <button disabled={isPending} onClick={() => runAction(approveEditorialRevision, article.id, 'Revision approved. A separate publisher must publish it.')} className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white">Approve revision</button>}{article.revision_status === 'approved' && <div className="min-w-[230px] space-y-2">
                   <label className="flex items-start gap-2 text-[10px] leading-4 text-slate-600">
                     <input type="checkbox" checked={!!publicPolicyConfirmed[article.id]} onChange={e => setPublicPolicyConfirmed(current => ({ ...current, [article.id]: e.target.checked }))} className="mt-0.5" />
