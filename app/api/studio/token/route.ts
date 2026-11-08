@@ -114,6 +114,8 @@ export async function POST(request: Request) {
   }
 
   let consumedInviteId: string | null = null;
+  let consumedInviteRoomId: string | null = null;
+  let consumedGuestStreamUserId: string | null = null;
   try {
     const raw = await request.text();
     if (raw.length > 4096) throw new BroadcastIssueError('Broadcast token request is too large.', 413);
@@ -250,7 +252,11 @@ export async function POST(request: Request) {
       };
     }));
 
-    if (identity.identityKind === 'guest') consumedInviteId = identity.inviteId;
+    if (identity.identityKind === 'guest') {
+      consumedInviteId = identity.inviteId;
+      consumedInviteRoomId = identity.room.id as string;
+      consumedGuestStreamUserId = identity.userId;
+    }
 
     const issuedAt = Math.floor(Date.now() / 1000) - 1;
     const serverToken = await new SignJWT({ server: true })
@@ -289,6 +295,8 @@ export async function POST(request: Request) {
           ${JSON.stringify({ inviteId: consumedInviteId, label: identity.inviteLabel })}::jsonb)
       `);
       consumedInviteId = null;
+      consumedInviteRoomId = null;
+      consumedGuestStreamUserId = null;
     }
 
     const response = NextResponse.json({
@@ -311,11 +319,19 @@ export async function POST(request: Request) {
   } catch (error) {
     if (consumedInviteId) {
       try {
-        await withFactsportBroadcastTokenIssuerPostgres(async sql => sql`
-          UPDATE public.media_broadcast_invites
-          SET use_count=GREATEST(use_count - 1, 0)
-          WHERE id=${consumedInviteId}::uuid AND revoked_at IS NULL
-        `);
+        await withFactsportBroadcastTokenIssuerPostgres(async sql => sql.begin(async tx => {
+          await tx`
+            UPDATE public.media_broadcast_invites
+            SET use_count=GREATEST(use_count - 1, 0)
+            WHERE id=${consumedInviteId}::uuid AND revoked_at IS NULL
+          `;
+          if (consumedGuestStreamUserId && consumedInviteRoomId) {
+            await tx`
+              UPDATE public.media_broadcast_token_identities SET revoked_at=now()
+              WHERE room_id=${consumedInviteRoomId}::uuid AND stream_user_id=${consumedGuestStreamUserId}
+            `;
+          }
+        }));
       } catch (compensationError) {
         console.error('Broadcast invite redemption compensation failed', compensationError);
       }
