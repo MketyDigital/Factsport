@@ -1,6 +1,5 @@
 'use client';
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { StreamVideo, StreamCall, useCallStateHooks, StreamTheme, hasAudio } from '@stream-io/video-react-sdk';
 import '@stream-io/video-react-sdk/dist/css/styles.css';
 import { Loader2, Radio, Hand, Mic, MicOff, CheckCircle, XCircle, Link as LinkIcon, Play, Square, LogOut, Users, Circle, Activity, Tv } from 'lucide-react';
