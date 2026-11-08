@@ -508,7 +508,9 @@ export async function grantBroadcastRole(input: { roomId: string; userId: string
     let warning: string | null = null;
     if (granted.streamUserId && granted.roomName) {
       if (granted.wasRevoked) warning = await unblockStreamCallUser(granted.roomName, granted.streamUserId);
-      if (!warning) warning = await setStreamCallMemberRole(granted.roomName, granted.streamUserId, input.role === 'host' ? 'admin' : input.role === 'moderator' ? 'moderator' : 'user');
+      if (!warning && (input.role !== 'caller' || granted.wasRevoked)) {
+        warning = await setStreamCallMemberRole(granted.roomName, granted.streamUserId, input.role === 'host' ? 'admin' : input.role === 'moderator' ? 'moderator' : 'user');
+      }
       if (!warning) {
         await withFactsportBroadcastAdminPostgres(async sql => sql`
           UPDATE public.media_broadcast_token_identities
