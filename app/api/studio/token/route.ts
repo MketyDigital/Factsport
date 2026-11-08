@@ -155,10 +155,6 @@ export async function POST(request: Request) {
         };
       }
 
-      if (!room.public_listening_enabled && !entraSession) {
-        throw new BroadcastIssueError('Public listening is disabled for this room.', 403);
-      }
-
       if (entraSession) {
         const grants = await tx`
           SELECT role_key FROM public.media_broadcast_room_roles
@@ -168,6 +164,7 @@ export async function POST(request: Request) {
           LIMIT 1
         `;
         const grant = grants[0]?.role_key as string | undefined;
+        if (!room.public_listening_enabled && !grant) throw new BroadcastIssueError('Public listening is disabled for this room.', 403);
         if (grant === 'moderator' && !config.moderatorRoleReady) {
           throw new BroadcastIssueError('The Stream moderator call role is not configured. Contact the Media administrator.', 503);
         }
@@ -181,6 +178,7 @@ export async function POST(request: Request) {
         };
       }
 
+      if (!room.public_listening_enabled) throw new BroadcastIssueError('Public listening is disabled for this room.', 403);
       const anonymous = await anonymousIdentity(room.id, anonCookieValue, anonSecret);
       return {
         room, identityKind: 'anonymous' as const, subject: anonymous.subject,
