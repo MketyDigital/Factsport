@@ -195,6 +195,42 @@ export async function createBroadcastInvite(input: {
   }
 }
 
+
+export async function createBroadcastInviteForRoomKey(roomKey: string): Promise<Result> {
+  const authorization = await authorizeMediaEditorialAction('broadcast');
+  if (!authorization.ok) return { success: false, error: authorization.error, code: 'MEDIA_BROADCAST_FORBIDDEN' };
+  if (typeof roomKey !== 'string' || !roomKey.trim() || roomKey.length > 160) {
+    return { success: false, error: 'Invalid broadcast room key.' };
+  }
+  try {
+    const rooms = await withFactsportBroadcastAdminPostgres(async sql => sql`
+      SELECT id, scope_type, match_id
+      FROM public.media_broadcast_rooms
+      WHERE scope_key=${roomKey.trim()}
+         OR (match_id IS NOT NULL AND match_id::text=${roomKey.trim()})
+      LIMIT 1
+    `);
+    if (!rooms.length) return { success: false, error: 'Broadcast room not found.' };
+    const result = await createBroadcastInvite({
+      roomId: rooms[0].id as string,
+      label: 'VIP Guest',
+      expiresInHours: 24,
+      maxUses: null,
+    });
+    if (!result.success) return result;
+    return {
+      success: true,
+      data: {
+        ...result.data,
+        invitePath: rooms[0].scope_type === 'global' ? '/live' : '/match/' + String(rooms[0].match_id),
+      },
+    };
+  } catch (error) {
+    console.error('Broadcast invite link creation failed', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to create broadcast invitation.' };
+  }
+}
+
 export async function revokeBroadcastInvite(inviteId: string): Promise<Result> {
   const authorization = await authorizeMediaEditorialAction('broadcast');
   if (!authorization.ok) return { success: false, error: authorization.error, code: 'MEDIA_BROADCAST_FORBIDDEN' };
