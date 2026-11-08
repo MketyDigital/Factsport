@@ -65,3 +65,29 @@ test('broadcast caller UI follows server call-in eligibility and separates host 
   assert.match(room, /role === 'admin' \? \(!isLive/);
   assert.match(room, /role === 'admin' && <button onClick=\{toggleRecording\}/);
 });
+
+
+test('Stream webhooks are signature-verified, gzip-aware, idempotent and reconcile participants', () => {
+  const route = read('app/api/webhooks/stream/route.ts');
+  const migration = read('db/migrations/0030_factsport_broadcast_token_identity_and_webhooks.sql');
+  assert.match(route, /x-api-key/);
+  assert.match(route, /x-signature/);
+  assert.match(route, /x-webhook-id/);
+  assert.match(route, /DecompressionStream\('gzip'\)/);
+  assert.match(route, /crypto\.subtle\.sign\('HMAC'/);
+  assert.match(route, /constantTimeEqual/);
+  assert.match(route, /ON CONFLICT \(webhook_id\) DO NOTHING/);
+  assert.match(route, /call\.session_participant_joined/);
+  assert.match(route, /call\.session_participant_left/);
+  assert.match(route, /call\.permission_request/);
+  assert.match(route, /call\.permissions_updated/);
+  assert.match(route, /call\.user_muted/);
+  assert.match(route, /call\.member_removed/);
+  assert.match(route, /removeStreamMember/);
+  assert.match(route, /processed_at/);
+  assert.doesNotMatch(route, /INSERT INTO public\.media_broadcast_webhook_events[^;]*payload/);
+  assert.match(migration, /media_broadcast_token_identities/);
+  assert.match(migration, /media_broadcast_webhook_events/);
+  assert.match(migration, /GRANT SELECT, INSERT ON public\.media_broadcast_webhook_events/);
+  assert.match(migration, /invite_id uuid REFERENCES public\.media_broadcast_invites/);
+});
