@@ -94,3 +94,12 @@ These checks validate the V2 app deployment and existing reader path, **not** th
 
 
 - Entra External ID Media editor login and encrypted session adapter are now implemented in source; see M32. The newsroom composer also reuses the sanitized public Markdown renderer for draft preview. Isolated verification `42490686096` and native vinext build `42490686088` passed on `c8c39f9e3785ace19e93ed37f0da2abba18f5663`; protected staging `42490686122` was still running at this update. Real Entra tenant configuration and database/R2 runtime tests remain outstanding.
+
+
+## Media editor enhancements — ordered inline gallery and reusable assets
+
+- The newsroom can search and reuse previously approved, non-expired assets from the private Media library; selected assets retain their rights metadata and are previewed through the authenticated private R2 endpoint.
+- Added ordered `inline` placement to revision-scoped media with migration `0027_factsport_revision_inline_media_gallery.sql`. Publication copies approved inline attachments to the article media relation at their chosen order; a new public view exposes only assets attached to published, reviewed articles with valid rights and unexpired usage.
+- Public article pages now render the rights-filtered inline gallery with alt text and attribution. Reusing an existing asset no longer resets its global `is_public` flag, so one article revision cannot accidentally unpublish an asset already used by another published story.
+- The public article sidebar no longer contains the prize/prediction acquisition message; it now links to neutral fixtures and live-score coverage, keeping private Prediction promotion out of the public newsroom surface.
+- These changes are source committed; latest verification for commit `34494850b31ce530f960cfe30f46a95fe97e0927` is running. Do not mark migration 0027 or public gallery runtime complete until it is applied and exercised in isolated staging.
