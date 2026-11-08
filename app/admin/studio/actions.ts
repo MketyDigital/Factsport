@@ -65,7 +65,7 @@ export async function updateStudioSettings(input: {
       `;
       await tx`
         INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, details)
-        VALUES (${rooms[0].id}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'settings_updated',
+        VALUES (${rooms[0].id}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', ${rooms[0].is_active ? 'room_shutdown' : 'settings_updated'},
           ${JSON.stringify({ title, hasAudioUrl: Boolean(audioUrl), hasVideoUrl: Boolean(videoUrl), isActive, publicListeningEnabled, callinEnabled })}::jsonb)
       `;
     }));
@@ -86,7 +86,7 @@ export async function updateBroadcastRoom(input: {
   if (!uuid(input?.roomId)) return { success: false, error: 'Invalid broadcast room.' };
   try {
     await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
-      const rooms = await tx`SELECT id, scope_type, scope_key FROM public.media_broadcast_rooms WHERE id=${input.roomId}::uuid FOR UPDATE`;
+      const rooms = await tx`SELECT id, scope_type, scope_key, is_active FROM public.media_broadcast_rooms WHERE id=${input.roomId}::uuid FOR UPDATE`;
       if (!rooms.length) throw new Error('Broadcast room not found.');
       const active = input.isActive === true;
       const callinEnabled = input.callinEnabled === true;
@@ -225,11 +225,13 @@ export async function grantBroadcastRole(input: { roomId: string; userId: string
   }
   try {
     await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
-      await tx`
+      const inserted = await tx`
         INSERT INTO public.media_broadcast_room_roles (room_id, user_id, role_key, granted_by)
         VALUES (${input.roomId}::uuid, ${input.userId}::uuid, ${input.role}, ${authorization.user.domainUserId}::uuid)
         ON CONFLICT (room_id, user_id, role_key) WHERE revoked_at IS NULL DO NOTHING
+        RETURNING id
       `;
+      if (!inserted.length) throw new Error('This user already has the active broadcast role for this room.');
       await tx`
         INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, details)
         VALUES (${input.roomId}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'role_granted',
