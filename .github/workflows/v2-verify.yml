@@ -77,15 +77,15 @@ jobs:
           grep -q "ADD COLUMN IF NOT EXISTS legacy_match_id uuid" db/migrations/0008_factsport_match_identity_alias.sql
           grep -q "CREATE TABLE IF NOT EXISTS public.predictions" db/migrations/0003_factsport_public_predictions.sql
           for migration_number in $(seq 9 26); do
-  migration_prefix="$(printf '%04d' "$migration_number")"
-  migration_matches=(db/migrations/"$migration_prefix"_*.sql)
-  if [ "${#migration_matches[@]}" -ne 1 ] || [ ! -s "${migration_matches[0]}" ]; then
-    echo "::error::Expected exactly one non-empty migration for $migration_prefix"
-    exit 1
-  fi
-done
-grep -q "announcement_text" db/migrations/0024_factsport_media_public_announcements.sql
-grep -q "factsport_v2_editorial_writer" db/migrations/0025_factsport_media_homepage_settings_grants.sql
-grep -q "MEDIA_ATTESTATION_RECONCILIATION_REQUIRED" db/migrations/0026_factsport_public_media_attestation_enforcement.sql
-grep -q "EDITORIAL_ATTESTATION_RECONCILIATION_REQUIRED" db/migrations/0026_factsport_public_media_attestation_enforcement.sql
-echo "Migrations 0001-0026 present; public Media announcement grants and fail-closed attestation guard inventoried; live migration NOT executed"
+            migration_prefix="$(printf '%04d' "$migration_number")"
+            migration_matches=(db/migrations/"$migration_prefix"_*.sql)
+            if [ "${#migration_matches[@]}" -ne 1 ] || [ ! -s "${migration_matches[0]}" ]; then
+              echo "::error::Expected exactly one non-empty migration for $migration_prefix"
+              exit 1
+            fi
+          done
+          grep -q "announcement_text" db/migrations/0024_factsport_media_public_announcements.sql
+          grep -q "factsport_v2_editorial_writer" db/migrations/0025_factsport_media_homepage_settings_grants.sql
+          grep -q "MEDIA_ATTESTATION_RECONCILIATION_REQUIRED" db/migrations/0026_factsport_public_media_attestation_enforcement.sql
+          grep -q "EDITORIAL_ATTESTATION_RECONCILIATION_REQUIRED" db/migrations/0026_factsport_public_media_attestation_enforcement.sql
+          echo "Migrations 0001-0026 present; public Media announcement grants and fail-closed attestation guard inventoried; live migration NOT executed"
