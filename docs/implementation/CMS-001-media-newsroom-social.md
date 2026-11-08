@@ -91,3 +91,6 @@ These checks validate the V2 app deployment and existing reader path, **not** th
 
 
 - Follow-up CI result: isolated verification passed (run `42461455150`), native vinext build passed (run `42461455356`), and protected staging deployment/deny-by-default smoke passed (run `42461455140`) on code commit `5a6f4a86e27b7d27c20eb2c73d21b3a3534d6957`. This does not verify the unprovisioned editorial database binding, CMS runtime, private media preview or R2 upload.
+
+
+- Entra External ID Media editor login and encrypted session adapter are now implemented in source; see M32. The newsroom composer also reuses the sanitized public Markdown renderer for draft preview. Isolated verification `42490686096` and native vinext build `42490686088` passed on `c8c39f9e3785ace19e93ed37f0da2abba18f5663`; protected staging `42490686122` was still running at this update. Real Entra tenant configuration and database/R2 runtime tests remain outstanding.
