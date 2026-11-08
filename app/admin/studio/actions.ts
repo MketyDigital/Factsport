@@ -1,8 +1,9 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { SignJWT } from 'jose';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
-import { isFactsportBroadcastTokenIssuerReady, withFactsportBroadcastAdminPostgres } from '@/lib/adapters/postgres-client';
+import { getFactsportBroadcastRuntimeConfig, isFactsportBroadcastTokenIssuerReady, withFactsportBroadcastAdminPostgres } from '@/lib/adapters/postgres-client';
 
 type Result = { success: true; data?: Record<string, unknown> } | { success: false; error: string; code?: string };
 const unavailable = (): Result => ({
@@ -10,6 +11,35 @@ const unavailable = (): Result => ({
   error: 'The dedicated Factsport broadcast administrator database binding is not provisioned.',
   code: 'V2_BROADCAST_ADMIN_NOT_PROVISIONED',
 });
+
+
+async function removeRevokedStreamMembers(roomName: string, userIds: string[]): Promise<string | null> {
+  const config = getFactsportBroadcastRuntimeConfig();
+  if (!config || userIds.length === 0) return null;
+  try {
+    const issuedAt = Math.floor(Date.now() / 1000) - 1;
+    const serverToken = await new SignJWT({ server: true })
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+      .setIssuedAt(issuedAt)
+      .setExpirationTime(issuedAt + 5 * 60)
+      .sign(new TextEncoder().encode(config.apiSecret));
+    const response = await fetch(
+      `https://video.stream-io-api.com/api/v2/video/call/audio_room/${encodeURIComponent(roomName)}/members?api_key=${encodeURIComponent(config.apiKey)}`,
+      {
+        method: 'POST',
+        headers: { Authorization: serverToken, 'stream-auth-type': 'jwt', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ remove_members: userIds }),
+        cache: 'no-store',
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+    if (!response.ok && response.status !== 404) return 'Invite was revoked, but Stream could not immediately remove every active guest. Rejoin attempts will be rejected by the webhook.';
+    return null;
+  } catch (error) {
+    console.error('Immediate revoked guest removal failed', error);
+    return 'Invite was revoked, but active guest removal could not be confirmed. Rejoin attempts will be rejected by the webhook.';
+  }
+}
 
 function safeMediaUrl(value: unknown): string | null {
   if (value === null || value === undefined || value === '') return null;
@@ -246,18 +276,22 @@ export async function revokeBroadcastInvite(inviteId: string): Promise<Result> {
     await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
       const rows = await tx`UPDATE public.media_broadcast_invites SET revoked_at=now() WHERE id=${inviteId}::uuid AND revoked_at IS NULL RETURNING room_id`;
       if (!rows.length) throw new Error('Invite was not found or is already revoked.');
-      await tx`
+      const room = await tx`SELECT room_name FROM public.media_broadcast_rooms WHERE id=${rows[0].room_id}::uuid LIMIT 1`;
+      const identities = await tx`
         UPDATE public.media_broadcast_token_identities SET revoked_at=now()
         WHERE invite_id=${inviteId}::uuid AND revoked_at IS NULL
+        RETURNING stream_user_id
       `;
       await tx`
         INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, details)
         VALUES (${rows[0].room_id}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'invite_revoked',
-          ${JSON.stringify({ inviteId })}::jsonb)
+          ${JSON.stringify({ inviteId, revokedIdentities: identities.length })}::jsonb)
       `;
+      return { roomName: room[0]?.room_name as string | undefined, userIds: identities.map((item: { stream_user_id: string }) => item.stream_user_id) };
     }));
+    const warning = revoked.roomName ? await removeRevokedStreamMembers(revoked.roomName, revoked.userIds) : null;
     revalidatePath('/admin/studio');
-    return { success: true };
+    return { success: true, data: warning ? { warning } : {} };
   } catch (error) {
     console.error('Broadcast invite revocation failed', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unable to revoke broadcast invite.' };
