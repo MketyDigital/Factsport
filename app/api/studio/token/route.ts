@@ -191,7 +191,7 @@ export async function POST(request: Request) {
           VALUES (${room.id}::uuid, ${guestUserId}, 'guest', 'guest', ${invite.id}::uuid, ${identityExpiresAt}::timestamptz)
           ON CONFLICT (room_id, stream_user_id) DO UPDATE SET
             identity_kind='guest', role_key='guest', invite_id=EXCLUDED.invite_id,
-            issued_at=now(), expires_at=EXCLUDED.expires_at, revoked_at=NULL
+            issued_at=now(), expires_at=EXCLUDED.expires_at
         `;
         return {
           room, identityKind: 'guest' as const, inviteId: invite.id as string, inviteLabel: invite.invited_label as string, subject: randomId(),
@@ -216,7 +216,7 @@ export async function POST(request: Request) {
         const role = grant === 'host' ? 'admin' : grant === 'moderator' ? 'moderator' : 'user';
         const roleKey = grant === 'host' ? 'host' : grant === 'moderator' ? 'moderator' : grant === 'caller' ? 'caller' : 'listener';
         const streamUserId = 'factsport-' + entraSession.internalUserId;
-        await tx`
+        const tokenIdentity = await tx`
           INSERT INTO public.media_broadcast_token_identities
             (room_id, stream_user_id, identity_kind, user_id, role_key, expires_at)
           VALUES (${room.id}::uuid, ${streamUserId}, 'authenticated', ${entraSession.internalUserId}::uuid, ${roleKey}, ${identityExpiresAt}::timestamptz)
@@ -236,7 +236,7 @@ export async function POST(request: Request) {
       if (!room.public_listening_enabled) throw new BroadcastIssueError('Public listening is disabled for this room.', 403);
       const anonymous = await anonymousIdentity(room.id, anonCookieValue, anonSecret);
       const anonymousUserId = 'factsport-anon-' + anonymous.subject.replace(/-/g, '');
-      await tx`
+      const tokenIdentity = await tx`
         INSERT INTO public.media_broadcast_token_identities
           (room_id, stream_user_id, identity_kind, role_key, expires_at)
         VALUES (${room.id}::uuid, ${anonymousUserId}, 'anonymous', 'listener', ${identityExpiresAt}::timestamptz)
