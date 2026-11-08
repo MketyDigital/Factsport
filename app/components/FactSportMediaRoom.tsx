@@ -8,7 +8,7 @@ import { useGlobalMedia } from '@/app/providers/GlobalMediaProvider';
 import { createBroadcastInviteForRoomKey } from '@/app/admin/studio/actions';
 
 const PremiumListenerUI = ({ role }: { role: string }) => {
-    const { call, stopMedia } = useGlobalMedia();
+    const { call, stopMedia, canRequestCallIn } = useGlobalMedia();
     const { useParticipants } = useCallStateHooks();
     const participants = useParticipants();
     
@@ -61,15 +61,17 @@ const PremiumListenerUI = ({ role }: { role: string }) => {
                 </div>
             </div>
 
-            {role === 'anonymous' ? (
-                <Link href="/login" className="flex items-center gap-2 px-8 py-3.5 rounded-full bg-[#1A1A1A] border border-slate-700 text-slate-300 hover:bg-slate-800 shadow-xl transition-all active:scale-95 mt-2">
-                    <Mic size={16} /> <span className="text-xs font-black uppercase tracking-widest">Login to Call In</span>
-                </Link>
-            ) : (
+            {canRequestCallIn ? (
                 <button onClick={raiseHand} disabled={handRaised} className={`flex items-center gap-2 px-8 py-3.5 rounded-full shadow-xl transition-all active:scale-95 mt-2 ${handRaised ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30' : 'bg-slate-800 text-white hover:bg-slate-700 border border-slate-600'}`}>
                     <Hand size={18} className={handRaised ? "animate-bounce" : ""} />
                     <span className="text-xs font-black uppercase tracking-widest">{handRaised ? 'Hand Raised (Waiting...)' : 'Raise Hand to Call In'}</span>
                 </button>
+            ) : (
+                <p className="mt-2 max-w-sm text-center text-[11px] font-semibold leading-5 text-slate-400">
+                    {role === 'anonymous'
+                      ? 'You are listening anonymously. Call-in access requires a verified Factsport account and an assigned caller role.'
+                      : 'You are listening. Call-in requests are enabled only for users with an active room caller grant.'}
+                </p>
             )}
         </div>
     );
@@ -145,9 +147,9 @@ const StudioUI = ({ role, matchId }: { role: string, matchId: string }) => {
 
     return (
         <div className="flex flex-col items-center w-full gap-6 mt-4 relative z-30">
-            {role === 'admin' && (
+            {(role === 'admin' || role === 'moderator') && (
                 <div className="w-full flex flex-col items-center gap-4">
-                    {!isLive ? (
+                    {role === 'admin' ? (!isLive ? (
                         <button onClick={() => call.goLive()} className="flex items-center gap-2 px-10 py-3.5 rounded-full bg-green-600 hover:bg-green-500 text-white font-black tracking-widest uppercase shadow-[0_0_20px_rgba(34,197,94,0.4)] transition-all animate-pulse active:scale-95 w-full max-w-sm justify-center">
                             <Play size={18} fill="currentColor" /> Go Live Now
                         </button>
@@ -155,11 +157,11 @@ const StudioUI = ({ role, matchId }: { role: string, matchId: string }) => {
                         <button onClick={() => call.stopLive()} className="flex items-center gap-2 px-8 py-2.5 rounded-full bg-red-900/80 hover:bg-red-600 border border-red-500 text-white font-bold tracking-widest uppercase transition-all shadow-lg active:scale-95 w-full max-w-sm justify-center">
                             <Square size={14} fill="currentColor" /> End Broadcast
                         </button>
-                    )}
+                    )) : <p className="rounded-full border border-blue-500/20 bg-blue-600/10 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-blue-300">Moderator controls</p>}
 
                     <div className="flex flex-wrap items-center justify-center gap-3 bg-slate-900/90 p-2.5 rounded-full border border-slate-700 shadow-xl w-full max-w-sm">
                         <button onClick={toggleMic} className={`p-4 rounded-full transition-all flex-1 flex justify-center ${isMute ? 'bg-red-500/20 text-red-500' : 'bg-slate-700 text-white hover:bg-slate-600 shadow-md'}`}>{isMute ? <MicOff size={20} /> : <Mic size={20} />}</button>
-                        <button onClick={toggleRecording} className={`p-4 rounded-full transition-all flex-1 flex justify-center ${isRecording ? 'bg-red-600 text-white animate-pulse shadow-[0_0_15px_red]' : 'bg-slate-700 text-white hover:bg-slate-600 shadow-md'}`}><Circle size={20} fill={isRecording ? "white" : "none"} /></button>
+                        {role === 'admin' && <button onClick={toggleRecording} className={`p-4 rounded-full transition-all flex-1 flex justify-center ${isRecording ? 'bg-red-600 text-white animate-pulse shadow-[0_0_15px_red]' : 'bg-slate-700 text-white hover:bg-slate-600 shadow-md'}`}><Circle size={20} fill={isRecording ? "white" : "none"} /></button>}
                         <button onClick={() => setShowManager(!showManager)} className={`p-4 rounded-full transition-all flex-1 flex justify-center ${showManager ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.5)]' : 'bg-slate-700 text-white hover:bg-slate-600 shadow-md'}`}><Users size={20} /></button>
                         <button onClick={stopMedia} className="p-4 rounded-full bg-slate-700 text-red-400 hover:bg-red-900/80 transition-all shadow-md flex-1 flex justify-center"><LogOut size={20} /></button>
                     </div>
@@ -168,9 +170,9 @@ const StudioUI = ({ role, matchId }: { role: string, matchId: string }) => {
                         <div className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-xl p-4 flex flex-col gap-3 shadow-2xl animate-in slide-in-from-top-4">
                             <div className="flex items-center justify-between border-b border-slate-700 pb-3 mb-1">
                                 <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Manage Callers</span>
-                                <button onClick={generateVIPLink} disabled={isGenerating} className="text-blue-400 hover:text-blue-300 text-[9px] uppercase font-bold flex items-center gap-1.5 bg-blue-900/40 px-3 py-1.5 rounded-full transition-all">
+                                {role === 'admin' && <button onClick={generateVIPLink} disabled={isGenerating} className="text-blue-400 hover:text-blue-300 text-[9px] uppercase font-bold flex items-center gap-1.5 bg-blue-900/40 px-3 py-1.5 rounded-full transition-all">
                                     {isGenerating ? <Loader2 size={12} className="animate-spin"/> : <LinkIcon size={12}/>} {copied ? 'Copied' : 'Copy VIP Link'}
-                                </button>
+                                </button>}
                             </div>
                             {participants.map(p => (
                                 <div key={p.userId} className="flex items-center justify-between bg-black/50 px-3 py-2.5 rounded-lg border border-white/5">
@@ -210,7 +212,7 @@ const StudioUI = ({ role, matchId }: { role: string, matchId: string }) => {
 };
 
 export default function FactSportMediaRoom({ matchId, mediaUrl = 'streamio', title = 'FactSport Broadcast' }: { matchId: string, mediaUrl?: string, title?: string }) {
-    const { activeMatchId, mediaType, videoUrl, client, call, role, isConnecting, isWaitingForHost, setIsPageActive, tuneInAudio, tuneInVideo } = useGlobalMedia();
+    const { activeMatchId, mediaType, videoUrl, client, call, role, isConnecting, isWaitingForHost, canRequestCallIn, setIsPageActive, tuneInAudio, tuneInVideo } = useGlobalMedia();
     const [canSpeak, setCanSpeak] = useState(false);
 
     const isVideo = mediaUrl !== 'streamio';
@@ -291,7 +293,7 @@ export default function FactSportMediaRoom({ matchId, mediaUrl = 'streamio', tit
     }
 
     // 🟢 DECLARED `inStudio` VARIABLE RIGHT BEFORE RETURN
-    const inStudio = role === 'admin' || role === 'guest' || (role === 'user' && canSpeak);
+    const inStudio = role === 'admin' || role === 'moderator' || role === 'guest' || (role === 'user' && canSpeak);
 
     return (
         <div className="w-full bg-gradient-to-b from-[#0a1428] to-black relative overflow-hidden border border-slate-800 flex flex-col group p-6 min-h-[350px] rounded-2xl shadow-2xl">
