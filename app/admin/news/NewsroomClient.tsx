@@ -6,6 +6,7 @@ import {
   submitEditorialForReview,
 } from './actions';
 import { reviewRightsAndAttachMedia } from './media-actions';
+import MarkdownRenderer from '@/app/components/MarkdownRenderer';
 
 type Article = {
   id: string;
@@ -48,6 +49,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [message, setMessage] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [reviewComment, setReviewComment] = useState('');
   const [publicPolicyConfirmed, setPublicPolicyConfirmed] = useState<Record<string, boolean>>({});
   const [isPending, startTransition] = useTransition();
@@ -77,11 +79,13 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
       isHeadline: article.is_headline, isBreaking: article.is_breaking,
     });
     setMessage('');
+    setPreviewOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function reset() {
     setForm(blank);
+    setPreviewOpen(false);
     setMessage('');
   }
 
@@ -216,6 +220,25 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
             </label>
             <label className="md:col-span-2 text-xs font-bold text-slate-600">Article body (Markdown)
               <textarea value={form.bodyMarkdown} onChange={e => setForm({ ...form, bodyMarkdown: e.target.value })} rows={14} className="mt-1 w-full rounded-xl border border-slate-200 p-3 font-mono text-sm" placeholder="Write the complete article. Use Markdown for headings, links and lists." />
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-slate-500">Preview uses the same sanitized Markdown renderer as published articles.</p>
+                <button type="button" onClick={() => setPreviewOpen(value => !value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                  {previewOpen ? 'Hide article preview' : 'Preview article'}
+                </button>
+              </div>
+              {previewOpen && <section aria-label="Article preview" className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div className="border-b border-slate-100 bg-slate-50 p-5">
+                  <p className="text-[10px] font-black uppercase tracking-[.18em] text-blue-700">{form.category || 'Football'} · Draft preview</p>
+                  <h2 className="mt-2 text-2xl font-black leading-tight text-slate-950">{form.title || 'Untitled article'}</h2>
+                  {form.excerpt && <p className="mt-2 text-sm leading-6 text-slate-600">{form.excerpt}</p>}
+                  <p className="mt-3 text-[11px] font-semibold text-slate-500">{form.authorDisplayName || 'FactSport Desk'} · Not published</p>
+                </div>
+                <div className="prose prose-lg prose-slate max-w-none p-5 text-slate-800">
+                  {form.bodyMarkdown.trim()
+                    ? <MarkdownRenderer content={form.bodyMarkdown} />
+                    : <p className="italic text-slate-500">Article body preview will appear here.</p>}
+                </div>
+              </section>}
             </label>
             <label className="text-xs font-bold text-slate-600">Tags (comma separated)
               <input value={form.tagsText} onChange={e => setForm({ ...form, tagsText: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
