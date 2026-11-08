@@ -247,6 +247,10 @@ export async function revokeBroadcastInvite(inviteId: string): Promise<Result> {
       const rows = await tx`UPDATE public.media_broadcast_invites SET revoked_at=now() WHERE id=${inviteId}::uuid AND revoked_at IS NULL RETURNING room_id`;
       if (!rows.length) throw new Error('Invite was not found or is already revoked.');
       await tx`
+        UPDATE public.media_broadcast_token_identities SET revoked_at=now()
+        WHERE invite_id=${inviteId}::uuid AND revoked_at IS NULL
+      `;
+      await tx`
         INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, details)
         VALUES (${rows[0].room_id}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'invite_revoked',
           ${JSON.stringify({ inviteId })}::jsonb)
