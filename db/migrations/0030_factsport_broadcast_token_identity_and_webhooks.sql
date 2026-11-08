@@ -53,6 +53,7 @@ REVOKE ALL ON public.media_broadcast_token_identities,
 
 GRANT SELECT, INSERT, UPDATE ON public.media_broadcast_token_identities
   TO factsport_v2_broadcast_token_issuer, factsport_v2_media_broadcast_admin;
+GRANT SELECT ON public.media_broadcast_participants TO factsport_v2_media_broadcast_admin;
 GRANT SELECT, INSERT, UPDATE ON public.media_broadcast_webhook_events
   TO factsport_v2_broadcast_token_issuer;
 
