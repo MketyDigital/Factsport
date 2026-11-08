@@ -31,7 +31,8 @@ test('broadcast token issuer is same-origin, room-scoped and derives every ident
   assert.match(adapter, /STREAM_API_SECRET/);
   assert.match(adapter, /FACTSPORT_BROADCAST_TOKEN_ISSUER_READY/);
   assert.match(client, /\/api\/studio\/token/);
-  assert.match(client, /window\.location\.hash/);
+  assert.match(client, /url\.hash/);
+  assert.match(client, /window\.location\.href/);
   assert.match(client, /data\.roomName/);
   assert.doesNotMatch(client, /\/api\/stream\/token/);
   assert.match(room, /createBroadcastInviteForRoomKey/);
