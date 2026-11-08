@@ -228,7 +228,7 @@ export async function createBroadcastInviteForRoomKey(roomKey: string): Promise<
     return {
       success: true,
       data: {
-        ...result.data,
+        ...(result.data ?? {}),
         invitePath: rooms[0].scope_type === 'global' ? '/live' : '/match/' + String(rooms[0].match_id),
       },
     };
