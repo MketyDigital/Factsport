@@ -124,7 +124,8 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
             startTransition(async () => { const result = await updateBroadcastRoom({ roomId: room.id, isActive: room.is_active, publicListeningEnabled: room.public_listening_enabled, callinEnabled: next.callin_enabled }); setMessage(result.success ? 'Room updated.' : result.error); if (result.success) refresh(); });
           }} /> Call-in enabled</label>
           <button disabled={pending} onClick={() => startTransition(async () => {
-            const result = await updateBroadcastRoom({ roomId: room.id, isActive: !room.is_active, publicListeningEnabled: room.public_listening_enabled, callinEnabled: room.callin_enabled });
+            const nextActive = !room.is_active;
+            const result = await updateBroadcastRoom({ roomId: room.id, isActive: nextActive, publicListeningEnabled: room.public_listening_enabled, callinEnabled: nextActive ? room.callin_enabled : false });
             setMessage(result.success ? 'Room state updated.' : result.error); if (result.success) refresh();
           })} className="rounded-lg border border-slate-300 px-3 py-1.5 font-bold">{room.is_active ? 'Shut down room' : 'Activate room'}</button>
         </div>
