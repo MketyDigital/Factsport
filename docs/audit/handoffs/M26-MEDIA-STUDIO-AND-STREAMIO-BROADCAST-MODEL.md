@@ -60,3 +60,8 @@ The dedicated Media broadcast admin UI and server mutations are now implemented 
 ## M34 token issuer update
 
 The legacy `/api/stream/token` caller has been migrated to `POST /api/studio/token`. The V2 route preserves `audio_room`, four-hour tokens and 24-hour reusable guest invites while adding room scoping, server-derived roles, invite hashing/revocation/use limits, same-origin POST, rate limits and Entra-linked host/member identity. Anonymous public listening is separate from Prediction VIP. See M34 for required Cloudflare/Stream configuration and uncompleted webhook/participant acceptance.
+
+
+## M35 webhook and revocation update
+
+The signed Stream webhook endpoint now verifies raw-body HMAC, handles gzip payloads and idempotent `X-Webhook-Id` retries, and reconciles participant presence, call-in/mic events and room lifecycle audit. Guest invite revocation now marks issued token identities revoked, attempts Stream `BlockUser`, and webhook-rejects any later rejoin. Migration `0030_factsport_broadcast_token_identity_and_webhooks.sql` adds identity and webhook ledgers. See `M35-STREAM-WEBHOOKS-PARTICIPANT-AND-REVOCATION.md`; actual Stream webhook configuration and staging E2E remain open.
