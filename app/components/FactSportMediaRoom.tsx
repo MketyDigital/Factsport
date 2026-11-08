@@ -5,6 +5,7 @@ import { StreamVideo, StreamCall, useCallStateHooks, StreamTheme, hasAudio } fro
 import '@stream-io/video-react-sdk/dist/css/styles.css';
 import { Loader2, Radio, Hand, Mic, MicOff, CheckCircle, XCircle, Link as LinkIcon, Play, Square, LogOut, Users, Circle, Activity, Tv } from 'lucide-react';
 import { useGlobalMedia } from '@/app/providers/GlobalMediaProvider';
+import { createBroadcastInviteForRoomKey } from '@/app/admin/studio/actions';
 
 const PremiumListenerUI = ({ role }: { role: string }) => {
     const { call, stopMedia } = useGlobalMedia();
@@ -109,6 +110,7 @@ const StudioUI = ({ role, matchId }: { role: string, matchId: string }) => {
     
     const [isGenerating, setIsGenerating] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [inviteError, setInviteError] = useState<string | null>(null);
     const [showManager, setShowManager] = useState(false);
 
     useEffect(() => {
@@ -125,14 +127,20 @@ const StudioUI = ({ role, matchId }: { role: string, matchId: string }) => {
 
     const generateVIPLink = async () => {
         setIsGenerating(true);
+        setInviteError(null);
         try {
-            const res = await fetch('/api/stream/token', { method: 'POST', body: JSON.stringify({ matchId }) });
-            const data = await res.json();
-            await navigator.clipboard.writeText(data.inviteLink);
+            const result = await createBroadcastInviteForRoomKey(matchId);
+            if (!result.success) throw new Error(result.error);
+            const token = String(result.data?.token || '');
+            const invitePath = String(result.data?.invitePath || '');
+            if (!token || !invitePath) throw new Error('Invite token was not returned.');
+            const inviteLink = window.location.origin + invitePath + '#guest=' + encodeURIComponent(token);
+            await navigator.clipboard.writeText(inviteLink);
             setCopied(true);
             setTimeout(() => setCopied(false), 3000);
-        } catch (error) {} 
-        finally { setIsGenerating(false); }
+        } catch (error) {
+            setInviteError(error instanceof Error ? error.message : 'Unable to create guest invitation.');
+        } finally { setIsGenerating(false); }
     };
 
     return (
@@ -180,6 +188,7 @@ const StudioUI = ({ role, matchId }: { role: string, matchId: string }) => {
                             ))}
                         </div>
                     )}
+                    {inviteError && <p role="alert" className="text-xs text-red-300">{inviteError}</p>}
                 </div>
             )}
 
