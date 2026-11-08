@@ -44,3 +44,8 @@ Status: source implementation committed; CI regression, native build and protect
 ## Safety
 
 No production database, legacy Supabase rows, DNS, Cloudflare production routes, social provider credentials, AdSense account, publisher ID or CMP was changed. No article or media rows were imported.
+
+
+## Follow-up M32 identity integration
+
+The Media admin now has a source-level Entra External ID OIDC/PKCE flow and encrypted Factsport session. The Media authorization bridge and admin layout consume this session, while middleware bypasses the old Supabase/email allowlist only on cookie presence; all actual Media authorization remains server-side and rechecks the issuer+subject+internal UUID mapping plus active Factsport Media membership. See `M32-ENTRA-MEDIA-EDITOR-IDENTITY-FLOW.md` for security properties and the exact external configuration still required. Real Entra sign-in is not yet verified; tenant/app registration, deployed callback hostname, Cloudflare session secret, editorial Hyperdrive and role memberships remain prerequisites.
