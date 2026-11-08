@@ -133,6 +133,7 @@ export async function POST(request: Request) {
     const connectingIp = request.headers.get('cf-connecting-ip') || 'unknown';
     const ipBucketHash = await sha256Hex('ip:' + connectingIp + ':' + config.anonymousSessionSecret);
     const inviteTokenHash = inviteToken ? await sha256Hex(inviteToken) : '';
+    const identityExpiresAt = new Date(Date.now() + TOKEN_TTL_SECONDS * 1000).toISOString();
     const ipAllowed = await withFactsportBroadcastTokenIssuerPostgres(async sql => sql.begin(tx => consumeRateLimit(tx, ipBucketHash, 30)));
     if (!ipAllowed) throw new BroadcastIssueError('Too many broadcast token requests from this network. Try again shortly.', 429);
     if (inviteTokenHash) {
@@ -181,9 +182,18 @@ export async function POST(request: Request) {
           RETURNING id
         `;
         if (!consumed.length) throw new BroadcastIssueError('Guest invitation has already been consumed or revoked.', 403);
+        const guestUserId = 'factsport-guest-' + randomId();
+        await tx`
+          INSERT INTO public.media_broadcast_token_identities
+            (room_id, stream_user_id, identity_kind, role_key, invite_id, expires_at)
+          VALUES (${room.id}::uuid, ${guestUserId}, 'guest', 'guest', ${invite.id}::uuid, ${identityExpiresAt}::timestamptz)
+          ON CONFLICT (room_id, stream_user_id) DO UPDATE SET
+            identity_kind='guest', role_key='guest', invite_id=EXCLUDED.invite_id,
+            issued_at=now(), expires_at=EXCLUDED.expires_at, revoked_at=NULL
+        `;
         return {
           room, identityKind: 'guest' as const, inviteId: invite.id as string, inviteLabel: invite.invited_label as string, subject: randomId(),
-          userId: 'factsport-guest-' + randomId(), username: invite.invited_label || 'VIP Guest',
+          userId: guestUserId, username: invite.invited_label || 'VIP Guest',
           role: 'guest', streamRole: 'user', canRequestCallIn: false, createCall: false,
         };
       }
@@ -202,9 +212,19 @@ export async function POST(request: Request) {
           throw new BroadcastIssueError('The Stream moderator call role is not configured. Contact the Media administrator.', 503);
         }
         const role = grant === 'host' ? 'admin' : grant === 'moderator' ? 'moderator' : 'user';
+        const roleKey = grant === 'host' ? 'host' : grant === 'moderator' ? 'moderator' : grant === 'caller' ? 'caller' : 'listener';
+        const streamUserId = 'factsport-' + entraSession.internalUserId;
+        await tx`
+          INSERT INTO public.media_broadcast_token_identities
+            (room_id, stream_user_id, identity_kind, user_id, role_key, expires_at)
+          VALUES (${room.id}::uuid, ${streamUserId}, 'authenticated', ${entraSession.internalUserId}::uuid, ${roleKey}, ${identityExpiresAt}::timestamptz)
+          ON CONFLICT (room_id, stream_user_id) DO UPDATE SET
+            identity_kind='authenticated', user_id=EXCLUDED.user_id, role_key=EXCLUDED.role_key,
+            invite_id=NULL, issued_at=now(), expires_at=EXCLUDED.expires_at, revoked_at=NULL
+        `;
         return {
           room, identityKind: 'authenticated' as const, subject: entraSession.internalUserId,
-          userId: 'factsport-' + entraSession.internalUserId,
+          userId: streamUserId,
           username: 'Factsport Fan', role, streamRole: role,
           canRequestCallIn: grant === 'caller' && room.callin_enabled,
           createCall: grant === 'host',
@@ -213,9 +233,18 @@ export async function POST(request: Request) {
 
       if (!room.public_listening_enabled) throw new BroadcastIssueError('Public listening is disabled for this room.', 403);
       const anonymous = await anonymousIdentity(room.id, anonCookieValue, anonSecret);
+      const anonymousUserId = 'factsport-anon-' + anonymous.subject.replace(/-/g, '');
+      await tx`
+        INSERT INTO public.media_broadcast_token_identities
+          (room_id, stream_user_id, identity_kind, role_key, expires_at)
+        VALUES (${room.id}::uuid, ${anonymousUserId}, 'anonymous', 'listener', ${identityExpiresAt}::timestamptz)
+        ON CONFLICT (room_id, stream_user_id) DO UPDATE SET
+          identity_kind='anonymous', user_id=NULL, role_key='listener', invite_id=NULL,
+          issued_at=now(), expires_at=EXCLUDED.expires_at, revoked_at=NULL
+      `;
       return {
         room, identityKind: 'anonymous' as const, subject: anonymous.subject,
-        userId: 'factsport-anon-' + anonymous.subject.replace(/-/g, ''),
+        userId: anonymousUserId,
         username: 'Listener', role: 'anonymous', streamRole: 'user',
         canRequestCallIn: false, createCall: false, anonymousCookie: anonymous.cookie,
       };
