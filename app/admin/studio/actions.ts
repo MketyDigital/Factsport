@@ -13,7 +13,7 @@ const unavailable = (): Result => ({
 });
 
 
-async function blockRevokedStreamUsers(roomName: string, userIds: string[]): Promise<string | null> {
+async async function blockRevokedStreamUsers(roomName: string, userIds: string[]): Promise<string | null> {
   const config = getFactsportBroadcastRuntimeConfig();
   if (!config || userIds.length === 0) return null;
   try {
