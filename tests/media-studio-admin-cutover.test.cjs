@@ -46,3 +46,19 @@ test('broadcast role grants retain revoked history and audit all administrative 
   assert.match(migration, /'role_granted', 'role_revoked'/);
   assert.doesNotMatch(migration, /DROP TABLE|TRUNCATE|DELETE FROM/);
 });
+
+
+test('broadcast admin exposes webhook-backed participants and can revoke their room access', () => {
+  const page = read('app/admin/studio/page.tsx');
+  const client = read('app/admin/studio/StudioClient.tsx');
+  const actions = read('app/admin/studio/actions.ts');
+  const migration = read('db/migrations/0030_factsport_broadcast_token_identity_and_webhooks.sql');
+  assert.match(page, /media_broadcast_participants/);
+  assert.match(page, /WHERE p\.left_at IS NULL/);
+  assert.match(client, /Live participants/);
+  assert.match(client, /Block participant/);
+  assert.match(actions, /blockBroadcastParticipant/);
+  assert.match(actions, /UPDATE public\.media_broadcast_token_identities SET revoked_at/);
+  assert.match(actions, /blockRevokedStreamUsers/);
+  assert.match(migration, /GRANT UPDATE \(left_at, last_seen_at, mic_enabled\)/);
+});
