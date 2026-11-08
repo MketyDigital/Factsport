@@ -65,3 +65,12 @@ Migration 0008 adds only a nullable `legacy_match_id` column and unique partial 
 ## M33 broadcast admin implementation update
 
 The dedicated Media broadcast admin UI and server mutations are now implemented in source under the Entra-backed `broadcast` capability and separate `FACTSPORT_BROADCAST_ADMIN_HYPERDRIVE`. It supports studio settings, inactive match-room creation, room shutdown/settings, hashed invite creation/revocation and room host/moderator/caller role grants. Migration `0028_factsport_broadcast_admin_audit_and_role_history.sql` fixes role re-grant history and adds audit actions. Activation and call-ins are deliberately rejected until the separate Stream token issuer exists; invite redemption and participant controls are not yet active. See `M33-BROADCAST-ADMIN-CONTROL-PLANE.md`.
+
+
+## Media role and adapter continuation
+
+- Media editorial operations require an Entra session linked by exact issuer + subject and active Factsport `media_editorial_memberships` role.
+- Broadcast admin is a distinct Media capability granted only to `media_admin`, using `FACTSPORT_BROADCAST_ADMIN_HYPERDRIVE` and the `factsport_v2_media_broadcast_admin` database role.
+- Stream token issuance is a separate service identity (`factsport_v2_broadcast_token_issuer` / `FACTSPORT_BROADCAST_TOKEN_HYPERDRIVE`). It may read room policy/roles/invites, consume invite use counts, append audit and update token rate-limit buckets; it cannot grant room roles or alter studio settings.
+- Host/moderator/caller are room-scoped grants. Host receives Stream call admin membership; moderator receives a configured custom Stream moderator role; caller eligibility is derived from a current caller grant and room `callin_enabled`. Anonymous listeners and guest invitees do not inherit Prediction VIP or payment status.
+- M34 records token-issuer implementation and the external configuration/E2E gates. No database roles or Hyperdrive bindings were provisioned in this source change.
