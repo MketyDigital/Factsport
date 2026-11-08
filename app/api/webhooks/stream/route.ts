@@ -57,7 +57,7 @@ async function removeStreamMember(apiKey: string, apiSecret: string, roomName: s
 
 function streamUserId(event: any): string | null {
   const value = event?.participant?.user_id || event?.participant?.user?.id ||
-    event?.user?.id || event?.user_id;
+    event?.user?.id || event?.user_id || event?.member?.user_id;
   return typeof value === 'string' && value.length > 0 && value.length <= 160 ? value : null;
 }
 
@@ -158,7 +158,7 @@ export async function POST(request: Request) {
           await audit(tx, roomId, 'callin_requested', participants[0].id as string, { streamUserId: incomingUserId });
         }
       } else if (eventType === 'call.permissions_updated' && incomingUserId) {
-        const permissions = Array.isArray(event.own_capability) ? event.own_capability :
+        const permissions = Array.isArray(event.own_capabilities) ? event.own_capabilities :
           Array.isArray(event.permissions) ? event.permissions : [];
         const micEnabled = permissions.includes('send-audio');
         const participants = await tx`
@@ -168,13 +168,24 @@ export async function POST(request: Request) {
           RETURNING id
         `;
         if (participants.length) await audit(tx, roomId, micEnabled ? 'mic_granted' : 'mic_revoked', participants[0].id as string, { streamUserId: incomingUserId });
-      } else if (eventType === 'call.user_muted' && incomingUserId) {
+      } else if (eventType === 'call.user_muted' && Array.isArray(event.muted_user_ids)) {
+        for (const mutedUserId of event.muted_user_ids) {
+          if (typeof mutedUserId !== 'string' || mutedUserId.length > 160) continue;
+          const participants = await tx`
+            UPDATE public.media_broadcast_participants SET mic_enabled=false
+            WHERE room_id=${roomId}::uuid AND stream_user_id=${mutedUserId}
+            RETURNING id
+          `;
+          if (participants.length) await audit(tx, roomId, 'mic_revoked', participants[0].id as string, { streamUserId: mutedUserId, source: 'stream_user_muted' });
+        }
+      } else if ((eventType === 'call.kicked_user' || eventType === 'call.blocked_user') && incomingUserId) {
         const participants = await tx`
-          UPDATE public.media_broadcast_participants SET mic_enabled=false
+          UPDATE public.media_broadcast_participants
+          SET left_at=now(), last_seen_at=now(), mic_enabled=false
           WHERE room_id=${roomId}::uuid AND stream_user_id=${incomingUserId}
           RETURNING id
         `;
-        if (participants.length) await audit(tx, roomId, 'mic_revoked', participants[0].id as string, { streamUserId: incomingUserId, source: 'stream_user_muted' });
+        if (participants.length) await audit(tx, roomId, 'participant_removed', participants[0].id as string, { streamUserId: incomingUserId, source: eventType });
       } else if (eventType === 'call.member_removed' && Array.isArray(event.members)) {
         for (const memberId of event.members) {
           if (typeof memberId !== 'string' || memberId.length > 160) continue;
