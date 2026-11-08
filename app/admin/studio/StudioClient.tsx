@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import {
-  createBroadcastInvite, grantBroadcastRole, revokeBroadcastInvite,
+  createBroadcastInvite, createMatchBroadcastRoom, grantBroadcastRole, revokeBroadcastInvite,
   revokeBroadcastRole, updateBroadcastRoom, updateStudioSettings,
 } from './actions';
 
@@ -31,6 +31,7 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
   const [inviteLabel, setInviteLabel] = useState('VIP Guest');
   const [inviteHours, setInviteHours] = useState(24);
   const [inviteMaxUses, setInviteMaxUses] = useState('');
+  const [newMatchId, setNewMatchId] = useState('');
   const [roleRoomId, setRoleRoomId] = useState(initialSettings?.room_id || initialRooms[0]?.id || '');
   const [roleUserId, setRoleUserId] = useState('');
   const [roleKey, setRoleKey] = useState<'host' | 'moderator' | 'caller'>('moderator');
@@ -78,6 +79,22 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
       </div>
       <p className="text-xs text-amber-700">Keep the studio inactive and call-ins disabled until the Stream token issuer and private-room tests are complete.</p>
       <button disabled={pending} className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{pending ? 'Saving…' : 'Save studio settings'}</button>
+    </form>
+
+    <form className="rounded-2xl border border-slate-200 bg-white p-5" onSubmit={event => {
+      event.preventDefault();
+      startTransition(async () => {
+        const result = await createMatchBroadcastRoom(newMatchId);
+        setMessage(result.success ? 'Inactive match room created.' : result.error);
+        if (result.success) refresh();
+      });
+    }}>
+      <h2 className="text-lg font-black">Create match-specific room</h2>
+      <p className="mt-1 text-xs text-slate-500">Uses the canonical Factsport match UUID. New rooms always start inactive with call-ins disabled.</p>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <input value={newMatchId} onChange={event => setNewMatchId(event.target.value)} placeholder="Canonical match UUID" className="min-w-0 flex-1 rounded-lg border border-slate-200 p-2 text-sm" />
+        <button disabled={pending || !newMatchId} className="rounded-lg bg-slate-950 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">Create inactive room</button>
+      </div>
     </form>
 
     <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
