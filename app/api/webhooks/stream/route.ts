@@ -29,7 +29,7 @@ async function verifySignature(payload: Uint8Array, signature: string, secret: s
   const key = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret) as unknown as BufferSource, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
   );
-  const digest = new Uint8Array(await crypto.subtle.sign('HMAC', key, payload));
+  const digest = new Uint8Array(await crypto.subtle.sign('HMAC', key, payload as unknown as BufferSource));
   return constantTimeEqual(bytesToHex(digest), signature.toLowerCase());
 }
 
