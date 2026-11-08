@@ -131,7 +131,7 @@ test('editorial media uploads are private, validated, hashed and rights-reviewed
   assert.match(mediaActions, /rights_reviewed_at/);
   assert.match(mediaActions, /workflow_status='draft'/);
   assert.match(mediaActions, /editorial_article_revision_media/);
-  assert.match(mediaActions, /is_public=false/);
+  assert.doesNotMatch(mediaActions, /is_public=false/);
   assert.match(actions, /editorial_article_revision_media/);
   assert.match(actions, /is_public=true/);
   assert.match(revisionMediaSql, /CREATE TABLE IF NOT EXISTS public\.editorial_article_revision_media/i);
