@@ -166,3 +166,5 @@ Guest invitation tokens are passed in URL fragments and submitted in the POST bo
 ## M35 webhook and revocation update
 
 The signed Stream webhook endpoint now verifies raw-body HMAC, handles gzip payloads and idempotent `X-Webhook-Id` retries, and reconciles participant presence, call-in/mic events and room lifecycle audit. Guest invite revocation now marks issued token identities revoked, attempts Stream `BlockUser`, and webhook-rejects any later rejoin. Migration `0030_factsport_broadcast_token_identity_and_webhooks.sql` adds identity and webhook ledgers. See `M35-STREAM-WEBHOOKS-PARTICIPANT-AND-REVOCATION.md`; actual Stream webhook configuration and staging E2E remain open.
+
+| `POST /api/webhooks/stream` | Signed Stream Video webhook receiver; gzip-aware HMAC verification, idempotent webhook ledger, participant/mic/call lifecycle reconciliation and revoked-identity blocking. | Requires Stream `X-Api-Key`, `X-Signature`, `X-Webhook-Id`, token-issuer Hyperdrive and migrations 0030; retries unprocessed events; no raw payload persistence. |
