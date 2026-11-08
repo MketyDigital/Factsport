@@ -42,7 +42,6 @@ export async function updateStudioSettings(input: {
     const callinEnabled = input.callinEnabled === true;
     if (isActive || callinEnabled) return { success: false, error: 'The Stream token issuer is not provisioned. Public studio activation and call-ins remain disabled.' };
     const publicListeningEnabled = input.publicListeningEnabled === true;
-    const callinEnabled = input.callinEnabled === true;
     await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
       const rooms = await tx`
         SELECT id, is_active FROM public.media_broadcast_rooms
