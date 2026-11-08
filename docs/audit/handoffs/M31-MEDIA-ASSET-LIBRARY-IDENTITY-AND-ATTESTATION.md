@@ -2,7 +2,7 @@
 
 Date: 2026-11-08
 Branch: `refactor/factsport-v2`
-Status: source implementation committed; CI regression and native build passed; protected staging deployment still in progress; no editorial database migration or runtime asset upload verified.
+Status: source implementation committed; CI regression, native build and protected staging deployment passed; no editorial database migration or runtime asset upload verified.
 
 ## Scope and evidence
 
@@ -19,7 +19,7 @@ Status: source implementation committed; CI regression and native build passed; 
 
 - Isolated verification passed on code commit `5a6f4a86e27b7d27c20eb2c73d21b3a3534d6957` (workflow run `42461455150`).
 - Native vinext build passed on the same code commit (workflow run `42461455356`).
-- Protected staging workflow run `42461455140` was still in progress at handoff time. It is a staging deployment only, not production.
+- Protected staging deployment passed on workflow run `42461455140`. The run verified regression suite, TypeScript, native Worker build, staging deployment and deny-by-default gate. It did **not** apply editorial migrations, exercise `/admin/media`, test the editorial Hyperdrive, or perform an R2 upload. It is a staging deployment only, not production.
 - No migrations were applied, no Media roles/memberships or editorial Hyperdrive were provisioned, and no R2 asset upload was runtime-tested.
 
 ## Blocking gaps found during continuation audit
