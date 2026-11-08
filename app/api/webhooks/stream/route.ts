@@ -2,6 +2,7 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
+import { SignJWT } from 'jose';
 import { getFactsportBroadcastRuntimeConfig, withFactsportBroadcastTokenIssuerPostgres } from '@/lib/adapters/postgres-client';
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -35,7 +36,7 @@ async function verifySignature(payload: Uint8Array, signature: string, secret: s
 
 async function removeStreamMember(apiKey: string, apiSecret: string, roomName: string, userId: string) {
   const issuedAt = Math.floor(Date.now() / 1000) - 1;
-  const serverToken = await new (await import('jose')).SignJWT({ server: true })
+  const serverToken = await new SignJWT({ server: true })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setIssuedAt(issuedAt)
     .setExpirationTime(issuedAt + 5 * 60)
@@ -48,7 +49,7 @@ async function removeStreamMember(apiKey: string, apiSecret: string, roomName: s
     cache: 'no-store',
     signal: AbortSignal.timeout(5000),
   });
-  if (!response.ok) {
+  if (!response.ok && response.status !== 404) {
     console.error('Stream rejected revoked participant removal', { status: response.status });
     throw new Error('Unable to remove a revoked participant from the Stream room.');
   }
@@ -122,7 +123,6 @@ export async function POST(request: Request) {
         `;
         const identity = identities[0];
         if (!identity || identity.revoked_at || new Date(identity.expires_at).valueOf() <= Date.now()) {
-          await audit(tx, roomId, 'participant_removed', null, { streamUserId: incomingUserId, reason: 'missing_or_revoked_token_identity' });
           return { duplicate: false, ignored: true, removeUserId: incomingUserId, roomName: rooms[0].room_name as string };
         }
         const participants = await tx`
@@ -218,9 +218,13 @@ export async function POST(request: Request) {
 
     if ('removeUserId' in result && result.removeUserId && result.roomName) {
       await removeStreamMember(config.apiKey, config.apiSecret, result.roomName, result.removeUserId);
-      await withFactsportBroadcastTokenIssuerPostgres(async sql => sql`
-        UPDATE public.media_broadcast_webhook_events SET processed_at=now() WHERE webhook_id=${webhookId}
-      `);
+      await withFactsportBroadcastTokenIssuerPostgres(async sql => sql.begin(async tx => {
+        const rooms = await tx`SELECT id FROM public.media_broadcast_rooms WHERE room_name=${result.roomName} LIMIT 1`;
+        if (rooms.length) await audit(tx, rooms[0].id as string, 'participant_removed', null, {
+          streamUserId: result.removeUserId, reason: 'missing_or_revoked_token_identity',
+        });
+        await tx`UPDATE public.media_broadcast_webhook_events SET processed_at=now() WHERE webhook_id=${webhookId}`;
+      }));
     }
 
     return NextResponse.json({ success: true, ...result }, {
