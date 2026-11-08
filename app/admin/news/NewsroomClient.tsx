@@ -8,6 +8,11 @@ import {
 import { reviewRightsAndAttachMedia } from './media-actions';
 import MarkdownRenderer from '@/app/components/MarkdownRenderer';
 
+type ReusableMediaAsset = {
+  id: string; object_key: string; rights_status: string; rights_reference: string | null;
+  attribution_text: string | null; alt_text: string | null; usage_expires_at: string | null;
+};
+
 type Article = {
   id: string;
   title: string;
@@ -55,7 +60,10 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const [isPending, startTransition] = useTransition();
   const [mediaPending, startMediaTransition] = useTransition();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadedAsset, setUploadedAsset] = useState<{ id: string; object_key: string; rights_status: string } | null>(null);
+  const [uploadedAsset, setUploadedAsset] = useState<{ id: string; object_key: string; rights_status: string; source?: 'upload' | 'library' } | null>(null);
+  const [assetSearch, setAssetSearch] = useState('');
+  const [existingAssets, setExistingAssets] = useState<ReusableMediaAsset[]>([]);
+  const [libraryPending, setLibraryPending] = useState(false);
   const [assetAltText, setAssetAltText] = useState('');
   const [rightsStatus, setRightsStatus] = useState<'owned' | 'licensed' | 'editorial_exception'>('owned');
   const [rightsReference, setRightsReference] = useState('');
@@ -81,6 +89,24 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
     setMessage('');
     setPreviewOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function findReusableAssets() {
+    setLibraryPending(true);
+    try {
+      const params = new URLSearchParams({ q: assetSearch, status: 'all', offset: '0' });
+      const response = await fetch('/api/admin/media?' + params.toString(), { cache: 'no-store', credentials: 'same-origin' });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Unable to search media library.');
+      const now = Date.now();
+      setExistingAssets((data.assets || []).filter((asset: ReusableMediaAsset) =>
+        ['owned', 'licensed', 'editorial_exception'].includes(asset.rights_status) &&
+        (!asset.usage_expires_at || new Date(asset.usage_expires_at).valueOf() > now)
+      ));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Media library search failed.');
+      setExistingAssets([]);
+    } finally { setLibraryPending(false); }
   }
 
   function reset() {
@@ -168,16 +194,39 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                   const response = await fetch('/api/admin/media', { method: 'POST', body: data });
                   const json = await response.json();
                   if (!response.ok || !json.success) { setMessage(json.error || 'Image upload failed.'); return; }
-                  setUploadedAsset(json.asset);
+                  setUploadedAsset({ ...json.asset, source: 'upload' });
                   setSelectedFile(null);
                   setMessage('Image uploaded privately. Complete the rights review before attaching it.');
                 })} className="mt-3 rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-bold disabled:opacity-50">
                   {mediaPending ? 'Uploading…' : 'Upload image'}
                 </button>
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                  <h4 className="text-xs font-black uppercase tracking-wide text-slate-700">Reuse an existing approved asset</h4>
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                    <input value={assetSearch} onChange={event => setAssetSearch(event.target.value)} maxLength={100} placeholder="Search filename, alt text or attribution" className="min-w-0 flex-1 rounded-lg border border-slate-200 p-2 text-xs" />
+                    <button type="button" disabled={libraryPending} onClick={() => void findReusableAssets()} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold disabled:opacity-50">{libraryPending ? 'Searching…' : 'Find approved assets'}</button>
+                  </div>
+                  {existingAssets.length > 0 && <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {existingAssets.map(asset => <button type="button" key={asset.id} onClick={() => {
+                      setUploadedAsset({ id: asset.id, object_key: asset.object_key, rights_status: asset.rights_status, source: 'library' });
+                      setRightsStatus(asset.rights_status as typeof rightsStatus);
+                      setRightsReference(asset.rights_reference || '');
+                      setAttributionText(asset.attribution_text || '');
+                      setAssetAltText(asset.alt_text || '');
+                      setUsageExpiresAt(asset.usage_expires_at ? new Date(asset.usage_expires_at).toISOString().slice(0, 16) : '');
+                      setMessage('Existing approved asset selected. Confirm its rights and attach it to this draft revision.');
+                    }} className="rounded-lg border border-slate-200 p-3 text-left hover:border-blue-400">
+                      <span className="block truncate text-xs font-bold text-slate-800">{asset.object_key}</span>
+                      <span className="mt-1 block text-[10px] font-semibold uppercase text-emerald-700">{asset.rights_status.replace('_', ' ')}</span>
+                      {asset.attribution_text && <span className="mt-1 block truncate text-[10px] text-slate-500">{asset.attribution_text}</span>}
+                    </button>)}
+                  </div>}
+                  {existingAssets.length === 0 && <p className="mt-2 text-[11px] text-slate-500">Search to find reusable assets with approved rights and no expired usage window.</p>}
+                </div>
                 {uploadedAsset && <div className="mt-4 rounded-xl border border-blue-200 bg-white p-3">
-                  <p className="text-xs font-bold text-slate-800">Uploaded asset: {uploadedAsset.object_key}</p>
+                  <p className="text-xs font-bold text-slate-800">{uploadedAsset.source === 'library' ? 'Selected library asset: ' : 'Uploaded asset: '}{uploadedAsset.object_key}</p>
                   <img src={"/api/admin/media/" + encodeURIComponent(uploadedAsset.id)} alt={assetAltText || "Private editorial media preview"} className="mt-3 max-h-56 w-auto max-w-full rounded-lg border border-slate-200 object-contain" />
-                  <p className="mt-1 text-xs text-amber-700">Private preview · Rights state: pending review</p>
+                  <p className="mt-1 text-xs text-amber-700">Private preview · Rights state: {uploadedAsset.rights_status.replace('_', ' ')}</p>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <label className="text-xs font-bold text-slate-600">Placement
                       <select value={placement} onChange={e => setPlacement(e.target.value as typeof placement)} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm">
