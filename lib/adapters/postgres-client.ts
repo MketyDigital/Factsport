@@ -82,3 +82,9 @@ export function getFactsportBroadcastRuntimeConfig(): FactsportBroadcastRuntimeC
   if (!apiKey || !apiSecret || !anonymousSessionSecret || !issuerReady) return null;
   return { apiKey, apiSecret, anonymousSessionSecret, moderatorRoleReady, issuerReady };
 }
+
+export function isFactsportBroadcastTokenIssuerReady(): boolean {
+  const bindings = env as unknown as Record<string, unknown>;
+  return getFactsportBroadcastRuntimeConfig() !== null &&
+    Boolean((bindings.FACTSPORT_BROADCAST_TOKEN_HYPERDRIVE as HyperdriveBinding | undefined)?.connectionString);
+}
