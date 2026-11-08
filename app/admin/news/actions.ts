@@ -262,7 +262,7 @@ export async function publishApprovedEditorial(articleId: string, publicContentC
       const contentPolicy = inspectPublicMediaArticle(snapshot);
       if (!contentPolicy.eligible) throw new Error('This revision contains betting promotion, affiliate links or private Prediction content and cannot be published on public Media.');
       const revisionMedia = await tx`
-        SELECT placement, media_id, remove_media
+        SELECT placement, position, media_id, remove_media
         FROM public.editorial_article_revision_media
         WHERE revision_id=${revision.id}::uuid FOR UPDATE
       `;
@@ -301,12 +301,19 @@ export async function publishApprovedEditorial(articleId: string, publicContentC
             await tx`INSERT INTO public.editorial_article_media (article_id, media_id, placement, position)
               VALUES (${articleId}::uuid, ${mediaId}::uuid, 'hero', 0)`;
           }
-        } else {
+        } else if (attachment.placement === 'team_1' || attachment.placement === 'team_2') {
           await tx`DELETE FROM public.editorial_article_team_media
             WHERE article_id=${articleId}::uuid AND team_side=${attachment.placement}`;
           if (mediaId && !attachment.remove_media) {
             await tx`INSERT INTO public.editorial_article_team_media (article_id, team_side, media_id)
               VALUES (${articleId}::uuid, ${attachment.placement}, ${mediaId}::uuid)`;
+          }
+        } else if (attachment.placement === 'inline') {
+          await tx`DELETE FROM public.editorial_article_media
+            WHERE article_id=${articleId}::uuid AND placement='inline' AND position=${attachment.position}`;
+          if (mediaId && !attachment.remove_media) {
+            await tx`INSERT INTO public.editorial_article_media (article_id, media_id, placement, position)
+              VALUES (${articleId}::uuid, ${mediaId}::uuid, 'inline', ${attachment.position})`;
           }
         }
         if (mediaId && !attachment.remove_media) {
