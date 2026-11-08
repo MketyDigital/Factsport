@@ -54,3 +54,12 @@ The Media admin now has a source-level Entra External ID OIDC/PKCE flow and encr
 ## CMS preview parity addition
 
 The newsroom composer now has a draft article preview using the exact public `MarkdownRenderer` component (including its sanitization and safe-embed pipeline). This avoids a second renderer drifting from public output. It is a source/build-verified UI preview; article media placements and final page-layout preview still need to be loaded from the revision-scoped media join before the full public article preview is considered complete.
+
+
+## Media editor enhancements — ordered inline gallery and reusable assets
+
+- The newsroom can search and reuse previously approved, non-expired assets from the private Media library; selected assets retain their rights metadata and are previewed through the authenticated private R2 endpoint.
+- Added ordered `inline` placement to revision-scoped media with migration `0027_factsport_revision_inline_media_gallery.sql`. Publication copies approved inline attachments to the article media relation at their chosen order; a new public view exposes only assets attached to published, reviewed articles with valid rights and unexpired usage.
+- Public article pages now render the rights-filtered inline gallery with alt text and attribution. Reusing an existing asset no longer resets its global `is_public` flag, so one article revision cannot accidentally unpublish an asset already used by another published story.
+- The public article sidebar no longer contains the prize/prediction acquisition message; it now links to neutral fixtures and live-score coverage, keeping private Prediction promotion out of the public newsroom surface.
+- These changes are source committed; latest verification for commit `34494850b31ce530f960cfe30f46a95fe97e0927` is running. Do not mark migration 0027 or public gallery runtime complete until it is applied and exercised in isolated staging.
