@@ -2,23 +2,18 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { Newspaper, Images, Send, Radio, Settings, LogOut } from 'lucide-react';
-import { createClient } from '@/app/lib/supabase/server';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
-
   const access = await authorizeMediaEditorialAction('workspace');
   if (!access.ok) {
     return (
       <main className="mx-auto mt-12 max-w-2xl rounded-2xl border border-amber-200 bg-amber-50 p-6">
         <h1 className="text-xl font-black text-amber-950">Factsport Media workspace</h1>
         <p className="mt-2 text-sm text-amber-900">{access.error}</p>
-        <p className="mt-3 text-xs text-amber-800">Access is managed through Factsport Media roles, not email allowlists, profile metadata or the legacy admin PIN.</p>
+        <p className="mt-3 text-xs text-amber-800">Access is managed through verified Entra identity and Factsport Media roles, not email allowlists or profile metadata.</p>
+        <Link href="/media-login" className="mt-4 inline-block rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white">Sign in to Media</Link>
       </main>
     );
   }
