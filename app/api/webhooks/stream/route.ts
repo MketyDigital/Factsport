@@ -27,14 +27,14 @@ async function decompressIfGzip(rawBody: ArrayBuffer): Promise<Uint8Array> {
 
 async function verifySignature(payload: Uint8Array, signature: string, secret: string): Promise<boolean> {
   const key = await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+    'raw', new TextEncoder().encode(secret) as unknown as BufferSource, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
   );
   const digest = new Uint8Array(await crypto.subtle.sign('HMAC', key, payload));
   return constantTimeEqual(bytesToHex(digest), signature.toLowerCase());
 }
 
 
-async async function blockStreamUser(apiKey: string, apiSecret: string, roomName: string, userId: string) {
+async function blockStreamUser(apiKey: string, apiSecret: string, roomName: string, userId: string) {
   const issuedAt = Math.floor(Date.now() / 1000) - 1;
   const serverToken = await new SignJWT({ server: true })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
@@ -217,14 +217,12 @@ export async function POST(request: Request) {
         await audit(tx, roomId, 'recording_stopped', null, {});
       }
 
-      if (!('removeUserId' in result) || !result.removeUserId) {
-        await tx`
-          UPDATE public.media_broadcast_webhook_events
-          SET processed_at=now()
-          WHERE webhook_id=${webhookId}
-        `;
-      }
-      return { ...result, webhookId };
+      await tx`
+        UPDATE public.media_broadcast_webhook_events
+        SET processed_at=now()
+        WHERE webhook_id=${webhookId}
+      `;
+      return { duplicate: false, ignored: false, webhookId };
     }));
 
     if ('removeUserId' in result && result.removeUserId && result.roomName) {
