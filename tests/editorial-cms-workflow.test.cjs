@@ -255,3 +255,29 @@ test('reusing an approved asset in a new revision does not unpublish its existin
   assert.match(mediaActions, /INSERT INTO public\.editorial_article_revision_media/);
   assert.doesNotMatch(mediaActions, /is_public=false/);
 });
+
+
+test('revision-scoped inline media is ordered, rights-filtered and projected only on published articles', () => {
+  const migration = read('db/migrations/0027_factsport_revision_inline_media_gallery.sql');
+  const mediaActions = read('app/admin/news/media-actions.ts');
+  const publish = read('app/admin/news/actions.ts');
+  const adapter = read('lib/adapters/postgres-editorial.ts');
+  const article = read('app/news/[slug]/page.tsx');
+  assert.match(migration, /placement IN \('hero', 'team_1', 'team_2', 'inline'\)/);
+  assert.match(migration, /PRIMARY KEY \(revision_id, placement, position\)/);
+  assert.match(migration, /public_editorial_article_inline_media/);
+  assert.match(migration, /a\.status = 'published'/);
+  assert.match(migration, /m\.rights_status IN \('owned', 'licensed', 'editorial_exception'\)/);
+  assert.match(mediaActions, /ON CONFLICT \(revision_id, placement, position\)/);
+  assert.match(publish, /attachment\.placement === 'inline'/);
+  assert.match(publish, /placement='inline' AND position=/);
+  assert.match(adapter, /public_editorial_article_inline_media/);
+  assert.match(article, /article\.inline_media/);
+  assert.match(article, /\/api\/media\//);
+});
+
+test('public article pages do not carry Prediction prize acquisition promotions', () => {
+  const article = read('app/news/[slug]/page.tsx');
+  assert.match(article, /Follow fixtures, live scores and match coverage/);
+  assert.doesNotMatch(article, /Win Amazing Prizes|Start Predicting|Think You.*Know Football/);
+});
