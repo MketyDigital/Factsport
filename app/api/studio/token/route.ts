@@ -93,6 +93,7 @@ async function streamRequest(apiKey: string, serverToken: string, path: string, 
     },
     body: JSON.stringify(body),
     cache: 'no-store',
+    signal: AbortSignal.timeout(5000),
   });
   if (!response.ok) {
     console.error('Stream provider request failed', { path: path.split('?')[0], status: response.status });
