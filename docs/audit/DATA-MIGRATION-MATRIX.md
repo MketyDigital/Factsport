@@ -96,3 +96,11 @@ The homepage read model is intentionally not a substitute for the full CMS or sp
 - Added a PostgreSQL reader that resolves either the canonical V2 UUID or the legacy alias and always returns the canonical V2 ID.
 - Added an independently gated same-origin match detail API branch using only public match fields. It deliberately excludes raw stream URLs, audio/video links, pro_analysis, campaign_id, affiliate links and settlement flags.
 - No legacy IDs have been imported or mapped yet. Migration 0008 remains unapplied; alias population requires an approved, reconciled import/crosswalk.
+
+
+## 2026-11-08 Media data additions
+
+- `0027_factsport_revision_inline_media_gallery.sql`: ordered revision-scoped inline media and public gallery projection filtered to published/reviewed articles and rights-cleared, unexpired assets.
+- `0028_factsport_broadcast_admin_audit_and_role_history.sql`: active-only unique broadcast room-role grants so revoked roles can be re-granted without deleting history; extends audit action coverage.
+- `0029_factsport_broadcast_token_rate_limits.sql`: keyed-hash rate-limit buckets for Stream token issuance; no raw IP or invite token values persisted.
+- These migrations are committed but not applied to staging or production. Apply only after dedicated editorial/broadcast roles and Hyperdrive bindings are provisioned; validate existing data and grants first.
