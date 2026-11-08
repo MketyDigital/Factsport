@@ -73,6 +73,63 @@ async function demoteStreamCallMember(roomName: string, userId: string): Promise
   }
 }
 
+
+async function setStreamCallMemberRole(roomName: string, userId: string, role: string): Promise<string | null> {
+  const config = getFactsportBroadcastRuntimeConfig();
+  if (!config) return 'Factsport role was saved, but Stream credentials are not provisioned; provider role will apply after configuration.';
+  try {
+    const issuedAt = Math.floor(Date.now() / 1000) - 1;
+    const serverToken = await new SignJWT({ server: true })
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+      .setIssuedAt(issuedAt)
+      .setExpirationTime(issuedAt + 5 * 60)
+      .sign(new TextEncoder().encode(config.apiSecret));
+    const response = await fetch(
+      `https://video.stream-io-api.com/api/v2/video/call/audio_room/${encodeURIComponent(roomName)}/members?api_key=${encodeURIComponent(config.apiKey)}`,
+      {
+        method: 'POST',
+        headers: { Authorization: serverToken, 'stream-auth-type': 'jwt', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ update_members: [{ user_id: userId, role }] }),
+        cache: 'no-store',
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+    if (!response.ok && response.status !== 404) return 'Factsport role was saved, but Stream could not confirm the member role update.';
+    return null;
+  } catch (error) {
+    console.error('Stream call member role update failed', error);
+    return 'Factsport role was saved, but Stream could not confirm the member role update.';
+  }
+}
+
+async function unblockStreamCallUser(roomName: string, userId: string): Promise<string | null> {
+  const config = getFactsportBroadcastRuntimeConfig();
+  if (!config) return 'Factsport role was saved, but Stream credentials are unavailable to unblock this account.';
+  try {
+    const issuedAt = Math.floor(Date.now() / 1000) - 1;
+    const serverToken = await new SignJWT({ server: true })
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+      .setIssuedAt(issuedAt)
+      .setExpirationTime(issuedAt + 5 * 60)
+      .sign(new TextEncoder().encode(config.apiSecret));
+    const response = await fetch(
+      `https://video.stream-io-api.com/api/v2/video/call/audio_room/${encodeURIComponent(roomName)}/unblock?api_key=${encodeURIComponent(config.apiKey)}`,
+      {
+        method: 'POST',
+        headers: { Authorization: serverToken, 'stream-auth-type': 'jwt', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+        cache: 'no-store',
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+    if (!response.ok && response.status !== 404) return 'Factsport role was saved, but Stream could not confirm the account unblock.';
+    return null;
+  } catch (error) {
+    console.error('Stream call user unblock failed', error);
+    return 'Factsport role was saved, but Stream could not confirm the account unblock.';
+  }
+}
+
 function safeMediaUrl(value: unknown): string | null {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value !== 'string') throw new Error('Broadcast media URL must be text.');
@@ -441,7 +498,7 @@ export async function grantBroadcastRole(input: { roomId: string; userId: string
     return { success: false, error: 'Choose a valid room, internal user and broadcast role.' };
   }
   try {
-    await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
+    const granted = await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
       const inserted = await tx`
         INSERT INTO public.media_broadcast_room_roles (room_id, user_id, role_key, granted_by)
         VALUES (${input.roomId}::uuid, ${input.userId}::uuid, ${input.role}, ${authorization.user.domainUserId}::uuid)
@@ -449,14 +506,37 @@ export async function grantBroadcastRole(input: { roomId: string; userId: string
         RETURNING id
       `;
       if (!inserted.length) throw new Error('This user already has the active broadcast role for this room.');
+      const room = await tx`SELECT room_name FROM public.media_broadcast_rooms WHERE id=${input.roomId}::uuid LIMIT 1`;
+      const identities = await tx`
+        SELECT stream_user_id, revoked_at FROM public.media_broadcast_token_identities
+        WHERE room_id=${input.roomId}::uuid AND user_id=${input.userId}::uuid
+          AND identity_kind='authenticated' LIMIT 1
+      `;
       await tx`
         INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, details)
         VALUES (${input.roomId}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'role_granted',
           ${JSON.stringify({ targetUserId: input.userId, role: input.role })}::jsonb)
       `;
+      return {
+        roomName: room[0]?.room_name as string | undefined,
+        streamUserId: identities[0]?.stream_user_id as string | undefined,
+        wasRevoked: Boolean(identities[0]?.revoked_at),
+      };
     }));
+    let warning: string | null = null;
+    if (granted.streamUserId && granted.roomName) {
+      if (granted.wasRevoked) warning = await unblockStreamCallUser(granted.roomName, granted.streamUserId);
+      if (!warning) warning = await setStreamCallMemberRole(granted.roomName, granted.streamUserId, input.role === 'host' ? 'admin' : input.role === 'moderator' ? 'moderator' : 'user');
+      if (!warning) {
+        await withFactsportBroadcastAdminPostgres(async sql => sql`
+          UPDATE public.media_broadcast_token_identities
+          SET revoked_at=NULL, role_key=${input.role}
+          WHERE room_id=${input.roomId}::uuid AND user_id=${input.userId}::uuid AND identity_kind='authenticated'
+        `);
+      }
+    }
     revalidatePath('/admin/studio');
-    return { success: true };
+    return { success: true, data: warning ? { warning } : {} };
   } catch (error) {
     console.error('Broadcast role grant failed', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unable to grant broadcast role.' };
