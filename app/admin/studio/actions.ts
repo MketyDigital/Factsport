@@ -477,18 +477,28 @@ export async function grantBroadcastRole(input: { roomId: string; userId: string
         ON CONFLICT (room_id, user_id, role_key) WHERE revoked_at IS NULL DO NOTHING
         RETURNING id
       `;
-      if (!inserted.length) throw new Error('This user already has the active broadcast role for this room.');
+      if (!inserted.length) {
+        const active = await tx`
+          SELECT id FROM public.media_broadcast_room_roles
+          WHERE room_id=${input.roomId}::uuid AND user_id=${input.userId}::uuid
+            AND role_key=${input.role} AND revoked_at IS NULL
+          LIMIT 1
+        `;
+        if (!active.length) throw new Error('This user already has the active broadcast role for this room.');
+      }
       const room = await tx`SELECT room_name FROM public.media_broadcast_rooms WHERE id=${input.roomId}::uuid LIMIT 1`;
       const identities = await tx`
         SELECT stream_user_id, revoked_at FROM public.media_broadcast_token_identities
         WHERE room_id=${input.roomId}::uuid AND user_id=${input.userId}::uuid
           AND identity_kind='authenticated' LIMIT 1
       `;
-      await tx`
-        INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, details)
-        VALUES (${input.roomId}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'role_granted',
-          ${JSON.stringify({ targetUserId: input.userId, role: input.role })}::jsonb)
-      `;
+      if (inserted.length) {
+        await tx`
+          INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, details)
+          VALUES (${input.roomId}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'role_granted',
+            ${JSON.stringify({ targetUserId: input.userId, role: input.role })}::jsonb)
+        `;
+      }
       return {
         roomName: room[0]?.room_name as string | undefined,
         streamUserId: identities[0]?.stream_user_id as string | undefined,
