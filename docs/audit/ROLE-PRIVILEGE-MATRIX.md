@@ -60,3 +60,8 @@ The current role migration is `db/migrations/0002_factsport_v2_runtime_role_hard
 ## Match identity alias privilege note
 
 Migration 0008 adds only a nullable `legacy_match_id` column and unique partial index on `public.matches`. It grants no new INSERT or UPDATE privileges to runtime roles. The existing reader SELECT grant on `public.matches` permits the narrow alias-resolution query. Population of aliases is an import/admin operation and must use an explicitly authorized migration/import identity; the schedule writer must not be able to change legacy aliases.
+
+
+## M33 broadcast admin implementation update
+
+The dedicated Media broadcast admin UI and server mutations are now implemented in source under the Entra-backed `broadcast` capability and separate `FACTSPORT_BROADCAST_ADMIN_HYPERDRIVE`. It supports studio settings, inactive match-room creation, room shutdown/settings, hashed invite creation/revocation and room host/moderator/caller role grants. Migration `0028_factsport_broadcast_admin_audit_and_role_history.sql` fixes role re-grant history and adds audit actions. Activation and call-ins are deliberately rejected until the separate Stream token issuer exists; invite redemption and participant controls are not yet active. See `M33-BROADCAST-ADMIN-CONTROL-PLANE.md`.
