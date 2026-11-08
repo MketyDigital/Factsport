@@ -49,3 +49,8 @@ No production database, legacy Supabase rows, DNS, Cloudflare production routes,
 ## Follow-up M32 identity integration
 
 The Media admin now has a source-level Entra External ID OIDC/PKCE flow and encrypted Factsport session. The Media authorization bridge and admin layout consume this session, while middleware bypasses the old Supabase/email allowlist only on cookie presence; all actual Media authorization remains server-side and rechecks the issuer+subject+internal UUID mapping plus active Factsport Media membership. See `M32-ENTRA-MEDIA-EDITOR-IDENTITY-FLOW.md` for security properties and the exact external configuration still required. Real Entra sign-in is not yet verified; tenant/app registration, deployed callback hostname, Cloudflare session secret, editorial Hyperdrive and role memberships remain prerequisites.
+
+
+## CMS preview parity addition
+
+The newsroom composer now has a draft article preview using the exact public `MarkdownRenderer` component (including its sanitization and safe-embed pipeline). This avoids a second renderer drifting from public output. It is a source/build-verified UI preview; article media placements and final page-layout preview still need to be loaded from the revision-scoped media join before the full public article preview is considered complete.
