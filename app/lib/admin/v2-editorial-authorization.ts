@@ -5,7 +5,7 @@ import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 
 export type MediaEditorialCapability = 'workspace' | 'read' | 'draft' | 'review' | 'publish' | 'archive' | 'media' | 'social';
 export type MediaEditorialAuthorization =
-  | { ok: true; user: { id: string; domainUserId: string; roles: string[] } }
+  | { ok: true; user: { id: string; issuer: string; domainUserId: string; roles: string[] } }
   | { ok: false; status: 401 | 403 | 503; error: string };
 
 const allowedRoles: Record<MediaEditorialCapability, string[]> = {
@@ -19,22 +19,50 @@ const allowedRoles: Record<MediaEditorialCapability, string[]> = {
   social: ['social_manager', 'editor', 'publisher', 'media_admin'],
 };
 
+type VerifiedSessionIdentity = { issuer: string; subject: string };
+
+/**
+ * The provider session is verified by getUser(); issuer and subject are then
+ * taken from the corresponding signed access-token claims and cross-checked.
+ * Email and profile metadata are never identity-linking or authorization keys.
+ */
+function readSessionIdentity(accessToken: string, verifiedSubject: string): VerifiedSessionIdentity | null {
+  const parts = accessToken.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const encoded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, '=')));
+    if (typeof payload.iss !== 'string' || !payload.iss.trim() ||
+        typeof payload.sub !== 'string' || payload.sub !== verifiedSubject) return null;
+    return { issuer: payload.iss, subject: payload.sub };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Authentication is delegated to the configured identity provider session.
- * Authorization is resolved exclusively from Factsport's own PostgreSQL role
- * memberships and explicit external identity bridge; email/profile metadata is
- * never an authorization source.
+ * Authorization is resolved exclusively from Factsport's issuer+subject bridge
+ * and Factsport-owned PostgreSQL role memberships.
  */
 export async function authorizeMediaEditorialAction(
   capability: MediaEditorialCapability,
 ): Promise<MediaEditorialAuthorization> {
-  let authUser;
+  let identity: VerifiedSessionIdentity | null = null;
   try {
     const supabase = createClient();
-    const result = await supabase.auth.getUser();
-    authUser = result.data.user;
-    if (result.error || !authUser?.id) {
+    const [sessionResult, userResult] = await Promise.all([
+      supabase.auth.getSession(),
+      supabase.auth.getUser(),
+    ]);
+    const accessToken = sessionResult.data.session?.access_token;
+    const verifiedUser = userResult.data.user;
+    if (sessionResult.error || userResult.error || !accessToken || !verifiedUser?.id) {
       return { ok: false, status: 401, error: 'Sign in with a verified Factsport identity.' };
+    }
+    identity = readSessionIdentity(accessToken, verifiedUser.id);
+    if (!identity) {
+      return { ok: false, status: 401, error: 'The identity provider token is missing a valid issuer or subject claim.' };
     }
   } catch {
     return { ok: false, status: 401, error: 'Unable to verify the current identity session.' };
@@ -45,7 +73,8 @@ export async function authorizeMediaEditorialAction(
       WITH mapped AS (
         SELECT DISTINCT user_id
         FROM public.external_identities
-        WHERE subject = ${authUser.id}
+        WHERE issuer = ${identity!.issuer}
+          AND subject = ${identity!.subject}
       )
       SELECT mapped.user_id,
         COALESCE(array_agg(DISTINCT membership.role_key)
@@ -57,13 +86,16 @@ export async function authorizeMediaEditorialAction(
       LIMIT 2
     `);
     if (memberships.length !== 1) {
-      return { ok: false, status: 403, error: 'This identity is not uniquely linked to a Factsport account.' };
+      return { ok: false, status: 403, error: 'This issuer and subject are not uniquely linked to a Factsport account.' };
     }
     const roles = memberships[0].roles as string[];
     if (!allowedRoles[capability].some(role => roles.includes(role))) {
       return { ok: false, status: 403, error: 'Your Factsport Media role does not permit this action.' };
     }
-    return { ok: true, user: { id: authUser.id, domainUserId: memberships[0].user_id as string, roles } };
+    return {
+      ok: true,
+      user: { id: identity.subject, issuer: identity.issuer, domainUserId: memberships[0].user_id as string, roles },
+    };
   } catch (error) {
     console.error('Media editorial authorization unavailable', error);
     return { ok: false, status: 503, error: 'Media authorization is not provisioned. No legacy admin fallback is allowed.' };
