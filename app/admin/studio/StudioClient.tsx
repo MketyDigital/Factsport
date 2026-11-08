@@ -76,9 +76,9 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
         </label>
       </div>
       <div className="flex flex-wrap gap-5 text-sm">
-        <label className="flex items-center gap-2"><input type="checkbox" checked={settings.is_active} disabled={!tokenIssuerReady} /> Activate public studio</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={settings.is_active} disabled={!tokenIssuerReady} onChange={event => setSettings({ ...settings, is_active: event.target.checked })} /> Activate public studio</label>
         <label className="flex items-center gap-2"><input type="checkbox" checked={settings.public_listening_enabled} onChange={event => setSettings({ ...settings, public_listening_enabled: event.target.checked })} /> Allow public listening</label>
-        <label className="flex items-center gap-2"><input type="checkbox" checked={settings.callin_enabled} disabled={!tokenIssuerReady} /> Enable call-in requests</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={settings.callin_enabled} disabled={!tokenIssuerReady} onChange={event => setSettings({ ...settings, callin_enabled: event.target.checked })} /> Enable call-in requests</label>
       </div>
       <p className="text-xs text-amber-700">{tokenIssuerReady ? 'Token issuer configured. Complete private-room tests before enabling the studio or call-ins.' : 'Keep the studio inactive and call-ins disabled until the Stream token issuer and its dedicated database binding are provisioned.'}</p>
       <button disabled={pending} className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{pending ? 'Saving…' : 'Save studio settings'}</button>
