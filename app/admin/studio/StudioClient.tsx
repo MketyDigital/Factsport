@@ -20,8 +20,8 @@ type Invite = {
 };
 type Role = { id: string; room_id: string; room_name: string; user_id: string; role_key: string; created_at: string };
 
-export default function StudioClient({ initialSettings, initialRooms, initialInvites, initialRoles }: {
-  initialSettings: Settings | null; initialRooms: Room[]; initialInvites: Invite[]; initialRoles: Role[];
+export default function StudioClient({ initialSettings, initialRooms, initialInvites, initialRoles, tokenIssuerReady }: {
+  initialSettings: Settings | null; initialRooms: Room[]; initialInvites: Invite[]; initialRoles: Role[]; tokenIssuerReady: boolean;
 }) {
   const [settings, setSettings] = useState<Settings | null>(initialSettings);
   const [rooms] = useState(initialRooms);
@@ -73,11 +73,11 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
         </label>
       </div>
       <div className="flex flex-wrap gap-5 text-sm">
-        <label className="flex items-center gap-2"><input type="checkbox" checked={settings.is_active} disabled /> Activate public studio</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={settings.is_active} disabled={!tokenIssuerReady} /> Activate public studio</label>
         <label className="flex items-center gap-2"><input type="checkbox" checked={settings.public_listening_enabled} onChange={event => setSettings({ ...settings, public_listening_enabled: event.target.checked })} /> Allow public listening</label>
-        <label className="flex items-center gap-2"><input type="checkbox" checked={settings.callin_enabled} disabled /> Enable call-in requests</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={settings.callin_enabled} disabled={!tokenIssuerReady} /> Enable call-in requests</label>
       </div>
-      <p className="text-xs text-amber-700">Keep the studio inactive and call-ins disabled until the Stream token issuer and private-room tests are complete.</p>
+      <p className="text-xs text-amber-700">{tokenIssuerReady ? 'Token issuer configured. Complete private-room tests before enabling the studio or call-ins.' : 'Keep the studio inactive and call-ins disabled until the Stream token issuer and its dedicated database binding are provisioned.'}</p>
       <button disabled={pending} className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{pending ? 'Saving…' : 'Save studio settings'}</button>
       <button type="button" disabled={pending || !settings.is_active} onClick={() => startTransition(async () => {
         const result = await updateBroadcastRoom({
@@ -116,7 +116,7 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
             const next = { ...room, public_listening_enabled: event.target.checked };
             startTransition(async () => { const result = await updateBroadcastRoom({ roomId: room.id, isActive: room.is_active, publicListeningEnabled: next.public_listening_enabled, callinEnabled: room.callin_enabled }); setMessage(result.success ? 'Room updated.' : result.error); if (result.success) refresh(); });
           }} /> Public listening</label>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={room.callin_enabled} disabled onChange={event => {
+          <label className="flex items-center gap-2"><input type="checkbox" checked={room.callin_enabled} disabled={!tokenIssuerReady} onChange={event => {
             const next = { ...room, callin_enabled: event.target.checked };
             startTransition(async () => { const result = await updateBroadcastRoom({ roomId: room.id, isActive: room.is_active, publicListeningEnabled: room.public_listening_enabled, callinEnabled: next.callin_enabled }); setMessage(result.success ? 'Room updated.' : result.error); if (result.success) refresh(); });
           }} /> Call-in enabled</label>
