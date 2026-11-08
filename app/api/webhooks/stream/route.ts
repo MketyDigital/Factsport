@@ -32,6 +32,28 @@ async function verifySignature(payload: Uint8Array, signature: string, secret: s
   return constantTimeEqual(bytesToHex(digest), signature.toLowerCase());
 }
 
+
+async function removeStreamMember(apiKey: string, apiSecret: string, roomName: string, userId: string) {
+  const issuedAt = Math.floor(Date.now() / 1000) - 1;
+  const serverToken = await new (await import('jose')).SignJWT({ server: true })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuedAt(issuedAt)
+    .setExpirationTime(issuedAt + 5 * 60)
+    .sign(new TextEncoder().encode(apiSecret));
+  const url = `https://video.stream-io-api.com/api/v2/video/call/audio_room/${encodeURIComponent(roomName)}/members?api_key=${encodeURIComponent(apiKey)}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: serverToken, 'stream-auth-type': 'jwt', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ remove_members: [userId] }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!response.ok) {
+    console.error('Stream rejected revoked participant removal', { status: response.status });
+    throw new Error('Unable to remove a revoked participant from the Stream room.');
+  }
+}
+
 function streamUserId(event: any): string | null {
   const value = event?.participant?.user_id || event?.participant?.user?.id ||
     event?.user?.id || event?.user_id;
@@ -77,12 +99,18 @@ export async function POST(request: Request) {
         ON CONFLICT (webhook_id) DO NOTHING
         RETURNING webhook_id
       `;
-      if (!inserted.length) return { duplicate: true };
+      if (!inserted.length) {
+        const previous = await tx`SELECT processed_at FROM public.media_broadcast_webhook_events WHERE webhook_id=${webhookId}`;
+        if (previous[0]?.processed_at) return { duplicate: true };
+      }
 
       const rooms = callId ? await tx`
         SELECT id, room_name FROM public.media_broadcast_rooms WHERE room_name=${callId} LIMIT 1
       ` : [];
-      if (!rooms.length) return { duplicate: false, ignored: true };
+      if (!rooms.length) {
+        await tx`UPDATE public.media_broadcast_webhook_events SET processed_at=now() WHERE webhook_id=${webhookId}`;
+        return { duplicate: false, ignored: true };
+      }
       const roomId = rooms[0].id as string;
 
       if (eventType === 'call.session_participant_joined' && incomingUserId) {
@@ -95,7 +123,7 @@ export async function POST(request: Request) {
         const identity = identities[0];
         if (!identity || identity.revoked_at || new Date(identity.expires_at).valueOf() <= Date.now()) {
           await audit(tx, roomId, 'participant_removed', null, { streamUserId: incomingUserId, reason: 'missing_or_revoked_token_identity' });
-          return { duplicate: false, ignored: true };
+          return { duplicate: false, ignored: true, removeUserId: incomingUserId, roomName: rooms[0].room_name as string };
         }
         const participants = await tx`
           INSERT INTO public.media_broadcast_participants
@@ -178,13 +206,22 @@ export async function POST(request: Request) {
         await audit(tx, roomId, 'recording_stopped', null, {});
       }
 
-      await tx`
-        UPDATE public.media_broadcast_webhook_events
-        SET processed_at=now()
-        WHERE webhook_id=${webhookId}
-      `;
-      return { duplicate: false, ignored: false };
+      if (!('removeUserId' in result) || !result.removeUserId) {
+        await tx`
+          UPDATE public.media_broadcast_webhook_events
+          SET processed_at=now()
+          WHERE webhook_id=${webhookId}
+        `;
+      }
+      return { ...result, webhookId };
     }));
+
+    if ('removeUserId' in result && result.removeUserId && result.roomName) {
+      await removeStreamMember(config.apiKey, config.apiSecret, result.roomName, result.removeUserId);
+      await withFactsportBroadcastTokenIssuerPostgres(async sql => sql`
+        UPDATE public.media_broadcast_webhook_events SET processed_at=now() WHERE webhook_id=${webhookId}
+      `);
+    }
 
     return NextResponse.json({ success: true, ...result }, {
       headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
