@@ -2,7 +2,7 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
-import { withFactsportBroadcastAdminPostgres } from '@/lib/adapters/postgres-client';
+import { isFactsportBroadcastTokenIssuerReady, withFactsportBroadcastAdminPostgres } from '@/lib/adapters/postgres-client';
 import StudioClient from './StudioClient';
 
 export default async function AdminStudioPage() {
@@ -56,6 +56,7 @@ export default async function AdminStudioPage() {
       initialRooms={data.rooms as any[]}
       initialInvites={data.invites as any[]}
       initialRoles={data.roles as any[]}
+      tokenIssuerReady={isFactsportBroadcastTokenIssuerReady()}
     />;
   } catch (error) {
     console.error('V2 broadcast admin database unavailable', error);
