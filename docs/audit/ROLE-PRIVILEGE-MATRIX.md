@@ -74,3 +74,8 @@ The dedicated Media broadcast admin UI and server mutations are now implemented 
 - Stream token issuance is a separate service identity (`factsport_v2_broadcast_token_issuer` / `FACTSPORT_BROADCAST_TOKEN_HYPERDRIVE`). It may read room policy/roles/invites, consume invite use counts, append audit and update token rate-limit buckets; it cannot grant room roles or alter studio settings.
 - Host/moderator/caller are room-scoped grants. Host receives Stream call admin membership; moderator receives a configured custom Stream moderator role; caller eligibility is derived from a current caller grant and room `callin_enabled`. Anonymous listeners and guest invitees do not inherit Prediction VIP or payment status.
 - M34 records token-issuer implementation and the external configuration/E2E gates. No database roles or Hyperdrive bindings were provisioned in this source change.
+
+
+## M35 webhook and revocation update
+
+The signed Stream webhook endpoint now verifies raw-body HMAC, handles gzip payloads and idempotent `X-Webhook-Id` retries, and reconciles participant presence, call-in/mic events and room lifecycle audit. Guest invite revocation now marks issued token identities revoked, attempts Stream `BlockUser`, and webhook-rejects any later rejoin. Migration `0030_factsport_broadcast_token_identity_and_webhooks.sql` adds identity and webhook ledgers. See `M35-STREAM-WEBHOOKS-PARTICIPANT-AND-REVOCATION.md`; actual Stream webhook configuration and staging E2E remain open.
