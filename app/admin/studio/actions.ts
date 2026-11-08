@@ -104,7 +104,7 @@ export async function updateBroadcastRoom(input: {
       await tx`
         INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, details)
         VALUES (${input.roomId}::uuid, ${authorization.user.domainUserId}::uuid, 'admin',
-          ${active ? 'room_activated' : 'room_shutdown'},
+          ${active ? 'room_activated' : (rooms[0].is_active ? 'room_shutdown' : 'settings_updated')},
           ${JSON.stringify({ publicListeningEnabled: input.publicListeningEnabled === true, callinEnabled })}::jsonb)
       `;
     }));
