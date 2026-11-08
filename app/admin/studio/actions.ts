@@ -13,7 +13,7 @@ const unavailable = (): Result => ({
 });
 
 
-async async function blockRevokedStreamUsers(roomName: string, userIds: string[]): Promise<string | null> {
+async function blockRevokedStreamUsers(roomName: string, userIds: string[]): Promise<string | null> {
   const config = getFactsportBroadcastRuntimeConfig();
   if (!config || userIds.length === 0) return null;
   try {
@@ -289,7 +289,7 @@ export async function revokeBroadcastInvite(inviteId: string): Promise<Result> {
         VALUES (${rows[0].room_id}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'invite_revoked',
           ${JSON.stringify({ inviteId, revokedIdentities: identities.length })}::jsonb)
       `;
-      return { roomName: room[0]?.room_name as string | undefined, userIds: identities.map((item: { stream_user_id: string }) => item.stream_user_id) };
+      return { roomName: room[0]?.room_name as string | undefined, userIds: identities.map(item => String(item.stream_user_id)) };
     }));
     const warning = revoked.roomName ? await blockRevokedStreamUsers(revoked.roomName, revoked.userIds) : null;
     revalidatePath('/admin/studio');
