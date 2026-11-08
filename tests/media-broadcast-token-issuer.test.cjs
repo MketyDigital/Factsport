@@ -50,3 +50,17 @@ test('broadcast token rate limits store keyed hashes only and are isolated to to
   assert.match(route, /userRateHash, 12/);
   assert.doesNotMatch(migration, /ip_address|invite_token text|raw_token/);
 });
+
+
+test('broadcast caller UI follows server call-in eligibility and separates host from moderator controls', () => {
+  const provider = read('app/providers/GlobalMediaProvider.tsx');
+  const room = read('app/components/FactSportMediaRoom.tsx');
+  assert.match(provider, /setCanRequestCallIn\(data\.canRequestCallIn === true\)/);
+  assert.match(provider, /canRequestCallIn,/);
+  assert.match(room, /canRequestCallIn \? \(/);
+  assert.match(room, /assigned caller role/);
+  assert.doesNotMatch(room, /href="\/login"/);
+  assert.match(room, /role === 'moderator'/);
+  assert.match(room, /role === 'admin' \? \(!isLive/);
+  assert.match(room, /role === 'admin' && <button onClick=\{toggleRecording\}/);
+});
