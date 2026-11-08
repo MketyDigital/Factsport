@@ -252,11 +252,11 @@ export async function POST(request: Request) {
       .setExpirationTime(issuedAt + TOKEN_TTL_SECONDS)
       .sign(new TextEncoder().encode(config.apiSecret));
 
-    if (consumedInviteId) {
+    if (consumedInviteId && identity.identityKind === 'guest') {
       await withFactsportBroadcastTokenIssuerPostgres(async sql => sql`
         INSERT INTO public.media_broadcast_audit_events (room_id, actor_kind, action, details)
         VALUES (${identity.room.id}::uuid, 'participant', 'guest_admitted',
-          ${JSON.stringify({ inviteId: consumedInviteId, label: 'VIP Guest' })}::jsonb)
+          ${JSON.stringify({ inviteId: consumedInviteId, label: identity.inviteLabel })}::jsonb)
       `);
       consumedInviteId = null;
     }
