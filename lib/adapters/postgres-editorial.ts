@@ -91,7 +91,7 @@ export async function getPublicEditorialArticle(slug: string): Promise<PublicEdi
       WHERE article_id = ${article.id}::uuid
       ORDER BY position ASC, object_key ASC
     `;
-    return { ...article, inline_media: inlineMedia as PublicEditorialArticle['inline_media'] };
+    return { ...article, inline_media: inlineMedia as unknown as PublicEditorialArticle['inline_media'] };
   });
 }
 
