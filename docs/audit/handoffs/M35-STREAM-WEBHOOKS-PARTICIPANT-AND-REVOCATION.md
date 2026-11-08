@@ -36,3 +36,8 @@ Status: source implementation committed; Stream webhook endpoint/configuration a
 ## Validation
 
 Isolated regression verification passed on commit `a2ada291fdddbe208c7ddfb53b26ffd644bc8694` (run `42494347600`). Native Worker build passed on commit `22c0da6fae921a4f53c3ab7beb333fea5303f132` (run `42494317705`). The latest participant-admin changes are running through CI; no actual Stream webhook, token issuance, participant update, invite revocation or production room activation has been executed.
+
+## Admin participant controls
+
+- `/admin/studio` now shows active webhook-backed participants without email disclosure and exposes a server-authorized Block participant action. It revokes the token identity (and the guest invite if applicable), blocks the Stream user, and only marks the participant left after provider blocking succeeds. The broadcast admin receives read access plus column-scoped updates to participant state/role metadata.
+- Host/moderator role revocation demotes the existing Stream member to `user`; if that cannot be confirmed, the fallback blocks the member and revokes the token identity. Explicit role regrant attempts to unblock and restore the assigned Stream role.
