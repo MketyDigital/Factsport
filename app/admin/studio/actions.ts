@@ -273,7 +273,7 @@ export async function revokeBroadcastInvite(inviteId: string): Promise<Result> {
   if (!authorization.ok) return { success: false, error: authorization.error, code: 'MEDIA_BROADCAST_FORBIDDEN' };
   if (!uuid(inviteId)) return { success: false, error: 'Invalid broadcast invite.' };
   try {
-    await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
+    const revoked = await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
       const rows = await tx`UPDATE public.media_broadcast_invites SET revoked_at=now() WHERE id=${inviteId}::uuid AND revoked_at IS NULL RETURNING room_id`;
       if (!rows.length) throw new Error('Invite was not found or is already revoked.');
       const room = await tx`SELECT room_name FROM public.media_broadcast_rooms WHERE id=${rows[0].room_id}::uuid LIMIT 1`;
