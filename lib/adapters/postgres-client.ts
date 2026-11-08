@@ -79,7 +79,12 @@ export function getFactsportBroadcastRuntimeConfig(): FactsportBroadcastRuntimeC
     ? bindings.FACTSPORT_BROADCAST_ANON_SECRET : '';
   const issuerReady = bindings.FACTSPORT_BROADCAST_TOKEN_ISSUER_READY === 'true';
   const moderatorRoleReady = bindings.FACTSPORT_STREAM_MODERATOR_ROLE_READY === 'true';
-  if (!apiKey || !apiSecret || !anonymousSessionSecret || !issuerReady) return null;
+  let anonymousSecretValid = false;
+  try {
+    const normalized = anonymousSessionSecret.replace(/-/g, '+').replace(/_/g, '/');
+    anonymousSecretValid = atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')).length === 32;
+  } catch { anonymousSecretValid = false; }
+  if (!apiKey || !apiSecret || !anonymousSecretValid || !issuerReady) return null;
   return { apiKey, apiSecret, anonymousSessionSecret, moderatorRoleReady, issuerReady };
 }
 
