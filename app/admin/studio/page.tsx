@@ -49,13 +49,28 @@ export default async function AdminStudioPage() {
         ORDER BY rr.created_at DESC
         LIMIT 100
       `;
-      return { settings: settings[0] || null, rooms, invites, roles };
+      const participants = await sql`
+        SELECT p.id, p.room_id, p.stream_user_id, p.identity_kind, p.role_key,
+               p.mic_enabled, p.joined_at, p.last_seen_at, r.room_name,
+               COALESCE(inv.invited_label,
+                 CASE p.identity_kind WHEN 'anonymous' THEN 'Listener'
+                   WHEN 'authenticated' THEN 'Factsport Fan' ELSE 'Guest' END) AS display_label
+        FROM public.media_broadcast_participants p
+        JOIN public.media_broadcast_rooms r ON r.id=p.room_id
+        LEFT JOIN public.media_broadcast_token_identities identity
+          ON identity.room_id=p.room_id AND identity.stream_user_id=p.stream_user_id
+        LEFT JOIN public.media_broadcast_invites inv ON inv.id=identity.invite_id
+        WHERE p.left_at IS NULL
+        ORDER BY p.last_seen_at DESC LIMIT 100
+      `;
+      return { settings: settings[0] || null, rooms, invites, roles, participants };
     });
     return <StudioClient
       initialSettings={data.settings as any}
       initialRooms={data.rooms as any[]}
       initialInvites={data.invites as any[]}
       initialRoles={data.roles as any[]}
+      initialParticipants={data.participants as any[]}
       tokenIssuerReady={isFactsportBroadcastTokenIssuerReady()}
     />;
   } catch (error) {
