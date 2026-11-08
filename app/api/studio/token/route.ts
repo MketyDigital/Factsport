@@ -112,6 +112,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Expected a JSON request.' }, { status: 415, headers: { 'Cache-Control': 'no-store' } });
   }
 
+  let consumedInviteId: string | null = null;
   try {
     const raw = await request.text();
     if (raw.length > 4096) throw new BroadcastIssueError('Broadcast token request is too large.', 413);
@@ -179,13 +180,8 @@ export async function POST(request: Request) {
           RETURNING id
         `;
         if (!consumed.length) throw new BroadcastIssueError('Guest invitation has already been consumed or revoked.', 403);
-        await tx`
-          INSERT INTO public.media_broadcast_audit_events (room_id, actor_kind, action, details)
-          VALUES (${room.id}::uuid, 'participant', 'guest_admitted',
-            ${JSON.stringify({ inviteId: invite.id, label: invite.invited_label })}::jsonb)
-        `;
         return {
-          room, identityKind: 'guest' as const, subject: randomId(),
+          room, identityKind: 'guest' as const, inviteId: invite.id as string, inviteLabel: invite.invited_label as string, subject: randomId(),
           userId: 'factsport-guest-' + randomId(), username: invite.invited_label || 'VIP Guest',
           role: 'guest', streamRole: 'user', canRequestCallIn: false, createCall: false,
         };
@@ -224,6 +220,8 @@ export async function POST(request: Request) {
       };
     }));
 
+    if (identity.identityKind === 'guest') consumedInviteId = identity.inviteId;
+
     const issuedAt = Math.floor(Date.now() / 1000) - 1;
     const serverToken = await new SignJWT({ server: true })
       .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
@@ -254,6 +252,15 @@ export async function POST(request: Request) {
       .setExpirationTime(issuedAt + TOKEN_TTL_SECONDS)
       .sign(new TextEncoder().encode(config.apiSecret));
 
+    if (consumedInviteId) {
+      await withFactsportBroadcastTokenIssuerPostgres(async sql => sql`
+        INSERT INTO public.media_broadcast_audit_events (room_id, actor_kind, action, details)
+        VALUES (${identity.room.id}::uuid, 'participant', 'guest_admitted',
+          ${JSON.stringify({ inviteId: consumedInviteId, label: 'VIP Guest' })}::jsonb)
+      `);
+      consumedInviteId = null;
+    }
+
     const response = NextResponse.json({
       token,
       userId: identity.userId,
@@ -272,6 +279,17 @@ export async function POST(request: Request) {
     }
     return response;
   } catch (error) {
+    if (consumedInviteId) {
+      try {
+        await withFactsportBroadcastTokenIssuerPostgres(async sql => sql`
+          UPDATE public.media_broadcast_invites
+          SET use_count=GREATEST(use_count - 1, 0)
+          WHERE id=${consumedInviteId}::uuid AND revoked_at IS NULL
+        `);
+      } catch (compensationError) {
+        console.error('Broadcast invite redemption compensation failed', compensationError);
+      }
+    }
     const status = error instanceof BroadcastIssueError ? error.status : 503;
     if (!(error instanceof BroadcastIssueError)) console.error('Broadcast token issuance unavailable', error);
     return NextResponse.json({
