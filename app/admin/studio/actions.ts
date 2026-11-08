@@ -170,7 +170,7 @@ export async function createBroadcastInvite(input: {
     let hex = ''; const digestBytes = new Uint8Array(digest); for (let i = 0; i < digestBytes.length; i += 1) hex += digestBytes[i].toString(16).padStart(2, '0');
     const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000).toISOString();
     const invite = await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
-      const rooms = await tx`SELECT id FROM public.media_broadcast_rooms WHERE id=${input.roomId}::uuid FOR SHARE`;
+      const rooms = await tx`SELECT id, scope_type, match_id FROM public.media_broadcast_rooms WHERE id=${input.roomId}::uuid FOR SHARE`;
       if (!rooms.length) throw new Error('Broadcast room not found.');
       const rows = await tx`
         INSERT INTO public.media_broadcast_invites
@@ -185,10 +185,13 @@ export async function createBroadcastInvite(input: {
         VALUES (${input.roomId}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'invite_created',
           ${JSON.stringify({ inviteId: rows[0].id, expiresAt, maxUses })}::jsonb)
       `;
-      return rows[0];
+      return { ...rows[0], scope_type: rooms[0].scope_type, match_id: rooms[0].match_id };
     }));
     revalidatePath('/admin/studio');
-    return { success: true, data: { id: invite.id, token, expiresAt: invite.expires_at, maxUses: invite.max_uses } };
+    return { success: true, data: {
+      id: invite.id, token, expiresAt: invite.expires_at, maxUses: invite.max_uses,
+      invitePath: invite.scope_type === 'global' ? '/live' : '/match/' + String(invite.match_id),
+    } };
   } catch (error) {
     console.error('Broadcast invite creation failed', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unable to create broadcast invite.' };
