@@ -223,3 +223,15 @@ test('Media library is role-protected, paginated and exposes only private asset 
   assert.match(layout, /href="\/admin\/media"/);
   assert.doesNotMatch(route, /public_media_assets|SUPABASE_SERVICE_ROLE_KEY/);
 });
+
+
+test('editorial composer preview reuses the exact sanitized public Markdown renderer', () => {
+  const client = read('app/admin/news/NewsroomClient.tsx');
+  const renderer = read('app/components/MarkdownRenderer.tsx');
+  assert.match(client, /import MarkdownRenderer from '@\/app\/components\/MarkdownRenderer'/);
+  assert.match(client, /Preview uses the same sanitized Markdown renderer/);
+  assert.match(client, /<MarkdownRenderer content=\{form\.bodyMarkdown\} \/>/);
+  assert.match(client, /Not published/);
+  assert.match(renderer, /rehypeSanitize/);
+  assert.match(renderer, /rehypeSafeEmbeds/);
+});
