@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { entraCookieNames, readFactsportEntraSession } from '@/lib/auth/entra-external';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 
-export type MediaEditorialCapability = 'workspace' | 'read' | 'draft' | 'review' | 'publish' | 'archive' | 'media' | 'social';
+export type MediaEditorialCapability = 'workspace' | 'read' | 'draft' | 'review' | 'publish' | 'archive' | 'media' | 'social' | 'broadcast';
 export type MediaEditorialAuthorization =
   | { ok: true; user: { id: string; issuer: string; domainUserId: string; roles: string[] } }
   | { ok: false; status: 401 | 403 | 503; error: string };
@@ -18,6 +18,7 @@ const allowedRoles: Record<MediaEditorialCapability, string[]> = {
   archive: ['publisher', 'media_admin'],
   media: ['editor', 'publisher', 'media_admin'],
   social: ['social_manager', 'editor', 'publisher', 'media_admin'],
+  broadcast: ['media_admin'],
 };
 
 /**
