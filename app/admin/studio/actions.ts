@@ -165,6 +165,7 @@ export async function createBroadcastInvite(input: {
     const bytes = new Uint8Array(32); crypto.getRandomValues(bytes);
     let binary = ''; for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
     const token = btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    // Persist only a one-way SHA-256 token hash; the raw invite token is returned once.
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
     let hex = ''; const digestBytes = new Uint8Array(digest); for (let i = 0; i < digestBytes.length; i += 1) hex += digestBytes[i].toString(16).padStart(2, '0');
     const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000).toISOString();
