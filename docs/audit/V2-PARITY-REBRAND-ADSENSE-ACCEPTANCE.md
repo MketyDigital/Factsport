@@ -330,3 +330,48 @@ This clarification supersedes any earlier wording in AUTH-005 that said free pre
 ## 19. Protected staging schema-boundary correction
 
 The authorized \`/matches\` page returned HTTP 500 because the base match projection accidentally depended on \`matches.season\` from unapplied migration 0006. The base projection no longer selects that column. Season-specific form/results queries remain behind the separate \`FACTSPORT_COMPETITIONS_BACKEND\` flag. Editorial, homepage, highlights and competition flags are now independent; do not enable them until their migrations and reader grants are applied. A corrected staging rerun is pending; the previous keyset pagination 503 remains to be rechecked.
+
+## 20. 2026-11-08 CMS/media library, staging and AdSense re-audit
+
+### Current source and test state
+
+- Latest branch head before this audit: `785b0062ee4816116fabd7df2e7868d1d284ccea`. Latest application code checkpoint: `5a6f4a86e27b7d27c20eb2c73d21b3a3534d6957`.
+- The V2 branch now contains a Media editorial workspace with draft creation/editing, revision history, submission for review, distinct reviewer approval, approved publication, archive, audit events, revision-scoped media attachment and a social publication/outbox model.
+- Media upload is private R2, raster-only (JPEG/PNG/WebP, 8 MB), signature checked and hashed. New uploads start pending and non-public; a separate Media capability is required to review rights and attach an asset to a draft revision. `/admin/media` provides private asset search, rights status, pagination and authenticated preview.
+- Public publishing has an explicit content-policy inspection and publisher attestation. Public social delivery is scoped to `public_media`; bookmaker/betting promotions and private-product promotion are blocked by the public-content policy.
+- Migrations 0009–0026 extend the editorial writer, revision, social outbox, media metadata, broadcast, RBAC, review-feedback, public-media scope, policy attestation and announcement/settings domains. The latest migration inventory guard now checks continuity through 0026; it does not apply any migration.
+- Existing source-level CMS/media tests cover author/reviewer/publisher separation, rights review, private preview, social idempotency and public-media policy. This remains source/test evidence, not database/runtime parity.
+
+### Latest runtime evidence and its exact boundary
+
+- On code commit `5a6f4a86e27b7d27c20eb2c73d21b3a3534d6957`, isolated verification passed (run [42461455150](https://github.com/MketyDigital/Factsport/actions/runs/42461455150)); native Vinext build passed (run [42461455356](https://github.com/MketyDigital/Factsport/actions/runs/42461455356)); protected staging passed (run [42461455140](https://github.com/MketyDigital/Factsport/actions/runs/42461455140)).
+- The protected staging run checked unauthenticated denial for `/`, `/api/matches`, `/admin` and `/matches`; authorized `/api/v2/health` confirmed Hyperdrive and R2 availability; authorized `/matches` rendered from PostgreSQL; `/api/matches` returned populated fixtures with timestamp+UUID keyset pagination, private/no-store caching and auth/cache isolation.
+- That staging run did **not** apply migrations 0004–0026, execute CMS create/review/publish, exercise editorial/media APIs, upload or preview an R2 asset, verify the editorial writer role, test social delivery, or complete Entra sign-in. The current protected runtime remains a sports read-path slice, not full product staging.
+- A new migration guard and CI inventory extension are now being verified on the current branch. The first attempt failed because the newly added test had an invalid regular expression and the workflow block had incorrect indentation; both were corrected. Do not treat the failed attempts as acceptance evidence. Latest runs are pending at the time of this checkpoint.
+
+### Identity, database and editorial blockers
+
+- **BLOCKED — Entra staging identity:** Entra External ID is the approved Day 1 identity provider, but the tenant/application, redirect URI, client configuration and session adapter have not been proven in staging. The Media admin still has a legacy email-allowlist middleware guard while its layout redirects to a login route gated for the private Prediction host. Do not remove the guard until Media-host sign-in, callback validation, session refresh/revocation, logout and role mapping pass.
+- **BLOCKED — editorial database runtime:** migrations 0004–0026 remain unapplied to isolated Azure PostgreSQL in the evidence reviewed here. The editorial Hyperdrive writer binding/role and exact grants must be provisioned and catalog-verified before CMS writes are enabled.
+- Migration 0026 deliberately fails closed if queued/scheduled/publishing/published social rows lack public-media confirmation or published revisions lack publisher attestation. Reconcile existing rows explicitly before applying it; do not auto-approve or rewrite content.
+- CMS preview parity, crop/resize/transcode, asset reuse/replacement, inline media ordering, revision diff/restore, full article-renderer preview, image-attribution accessibility and end-to-end media expiry/revocation tests remain OPEN.
+- The public PWA manifest still contains legacy “Predict & Win” wording. Preserve the Factsport name and existing icon files; complete a host-aware public/private manifest review before changing the shared PWA metadata.
+
+### Current Google policy and live-site recheck — 2026-11-08
+
+- Google's current [Publisher Restrictions](https://support.google.com/publisherpolicies/answer/10437795) define online-gambling restricted content to include bookmakers, online sports betting and affiliate/aggregator sites promoting online gambling. The exclusion-country list on that publisher page does not include Nigeria. For Nigerian users, such content is therefore restricted inventory: fewer eligible advertising sources may bid, Google Ads will not serve on that restricted content, and this is not by itself the same as a publisher-policy violation.
+- The publisher restriction is distinct from Google's [Gambling and games advertiser policy](https://support.google.com/adspolicy/answer/15132179). The advertiser policy was updated for Nigeria effective 14 October 2026 to add Enugu and Imo to the eligible state list (alongside Cross River, Ekiti, Lagos and Oyo); advertiser certification/licensing does not establish AdSense publisher approval.
+- A read-only crawl of the current production domain still finds the legacy homepage 1xBet welcome-bonus/affiliate banner, public `/vip/upgrade` copy promoting betting slips, “90%+” win-rate claims and crypto payment instructions, `/how-to-play` VIP-only monthly cash-prize eligibility, and Terms stating that VIP payment grants prize eligibility. This conflicts with the intended AdSense-first public/private split and is a substantial publisher-policy/legal review blocker. The V2 source tests now assert that public Media routes do not render betting affiliate widgets and that VIP/prize routes are private-host gated; that is not yet the live production experience.
+- The live Privacy Policy says it does not use third-party advertising cookies while the live site displays third-party affiliate advertising; reconcile the actual tracking technologies and disclosure. Live About/Contact and root `robots.txt`, `sitemap.xml` and `ads.txt` responses were not independently verified in this crawl. No AdSense account/site “Ready” status is visible to engineering; the owner must verify it in the AdSense console and confirm the live authorized seller line.
+- Google reviews the entire submitted site, not merely the pages where an ad unit is intended. Do not load AdSense code until the public/private split is live, public content and links are reviewed, privacy/consent and legal copy are accurate, robots/sitemap/ads.txt are verified, and the owner confirms the actual AdSense site status is “Ready”.
+
+### Required next actions
+
+1. Finish the current CI run and keep any failing test/workflow fix on this branch.
+2. Verify isolated staging database identity and backup/restore first; reconcile 0026 preflight rows; then apply migrations 0004–0026 to isolated staging only and catalog-verify all reader/editorial-writer grants. No production migration.
+3. Configure and test Entra External ID in staging, including the Media host, before removing any legacy admin guard.
+4. Run real CMS journeys: create draft, upload private asset, review rights, attach to revision, submit, approve as a different editor, publish, render public article/R2 image, replace revision, archive, and verify audit/revocation.
+5. Exercise social outbox with a non-production test channel and verify idempotency, retry, cancellation, moderation/policy attestation and no duplicate posts.
+6. Reconcile live production legal/policy content and public/private routes only through the separately approved cutover plan. Obtain owner/legal review of VIP/prize mechanics and owner confirmation of the private hostname, AdSense “Ready” status and seller record.
+7. Keep all sports, gameplay, VIP, payment, prize and admin parity gates open until runtime journeys pass. No production DNS, Worker, database, secret, schedule or AdSense changes are authorized.
+
