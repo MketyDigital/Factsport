@@ -62,3 +62,16 @@ test('broadcast admin exposes webhook-backed participants and can revoke their r
   assert.match(actions, /blockRevokedStreamUsers/);
   assert.match(migration, /GRANT UPDATE \(left_at, last_seen_at, mic_enabled\)/);
 });
+
+
+test('broadcast role changes reconcile Stream call membership and preserve fail-closed revocation', () => {
+  const actions = read('app/admin/studio/actions.ts');
+  const client = read('app/admin/studio/StudioClient.tsx');
+  assert.match(actions, /setStreamCallMemberRole/);
+  assert.match(actions, /unblockStreamCallUser/);
+  assert.match(actions, /update_members: \[\{ user_id: userId, role \}\]/);
+  assert.match(actions, /blockedUserIds/);
+  assert.match(actions, /UPDATE public\.media_broadcast_token_identities SET revoked_at=now\(\)/);
+  assert.match(actions, /role_revoked/);
+  assert.match(client, /result\.data\?\.warning/);
+});
