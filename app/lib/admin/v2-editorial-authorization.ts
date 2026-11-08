@@ -1,6 +1,7 @@
 import 'server-only';
 
-import { createClient } from '@/app/lib/supabase/server';
+import { cookies } from 'next/headers';
+import { entraCookieNames, readFactsportEntraSession } from '@/lib/auth/entra-external';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 
 export type MediaEditorialCapability = 'workspace' | 'read' | 'draft' | 'review' | 'publish' | 'archive' | 'media' | 'social';
@@ -19,55 +20,23 @@ const allowedRoles: Record<MediaEditorialCapability, string[]> = {
   social: ['social_manager', 'editor', 'publisher', 'media_admin'],
 };
 
-type VerifiedSessionIdentity = { issuer: string; subject: string };
-
 /**
- * The provider session is verified by getUser(); issuer and subject are then
- * taken from the corresponding signed access-token claims and cross-checked.
- * Email and profile metadata are never identity-linking or authorization keys.
- */
-function readSessionIdentity(accessToken: string, verifiedSubject: string): VerifiedSessionIdentity | null {
-  const parts = accessToken.split('.');
-  if (parts.length !== 3) return null;
-  try {
-    const encoded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, '=')));
-    if (typeof payload.iss !== 'string' || !payload.iss.trim() ||
-        typeof payload.sub !== 'string' || payload.sub !== verifiedSubject) return null;
-    return { issuer: payload.iss, subject: payload.sub };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Authentication is delegated to the configured identity provider session.
- * Authorization is resolved exclusively from Factsport's issuer+subject bridge
- * and Factsport-owned PostgreSQL role memberships.
+ * Entra ID token is verified at callback and the encrypted, expiring Factsport
+ * session is authenticated again for every protected Media request.
  */
 export async function authorizeMediaEditorialAction(
   capability: MediaEditorialCapability,
 ): Promise<MediaEditorialAuthorization> {
-  let identity: VerifiedSessionIdentity | null = null;
+  let identity: { issuer: string; subject: string } | null = null;
+  let internalUserId: string | null = null;
   try {
-    const supabase = createClient();
-    const [sessionResult, userResult] = await Promise.all([
-      supabase.auth.getSession(),
-      supabase.auth.getUser(),
-    ]);
-    const accessToken = sessionResult.data.session?.access_token;
-    const verifiedUser = userResult.data.user;
-    if (sessionResult.error || userResult.error || !accessToken || !verifiedUser?.id) {
-      return { ok: false, status: 401, error: 'Sign in with a verified Factsport identity.' };
-    }
-    identity = readSessionIdentity(accessToken, verifiedUser.id);
-    if (!identity) {
-      return { ok: false, status: 401, error: 'The identity provider token is missing a valid issuer or subject claim.' };
-    }
+    const session = await readFactsportEntraSession(cookies().get(entraCookieNames.session)?.value);
+    if (!session) return { ok: false, status: 401, error: 'Sign in with your Factsport Media identity.' };
+    identity = { issuer: session.issuer, subject: session.subject };
+    internalUserId = session.internalUserId;
   } catch {
-    return { ok: false, status: 401, error: 'Unable to verify the current identity session.' };
+    return { ok: false, status: 401, error: 'Unable to verify the Factsport Media session.' };
   }
-
   try {
     const memberships = await withFactsportEditorialPostgres(async sql => sql`
       WITH mapped AS (
@@ -75,6 +44,7 @@ export async function authorizeMediaEditorialAction(
         FROM public.external_identities
         WHERE issuer = ${identity!.issuer}
           AND subject = ${identity!.subject}
+          AND user_id = ${internalUserId!}::uuid
       )
       SELECT mapped.user_id,
         COALESCE(array_agg(DISTINCT membership.role_key)
