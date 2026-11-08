@@ -84,3 +84,12 @@ See [PAGE-MIGRATION-MATRIX.md](./PAGE-MIGRATION-MATRIX.md) for full page journey
 ## Editorial composer preview update
 
 `app/admin/news/NewsroomClient.tsx` now toggles an article preview through the same sanitized `app/components/MarkdownRenderer.tsx` used by public article pages. This provides body rendering parity, but not yet full article page parity for attached revision media, metadata, byline/date and related content.
+
+
+## Media editor enhancements — ordered inline gallery and reusable assets
+
+- The newsroom can search and reuse previously approved, non-expired assets from the private Media library; selected assets retain their rights metadata and are previewed through the authenticated private R2 endpoint.
+- Added ordered `inline` placement to revision-scoped media with migration `0027_factsport_revision_inline_media_gallery.sql`. Publication copies approved inline attachments to the article media relation at their chosen order; a new public view exposes only assets attached to published, reviewed articles with valid rights and unexpired usage.
+- Public article pages now render the rights-filtered inline gallery with alt text and attribution. Reusing an existing asset no longer resets its global `is_public` flag, so one article revision cannot accidentally unpublish an asset already used by another published story.
+- The public article sidebar no longer contains the prize/prediction acquisition message; it now links to neutral fixtures and live-score coverage, keeping private Prediction promotion out of the public newsroom surface.
+- These changes are source committed; latest verification for commit `34494850b31ce530f960cfe30f46a95fe97e0927` is running. Do not mark migration 0027 or public gallery runtime complete until it is applied and exercised in isolated staging.
