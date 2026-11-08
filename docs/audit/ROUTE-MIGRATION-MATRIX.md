@@ -142,3 +142,12 @@ The active Media admin login remains blocked on the identity migration: middlewa
 - Social channel/publication configuration and an idempotent outbox are represented by migrations 0009 and 0015–0016, with public-media scope and publisher attestation in 0022–0023.
 - **Source/test only:** these paths have not been exercised against the isolated Azure schema. Migrations 0004–0026, editorial writer grants/binding, Entra Media-host sign-in, R2 upload/compensation and non-production social delivery must pass before any route is marked runtime verified.
 - Migration 0026 has a deliberate preflight that raises when existing queued/scheduled/publishing/published social rows or published editorial revisions lack the required attestations. Reconcile explicitly; never auto-approve or rewrite rows.
+
+
+## Media editor enhancements — ordered inline gallery and reusable assets
+
+- The newsroom can search and reuse previously approved, non-expired assets from the private Media library; selected assets retain their rights metadata and are previewed through the authenticated private R2 endpoint.
+- Added ordered `inline` placement to revision-scoped media with migration `0027_factsport_revision_inline_media_gallery.sql`. Publication copies approved inline attachments to the article media relation at their chosen order; a new public view exposes only assets attached to published, reviewed articles with valid rights and unexpired usage.
+- Public article pages now render the rights-filtered inline gallery with alt text and attribution. Reusing an existing asset no longer resets its global `is_public` flag, so one article revision cannot accidentally unpublish an asset already used by another published story.
+- The public article sidebar no longer contains the prize/prediction acquisition message; it now links to neutral fixtures and live-score coverage, keeping private Prediction promotion out of the public newsroom surface.
+- These changes are source committed; latest verification for commit `34494850b31ce530f960cfe30f46a95fe97e0927` is running. Do not mark migration 0027 or public gallery runtime complete until it is applied and exercised in isolated staging.
