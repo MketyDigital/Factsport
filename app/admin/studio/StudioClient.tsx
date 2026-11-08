@@ -134,7 +134,10 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
     <section className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div><h2 className="text-xl font-black">Live participants</h2><p className="mt-1 text-xs text-slate-500">Presence is reconciled from signed Stream webhooks. Blocking revokes the room identity and attempts to block the Stream user.</p></div>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{participants.length} active</span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{participants.length} active</span>
+          <button type="button" onClick={refresh} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700">Refresh</button>
+        </div>
       </div>
       {participants.length === 0 ? <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No active participants have been reported by Stream.</p> :
         <div className="mt-4 space-y-2">{participants.map(participant => <div key={participant.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 p-3">
