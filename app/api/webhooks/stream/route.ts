@@ -34,7 +34,7 @@ async function verifySignature(payload: Uint8Array, signature: string, secret: s
 }
 
 
-async function blockStreamUser(apiKey: string, apiSecret: string, roomName: string, userId: string) {
+async async function blockStreamUser(apiKey: string, apiSecret: string, roomName: string, userId: string) {
   const issuedAt = Math.floor(Date.now() / 1000) - 1;
   const serverToken = await new SignJWT({ server: true })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
