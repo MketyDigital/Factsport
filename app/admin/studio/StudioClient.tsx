@@ -199,7 +199,7 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
         event.preventDefault();
         startTransition(async () => {
           const result = await grantBroadcastRole({ roomId: roleRoomId, userId: roleUserId, role: roleKey });
-          setMessage(result.success ? 'Broadcast role granted.' : result.error); if (result.success) refresh();
+          setMessage(result.success ? String(result.data?.warning || 'Broadcast role granted.') : result.error); if (result.success) refresh();
         });
       }}>
         <h2 className="text-lg font-black">Room role grants</h2>
@@ -229,7 +229,7 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
         <h2 className="text-lg font-black">Active room roles</h2>
         <div className="mt-3 space-y-2">{roles.map(role => <div key={role.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 p-3">
           <div><p className="text-sm font-bold">{role.role_key} · {role.room_name}</p><p className="text-[11px] text-slate-500">{role.user_id}</p></div>
-          <button disabled={pending} onClick={() => startTransition(async () => { const result = await revokeBroadcastRole(role.id); setMessage(result.success ? 'Role revoked.' : result.error); if (result.success) refresh(); })} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-bold text-red-700">Revoke</button>
+          <button disabled={pending} onClick={() => startTransition(async () => { const result = await revokeBroadcastRole(role.id); setMessage(result.success ? String(result.data?.warning || 'Role revoked.') : result.error); if (result.success) refresh(); })} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-bold text-red-700">Revoke</button>
         </div>)}</div>
       </div>
     </section>
