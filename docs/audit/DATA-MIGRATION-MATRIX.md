@@ -104,3 +104,8 @@ The homepage read model is intentionally not a substitute for the full CMS or sp
 - `0028_factsport_broadcast_admin_audit_and_role_history.sql`: active-only unique broadcast room-role grants so revoked roles can be re-granted without deleting history; extends audit action coverage.
 - `0029_factsport_broadcast_token_rate_limits.sql`: keyed-hash rate-limit buckets for Stream token issuance; no raw IP or invite token values persisted.
 - These migrations are committed but not applied to staging or production. Apply only after dedicated editorial/broadcast roles and Hyperdrive bindings are provisioned; validate existing data and grants first.
+
+
+## M35 webhook and revocation update
+
+The signed Stream webhook endpoint now verifies raw-body HMAC, handles gzip payloads and idempotent `X-Webhook-Id` retries, and reconciles participant presence, call-in/mic events and room lifecycle audit. Guest invite revocation now marks issued token identities revoked, attempts Stream `BlockUser`, and webhook-rejects any later rejoin. Migration `0030_factsport_broadcast_token_identity_and_webhooks.sql` adds identity and webhook ledgers. See `M35-STREAM-WEBHOOKS-PARTICIPANT-AND-REVOCATION.md`; actual Stream webhook configuration and staging E2E remain open.
