@@ -36,6 +36,7 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
   const [roleUserId, setRoleUserId] = useState('');
   const [roleKey, setRoleKey] = useState<'host' | 'moderator' | 'caller'>('moderator');
   const [newToken, setNewToken] = useState('');
+  const [newInviteLink, setNewInviteLink] = useState('');
   const [message, setMessage] = useState('');
   const [pending, startTransition] = useTransition();
 
@@ -135,6 +136,8 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
           const result = await createBroadcastInvite({ roomId: inviteRoomId, label: inviteLabel, expiresInHours: inviteHours, maxUses: inviteMaxUses ? Number(inviteMaxUses) : null });
           if (result.success && result.data) {
             setNewToken(String(result.data.token || ''));
+            const invitePath = String(result.data.invitePath || '');
+            setNewInviteLink(invitePath ? window.location.origin + invitePath + '#guest=' + encodeURIComponent(String(result.data.token || '')) : '');
             setInvites(current => [{
               id: String(result.data?.id || ''), room_id: inviteRoomId,
               room_name: rooms.find(room => room.id === inviteRoomId)?.room_name || 'Broadcast room',
@@ -163,7 +166,11 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
         </div>
         <button disabled={pending || !inviteRoomId} className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{pending ? 'Creating…' : 'Create invitation token'}</button>
         <p className="text-xs text-amber-700">Legacy reusable invite behavior (24 hours) is retained by default. The token issuer must be provisioned before guests can redeem invitations.</p>
-        {newToken && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3"><p className="text-xs font-bold text-amber-900">Copy this token now. It is not stored in plaintext.</p><code className="mt-2 block break-all text-xs">{newToken}</code><button type="button" onClick={() => navigator.clipboard?.writeText(newToken)} className="mt-2 rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-bold">Copy token</button></div>}
+        {newToken && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+          <p className="text-xs font-bold text-amber-900">Copy this invitation link now. The raw token is not stored in plaintext.</p>
+          {newInviteLink && <><code className="mt-2 block break-all text-xs">{newInviteLink}</code><button type="button" onClick={() => navigator.clipboard?.writeText(newInviteLink)} className="mt-2 rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-bold">Copy guest link</button></>}
+          <details className="mt-2"><summary className="cursor-pointer text-[11px] font-bold text-amber-900">Show raw token</summary><code className="mt-2 block break-all text-xs">{newToken}</code></details>
+        </div>}
       </form>
 
       <form className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5" onSubmit={event => {
