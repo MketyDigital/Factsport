@@ -123,3 +123,14 @@ A route is not complete because it compiles or returns HTTP 200. For every route
 - Relative media paths are kept same-origin instead of being rewritten to the production domain; protocol-relative paths, backslashes and path traversal are rejected. The existing streamio sentinel is preserved. Match-page metadata uses the same explicit live-status allowlist so an unknown status cannot expose a pre-kickoff stream URL through OpenGraph metadata.
 - Final code head `ab3e924f29766f42ad35210ffd75e23892e58896`: isolated verification passed (run 42386252137; 104 engine tests and 5 ingestion tests), native vinext build passed (run 42386252158), and protected staging passed (run 42386252101).
 - Staging continues to verify the protected `/matches` PostgreSQL path and infrastructure boundary only. It does not call `/match/[id]` or the new playback/VIP APIs; those remain source/test/build verified, not runtime verified.
+
+
+## 2026-11-08 Media asset endpoints
+
+| Route | V2 behavior | Acceptance / boundary |
+|---|---|---|
+| `GET /api/admin/media` | Media-role-protected search and pagination over private `media_assets` metadata; supports bounded query, rights-status filter and 50-row pages. | Requires `FACTSPORT_EDITORIAL_HYPERDRIVE`, editor/media role, private no-store response; test role denial, pagination, wildcard handling and DB outage. |
+| `POST /api/admin/media` | Existing authenticated private R2 upload; JPEG/PNG/WebP only, 8 MB limit, signature verification, SHA-256 and pending rights state. | Requires same-origin request, Media role, R2 + editorial writer bindings; test body-size boundary, object/DB compensation and malformed image payloads. |
+| `GET /api/admin/media/[id]` | New authenticated private R2 preview by internal asset UUID. | Media role required; raster allowlist, private/no-store, nosniff, sandbox CSP; never expose public bucket URLs or pending media through public delivery. |
+
+The active Media admin login remains blocked on the identity migration: middleware retains a legacy email allowlist and unauthenticated admin layout redirects to the private-host-gated `/login`. Implement Entra External ID and a Media-host session before removing the old guard.
