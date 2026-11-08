@@ -2,7 +2,7 @@
 
 Date: 2026-11-08
 Branch: `refactor/factsport-v2`
-Status: OIDC/PKCE and encrypted Media session source committed; CI validation running; tenant-specific configuration and real Entra sign-in not yet verified.
+Status: OIDC/PKCE and encrypted Media session source committed; isolated verification and native vinext build passed on commit `c8c39f9e3785ace19e93ed37f0da2abba18f5663`; protected staging workflow is running; tenant-specific configuration and real Entra sign-in not yet verified.
 
 ## Implemented
 
@@ -34,3 +34,10 @@ No tenant, app registration, issuer, client ID, callback or secret was created o
 - Need test actual Entra discovery/JWKS/token exchange, wrong issuer/audience/nonce/signature, state replay, PKCE failure, account not linked, revoked membership, session expiry, logout and Media-host routing.
 - Need confirm the deployed Media host, configure the Entra app and Cloudflare secrets, and provision editorial Hyperdrive before any live editor sign-in test.
 - No social dispatcher, CMS database migration or R2 upload was activated by this identity work.
+
+## CI result update
+
+- Isolated verification: passed, run `42490686096`.
+- Native vinext build: passed, run `42490686088`.
+- Protected staging: run `42490686122` was in progress at this update; do not call it passed until completion.
+- The passing checks include the 163-test engine suite, TypeScript and native Worker build. They do not perform a real Entra tenant login or apply the editorial database migrations.
