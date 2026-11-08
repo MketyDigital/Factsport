@@ -69,7 +69,7 @@ export async function listPublicEditorialArticles(input: {
   });
 }
 
-export async function getPublicEditorialArticle(slug: string) {
+export async function getPublicEditorialArticle(slug: string): Promise<PublicEditorialArticle | null> {
   if (!slug || slug.length > 240 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return null;
   return withFactsportPostgres(async sql => {
     const rows = await sql`
@@ -83,14 +83,15 @@ export async function getPublicEditorialArticle(slug: string) {
       WHERE slug = ${slug}
       LIMIT 1
     `;
-    if (!rows[0]) return null;
+    const article = rows[0] as PublicEditorialArticle | undefined;
+    if (!article) return null;
     const inlineMedia = await sql`
       SELECT position, object_key, content_type, width, height, alt_text, attribution_text
       FROM public.public_editorial_article_inline_media
-      WHERE article_id = ${rows[0].id}::uuid
+      WHERE article_id = ${article.id}::uuid
       ORDER BY position ASC, object_key ASC
     `;
-    return { ...rows[0], inline_media: inlineMedia };
+    return { ...article, inline_media: inlineMedia as PublicEditorialArticle['inline_media'] };
   });
 }
 
