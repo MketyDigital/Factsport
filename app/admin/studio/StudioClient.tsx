@@ -200,7 +200,7 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
         <div className="mt-3 space-y-2">{invites.map(invite => <div key={invite.id} className="rounded-lg border border-slate-100 p-3">
           <div className="flex items-center justify-between gap-2"><p className="text-sm font-bold">{invite.invited_label} · {invite.room_name}</p><span className="text-[10px] font-bold uppercase text-slate-500">{invite.revoked_at ? 'Revoked' : new Date(invite.expires_at).valueOf() < Date.now() ? 'Expired' : 'Active'}</span></div>
           <p className="mt-1 text-[11px] text-slate-500">Uses {invite.use_count}/{invite.max_uses ?? 'unlimited'} · Expires {new Date(invite.expires_at).toLocaleString()}</p>
-          {!invite.revoked_at && new Date(invite.expires_at).valueOf() > Date.now() && <button disabled={pending} onClick={() => startTransition(async () => { const result = await revokeBroadcastInvite(invite.id); setMessage(result.success ? 'Invite revoked.' : result.error); if (result.success) refresh(); })} className="mt-2 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-bold text-red-700">Revoke invite</button>}
+          {!invite.revoked_at && new Date(invite.expires_at).valueOf() > Date.now() && <button disabled={pending} onClick={() => startTransition(async () => { const result = await revokeBroadcastInvite(invite.id); setMessage(result.success ? String(result.data?.warning || 'Invite revoked.') : result.error); if (result.success) refresh(); })} className="mt-2 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-bold text-red-700">Revoke invite</button>}
         </div>)}</div>
       </div>
       <div className="rounded-2xl border border-slate-200 bg-white p-5">
