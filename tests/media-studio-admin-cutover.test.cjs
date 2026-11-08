@@ -19,6 +19,9 @@ test('V2 studio admin uses dedicated Media broadcast authorization and database 
   assert.match(actions, /withFactsportBroadcastAdminPostgres/);
   assert.match(actions, /token_hash/);
   assert.match(actions, /SHA-256/);
+  assert.match(actions, /createMatchBroadcastRoom/);
+  assert.match(actions, /scope_type, match_id/);
+  assert.match(actions, /is_active, public_listening_enabled, callin_enabled/);
   assert.match(actions, /invite_created/);
   assert.match(actions, /invite_revoked/);
   assert.match(actions, /role_granted/);
@@ -27,6 +30,7 @@ test('V2 studio admin uses dedicated Media broadcast authorization and database 
   assert.match(page, /authorizeMediaEditorialAction\('broadcast'\)/);
   assert.match(page, /media_broadcast_invites/);
   assert.match(page, /media_broadcast_room_roles/);
+  assert.match(client, /Create match-specific room/);
   assert.match(client, /Create invitation token/);
   assert.match(client, /Guest redemption is not enabled/);
   assert.match(client, /disabled/);
