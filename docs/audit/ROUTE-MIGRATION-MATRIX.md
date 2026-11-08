@@ -151,3 +151,13 @@ The active Media admin login remains blocked on the identity migration: middlewa
 - Public article pages now render the rights-filtered inline gallery with alt text and attribution. Reusing an existing asset no longer resets its global `is_public` flag, so one article revision cannot accidentally unpublish an asset already used by another published story.
 - The public article sidebar no longer contains the prize/prediction acquisition message; it now links to neutral fixtures and live-score coverage, keeping private Prediction promotion out of the public newsroom surface.
 - These changes are source committed; latest verification for commit `34494850b31ce530f960cfe30f46a95fe97e0927` is running. Do not mark migration 0027 or public gallery runtime complete until it is applied and exercised in isolated staging.
+
+
+## 2026-11-08 Media continuation routes
+
+| Route | V2 behavior | Security / acceptance |
+|---|---|---|
+| `POST /api/studio/token` | Issues four-hour Stream user token for active global/match room; supports anonymous listener, Entra-authenticated member and room-scoped guest invite. | Same-origin JSON only; server-derived role; hashed invite redemption with expiry/revocation/use limits; IP/account/invite rate limits; separate token-issuer Hyperdrive; no Stream secret to browser. |
+| `GET /api/admin/news/[id]/revisions` | Returns bounded latest-50 editorial revision history and snapshots for side-by-side comparison. | Entra session + Media read capability; private/no-store; no public draft exposure. |
+
+Guest invitation tokens are passed in URL fragments and submitted in the POST body, never in query strings. The retired `/api/stream/token` endpoint is no longer called by the Media client.
