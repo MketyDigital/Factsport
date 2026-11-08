@@ -290,9 +290,28 @@ export async function revokeBroadcastInvite(inviteId: string): Promise<Result> {
         VALUES (${rows[0].room_id}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'invite_revoked',
           ${JSON.stringify({ inviteId, revokedIdentities: identities.length })}::jsonb)
       `;
-      return { roomName: room[0]?.room_name as string | undefined, userIds: identities.map(item => String(item.stream_user_id)) };
+      return { roomId: rows[0].room_id as string, roomName: room[0]?.room_name as string | undefined, userIds: identities.map(item => String(item.stream_user_id)) };
     }));
     const warning = revoked.roomName ? await blockRevokedStreamUsers(revoked.roomName, revoked.userIds) : null;
+    if (!warning && revoked.userIds.length) {
+      await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
+        const removed = await tx`
+          UPDATE public.media_broadcast_participants
+          SET left_at=now(), last_seen_at=now(), mic_enabled=false
+          WHERE room_id=${revoked.roomId}::uuid
+            AND stream_user_id = ANY(${revoked.userIds}::text[])
+            AND left_at IS NULL
+          RETURNING id, stream_user_id
+        `;
+        for (const participant of removed) {
+          await tx`
+            INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, participant_id, details)
+            VALUES (${revoked.roomId}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'participant_removed',
+              ${participant.id}::uuid, ${JSON.stringify({ streamUserId: participant.stream_user_id, source: 'invite_revoked' })}::jsonb)
+          `;
+        }
+      }));
+    }
     revalidatePath('/admin/studio');
     return { success: true, data: warning ? { warning } : {} };
   } catch (error) {
