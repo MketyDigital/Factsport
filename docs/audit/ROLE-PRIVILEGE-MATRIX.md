@@ -79,3 +79,5 @@ The dedicated Media broadcast admin UI and server mutations are now implemented 
 ## M35 webhook and revocation update
 
 The signed Stream webhook endpoint now verifies raw-body HMAC, handles gzip payloads and idempotent `X-Webhook-Id` retries, and reconciles participant presence, call-in/mic events and room lifecycle audit. Guest invite revocation now marks issued token identities revoked, attempts Stream `BlockUser`, and webhook-rejects any later rejoin. Migration `0030_factsport_broadcast_token_identity_and_webhooks.sql` adds identity and webhook ledgers. See `M35-STREAM-WEBHOOKS-PARTICIPANT-AND-REVOCATION.md`; actual Stream webhook configuration and staging E2E remain open.
+
+- Broadcast admin gains participant presence read access and only column-level updates to `left_at`, `last_seen_at`, `mic_enabled`; token issuer/webhook service identity owns token identity, invite redemption, webhook ledger and participant event writes. Stream API secrets remain outside browser and editorial DB roles.
