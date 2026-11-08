@@ -155,6 +155,20 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                     )}
                 </div>
                 
+                {article.inline_media && article.inline_media.length > 0 && (
+                    <section className="mt-12 border-t border-slate-200 pt-8" aria-label="Article media gallery">
+                        <h2 className="mb-5 text-xl font-black tracking-tight text-slate-900">More from this story</h2>
+                        <div className="grid gap-5 sm:grid-cols-2">
+                            {article.inline_media.map((asset: any) => (
+                                <figure key={asset.object_key} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                                    <img src={`/api/media/${asset.object_key}`} alt={asset.alt_text || 'Editorial image'} className="h-auto max-h-[520px] w-full object-contain" loading="lazy" />
+                                    {asset.attribution_text && <figcaption className="border-t border-slate-200 px-3 py-2 text-xs text-slate-500">{asset.attribution_text}</figcaption>}
+                                </figure>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
                 <div className="mt-12 pt-6 border-t border-slate-200 flex items-center justify-between">
                     <span className="text-xs font-black uppercase tracking-widest text-slate-400">Share Story</span>
                     <ShareButton title={article.title} slug={article.slug} />
@@ -169,10 +183,10 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                 <div className="bg-[#0a1428] rounded-3xl p-8 text-white text-center shadow-2xl relative overflow-hidden border border-slate-800 group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600 rounded-full blur-[80px] opacity-30 group-hover:opacity-50 transition-opacity"></div>
                     <Trophy className="text-yellow-500 mx-auto mb-4" size={40} />
-                    <h3 className="text-2xl font-black uppercase tracking-tighter leading-tight mb-3">Think You<br/><span className="text-yellow-500">Know Football?</span></h3>
-                    <p className="text-sm text-slate-400 mb-6 font-medium">Predict upcoming fixtures correctly and Win Amazing Prizes Every Months.</p>
+                    <h3 className="text-2xl font-black uppercase tracking-tighter leading-tight mb-3">Stay Close<br/><span className="text-yellow-500">To The Action</span></h3>
+                    <p className="text-sm text-slate-400 mb-6 font-medium">Follow fixtures, live scores and match coverage from across the football world.</p>
                     <Link href="/matches" className="block w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl text-xs tracking-widest uppercase transition-colors shadow-[0_5px_15px_rgba(234,179,8,0.3)]">
-                        Start Predicting
+                        Explore Fixtures
                     </Link>
                 </div>
 
