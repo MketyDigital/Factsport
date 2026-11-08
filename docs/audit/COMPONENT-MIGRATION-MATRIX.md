@@ -79,3 +79,8 @@ See [PAGE-MIGRATION-MATRIX.md](./PAGE-MIGRATION-MATRIX.md) for full page journey
 - `app/admin/news/NewsroomClient.tsx` now displays an authenticated private preview after upload; rights approval and revision-scoped attachment remain server actions.
 - Existing public `MarkdownRenderer` remains the canonical sanitized article-body renderer. CMS preview parity is still open; the new private asset preview is not a substitute for article preview.
 - Remaining media tooling: crop/resize/transcode, reuse/replace existing assets in article revisions, inline media ordering, revision diff/restore, public-renderer preview, and accessibility checks for image attribution/alt text.
+
+
+## Editorial composer preview update
+
+`app/admin/news/NewsroomClient.tsx` now toggles an article preview through the same sanitized `app/components/MarkdownRenderer.tsx` used by public article pages. This provides body rendering parity, but not yet full article page parity for attached revision media, metadata, byline/date and related content.
