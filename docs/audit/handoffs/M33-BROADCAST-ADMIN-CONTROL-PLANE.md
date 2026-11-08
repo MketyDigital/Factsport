@@ -37,3 +37,8 @@ Status: source implementation committed; CI checks in progress; database roles/m
 - Engine regression suite, TypeScript check and native Cloudflare Worker build passed on source commit `348a46a6740be0694b5764bc16cf2dca38090ada` (native build run `42492012094`).
 - Latest changes after that commit (including emergency shutdown UI and audit refinements) are under CI; no passing result is claimed for those until their run completes.
 - No broadcast database migrations were applied, no Hyperdrive or Stream credentials were provisioned, and no guest token was redeemed.
+
+
+## M34 follow-up
+
+The replacement Stream token issuer and room-scoped guest redemption are now implemented in source. It uses the separate token-issuer Hyperdrive, server-only Stream secrets, four-hour client tokens, anonymous listener sessions, 24-hour reusable hashed guest invites, room-scoped host/moderator/caller grants, and privacy-preserving rate limits. See `M34-STREAM-TOKEN-ISSUER-AND-GUEST-REDEMPTION.md`. Real provider configuration and E2E remain mandatory; studio activation stays fail-closed until those bindings/secrets are present.
