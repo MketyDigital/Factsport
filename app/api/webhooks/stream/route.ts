@@ -164,7 +164,7 @@ export async function POST(request: Request) {
         const participants = await tx`
           UPDATE public.media_broadcast_participants
           SET mic_enabled=${micEnabled}
-          WHERE room_id=${roomId}::uuid AND stream_user_id=${incomingUserId}
+          WHERE room_id=${roomId}::uuid AND stream_user_id=${incomingUserId} AND left_at IS NULL
           RETURNING id
         `;
         if (participants.length) await audit(tx, roomId, micEnabled ? 'mic_granted' : 'mic_revoked', participants[0].id as string, { streamUserId: incomingUserId });
@@ -173,7 +173,7 @@ export async function POST(request: Request) {
           if (typeof mutedUserId !== 'string' || mutedUserId.length > 160) continue;
           const participants = await tx`
             UPDATE public.media_broadcast_participants SET mic_enabled=false
-            WHERE room_id=${roomId}::uuid AND stream_user_id=${mutedUserId}
+            WHERE room_id=${roomId}::uuid AND stream_user_id=${mutedUserId} AND left_at IS NULL
             RETURNING id
           `;
           if (participants.length) await audit(tx, roomId, 'mic_revoked', participants[0].id as string, { streamUserId: mutedUserId, source: 'stream_user_muted' });
@@ -182,7 +182,7 @@ export async function POST(request: Request) {
         const participants = await tx`
           UPDATE public.media_broadcast_participants
           SET left_at=now(), last_seen_at=now(), mic_enabled=false
-          WHERE room_id=${roomId}::uuid AND stream_user_id=${incomingUserId}
+          WHERE room_id=${roomId}::uuid AND stream_user_id=${incomingUserId} AND left_at IS NULL
           RETURNING id
         `;
         if (participants.length) await audit(tx, roomId, 'participant_removed', participants[0].id as string, { streamUserId: incomingUserId, source: eventType });
