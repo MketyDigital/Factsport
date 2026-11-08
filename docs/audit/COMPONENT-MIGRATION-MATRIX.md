@@ -71,3 +71,11 @@ See [PAGE-MIGRATION-MATRIX.md](./PAGE-MIGRATION-MATRIX.md) for full page journey
 - MOTMVoteWidget still calls its external Worker and uses localStorage for the client-side voted marker. The authoritative vote limit, match window, candidate validation and idempotency must live server-side; do not rely on localStorage as authorization (P6).
 - FactSportPlayer supports raw media, YouTube embeds, generic iframe sources and the StreamIO media room. FactSportMediaRoom obtains Stream tokens through /api/stream/token; that API supports anonymous listeners, authenticated users and admin-generated guest invite tokens. Preserve this separate StreamIO identity/invite workflow while designing playback grants; do not replace it with a generic media proxy without an equivalent contract.
 - MatchHeaderClient/MatchMobileHub consume MatchLiveProvider and the existing external live-api path. Preserve the three-second edge-cached live UX; do not move per-viewer polling into PostgreSQL or Logic Apps.
+
+
+## 2026-11-08 Media library components
+
+- New `/admin/media/MediaLibraryClient.tsx` provides a searchable, paginated internal asset view, rights status, attribution, usage expiry and private preview. It is not a public component and requires the `media` capability through its server page.
+- `app/admin/news/NewsroomClient.tsx` now displays an authenticated private preview after upload; rights approval and revision-scoped attachment remain server actions.
+- Existing public `MarkdownRenderer` remains the canonical sanitized article-body renderer. CMS preview parity is still open; the new private asset preview is not a substitute for article preview.
+- Remaining media tooling: crop/resize/transcode, reuse/replace existing assets in article revisions, inline media ordering, revision diff/restore, public-renderer preview, and accessibility checks for image attribution/alt text.
