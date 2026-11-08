@@ -14,6 +14,11 @@ test('Media editorial authorization is domain-owned and capability-specific', ()
   assert.match(migration, /media_editorial_audit_events/);
   assert.match(migration, /GRANT SELECT ON public\.media_editorial_memberships\s+TO factsport_v2_editorial_writer/);
   assert.match(auth, /external_identities/);
+  assert.match(auth, /WHERE issuer = \\$\{identity!\\.issuer\}\\s+AND subject = \\$\{identity!\\.subject\}/);
+  assert.match(auth, /getSession\(\)/);
+  assert.match(auth, /payload\.iss/);
+  assert.match(auth, /payload\.sub/);
+  assert.doesNotMatch(auth, /WHERE subject = \\$\{authUser\.id\}/);
   assert.match(auth, /media_editorial_memberships/);
   assert.match(auth, /writer/);
   assert.match(auth, /publisher/);
