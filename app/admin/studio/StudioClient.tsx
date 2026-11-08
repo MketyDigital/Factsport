@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import {
-  createBroadcastInvite, createMatchBroadcastRoom, grantBroadcastRole, revokeBroadcastInvite,
+  blockBroadcastParticipant, createBroadcastInvite, createMatchBroadcastRoom, grantBroadcastRole, revokeBroadcastInvite,
   revokeBroadcastRole, updateBroadcastRoom, updateStudioSettings,
 } from './actions';
 
@@ -19,14 +19,16 @@ type Invite = {
   use_count: number; expires_at: string; revoked_at: string | null; created_at: string;
 };
 type Role = { id: string; room_id: string; room_name: string; user_id: string; role_key: string; created_at: string };
+type Participant = { id: string; room_id: string; room_name: string; stream_user_id: string; identity_kind: string; role_key: string; mic_enabled: boolean; joined_at: string; last_seen_at: string; display_label: string };
 
-export default function StudioClient({ initialSettings, initialRooms, initialInvites, initialRoles, tokenIssuerReady }: {
-  initialSettings: Settings | null; initialRooms: Room[]; initialInvites: Invite[]; initialRoles: Role[]; tokenIssuerReady: boolean;
+export default function StudioClient({ initialSettings, initialRooms, initialInvites, initialRoles, initialParticipants, tokenIssuerReady }: {
+  initialSettings: Settings | null; initialRooms: Room[]; initialInvites: Invite[]; initialRoles: Role[]; initialParticipants: Participant[]; tokenIssuerReady: boolean;
 }) {
   const [settings, setSettings] = useState<Settings | null>(initialSettings);
   const [rooms] = useState(initialRooms);
   const [invites, setInvites] = useState(initialInvites);
   const [roles, setRoles] = useState(initialRoles);
+  const [participants] = useState(initialParticipants);
   const [inviteRoomId, setInviteRoomId] = useState(initialSettings?.room_id || initialRooms[0]?.id || '');
   const [inviteLabel, setInviteLabel] = useState('VIP Guest');
   const [inviteHours, setInviteHours] = useState(24);
@@ -127,6 +129,26 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
           })} className="rounded-lg border border-slate-300 px-3 py-1.5 font-bold">{room.is_active ? 'Shut down room' : 'Activate room'}</button>
         </div>
       </div>)}
+    </section>
+
+    <section className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div><h2 className="text-xl font-black">Live participants</h2><p className="mt-1 text-xs text-slate-500">Presence is reconciled from signed Stream webhooks. Blocking revokes the room identity and attempts to block the Stream user.</p></div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{participants.length} active</span>
+      </div>
+      {participants.length === 0 ? <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No active participants have been reported by Stream.</p> :
+        <div className="mt-4 space-y-2">{participants.map(participant => <div key={participant.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 p-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-slate-900">{participant.display_label} · {participant.room_name}</p>
+            <p className="text-[11px] text-slate-500">{participant.identity_kind} · {participant.role_key} · {participant.mic_enabled ? 'Microphone enabled' : 'Listen only'}</p>
+            <p className="text-[11px] text-slate-400">Joined {new Date(participant.joined_at).toLocaleString()} · Last seen {new Date(participant.last_seen_at).toLocaleString()}</p>
+          </div>
+          <button disabled={pending} onClick={() => startTransition(async () => {
+            const result = await blockBroadcastParticipant({ roomId: participant.room_id, streamUserId: participant.stream_user_id });
+            setMessage(result.success ? String(result.data?.warning || 'Participant blocked and room access revoked.') : result.error);
+            if (result.success) refresh();
+          })} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50">Block participant</button>
+        </div>)}</div>}
     </section>
 
     <section className="grid gap-5 xl:grid-cols-2">
