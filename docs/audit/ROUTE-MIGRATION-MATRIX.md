@@ -134,3 +134,11 @@ A route is not complete because it compiles or returns HTTP 200. For every route
 | `GET /api/admin/media/[id]` | New authenticated private R2 preview by internal asset UUID. | Media role required; raster allowlist, private/no-store, nosniff, sandbox CSP; never expose public bucket URLs or pending media through public delivery. |
 
 The active Media admin login remains blocked on the identity migration: middleware retains a legacy email allowlist and unauthenticated admin layout redirects to the private-host-gated `/login`. Implement Entra External ID and a Media-host session before removing the old guard.
+
+## 2026-11-08 editorial writer and social runtime boundary
+
+- `app/admin/news/actions.ts` provides server-side draft/revision, submit-for-review, independent review approval, publish-approved and archive operations through the dedicated editorial PostgreSQL adapter. Publication records the public-media policy attestation and audit event.
+- `app/api/admin/media` and `app/api/admin/media/[id]` provide role-protected media search and private preview; `POST /api/admin/media` stores validated pending images in private R2. `app/admin/news/media-actions.ts` reviews rights and attaches media to a draft revision.
+- Social channel/publication configuration and an idempotent outbox are represented by migrations 0009 and 0015–0016, with public-media scope and publisher attestation in 0022–0023.
+- **Source/test only:** these paths have not been exercised against the isolated Azure schema. Migrations 0004–0026, editorial writer grants/binding, Entra Media-host sign-in, R2 upload/compensation and non-production social delivery must pass before any route is marked runtime verified.
+- Migration 0026 has a deliberate preflight that raises when existing queued/scheduled/publishing/published social rows or published editorial revisions lack the required attestations. Reconcile explicitly; never auto-approve or rewrite rows.
