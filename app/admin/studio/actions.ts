@@ -301,6 +301,68 @@ export async function revokeBroadcastInvite(inviteId: string): Promise<Result> {
   }
 }
 
+
+export async function blockBroadcastParticipant(input: { roomId: string; streamUserId: string }): Promise<Result> {
+  const authorization = await authorizeMediaEditorialAction('broadcast');
+  if (!authorization.ok) return { success: false, error: authorization.error, code: 'MEDIA_BROADCAST_FORBIDDEN' };
+  if (!uuid(input.roomId) || typeof input.streamUserId !== 'string' ||
+      !/^[A-Za-z0-9_-]{1,160}$/.test(input.streamUserId)) {
+    return { success: false, error: 'Invalid broadcast participant reference.' };
+  }
+  try {
+    const target = await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
+      const rows = await tx`
+        SELECT p.id, p.room_id, p.stream_user_id, p.identity_kind,
+               r.room_name, identity.invite_id
+        FROM public.media_broadcast_participants p
+        JOIN public.media_broadcast_rooms r ON r.id=p.room_id
+        LEFT JOIN public.media_broadcast_token_identities identity
+          ON identity.room_id=p.room_id AND identity.stream_user_id=p.stream_user_id
+        WHERE p.room_id=${input.roomId}::uuid
+          AND p.stream_user_id=${input.streamUserId}
+          AND p.left_at IS NULL
+        LIMIT 1 FOR UPDATE OF p
+      `;
+      if (!rows.length) throw new Error('Active participant not found.');
+      const participant = rows[0];
+      let userIds = [participant.stream_user_id as string];
+      if (participant.invite_id) {
+        await tx`
+          UPDATE public.media_broadcast_invites SET revoked_at=COALESCE(revoked_at, now())
+          WHERE id=${participant.invite_id}::uuid
+        `;
+        await tx`
+          UPDATE public.media_broadcast_token_identities SET revoked_at=COALESCE(revoked_at, now())
+          WHERE invite_id=${participant.invite_id}::uuid
+        `;
+        const identities = await tx`
+          SELECT stream_user_id FROM public.media_broadcast_token_identities
+          WHERE invite_id=${participant.invite_id}::uuid
+        `;
+        userIds = identities.map(item => String(item.stream_user_id));
+      } else {
+        await tx`
+          UPDATE public.media_broadcast_token_identities SET revoked_at=COALESCE(revoked_at, now())
+          WHERE room_id=${participant.room_id}::uuid AND stream_user_id=${participant.stream_user_id}
+        `;
+      }
+      await tx`
+        INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, participant_id, details)
+        VALUES (${participant.room_id}::uuid, ${authorization.user.domainUserId}::uuid, 'admin', 'participant_removed',
+          ${participant.id}::uuid,
+          ${JSON.stringify({ streamUserId: participant.stream_user_id, identityKind: participant.identity_kind, inviteRevoked: Boolean(participant.invite_id) })}::jsonb)
+      `;
+      return { roomName: participant.room_name as string, userIds };
+    }));
+    const warning = await blockRevokedStreamUsers(target.roomName, target.userIds);
+    revalidatePath('/admin/studio');
+    return { success: true, data: warning ? { warning } : {} };
+  } catch (error) {
+    console.error('Broadcast participant block failed', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to block participant.' };
+  }
+}
+
 export async function grantBroadcastRole(input: { roomId: string; userId: string; role: 'host' | 'moderator' | 'caller' }): Promise<Result> {
   const authorization = await authorizeMediaEditorialAction('broadcast');
   if (!authorization.ok) return { success: false, error: authorization.error, code: 'MEDIA_BROADCAST_FORBIDDEN' };
