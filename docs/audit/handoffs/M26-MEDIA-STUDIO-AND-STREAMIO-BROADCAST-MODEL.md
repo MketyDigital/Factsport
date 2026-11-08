@@ -55,3 +55,8 @@ Migration 0019 is source-checked only. It has not been applied; the two broadcas
 ## M33 broadcast admin implementation update
 
 The dedicated Media broadcast admin UI and server mutations are now implemented in source under the Entra-backed `broadcast` capability and separate `FACTSPORT_BROADCAST_ADMIN_HYPERDRIVE`. It supports studio settings, inactive match-room creation, room shutdown/settings, hashed invite creation/revocation and room host/moderator/caller role grants. Migration `0028_factsport_broadcast_admin_audit_and_role_history.sql` fixes role re-grant history and adds audit actions. Activation and call-ins are deliberately rejected until the separate Stream token issuer exists; invite redemption and participant controls are not yet active. See `M33-BROADCAST-ADMIN-CONTROL-PLANE.md`.
+
+
+## M34 token issuer update
+
+The legacy `/api/stream/token` caller has been migrated to `POST /api/studio/token`. The V2 route preserves `audio_room`, four-hour tokens and 24-hour reusable guest invites while adding room scoping, server-derived roles, invite hashing/revocation/use limits, same-origin POST, rate limits and Entra-linked host/member identity. Anonymous public listening is separate from Prediction VIP. See M34 for required Cloudflare/Stream configuration and uncompleted webhook/participant acceptance.
