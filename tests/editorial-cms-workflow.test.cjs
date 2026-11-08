@@ -235,3 +235,16 @@ test('editorial composer preview reuses the exact sanitized public Markdown rend
   assert.match(renderer, /rehypeSanitize/);
   assert.match(renderer, /rehypeSafeEmbeds/);
 });
+
+
+test('editorial composer can reuse only rights-approved, non-expired media assets', () => {
+  const client = read('app/admin/news/NewsroomClient.tsx');
+  const api = read('app/api/admin/media/route.ts');
+  assert.match(client, /Reuse an existing approved asset/);
+  assert.match(client, /rights_status\) &&/);
+  assert.match(client, /owned', 'licensed', 'editorial_exception/);
+  assert.match(client, /usage_expires_at/);
+  assert.match(client, /setUploadedAsset\(\{ id: asset\.id/);
+  assert.match(client, /reviewRightsAndAttachMedia/);
+  assert.match(api, /authorizeMediaEditorialAction\('media'\)/);
+});
