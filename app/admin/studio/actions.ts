@@ -13,7 +13,7 @@ const unavailable = (): Result => ({
 });
 
 
-async function removeRevokedStreamMembers(roomName: string, userIds: string[]): Promise<string | null> {
+async function blockRevokedStreamUsers(roomName: string, userIds: string[]): Promise<string | null> {
   const config = getFactsportBroadcastRuntimeConfig();
   if (!config || userIds.length === 0) return null;
   try {
@@ -23,21 +23,23 @@ async function removeRevokedStreamMembers(roomName: string, userIds: string[]): 
       .setIssuedAt(issuedAt)
       .setExpirationTime(issuedAt + 5 * 60)
       .sign(new TextEncoder().encode(config.apiSecret));
-    const response = await fetch(
-      `https://video.stream-io-api.com/api/v2/video/call/audio_room/${encodeURIComponent(roomName)}/members?api_key=${encodeURIComponent(config.apiKey)}`,
-      {
-        method: 'POST',
-        headers: { Authorization: serverToken, 'stream-auth-type': 'jwt', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ remove_members: userIds }),
-        cache: 'no-store',
-        signal: AbortSignal.timeout(5000),
-      },
-    );
-    if (!response.ok && response.status !== 404) return 'Invite was revoked, but Stream could not immediately remove every active guest. Rejoin attempts will be rejected by the webhook.';
+    for (const userId of userIds) {
+      const response = await fetch(
+        `https://video.stream-io-api.com/api/v2/video/call/audio_room/${encodeURIComponent(roomName)}/block?api_key=${encodeURIComponent(config.apiKey)}`,
+        {
+          method: 'POST',
+          headers: { Authorization: serverToken, 'stream-auth-type': 'jwt', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId }),
+          cache: 'no-store',
+          signal: AbortSignal.timeout(5000),
+        },
+      );
+      if (!response.ok && response.status !== 404) return 'Invite was revoked, but Stream could not immediately block every active guest. Rejoin attempts will be blocked by the webhook.';
+    }
     return null;
   } catch (error) {
     console.error('Immediate revoked guest removal failed', error);
-    return 'Invite was revoked, but active guest removal could not be confirmed. Rejoin attempts will be rejected by the webhook.';
+    return 'Invite was revoked, but active guest blocking could not be confirmed. Rejoin attempts will be blocked by the webhook.';
   }
 }
 
@@ -289,7 +291,7 @@ export async function revokeBroadcastInvite(inviteId: string): Promise<Result> {
       `;
       return { roomName: room[0]?.room_name as string | undefined, userIds: identities.map((item: { stream_user_id: string }) => item.stream_user_id) };
     }));
-    const warning = revoked.roomName ? await removeRevokedStreamMembers(revoked.roomName, revoked.userIds) : null;
+    const warning = revoked.roomName ? await blockRevokedStreamUsers(revoked.roomName, revoked.userIds) : null;
     revalidatePath('/admin/studio');
     return { success: true, data: warning ? { warning } : {} };
   } catch (error) {
