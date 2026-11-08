@@ -21,6 +21,7 @@ export interface PublicEditorialArticle {
   last_verified_at: string | null;
   team_1_name: string | null; team_2_name: string | null;
   team_1_logo_key: string | null; team_2_logo_key: string | null;
+  inline_media?: Array<{ position: number; object_key: string; content_type: string; width: number | null; height: number | null; alt_text: string | null; attribution_text: string | null }>;
 }
 export interface PublicMediaAsset {
   object_key: string; content_type: string; byte_size: number;
@@ -82,7 +83,14 @@ export async function getPublicEditorialArticle(slug: string) {
       WHERE slug = ${slug}
       LIMIT 1
     `;
-    return rows[0] ?? null;
+    if (!rows[0]) return null;
+    const inlineMedia = await sql`
+      SELECT position, object_key, content_type, width, height, alt_text, attribution_text
+      FROM public.public_editorial_article_inline_media
+      WHERE article_id = ${rows[0].id}::uuid
+      ORDER BY position ASC, object_key ASC
+    `;
+    return { ...rows[0], inline_media: inlineMedia };
   });
 }
 
