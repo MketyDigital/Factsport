@@ -12,6 +12,7 @@ type MediaContextType = {
     role: string;
     isConnecting: boolean;
     isWaitingForHost: boolean;
+    canRequestCallIn: boolean;
     errorMsg: string | null;
     isPageActive: boolean;
     setIsPageActive: (active: boolean) => void;
