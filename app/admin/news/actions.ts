@@ -341,6 +341,90 @@ export async function publishApprovedEditorial(articleId: string, publicContentC
   }
 }
 
+
+export async function restoreEditorialRevision(articleId: string, revisionId: string): Promise<ActionResult<{ id: string }>> {
+  const authorization = await authorizeMediaEditorialAction('draft');
+  if (!authorization.ok) return { success: false, error: authorization.error };
+  if (!/^[0-9a-f-]{36}$/i.test(articleId) || !/^[0-9a-f-]{36}$/i.test(revisionId)) {
+    return { success: false, error: 'Invalid article or revision identifier.' };
+  }
+  try {
+    const newRevisionId = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+      const actorId = authorization.user.domainUserId;
+      const articles = await tx`
+        SELECT id, status FROM public.editorial_articles
+        WHERE id=${articleId}::uuid FOR UPDATE
+      `;
+      if (!articles.length || articles[0].status === 'archived') throw new Error('Article is unavailable.');
+      const source = await tx`
+        SELECT id, revision_number, snapshot::text AS snapshot_text
+        FROM public.editorial_article_revisions
+        WHERE id=${revisionId}::uuid AND article_id=${articleId}::uuid
+        LIMIT 1 FOR SHARE
+      `;
+      if (!source.length) throw new Error('The selected revision does not belong to this article.');
+      const snapshot = JSON.parse(source[0].snapshot_text);
+      const next = await tx`
+        SELECT COALESCE(MAX(revision_number), 0)::integer AS current
+        FROM public.editorial_article_revisions
+        WHERE article_id=${articleId}::uuid
+      `;
+      if (articles[0].status !== 'published') {
+        await tx`
+          UPDATE public.editorial_articles SET
+            title=${snapshot.title}, slug=${snapshot.slug}, excerpt=${snapshot.excerpt || null},
+            body_markdown=${snapshot.body_markdown || ''}, category=${snapshot.category || 'Football'},
+            team_1_name=${snapshot.team_1_name || null}, team_2_name=${snapshot.team_2_name || null},
+            tags=${Array.isArray(snapshot.tags) ? snapshot.tags : []},
+            seo_title=${snapshot.seo_title || null}, seo_description=${snapshot.seo_description || null},
+            canonical_url=${snapshot.canonical_url || null}, author_display_name=${snapshot.author_display_name || 'FactSport Desk'},
+            is_headline=${Boolean(snapshot.is_headline)}, is_breaking=${Boolean(snapshot.is_breaking)},
+            status='draft', review_status='pending', reviewed_by=NULL, reviewed_at=NULL,
+            published_at=NULL, updated_by=${actorId}::uuid, updated_at=now()
+          WHERE id=${articleId}::uuid
+        `;
+      }
+      const created = await tx`
+        INSERT INTO public.editorial_article_revisions
+          (article_id, revision_number, snapshot, changed_by, change_note, workflow_status)
+        VALUES (
+          ${articleId}::uuid, ${Number(next[0].current) + 1},
+          ${JSON.stringify(snapshot)}::jsonb, ${actorId}::uuid,
+          ${'Restored from revision #' + source[0].revision_number}, 'draft'
+        ) RETURNING id
+      `;
+      await tx`
+        INSERT INTO public.editorial_article_revision_media
+          (revision_id, placement, position, media_id, remove_media, updated_at)
+        SELECT ${created[0].id}::uuid, placement, position, media_id, remove_media, now()
+        FROM public.editorial_article_revision_media
+        WHERE revision_id=${revisionId}::uuid
+        ON CONFLICT (revision_id, placement, position) DO NOTHING
+      `;
+      await tx`
+        UPDATE public.editorial_article_revisions
+        SET workflow_status='superseded'
+        WHERE article_id=${articleId}::uuid
+          AND id <> ${created[0].id}::uuid
+          AND workflow_status IN ('draft','in_review','approved')
+      `;
+      await tx`
+        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, article_id, revision_id, details)
+        VALUES (
+          ${actorId}::uuid, 'draft_saved', ${articleId}::uuid, ${created[0].id}::uuid,
+          ${JSON.stringify({ restoredFromRevisionId: revisionId, restoredFromRevisionNumber: source[0].revision_number })}::jsonb
+        )
+      `;
+      return created[0].id as string;
+    }));
+    revalidateEditorial();
+    return { success: true, data: { id: newRevisionId } };
+  } catch (error) {
+    console.error('Editorial revision restore failed', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to restore revision.' };
+  }
+}
+
 export async function archiveEditorialArticle(articleId: string): Promise<ActionResult> {
   const authorization = await authorizeMediaEditorialAction('archive');
   if (!authorization.ok) return { success: false, error: authorization.error };
