@@ -43,6 +43,6 @@ test('public Media attestation enforcement fails closed and never rewrites exist
   assert.ok(migration.includes('VALIDATE CONSTRAINT media_social_publications_public_delivery_requires_confirmation'));
   assert.ok(migration.includes('ADD CONSTRAINT editorial_revision_published_requires_public_media_attestation'));
   assert.ok(!executableLines.some(line => /^(INSERT INTO|UPDATE|DELETE FROM|TRUNCATE|DROP TABLE)/i.test(line)));
-  assert.ok(migration.startsWith('BEGIN;'));
-  assert.ok(migration.trim().endsWith('COMMIT;'));
+  assert.equal(executableLines[0], 'BEGIN;');
+  assert.equal(executableLines[executableLines.length - 1], 'COMMIT;');
 });
