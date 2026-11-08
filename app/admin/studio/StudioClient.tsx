@@ -109,8 +109,17 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
         event.preventDefault();
         startTransition(async () => {
           const result = await createBroadcastInvite({ roomId: inviteRoomId, label: inviteLabel, expiresInHours: inviteHours, maxUses: inviteMaxUses ? Number(inviteMaxUses) : null });
-          if (result.success) { setNewToken(String(result.data?.token || '')); setMessage('Invite token created and stored as a hash. Guest redemption is not enabled until the token issuer is provisioned.'); refresh(); }
-          else setMessage(result.error);
+          if (result.success && result.data) {
+            setNewToken(String(result.data.token || ''));
+            setInvites(current => [{
+              id: String(result.data?.id || ''), room_id: inviteRoomId,
+              room_name: rooms.find(room => room.id === inviteRoomId)?.room_name || 'Broadcast room',
+              invited_label: inviteLabel, max_uses: result.data?.maxUses as number | null,
+              use_count: 0, expires_at: String(result.data?.expiresAt || ''),
+              revoked_at: null, created_at: new Date().toISOString(),
+            }, ...current].slice(0, 50));
+            setMessage('Invite token created and stored as a hash. Guest redemption is not enabled until the token issuer is provisioned.');
+          } else setMessage(result.success ? 'Invite created without a token response.' : result.error);
         });
       }}>
         <h2 className="text-lg font-black">Guest invitations</h2>
