@@ -148,3 +148,12 @@ The base \`FACTSPORT_MATCHES_BACKEND\` flag must remain independent of migration
 - Relative media paths are kept same-origin instead of being rewritten to the production domain; protocol-relative paths, backslashes and path traversal are rejected. The existing streamio sentinel is preserved. Match-page metadata uses the same explicit live-status allowlist so an unknown status cannot expose a pre-kickoff stream URL through OpenGraph metadata.
 - Final code head `ab3e924f29766f42ad35210ffd75e23892e58896`: isolated verification passed (run 42386252137; 104 engine tests and 5 ingestion tests), native vinext build passed (run 42386252158), and protected staging passed (run 42386252101).
 - Staging continues to verify the protected `/matches` PostgreSQL path and infrastructure boundary only. It does not call `/match/[id]` or the new playback/VIP APIs; those remain source/test/build verified, not runtime verified.
+
+
+## 2026-11-08 Media asset-library continuation
+
+- Added `/admin/media` as a Media-role-protected asset library with search, rights-status filtering, pagination, metadata and authenticated private R2 previews. New uploads in the newsroom also show a private preview before rights approval.
+- Added the matching role-protected `GET /api/admin/media` library endpoint and `GET /api/admin/media/[id]` private preview route. These are Media editorial writer operations, not public media delivery.
+- `/admin/news` still uses the dedicated editorial Hyperdrive and fails closed if unavailable. The new asset library does the same.
+- **Open login blocker:** `/admin` middleware still applies the legacy email allowlist, while `/admin/layout.tsx` redirects to `/login` and `/login/layout.tsx` is private-Prediction-host-gated. Entra External ID is the approved Day 1 identity provider but its tenant and adapter are not configured. Do not remove the old guard until a working Media-host identity flow and server-side RBAC are verified.
+- Source tests, TypeScript and native vinext build passed on code commit `5a6f4a86e27b7d27c20eb2c73d21b3a3534d6957`; protected staging deployment was still in progress at this update. No database migration or R2 upload runtime test has been performed.
