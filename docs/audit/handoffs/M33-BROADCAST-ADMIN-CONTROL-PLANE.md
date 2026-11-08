@@ -34,6 +34,6 @@ Status: source implementation committed; CI checks in progress; database roles/m
 
 ## Validation
 
-- Engine regression suite and TypeScript check passed on source commit `348a46a6740be0694b5764bc16cf2dca38090ada`; native Worker build was still running at handoff time.
-- Latest changes after that commit (including emergency shutdown UI) are also under CI; no passing result is claimed for those until their run completes.
+- Engine regression suite, TypeScript check and native Cloudflare Worker build passed on source commit `348a46a6740be0694b5764bc16cf2dca38090ada` (native build run `42492012094`).
+- Latest changes after that commit (including emergency shutdown UI and audit refinements) are under CI; no passing result is claimed for those until their run completes.
 - No broadcast database migrations were applied, no Hyperdrive or Stream credentials were provisioned, and no guest token was redeemed.
