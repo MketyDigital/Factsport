@@ -79,6 +79,13 @@ export default function StudioClient({ initialSettings, initialRooms, initialInv
       </div>
       <p className="text-xs text-amber-700">Keep the studio inactive and call-ins disabled until the Stream token issuer and private-room tests are complete.</p>
       <button disabled={pending} className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{pending ? 'Saving…' : 'Save studio settings'}</button>
+      <button type="button" disabled={pending || !settings.is_active} onClick={() => startTransition(async () => {
+        const result = await updateBroadcastRoom({
+          roomId: settings.room_id, isActive: false,
+          publicListeningEnabled: settings.public_listening_enabled, callinEnabled: false,
+        });
+        setMessage(result.success ? 'Global studio shut down.' : result.error); if (result.success) refresh();
+      })} className="ml-2 rounded-xl border border-red-200 px-5 py-3 text-sm font-bold text-red-700 disabled:opacity-50">Shutdown active studio</button>
     </form>
 
     <form className="rounded-2xl border border-slate-200 bg-white p-5" onSubmit={event => {
