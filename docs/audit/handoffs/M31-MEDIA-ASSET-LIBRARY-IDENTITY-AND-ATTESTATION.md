@@ -63,3 +63,12 @@ The newsroom composer now has a draft article preview using the exact public `Ma
 - Public article pages now render the rights-filtered inline gallery with alt text and attribution. Reusing an existing asset no longer resets its global `is_public` flag, so one article revision cannot accidentally unpublish an asset already used by another published story.
 - The public article sidebar no longer contains the prize/prediction acquisition message; it now links to neutral fixtures and live-score coverage, keeping private Prediction promotion out of the public newsroom surface.
 - These changes are source committed; latest verification for commit `34494850b31ce530f960cfe30f46a95fe97e0927` is running. Do not mark migration 0027 or public gallery runtime complete until it is applied and exercised in isolated staging.
+
+
+## Revision history and restore
+
+- Added Media-role-protected `GET /api/admin/news/[id]/revisions`, returning a bounded latest-50 revision history with snapshots and review feedback.
+- Newsroom history UI compares the selected snapshot with the current newsroom version and allows restore as a **new draft revision**. It never rewrites the historical source revision or changes currently published copy; revision-scoped media attachments are copied into the new draft.
+- `db/migrations/0027_factsport_revision_inline_media_gallery.sql` extends revision-scoped attachments with ordered inline placement and adds a public inline-media projection limited to published/reviewed articles and rights-cleared, unexpired assets.
+- The newsroom can search/reuse approved library assets; public article pages render the ordered gallery with attribution. Reusing an asset preserves its existing global public state.
+- Isolated verification passed on commit `c78b64029ea89706339243f3ad161e37953b353e` (run `42491443003`). TypeScript passed in native Worker build run `42491442888`, with final build still in progress at handoff time. Protected staging run `42491443017` was building/deploying staging; do not claim deployment passed until completion. Migration 0027 has not been applied to staging.
