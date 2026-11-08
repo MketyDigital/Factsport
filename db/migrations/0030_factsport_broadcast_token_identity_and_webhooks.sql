@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS public.media_broadcast_webhook_events (
   call_cid text,
   stream_user_id text,
   received_at timestamptz NOT NULL DEFAULT now(),
-  processed_at timestamptz NOT NULL DEFAULT now()
+  processed_at timestamptz
 );
 CREATE INDEX IF NOT EXISTS media_broadcast_webhook_events_received_idx
   ON public.media_broadcast_webhook_events (received_at DESC);
