@@ -39,6 +39,7 @@ export async function updateStudioSettings(input: {
     const audioUrl = safeMediaUrl(input.audioUrl);
     const videoUrl = safeMediaUrl(input.videoUrl);
     const isActive = input.isActive === true;
+    if (isActive || input.callinEnabled === true) return { success: false, error: 'The Stream token issuer is not provisioned. Public studio activation and call-ins remain disabled.' };
     const publicListeningEnabled = input.publicListeningEnabled === true;
     const callinEnabled = input.callinEnabled === true;
     await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
@@ -88,6 +89,7 @@ export async function updateBroadcastRoom(input: {
       const rooms = await tx`SELECT id, scope_type, scope_key FROM public.media_broadcast_rooms WHERE id=${input.roomId}::uuid FOR UPDATE`;
       if (!rooms.length) throw new Error('Broadcast room not found.');
       const active = input.isActive === true;
+      if (active || input.callinEnabled === true) throw new Error('The Stream token issuer is not provisioned. Room activation and call-ins remain disabled.');
       await tx`
         UPDATE public.media_broadcast_rooms SET
           is_active=${active}, public_listening_enabled=${input.publicListeningEnabled === true},
