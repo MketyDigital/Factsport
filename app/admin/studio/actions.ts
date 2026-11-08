@@ -39,7 +39,8 @@ export async function updateStudioSettings(input: {
     const audioUrl = safeMediaUrl(input.audioUrl);
     const videoUrl = safeMediaUrl(input.videoUrl);
     const isActive = input.isActive === true;
-    if (isActive || input.callinEnabled === true) return { success: false, error: 'The Stream token issuer is not provisioned. Public studio activation and call-ins remain disabled.' };
+    const callinEnabled = input.callinEnabled === true;
+    if (isActive || callinEnabled) return { success: false, error: 'The Stream token issuer is not provisioned. Public studio activation and call-ins remain disabled.' };
     const publicListeningEnabled = input.publicListeningEnabled === true;
     const callinEnabled = input.callinEnabled === true;
     await withFactsportBroadcastAdminPostgres(async sql => sql.begin(async tx => {
@@ -89,11 +90,12 @@ export async function updateBroadcastRoom(input: {
       const rooms = await tx`SELECT id, scope_type, scope_key FROM public.media_broadcast_rooms WHERE id=${input.roomId}::uuid FOR UPDATE`;
       if (!rooms.length) throw new Error('Broadcast room not found.');
       const active = input.isActive === true;
-      if (active || input.callinEnabled === true) throw new Error('The Stream token issuer is not provisioned. Room activation and call-ins remain disabled.');
+      const callinEnabled = input.callinEnabled === true;
+      if (active || callinEnabled) throw new Error('The Stream token issuer is not provisioned. Room activation and call-ins remain disabled.');
       await tx`
         UPDATE public.media_broadcast_rooms SET
           is_active=${active}, public_listening_enabled=${input.publicListeningEnabled === true},
-          callin_enabled=${input.callinEnabled === true},
+          callin_enabled=${callinEnabled},
           updated_by=${authorization.user.domainUserId}::uuid, updated_at=now()
         WHERE id=${input.roomId}::uuid
       `;
@@ -104,7 +106,7 @@ export async function updateBroadcastRoom(input: {
         INSERT INTO public.media_broadcast_audit_events (room_id, actor_user_id, actor_kind, action, details)
         VALUES (${input.roomId}::uuid, ${authorization.user.domainUserId}::uuid, 'admin',
           ${active ? 'room_activated' : 'room_shutdown'},
-          ${JSON.stringify({ publicListeningEnabled: input.publicListeningEnabled === true, callinEnabled: input.callinEnabled === true })}::jsonb)
+          ${JSON.stringify({ publicListeningEnabled: input.publicListeningEnabled === true, callinEnabled })}::jsonb)
       `;
     }));
     revalidatePath('/admin/studio'); revalidatePath('/');
