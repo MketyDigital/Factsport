@@ -18,7 +18,7 @@ test('Cloudflare Stream VOD is separate, signed, fail-closed and revision-scoped
   assert.match(migration, /editorial_article_revision_videos/);
   assert.match(migration, /editorial_article_videos/);
   assert.match(migration, /public_editorial_article_video_tokens/);
-  assert.match(migration, /requireSignedURLs/);
+  assert.match(migration, /signed_playback_required boolean NOT NULL DEFAULT true/);
   assert.match(migration, /rights_status IN \('owned','licensed','editorial_exception'\)/);
   assert.match(migration, /media_video_upload_started/);
   assert.match(adapter, /FACTSPORT_STREAM_VIDEO_READY === 'true'/);
