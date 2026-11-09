@@ -30,7 +30,7 @@ test('publisher transparency and ads.txt are present but do not imply account ap
   assert.match(privacy, /Google-certified consent management platform/);
   assert.match(advertising, /AdSense is not currently enabled/);
   assert.equal(adsTxt.length, 1);
-  assert.match(adsTxt[0], /^google\\.com, pub-[0-9]{16}, DIRECT, f08c47fec0942fa0$/);
+  assert.match(adsTxt[0], /^google\.com, pub-[0-9]{16}, DIRECT, f08c47fec0942fa0$/);
 });
 
 
