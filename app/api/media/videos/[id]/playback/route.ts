@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withFactsportPostgres } from '@/lib/adapters/postgres-client';
 import {
-  createFactsportStreamSignedToken, isFactsportStreamVideoReady,
+  createFactsportStreamSignedToken, isFactsportStreamPlaybackReady,
 } from '@/lib/media/cloudflare-stream';
 
 export const runtime = 'edge';
@@ -12,7 +12,7 @@ export async function GET(_request: Request, context: { params: { id: string } }
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(videoId)) {
     return NextResponse.json({ error: 'Not found' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
   }
-  if (!isFactsportStreamVideoReady()) {
+  if (!isFactsportStreamPlaybackReady()) {
     return NextResponse.json({ error: 'Video playback is temporarily unavailable.' }, {
       status: 503, headers: { 'Cache-Control': 'no-store' },
     });
