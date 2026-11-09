@@ -129,11 +129,14 @@ test('editorial media uploads are private, validated, hashed and rights-reviewed
   assert.match(mediaUpload, /isSameOriginRequest/);
   assert.match(mediaActions, /rights_reviewed_by/);
   assert.match(mediaActions, /rights_reviewed_at/);
+  assert.match(mediaActions, /Hero and inline images require descriptive alt text/);
   assert.match(mediaActions, /workflow_status='draft'/);
   assert.match(mediaActions, /editorial_article_revision_media/);
   assert.doesNotMatch(mediaActions.slice(0, mediaActions.indexOf('export async function revokeMediaRights')), /is_public=false/);
   assert.match(actions, /editorial_article_revision_media/);
   assert.match(actions, /is_public=true/);
+  assert.match(actions, /Hero and inline images require descriptive alt text before publication/);
+  assert.match(actions, /team 1 logo requires the corresponding team name/);
   assert.match(revisionMediaSql, /CREATE TABLE IF NOT EXISTS public\.editorial_article_revision_media/i);
   assert.match(revisionMediaSql, /public_media_assets[\s\S]*EXISTS \([\s\S]*editorial_articles/i);
   assert.match(revisionMediaSql, /GRANT SELECT, INSERT, UPDATE ON public\.editorial_article_revision_media/i);
