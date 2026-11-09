@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 
 type Props = {
   matchId: string;
@@ -46,7 +46,7 @@ export default function PublicPredictionSubmit({ matchId, matchDate, homeTeam, a
     }
   }
 
-  async function submitPrediction(event: React.FormEvent<HTMLFormElement>) {
+  async function submitPrediction(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!outcome || homeScore === '' || awayScore === '') {
       setMessage('Choose an outcome and enter both teams’ predicted scores.');
