@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import MediaDerivativeEditor from './MediaDerivativeEditor';
 import MediaRightsRevocationControl from './MediaRightsRevocationControl';
 import MediaUsagePanel from './MediaUsagePanel';
+import MediaVideoLibrary from './MediaVideoLibrary';
 
 type Asset = {
   id: string; object_key: string; content_type: string; byte_size: number;
@@ -26,7 +27,7 @@ function formatBytes(bytes: number) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-export default function MediaLibraryClient({ canRevokeRights = false }: { canRevokeRights?: boolean }) {
+export default function MediaLibraryClient({ canRevokeRights = false, streamVideoReady = false }: { canRevokeRights?: boolean; streamVideoReady?: boolean }) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
@@ -67,6 +68,8 @@ export default function MediaLibraryClient({ canRevokeRights = false }: { canRev
       <h1 className="mt-1 text-3xl font-black tracking-tight">Media library</h1>
       <p className="mt-2 text-sm text-slate-500">Private R2 assets, rights status, attribution and expiry. Public delivery remains restricted to assets approved and attached to published editorial content.</p>
     </header>
+
+    <MediaVideoLibrary ready={streamVideoReady} />
 
     <form className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_220px_auto]" onSubmit={event => { event.preventDefault(); void load(0, false); }}>
       <label className="text-xs font-bold text-slate-600">Search assets
