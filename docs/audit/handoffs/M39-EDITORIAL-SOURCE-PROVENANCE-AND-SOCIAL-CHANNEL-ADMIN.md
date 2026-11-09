@@ -39,3 +39,10 @@ Status: source implementation committed; current CI verification is running; mig
 4. Provision channel routing IDs from an authorized legacy export; never migrate secrets to settings JSON.
 5. Configure Logic Apps with secure connection references, dispatch claim/result calls, direct Meta/Telegram and Buffer/Make adapters.
 6. Run provider test destinations, verify receipt parsing, retry behavior and unknown-result reconciliation. Only then set provider readiness flags and enable individual channels.
+
+
+## Revision-scope hardening
+
+- Follow-up audit found that an article-level source table could otherwise expose a source added to a draft of an already-published article before review. Migration 0035 adds revision_id to source records and redefines the public view to expose only sources attached to the latest published revision.
+- Adding a source now requires a current draft revision. New draft saves carry source records forward from the previous pending/rejected revision, or seed from the latest published revision when editing a published article. Revision restore also carries the source records.
+- The newsroom displays sources from the current draft revision, falling back to the latest published revision. Private rights-reference notes remain excluded from the public projection.
