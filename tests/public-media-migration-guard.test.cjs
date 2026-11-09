@@ -9,7 +9,7 @@ const readMigration = name => fs.readFileSync(path.join(migrationDir, name), 'ut
 
 test('V2 migration inventory remains contiguous through the public Media policy boundary', () => {
   const files = fs.readdirSync(migrationDir).filter(name => /^[0-9]{4}_/.test(name) && name.endsWith('.sql'));
-  for (let number = 1; number <= 26; number += 1) {
+  for (let number = 1; number <= 37; number += 1) {
     const prefix = String(number).padStart(4, '0');
     const matches = files.filter(name => name.slice(0, 5) === prefix + '_');
     assert.equal(matches.length, 1, 'expected exactly one migration for ' + prefix);
