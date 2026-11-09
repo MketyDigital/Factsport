@@ -25,6 +25,7 @@ on:
       - 'app/components/**'
       - 'app/news/**'
       - 'app/page.tsx'
+      - 'lib/**'
       - 'lib/adapters/postgres-editorial.ts'
       - 'lib/adapters/postgres-homepage.ts'
       - 'lib/adapters/postgres-client.ts'
