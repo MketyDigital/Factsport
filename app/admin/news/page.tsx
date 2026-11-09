@@ -31,6 +31,7 @@ export default async function AdminNewsPage() {
         COALESCE(r.workflow_status, a.review_status) AS review_status,
         r.workflow_status AS revision_status,
         COALESCE(revision_media.items, '[]'::jsonb) AS revision_media,
+        COALESCE(article_sources.items, '[]'::jsonb) AS sources,
         r.review_comment,
         COALESCE((r.snapshot->>'is_headline')::boolean, a.is_headline) AS is_headline,
         COALESCE((r.snapshot->>'is_breaking')::boolean, a.is_breaking) AS is_breaking,
@@ -64,6 +65,19 @@ export default async function AdminNewsPage() {
         LEFT JOIN public.media_assets m ON m.id = rm.media_id
         WHERE rm.revision_id = r.id
       ) revision_media ON true
+      LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+          'id', s.id,
+          'source_title', s.source_title,
+          'publisher', s.publisher,
+          'canonical_url', s.canonical_url,
+          'attribution_text', s.attribution_text,
+          'rights_reference', s.rights_reference,
+          'accessed_at', s.accessed_at
+        ) ORDER BY s.created_at DESC) AS items
+        FROM public.editorial_article_sources s
+        WHERE s.article_id=a.id
+      ) article_sources ON true
       ORDER BY GREATEST(a.updated_at, COALESCE(r.created_at, a.updated_at)) DESC
       LIMIT 200
     `);
