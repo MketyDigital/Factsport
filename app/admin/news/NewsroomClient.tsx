@@ -255,7 +255,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                     <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setSelectedFile(e.target.files?.[0] || null)} className="mt-1 block w-full text-xs" />
                   </label>
                   <label className="text-xs font-bold text-slate-600">Image alt text
-                    <input value={assetAltText} onChange={e => setAssetAltText(e.target.value)} maxLength={500} className="mt-1 w-full rounded-xl border border-slate-200 p-2 text-sm" />
+                    <input value={assetAltText} onChange={e => setAssetAltText(e.target.value)} maxLength={240} required={placement === 'hero' || placement === 'inline'} className="mt-1 w-full rounded-xl border border-slate-200 p-2 text-sm" />
                   </label>
                 </div>
                 <button disabled={mediaPending || !selectedFile || !canEditRevisionMedia} onClick={() => startMediaTransition(async () => {
