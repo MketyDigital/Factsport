@@ -11,7 +11,8 @@ import { cache } from 'react';
 import { ChevronLeft, Calendar, Clock, ArrowRight, Trophy, Flame, Zap, ChevronRight, Tag } from 'lucide-react';
 import NewsArtwork from '@/app/components/NewsArtwork'; 
 import ShareButton from '@/app/components/ShareButton';
-import MarkdownRenderer from '@/app/components/MarkdownRenderer'; 
+import MarkdownRenderer from '@/app/components/MarkdownRenderer';
+import MediaVideoPlayer from '@/app/components/MediaVideoPlayer'; 
 
 const getArticleData = cache(async (slug: string) => {
   if (process.env.FACTSPORT_EDITORIAL_BACKEND === 'postgres') {
@@ -167,6 +168,22 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                                     <img src={`/api/media/${asset.object_key}`} alt={asset.alt_text || 'Editorial image'} width={asset.width || undefined} height={asset.height || undefined} className="h-auto max-h-[520px] w-full object-contain" loading="lazy" decoding="async" />
                                     {asset.attribution_text && <figcaption className="border-t border-slate-200 px-3 py-2 text-xs text-slate-500">{asset.attribution_text}</figcaption>}
                                 </figure>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {article.videos && article.videos.length > 0 && (
+                    <section className="mt-12 border-t border-slate-200 pt-8" aria-label="Editorial video clips">
+                        <h2 className="mb-5 text-xl font-black tracking-tight text-slate-900">Watch the clips</h2>
+                        <div className="space-y-6">
+                            {article.videos.map((video: any) => (
+                                <article key={video.video_id} className="space-y-2">
+                                    <MediaVideoPlayer videoId={video.video_id} title={video.title} />
+                                    <h3 className="text-base font-black text-slate-900">{video.title}</h3>
+                                    {video.description && <p className="text-sm leading-6 text-slate-600">{video.description}</p>}
+                                    {video.duration_seconds && <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{Math.round(video.duration_seconds)} seconds</p>}
+                                </article>
                             ))}
                         </div>
                     </section>
