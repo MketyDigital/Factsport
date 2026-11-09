@@ -17,6 +17,7 @@ test('Cloudflare Stream VOD is separate, signed, fail-closed and revision-scoped
   assert.match(migration, /media_video_assets/);
   assert.match(migration, /provider_video_id varchar\(64\)/);
   assert.match(migration, /char_length\(provider_video_id\) BETWEEN 32 AND 64/);
+  assert.match(migration, /provider_video_id !~ '\[\^A-Za-z0-9\]'/);
   assert.match(migration, /editorial_article_revision_videos/);
   assert.match(migration, /editorial_article_videos/);
   assert.match(migration, /public_editorial_article_video_tokens/);
