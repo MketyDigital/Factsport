@@ -2,7 +2,7 @@
 
 Date: 2026-11-09
 Branch: refactor/factsport-v2
-Status: source implementation committed; isolated verification and native Worker build pending; migration 0038/0039 unapplied; no real R2 derivative has been created in staging.
+Status: source implementation committed; isolated regression and native Worker build passed on commit 41ee5cfd1b0dbbdeed739ec952f093755d7274f7; protected staging workflow is being rerun on the latest source; migrations 0038/0039 unapplied; no real R2 derivative has been created in staging.
 
 ## Implemented
 
@@ -32,7 +32,7 @@ Status: source implementation committed; isolated verification and native Worker
 
 - Added tests/media-derivatives.test.cjs and extended tests/public-media-migration-guard.test.cjs.
 - CI migration inventory now extends through 0039.
-- Fresh isolated regression, TypeScript/native Worker build and protected staging workflow are required for the exact latest commit.
+- Isolated regression and native Worker build passed on commit 41ee5cfd1b0dbbdeed739ec952f093755d7274f7 (runs 42562605350 and 42562605340). The protected staging run was cancelled by a newer push; the replacement protected staging run is pending on the latest source. The subsequent test-only assertion correction is also undergoing fresh CI.
 - Migrations 0038/0039 have not been applied. No editorial Hyperdrive, role or membership provisioning was performed. No R2 derivative was generated in staging or production.
 
 ## Remaining Media work
