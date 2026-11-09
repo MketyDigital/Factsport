@@ -109,4 +109,4 @@ jobs:
           grep -q "REVOKE UPDATE ON public.media_assets" db/migrations/0038_factsport_media_asset_column_grants.sql
           grep -q "media_asset_derivatives" db/migrations/0039_factsport_media_derivative_lineage.sql
           grep -q "media_rights_revoked" db/migrations/0040_factsport_media_rights_revocation.sql
-          echo "Migrations 0001-0040 present; immutable derivatives, inherited rights, audited rights revocation, revision-scoped provenance, Media gallery, broadcast, social channel admin and least-privilege grants inventoried; live migration NOT executed"
+          echo "Migrations 0001-0040 present; immutable derivatives, inherited rights, audited rights withdrawal, revision-scoped provenance, Media gallery, broadcast, social channel admin and least-privilege grants inventoried; live migration NOT executed"
