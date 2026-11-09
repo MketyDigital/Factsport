@@ -88,3 +88,14 @@ test('social provider allowlist migration matches the implemented V2 adapter set
   const migration = readMigration('0037_factsport_social_provider_allowlist.sql');
   assert.ok(migration.includes("provider IN ('meta','telegram','buffer','make')"));
 });
+
+
+test('editorial writer media asset updates are column-scoped to rights and publication fields', () => {
+  const migration = readMigration('0038_factsport_media_asset_column_grants.sql');
+  assert.ok(migration.includes('REVOKE UPDATE ON public.media_assets FROM factsport_v2_editorial_writer'));
+  assert.ok(migration.includes('GRANT UPDATE ('));
+  for (const column of ['rights_status','rights_reference','attribution_text','alt_text','usage_expires_at','rights_reviewed_by','rights_reviewed_at','is_public','updated_at']) {
+    assert.ok(migration.includes(column));
+  }
+  assert.ok(!migration.includes('GRANT UPDATE ON public.media_assets TO factsport_v2_editorial_writer'));
+});
