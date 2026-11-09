@@ -151,4 +151,68 @@ GRANT EXECUTE ON FUNCTION public.submit_public_prediction(
   text, text, text, uuid, text, integer, integer
 ) TO factsport_v2_prediction_api;
 
+-- Privacy-preserving rate-limit counters. Only keyed hashes are stored; raw
+-- visitor tokens and client IP addresses never enter this table.
+CREATE TABLE public.prediction_submission_rate_limits (
+  scope text NOT NULL CHECK (scope IN ('visitor', 'network')),
+  key_hash char(64) NOT NULL CHECK (key_hash ~ '^[0-9a-f]{64}),
+  window_started_at timestamptz NOT NULL,
+  request_count integer NOT NULL CHECK (request_count > 0),
+  PRIMARY KEY (scope, key_hash, window_started_at)
+);
+
+REVOKE ALL ON TABLE public.prediction_submission_rate_limits FROM PUBLIC;
+
+CREATE OR REPLACE FUNCTION public.consume_public_prediction_rate_limit(
+  p_scope text,
+  p_key_hash text,
+  p_window_seconds integer,
+  p_limit integer
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $rate_limit$
+DECLARE
+  v_window_start timestamptz;
+  v_count integer;
+BEGIN
+  IF p_scope NOT IN ('visitor', 'network')
+     OR p_key_hash IS NULL OR p_key_hash !~ '^[0-9a-f]{64}
+     OR p_window_seconds NOT BETWEEN 1 AND 3600
+     OR p_limit NOT BETWEEN 1 AND 1000 THEN
+    RAISE EXCEPTION 'invalid_rate_limit_parameters' USING ERRCODE = '22023';
+  END IF;
+
+  v_window_start := pg_catalog.to_timestamp(
+    pg_catalog.floor(
+      EXTRACT(EPOCH FROM pg_catalog.transaction_timestamp()) / p_window_seconds
+    ) * p_window_seconds
+  );
+
+  INSERT INTO public.prediction_submission_rate_limits (
+    scope, key_hash, window_started_at, request_count
+  ) VALUES (
+    p_scope, p_key_hash, v_window_start, 1
+  )
+  ON CONFLICT (scope, key_hash, window_started_at) DO UPDATE
+    SET request_count = LEAST(
+      public.prediction_submission_rate_limits.request_count + 1,
+      p_limit + 1
+    )
+  RETURNING request_count INTO v_count;
+
+  RETURN v_count <= p_limit;
+END;
+$rate_limit$;
+
+REVOKE ALL ON FUNCTION public.consume_public_prediction_rate_limit(
+  text, text, integer, integer
+) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION public.consume_public_prediction_rate_limit(
+  text, text, integer, integer
+) TO factsport_v2_prediction_api;
+
 COMMIT;
