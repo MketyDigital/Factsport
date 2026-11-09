@@ -1,0 +1,161 @@
+name: Factsport v2 disposable PostgreSQL migration verification
+
+# Applies the complete reviewed chain only to an ephemeral CI database.
+# This workflow never connects to the Azure staging or production database.
+on:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - 'db/migrations/**'
+      - '.github/workflows/v2-db-migration-verify.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factsport-v2-disposable-postgres
+  cancel-in-progress: true
+
+jobs:
+  migration-chain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: factsport_v2
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: factsport-ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d factsport_v2"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGPASSWORD: factsport-ci-only-password
+      DATABASE_URL: postgresql://postgres:factsport-ci-only-password@127.0.0.1:5432/factsport_v2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Seed isolated runtime roles
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE role_name text;
+          BEGIN
+            FOREACH role_name IN ARRAY ARRAY[
+              'factsport_v2_reader',
+              'factsport_v2_schedule_writer',
+              'factsport_v2_espn_writer',
+              'factsport_v2_editorial_writer',
+              'factsport_v2_media_automation_writer',
+              'factsport_v2_social_dispatcher',
+              'factsport_v2_media_broadcast_admin',
+              'factsport_v2_broadcast_token_issuer',
+              'factsport_v2_media_access_admin'
+            ] LOOP
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
+                EXECUTE format('CREATE ROLE %I NOLOGIN', role_name);
+              END IF;
+            END LOOP;
+          END
+          $$;
+          SQL
+      - name: Apply every migration in sequence to disposable PostgreSQL
+        run: |
+          set -euo pipefail
+          count=0
+          for migration in db/migrations/[0-9][0-9][0-9][0-9]_*.sql; do
+            echo "::group::Applying $migration"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+            echo "::endgroup::"
+            count=$((count + 1))
+          done
+          [ "$count" -eq 41 ] || {
+            echo "::error::Expected 41 ordered migrations; applied $count."
+            exit 1
+          }
+          echo "Applied $count migrations to the disposable CI database."
+      - name: Verify Media, VOD and least-privilege database contracts
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF to_regclass('public.media_assets') IS NULL
+              OR to_regclass('public.media_asset_derivatives') IS NULL
+              OR to_regclass('public.media_video_assets') IS NULL
+              OR to_regclass('public.editorial_article_revision_videos') IS NULL
+              OR to_regclass('public.public_editorial_article_videos') IS NULL
+              OR to_regclass('public.public_editorial_article_video_tokens') IS NULL
+              OR to_regclass('public.media_social_delivery_attempts') IS NULL
+              OR to_regclass('public.media_social_outbox') IS NULL THEN
+              RAISE EXCEPTION 'Required Media/VOD/social objects are missing after migration apply';
+            END IF;
+
+            IF NOT has_column_privilege(
+              'factsport_v2_editorial_writer',
+              'public.media_video_assets',
+              'rights_status',
+              'UPDATE'
+            ) THEN
+              RAISE EXCEPTION 'Editorial writer cannot perform the approved video rights workflow';
+            END IF;
+
+            IF has_column_privilege(
+              'factsport_v2_editorial_writer',
+              'public.media_video_assets',
+              'provider_video_id',
+              'UPDATE'
+            ) THEN
+              RAISE EXCEPTION 'Editorial writer must not rewrite the provider video identity';
+            END IF;
+
+            IF NOT has_column_privilege(
+              'factsport_v2_social_dispatcher',
+              'public.media_social_delivery_attempts',
+              'provider_started_at',
+              'UPDATE'
+            ) THEN
+              RAISE EXCEPTION 'Dispatcher lacks the single-provider-call lock permission';
+            END IF;
+
+            IF has_column_privilege(
+              'factsport_v2_social_dispatcher',
+              'public.media_social_delivery_attempts',
+              'started_at',
+              'UPDATE'
+            ) THEN
+              RAISE EXCEPTION 'Dispatcher must not rewrite immutable attempt start time';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1
+              FROM information_schema.columns
+              WHERE table_schema='public'
+                AND table_name='media_video_assets'
+                AND column_name='signed_playback_required'
+                AND column_default LIKE '%true%'
+            ) THEN
+              RAISE EXCEPTION 'VOD signed-playback default is missing';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint
+              WHERE conrelid='public.media_video_assets'::regclass
+                AND conname='media_video_public_requires_ready_rights'
+            ) THEN
+              RAISE EXCEPTION 'VOD public-read rights constraint is missing';
+            END IF;
+          END
+          $$;
+          SQL
+          echo "Disposable PostgreSQL migration chain and privilege assertions passed."
