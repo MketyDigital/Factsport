@@ -77,3 +77,11 @@ The change is source/migration-only. Keep the new TUS UI path and feature flag d
 - Protected Cloudflare staging run `42584448515` completed dependency installation, regression suite, TypeScript and native Worker build; deployment and deny-by-default checks were still in progress at this update.
 - Disposable PostgreSQL migration chain through 0043 passed on commit `55464ea4a8d3000a836d109d1ad4c20397922d50` (run `42584159460`), including the revised migration 0041 transaction and VOD expected-size columns/constraint.
 - No actual Stream upload, TUS browser interruption/resume, Stream UID response validation, Azure staging migration or media-provider E2E has been performed.
+
+
+## Protected staging completion
+
+- Protected Cloudflare application staging passed on source commit `e3dac371fa40293ae73e0a1c75c1cd78419b6fff` (run `42584448515`), including deployment, temporary access-secret protection and deny-by-default verification.
+- **M50 source/build status:** 226 regression tests, TypeScript, native Worker build and protected Cloudflare staging passed; disposable PostgreSQL migration chain including the revised 0041 schema passed.
+- **Still not runtime-verified:** actual Cloudflare Stream TUS creation, browser CORS/HEAD/PATCH, interruption/resume across reload, expiry restart, provider media-ID format, processing-size reconciliation, rights approval and signed playback. The application staging deployment does not provision the Stream token/signing key or apply 0041 to Azure.
+- Keep `FACTSPORT_MEDIA_VIDEO_SCHEMA_READY` and `FACTSPORT_STREAM_VIDEO_READY` unset until the owner provisions isolated staging and the above end-to-end checks pass.
