@@ -23,7 +23,11 @@ export default async function AdminSocialPage() {
         JOIN public.media_social_channels c ON c.id=p.channel_id
         ORDER BY p.created_at DESC LIMIT 100
       `;
-      return { channels, publications };
+      const reconciliations = await sql`
+        SELECT * FROM public.media_social_operator_reconciliation
+        ORDER BY started_at DESC LIMIT 30
+      `;
+      return { channels, publications, reconciliations };
     });
     return <div className="mx-auto max-w-7xl space-y-6 pb-24">
       <header className="border-b border-slate-200 pb-5">
@@ -31,7 +35,7 @@ export default async function AdminSocialPage() {
         <h1 className="mt-1 text-3xl font-black tracking-tight">Social Publishing</h1>
         <p className="mt-1 text-sm text-slate-500">Prepare and schedule channel-specific social posts independently from match-event automation.</p>
       </header>
-      <SocialClient channels={data.channels as any[]} publications={data.publications as any[]} />
+      <SocialClient channels={data.channels as any[]} publications={data.publications as any[]} reconciliations={data.reconciliations as any[]} />
     </div>;
   } catch (error) {
     console.error('V2 social publishing workspace unavailable', error);
