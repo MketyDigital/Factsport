@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import MediaDerivativeEditor from './MediaDerivativeEditor';
+import MediaRightsRevocationControl from './MediaRightsRevocationControl';
 
 type Asset = {
   id: string; object_key: string; content_type: string; byte_size: number;
@@ -24,7 +25,7 @@ function formatBytes(bytes: number) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-export default function MediaLibraryClient() {
+export default function MediaLibraryClient({ canRevokeRights = false }: { canRevokeRights?: boolean }) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
@@ -133,6 +134,7 @@ export default function MediaLibraryClient() {
           {['owned', 'licensed', 'editorial_exception'].includes(asset.rights_status) &&
             (!asset.usage_expires_at || new Date(asset.usage_expires_at).valueOf() > Date.now()) &&
             <MediaDerivativeEditor asset={asset} onCreated={() => void load(0, false)} />}
+          {canRevokeRights && ['owned', 'licensed', 'editorial_exception'].includes(asset.rights_status) && <MediaRightsRevocationControl assetId={asset.id} onRevoked={() => void load(0, false)} />}
         </div>
       </article>)}
     </div>
