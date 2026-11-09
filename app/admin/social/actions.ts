@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
+import { isFactsportSocialDispatchReady, isFactsportSocialMediaProviderReady, isFactsportSocialProviderReady, withFactsportEditorialPostgres, type FactsportSocialProvider } from '@/lib/adapters/postgres-client';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 import { inspectPublicMediaArticle } from '@/lib/public-media-content-policy';
 
@@ -166,5 +166,81 @@ export async function cancelSocialPublication(publicationId: string): Promise<Re
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unable to cancel social post.' };
+  }
+}
+
+
+export async function updateSocialChannel(input: {
+  channelId: string;
+  isEnabled: boolean;
+  supportsMedia: boolean;
+  providerSetting: string;
+}): Promise<Result> {
+  const authorization = await authorizeMediaEditorialAction('social_admin');
+  if (!authorization.ok) return { success: false, error: authorization.error };
+  if (!/^[0-9a-f-]{36}$/i.test(input?.channelId || '') ||
+      typeof input.isEnabled !== 'boolean' || typeof input.supportsMedia !== 'boolean') {
+    return { success: false, error: 'Invalid social channel configuration.' };
+  }
+  try {
+    const updated = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+      const rows = await tx`
+        SELECT id, provider FROM public.media_social_channels
+        WHERE id=${input.channelId}::uuid
+        FOR UPDATE
+      `;
+      if (!rows.length) throw new Error('Social channel was not found.');
+      const provider = rows[0].provider as FactsportSocialProvider;
+      if (!['meta', 'telegram', 'buffer', 'make'].includes(provider)) {
+        throw new Error('This social provider has no approved V2 adapter mapping.');
+      }
+      if (input.isEnabled && (!isFactsportSocialDispatchReady() || !isFactsportSocialProviderReady(provider))) {
+        throw new Error('Channel activation is blocked until the Logic Apps dispatcher and this provider adapter pass staging readiness checks.');
+      }
+      if (input.supportsMedia && !isFactsportSocialMediaProviderReady(provider)) {
+        throw new Error('Image delivery is disabled until this provider has passed private image-delivery E2E.');
+      }
+
+      const raw = typeof input.providerSetting === 'string' ? input.providerSetting.trim() : '';
+      let settings: Record<string, unknown> = {};
+      if (provider === 'meta') {
+        if (raw && !/^\d{5,30}$/.test(raw)) throw new Error('Enter a numeric Meta Page ID; never enter a page access token here.');
+        settings = raw ? { page_id: raw } : {};
+      } else if (provider === 'buffer') {
+        if (raw && !/^[A-Za-z0-9_-]{1,200}$/.test(raw)) throw new Error('Enter the Buffer channel/profile ID, not an access token.');
+        settings = raw ? { profile_id: raw } : {};
+      } else if (provider === 'telegram') {
+        const chatIds = raw.split(',').map(value => value.trim()).filter(Boolean);
+        if (chatIds.length > 20 || chatIds.some(value => !/^(?:-?\d{1,20}|@[A-Za-z0-9_]{5,32})$/.test(value))) {
+          throw new Error('Enter up to 20 Telegram chat IDs or @channel usernames, separated by commas.');
+        }
+        settings = chatIds.length ? { chat_ids: chatIds } : {};
+      } else if (provider === 'make') {
+        if (raw && !/^[A-Za-z0-9_-]{1,80}$/.test(raw)) throw new Error('Enter a non-secret Make route key, not a webhook URL.');
+        settings = raw ? { route_key: raw } : {};
+      }
+
+      await tx`
+        UPDATE public.media_social_channels
+        SET is_enabled=${input.isEnabled},
+            supports_media=${input.supportsMedia},
+            settings=${JSON.stringify(settings)}::jsonb,
+            updated_at=now()
+        WHERE id=${input.channelId}::uuid
+      `;
+      await tx`
+        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, details)
+        VALUES (
+          ${authorization.user.domainUserId}::uuid, 'social_channel_configured',
+          ${JSON.stringify({ channelId: input.channelId, provider, enabled: input.isEnabled, supportsMedia: input.supportsMedia })}::jsonb
+        )
+      `;
+      return { provider };
+    }));
+    revalidatePath('/admin/social');
+    return { success: true };
+  } catch (error) {
+    console.error('Social channel configuration failed', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to update social channel.' };
   }
 }
