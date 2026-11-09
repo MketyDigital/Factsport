@@ -2,14 +2,20 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
-import { isEntraExternalConfigured } from '@/lib/auth/entra-external';
+import { headers } from 'next/headers';
+import { isEntraExternalConfigured, isEntraMediaRequestHost } from '@/lib/auth/entra-external';
 import { isFactsportEditorialPostgresReady } from '@/lib/adapters/postgres-client';
 import { rejectPrivateProductHost } from '@/app/lib/private-product-host';
 
 export default async function MediaLoginPage({ searchParams }: { searchParams?: { error?: string } }) {
   await rejectPrivateProductHost();
+  const requestHeaders = await headers();
+  const host = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').split(',')[0].trim();
+  const protocol = (requestHeaders.get('x-forwarded-proto') || 'https').split(',')[0].trim();
+  let isConfiguredMediaHost = false;
+  try { isConfiguredMediaHost = !!host && isEntraMediaRequestHost(new URL(protocol + '://' + host)); } catch { isConfiguredMediaHost = false; }
   const hasError = Boolean(searchParams?.error);
-  const signInReady = isEntraExternalConfigured() && isFactsportEditorialPostgresReady();
+  const signInReady = isEntraExternalConfigured() && isFactsportEditorialPostgresReady() && isConfiguredMediaHost;
   return <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-12 text-white">
     <section className="w-full max-w-md rounded-3xl border border-white/10 bg-white p-8 text-slate-950 shadow-2xl">
       <p className="text-xs font-black uppercase tracking-[.2em] text-blue-700">Factsport Media</p>
