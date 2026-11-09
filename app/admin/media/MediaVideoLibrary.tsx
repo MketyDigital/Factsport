@@ -191,7 +191,7 @@ export default function MediaVideoLibrary({ ready, schemaReady, canRevokeRights 
       {videos.map(video => <div key={video.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold text-slate-900">{video.title}</p>
-          <p className="mt-1 text-[10px] text-slate-500">{video.upload_status} · {video.rights_status} · {video.duration_seconds ? Math.round(video.duration_seconds) + ' sec' : 'duration pending'} · {video.width && video.height ? video.width + '×' + video.height : 'dimensions pending'}</p>
+          <p className="mt-1 text-[10px] text-slate-500">{video.upload_status} · {video.upload_protocol.toUpperCase()} · {video.upload_expected_size_bytes ? (video.upload_expected_size_bytes / (1024 * 1024)).toFixed(1) + ' MB expected' : 'size pending'} · {video.rights_status} · {video.duration_seconds ? Math.round(video.duration_seconds) + ' sec' : 'duration pending'} · {video.width && video.height ? video.width + '×' + video.height : 'dimensions pending'}</p>
           {video.is_public && <p className="mt-1 text-[10px] font-bold text-emerald-700">Public on an approved article</p>}
           {schemaReady && <MediaVideoUsagePanel videoId={video.id} />}
           {ready && video.upload_status === 'ready' && <MediaVideoPreview videoId={video.id} title={video.title} />}
