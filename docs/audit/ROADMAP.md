@@ -487,3 +487,10 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 
 - Protected Cloudflare application staging passed on source commit `7be8065d8ad75f6796ca572ef71853daf3eee61a` (run `42573678448`), including regression, TypeScript, native Worker build, isolated deployment, deny-by-default and protected `/matches` checks.
 - The run did not apply optional VOD migration 0041 to Azure PostgreSQL, enable `FACTSPORT_MEDIA_VIDEO_SCHEMA_READY`, or perform Newsroom/Stream browser E2E. M45 remains source/build/staging-deployment verified, with isolated database and browser acceptance open.
+
+
+## 2026-11-09 M45 responsive SEO preview and embed isolation
+
+- Added desktop/mobile preview controls, search result preview with title/description counts and canonical status, and Open Graph/social card preview. No ad or analytics scripts load in the editor.
+- Private preview now suppresses external Markdown images (including protocol-relative URLs), match widgets and third-party iframe embeds; approved Stream videos continue through the signed admin preview endpoint. Public Markdown rendering remains unchanged by default.
+- Isolated verification passed on `67c7d8b13138fa9da4242bb3aabf6b70a106f8cf` (run `42574631125`). Native build and protected staging were still running at handoff time.
