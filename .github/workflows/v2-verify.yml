@@ -16,6 +16,7 @@ on:
       - 'app/api/auth/**'
       - 'app/media-login/**'
       - 'app/lib/admin/**'
+      - 'app/lib/**'
       - 'app/auth/**'
       - 'app/login/**'
       - 'app/register/**'
