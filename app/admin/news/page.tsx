@@ -69,7 +69,7 @@ export default async function AdminNewsPage() {
         ) ORDER BY rm.placement, rm.position) AS items
         FROM public.editorial_article_revision_media rm
         LEFT JOIN public.media_assets m ON m.id = rm.media_id
-        WHERE rm.revision_id = r.id
+        WHERE rm.revision_id = COALESCE(r.id, published_revision.id)
       ) revision_media ON true
       LEFT JOIN LATERAL (
         SELECT jsonb_agg(jsonb_build_object(
