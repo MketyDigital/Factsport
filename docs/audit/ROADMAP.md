@@ -577,3 +577,13 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 
 
 - **M49 verification closeout:** disposable PostgreSQL run `42582443798` passed migration 0001–0043, execute-only Prediction role (zero direct public table grants), rules/consent, rate limits, kickoff/status, same-email/different-browser and concurrent same-visitor race assertions. Isolated verification, native Vinext build and protected Cloudflare staging passed on `4aa20c507bbdbf743b2f1e7c72f04e5cd5733e11` (runs `42582325642`, `42582325545`, `42582325595`). No isolated Azure DB migration/role/Hyperdrive provisioning or feature activation occurred. The exact closeout is in `docs/audit/handoffs/M49-PREDICTION-SUBMISSION-PREFLIGHT.md`.
+
+
+## 2026-11-09 Resumable Cloudflare Stream VOD uploads — M50
+
+- Added the missing large-file TUS upload path. Under-200MB files retain the basic direct upload; files at/above 200MB use TUS automatically, and editors can opt into TUS for smaller files on unreliable connections.
+- Uses `tus-js-client@4.3.1`, 50 MiB chunks, bounded retry, stored upload URLs for resume, and expiry-aware restart. Video bytes go directly from browser to Cloudflare Stream; the Worker provisions the upload URL and never proxies the file body.
+- TUS creation is admin- and same-origin-protected, validates file metadata/size/type/duration, keeps the Cloudflare API token server-side, and returns the one-time upload URL only in the TUS Location header.
+- Migration 0041 records upload protocol and expected byte size. Refresh verifies actual provider size before marking ready; mismatch fails closed and cleans up the provider asset. Stream assets remain signed/private and rights review remains mandatory.
+- Re-audit also removed an orphan duplicate SQL tail after migration 0041's COMMIT, restoring a single clean transaction. This migration has not been applied to Azure staging or production.
+- M50 handoff: `docs/audit/handoffs/M50-RESUMABLE-CLOUDFLARE-STREAM-UPLOADS.md`. Current-head isolated/native/protected staging verification is pending; no live Stream upload or provider E2E is claimed.
