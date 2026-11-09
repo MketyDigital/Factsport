@@ -179,7 +179,7 @@ export default function SocialClient({ channels, publications }: { channels: Cha
           </div>
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
             <h3 className="font-black text-amber-950">Dispatcher status</h3>
-            <p className="mt-2 text-sm text-amber-900">This stage queues posts safely. It does not call Buffer, Meta or Telegram yet. A dedicated dispatcher and provider credentials must be provisioned and tested before any live delivery.</p>
+            <p className="mt-2 text-sm text-amber-900">Posts enter a durable outbox and are delivered only by the dedicated dispatcher. Live delivery remains disabled until its isolated database identity, provider credentials, secure Logic Apps/APIM adapter and private-destination end-to-end tests are verified. Ambiguous provider results are dead-lettered for manual reconciliation; they are never blindly replayed.</p>
           </div>
         </aside>
       </section>
