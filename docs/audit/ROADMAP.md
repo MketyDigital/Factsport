@@ -531,3 +531,5 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - Source commits: `184519eea565d5b84e75ff771170970c86475b67` and `6f083d51a8738fb8c69953e92b51c528951ed551`. Isolated verification and native build were running at handoff; no pass is claimed until complete.
 - This is only a connection boundary. No prediction API, visitor cookie, role/grants, campaign, claim, settlement or public UI was activated. Dedicated role/Hyperdrive provisioning and isolated DB grant tests are still required.
 - Full next actions and rollback are recorded in `docs/audit/handoffs/M48-PREDICTION-DATABASE-RUNTIME-BOUNDARY.md`.
+
+- Follow-up: isolated regression passed on `6f083d51a8738fb8c69953e92b51c528951ed551` (run `42576199656`). Disposable PostgreSQL migration CI now seeds the Prediction API role as a NOLOGIN fixture so the upcoming grant migration can be tested without provisioning an Azure login; run `42576290658` was in progress. This does not provision staging credentials or grants.
