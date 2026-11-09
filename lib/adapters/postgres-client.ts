@@ -33,6 +33,11 @@ export function withFactsportPostgres<T>(operation: (sql: FactsportSql) => Promi
  * backed by factsport_v2_editorial_writer, never the public or sports writer.
  * There is deliberately no DATABASE_URL or Supabase service-role fallback.
  */
+export function isFactsportEditorialPostgresReady(): boolean {
+  const bindings = env as unknown as Record<string, HyperdriveBinding | undefined>;
+  return !!bindings.FACTSPORT_EDITORIAL_HYPERDRIVE?.connectionString;
+}
+
 export function withFactsportEditorialPostgres<T>(operation: (sql: FactsportSql) => Promise<T> | T): Promise<T> {
   const bindings = env as unknown as Record<string, HyperdriveBinding | undefined>;
   return withConnection(bindings.FACTSPORT_EDITORIAL_HYPERDRIVE?.connectionString, operation, 'Factsport editorial writer');
