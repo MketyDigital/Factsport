@@ -28,6 +28,38 @@ const VIDEO_CONTENT_TYPES = new Set([
   'application/mxf',
 ]);
 
+function decodeTusMetadataValue(value: string): string {
+  const binary = atob(value);
+  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+}
+
+function readFactsportTusMetadata(request: Request) {
+  const header = request.headers.get('upload-metadata') || '';
+  if (!header || header.length > 8192) throw new Error('Invalid TUS metadata.');
+  const metadata = new Map<string, string>();
+  const allowedKeys = new Set([
+    'filename', 'filetype', 'factsporttitle', 'factsportdescription',
+    'factsportcontenttype', 'factsportmaxdurationseconds',
+  ]);
+  for (const part of header.split(',')) {
+    const separator = part.indexOf(' ');
+    if (separator <= 0) throw new Error('Invalid TUS metadata entry.');
+    const key = part.slice(0, separator).trim().toLowerCase();
+    const encoded = part.slice(separator + 1).trim();
+    if (!allowedKeys.has(key) || metadata.has(key) || !encoded) {
+      throw new Error('Unsupported TUS metadata entry.');
+    }
+    metadata.set(key, decodeTusMetadataValue(encoded));
+  }
+  return {
+    title: metadata.get('factsporttitle') || '',
+    description: metadata.get('factsportdescription') || '',
+    contentType: metadata.get('factsportcontenttype') || metadata.get('filetype') || '',
+    maxDurationSeconds: Number(metadata.get('factsportmaxdurationseconds') || 900),
+  };
+}
+
 export async function POST(request: Request) {
   const authorization = await authorizeMediaEditorialAction('media');
   if (!authorization.ok) return NextResponse.json({ error: authorization.error }, {
@@ -50,17 +82,25 @@ export async function POST(request: Request) {
     });
   }
 
+  if (Number(request.headers.get('content-length') || 0) > 0) {
+    return NextResponse.json({ error: 'TUS creation requests must not include a file body.' }, { status: 400 });
+  }
   const fileSizeBytes = Number(request.headers.get('upload-length'));
-  const title = (request.headers.get('x-factsport-video-title') || '').trim().slice(0, 200);
-  const description = (request.headers.get('x-factsport-video-description') || '').trim().slice(0, 3000);
-  const contentType = (request.headers.get('x-factsport-video-content-type') || '').trim().toLowerCase();
-  const maxDurationSeconds = Number(request.headers.get('x-factsport-video-max-duration') || 900);
+  let metadata: ReturnType<typeof readFactsportTusMetadata>;
+  try { metadata = readFactsportTusMetadata(request); } catch {
+    return NextResponse.json({ error: 'Invalid resumable upload metadata.' }, { status: 400 });
+  }
+  const title = metadata.title.trim();
+  const description = metadata.description.trim();
+  const contentType = metadata.contentType.trim().toLowerCase();
+  const maxDurationSeconds = metadata.maxDurationSeconds;
 
   if (!Number.isSafeInteger(fileSizeBytes) || fileSizeBytes < 1 ||
       fileSizeBytes >= FACTSPORT_STREAM_MAX_UPLOAD_BYTES) {
     return NextResponse.json({ error: 'Resumable video uploads must be between 1 byte and 30 GB.' }, { status: 413 });
   }
-  if (title.length < 3 || !VIDEO_CONTENT_TYPES.has(contentType) ||
+  if (title.length < 3 || title.length > 200 || description.length > 3000 ||
+      !VIDEO_CONTENT_TYPES.has(contentType) ||
       !Number.isInteger(maxDurationSeconds) || maxDurationSeconds < 1 || maxDurationSeconds > 900) {
     return NextResponse.json({ error: 'A valid title, supported video type and duration up to 900 seconds are required.' }, { status: 400 });
   }
