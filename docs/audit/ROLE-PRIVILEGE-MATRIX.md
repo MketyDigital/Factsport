@@ -89,3 +89,5 @@ The signed Stream webhook endpoint now verifies raw-body HMAC, handles gzip payl
 - Social provider credentials are read only by the server-side delivery adapter: Meta Page token and Telegram bot token as Cloudflare secrets; Buffer/Make calls use an HTTPS Logic Apps/APIM adapter URL plus bearer secret. No provider secret is stored in social channel settings or returned by the claim endpoint.
 
 - Migration 0038 revokes table-wide UPDATE on `media_assets` from `factsport_v2_editorial_writer` and grants only rights metadata, rights-review identity/time, public-promotion and `updated_at` columns. Asset identity, object key, content type, byte size, hash, dimensions and uploader cannot be rewritten through the CMS role.
+
+- Media rights withdrawal is exposed through the `rights_admin` capability, restricted in application authorization to the `media_admin` role. The action writes only the already-granted rights/publication columns and appends a `media_rights_revoked` audit event; migration 0040 registers that action.
