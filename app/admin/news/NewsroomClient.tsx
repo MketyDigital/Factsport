@@ -8,6 +8,7 @@ import {
 import { removeRevisionMedia, reviewRightsAndAttachMedia } from './media-actions';
 import MarkdownRenderer from '@/app/components/MarkdownRenderer';
 import NewsArtwork from '@/app/components/NewsArtwork';
+import EditorialVideoAttachments from './EditorialVideoAttachments';
 
 type ReusableMediaAsset = {
   id: string; object_key: string; rights_status: string; rights_reference: string | null;
@@ -96,7 +97,6 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const canEditRevisionMedia = currentRevisionStatus === 'draft';
   const currentSources = articles.find(article => article.id === form.id)?.sources || [];
   const currentRevisionVideos = articles.find(article => article.id === form.id)?.revision_videos || [];
-  const currentRevisionStatus = articles.find(article => article.id === form.id)?.revision_status || null;
   const activeRevisionMedia = currentRevisionMedia.filter(asset => !asset.remove_media && asset.media_id);
   const previewHero = activeRevisionMedia.find(asset => asset.placement === 'hero');
   const previewTeam1 = activeRevisionMedia.find(asset => asset.placement === 'team_1');
