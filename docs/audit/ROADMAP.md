@@ -593,3 +593,11 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 
 
 - **M50 protected staging closeout:** Cloudflare staging deployment and deny-by-default checks passed on `e3dac371fa40293ae73e0a1c75c1cd78419b6fff` (run `42584448515`). M50 source/build is verified, but actual Stream TUS/browser/provider E2E and isolated Azure migration remain OPEN. Keep `FACTSPORT_MEDIA_VIDEO_SCHEMA_READY` and `FACTSPORT_STREAM_VIDEO_READY` unset until owner-provisioned staging acceptance. See `docs/audit/handoffs/M50-RESUMABLE-CLOUDFLARE-STREAM-UPLOADS.md`.
+
+
+### 2026-11-09 M51 media derivatives CI triage
+
+- Rechecked branch HEAD `7e9c983b0cc93fb1c7e75e3e99b92a08f44b476f`: isolated verification `42587739334`, native Vinext build `42587739501`, and protected staging `42587739398` all **failed** at TypeScript, not at a runtime staging acceptance test. Errors in `app/api/admin/media/derivatives/route.ts` were TS2345 on `crypto.subtle.digest` and TS2339 on R2 object `size`/`arrayBuffer`.
+- Bounded branch-only fixes: `d9afd7b95d518ec5dc5aff3c280aacd887ffd6cd` narrows the R2 `get` object type to the size and arrayBuffer contract; `5d552c017cd01ddaaca4d4bcf4ca6d3b2f3a2232` copies digest bytes into an ArrayBuffer-backed typed array. These changes do not enable derivative routes, touch production, or relax rights checks. **Current-head CI pending**; do not mark derivatives source-verified until passing runs.
+- M50 TUS earlier isolated/native/protected staging checks passed on `e3dac371fa40293ae73e0a1c75c1cd78419b6fff`, but actual Stream provider/browser resumable upload remains unverified. New M51 derivative path likewise needs isolated Azure migration/roles, R2 rights and byte-integrity E2E, malformed/oversized image cases, and rollback checks before activation.
+- All P0 media/sports, editorial/identity, P1 private business, P2 public free-prediction and AdSense release gates remain OPEN absent runtime-appropriate evidence. Owner decisions still required for Entra staging credentials, isolated Azure resources, private-host and VIP/prize legal treatment, and AdSense account Ready verification. Preserve legacy source and paid/identity/editorial obligations under separate disposition review.
