@@ -1,0 +1,154 @@
+-- Narrow anonymous Prediction submission capability.
+-- Apply only after 0001 and 0003 on an isolated Factsport V2 database.
+-- The API role receives EXECUTE on one function, never direct table access.
+BEGIN;
+
+CREATE OR REPLACE FUNCTION public.submit_public_prediction(
+  p_visitor_token_hash text,
+  p_email_address text,
+  p_display_name text,
+  p_match_id uuid,
+  p_predicted_outcome text,
+  p_predicted_home_score integer DEFAULT NULL,
+  p_predicted_away_score integer DEFAULT NULL
+)
+RETURNS TABLE (prediction_id uuid, duplicate boolean)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $function$
+DECLARE
+  v_participant_id uuid;
+  v_contact_id uuid;
+  v_prediction_id uuid;
+  v_status text;
+  v_match_date timestamptz;
+  v_email text;
+  v_email_normalized text;
+  v_display_name text;
+BEGIN
+  IF p_visitor_token_hash IS NULL
+     OR p_visitor_token_hash !~ '^[0-9a-f]{64}$' THEN
+    RAISE EXCEPTION 'invalid_visitor_token' USING ERRCODE = '22023';
+  END IF;
+  IF p_match_id IS NULL THEN
+    RAISE EXCEPTION 'invalid_match' USING ERRCODE = '22023';
+  END IF;
+  IF p_predicted_outcome IS NULL
+     OR p_predicted_outcome NOT IN ('home', 'draw', 'away') THEN
+    RAISE EXCEPTION 'invalid_outcome' USING ERRCODE = '22023';
+  END IF;
+  IF (p_predicted_home_score IS NULL) <> (p_predicted_away_score IS NULL)
+     OR p_predicted_home_score < 0 OR p_predicted_away_score < 0
+     OR p_predicted_home_score > 99 OR p_predicted_away_score > 99 THEN
+    RAISE EXCEPTION 'invalid_score_pair' USING ERRCODE = '22023';
+  END IF;
+
+  v_display_name := NULLIF(pg_catalog.btrim(p_display_name), '');
+  IF v_display_name IS NOT NULL AND
+     (pg_catalog.char_length(v_display_name) < 2 OR pg_catalog.char_length(v_display_name) > 40) THEN
+    RAISE EXCEPTION 'invalid_display_name' USING ERRCODE = '22023';
+  END IF;
+
+  -- Serialize submissions from the same opaque browser identity.
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(p_visitor_token_hash, 0)
+  );
+
+  -- A match row lock makes kickoff/status validation atomic with submission
+  -- relative to match status/date updates by the ingestion pipeline.
+  SELECT m.status, m.match_date
+    INTO v_status, v_match_date
+    FROM public.matches AS m
+   WHERE m.id = p_match_id
+   FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'match_not_found' USING ERRCODE = 'P0002';
+  END IF;
+
+  SELECT pp.id, pp.contact_id
+    INTO v_participant_id, v_contact_id
+    FROM public.prediction_participants AS pp
+   WHERE pp.visitor_token_hash = p_visitor_token_hash
+   FOR UPDATE;
+
+  -- Idempotent retry of an existing prediction remains recognizable even
+  -- after kickoff; it cannot create or alter a prediction.
+  IF v_participant_id IS NOT NULL THEN
+    SELECT p.id INTO v_prediction_id
+      FROM public.predictions AS p
+     WHERE p.participant_id = v_participant_id
+       AND p.match_id = p_match_id;
+    IF FOUND THEN
+      RETURN QUERY SELECT v_prediction_id, true;
+      RETURN;
+    END IF;
+  END IF;
+
+  IF pg_catalog.upper(pg_catalog.coalesce(v_status, '')) NOT IN ('SCHEDULED', 'PRE_MATCH')
+     OR v_match_date <= pg_catalog.transaction_timestamp() THEN
+    RAISE EXCEPTION 'prediction_closed' USING ERRCODE = '55000';
+  END IF;
+
+  IF v_participant_id IS NULL THEN
+    v_email := pg_catalog.btrim(COALESCE(p_email_address, ''));
+    v_email_normalized := pg_catalog.lower(v_email);
+    IF pg_catalog.char_length(v_email) NOT BETWEEN 3 AND 254
+       OR v_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' THEN
+      RAISE EXCEPTION 'valid_email_required' USING ERRCODE = '22023';
+    END IF;
+
+    INSERT INTO public.prediction_contacts (email_address, email_normalized)
+    VALUES (v_email, v_email_normalized)
+    ON CONFLICT (email_normalized) DO UPDATE
+      SET email_address = EXCLUDED.email_address,
+          updated_at = pg_catalog.transaction_timestamp()
+    RETURNING id INTO v_contact_id;
+
+    INSERT INTO public.prediction_participants (
+      visitor_token_hash, contact_id, display_name, last_seen_at
+    ) VALUES (
+      p_visitor_token_hash, v_contact_id, v_display_name, pg_catalog.transaction_timestamp()
+    )
+    RETURNING id INTO v_participant_id;
+  ELSE
+    UPDATE public.prediction_participants
+       SET last_seen_at = pg_catalog.transaction_timestamp(),
+           display_name = COALESCE(v_display_name, display_name)
+     WHERE id = v_participant_id;
+  END IF;
+
+  INSERT INTO public.predictions (
+    participant_id, match_id, predicted_outcome,
+    predicted_home_score, predicted_away_score,
+    is_eligible_for_prize, locked_at
+  ) VALUES (
+    v_participant_id, p_match_id, p_predicted_outcome,
+    p_predicted_home_score, p_predicted_away_score,
+    false, v_match_date
+  )
+  ON CONFLICT (participant_id, match_id) DO NOTHING
+  RETURNING id INTO v_prediction_id;
+
+  IF v_prediction_id IS NULL THEN
+    SELECT p.id INTO v_prediction_id
+      FROM public.predictions AS p
+     WHERE p.participant_id = v_participant_id
+       AND p.match_id = p_match_id;
+    RETURN QUERY SELECT v_prediction_id, true;
+    RETURN;
+  END IF;
+
+  RETURN QUERY SELECT v_prediction_id, false;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.submit_public_prediction(
+  text, text, text, uuid, text, integer, integer
+) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION public.submit_public_prediction(
+  text, text, text, uuid, text, integer, integer
+) TO factsport_v2_prediction_api;
+
+COMMIT;
