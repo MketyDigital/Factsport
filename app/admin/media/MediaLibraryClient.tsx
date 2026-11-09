@@ -69,7 +69,7 @@ export default function MediaLibraryClient({ canRevokeRights = false, streamVide
       <p className="mt-2 text-sm text-slate-500">Private R2 assets, rights status, attribution and expiry. Public delivery remains restricted to assets approved and attached to published editorial content.</p>
     </header>
 
-    <MediaVideoLibrary ready={streamVideoReady} />
+    <MediaVideoLibrary ready={streamVideoReady} canRevokeRights={canRevokeRights} />
 
     <form className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_220px_auto]" onSubmit={event => { event.preventDefault(); void load(0, false); }}>
       <label className="text-xs font-bold text-slate-600">Search assets
