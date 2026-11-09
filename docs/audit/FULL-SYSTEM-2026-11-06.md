@@ -217,3 +217,8 @@ These inventories make clear that only the matches API and protected health endp
 ### Hyperdrive identity reconciliation correction
 
 The earlier note that treated `08cee4...` as historical/unverified is superseded. The current four-resource map is now confirmed: `895cca...` = runtime reader, `eb634f...` = schedule writer, `c5166b...` = reserved ESPN writer, and `08cee4...` = administrative/bootstrap identity used only by temporary setup/audit/hardening Workers. The exact names, bindings and privileges are recorded in [ROLE-PRIVILEGE-MATRIX.md](./ROLE-PRIVILEGE-MATRIX.md).
+
+
+## Continuation update — 2026-11-09 (M35–M40)
+
+Media source implementation has advanced beyond this 2026-11-06 snapshot. See ROADMAP 2026-11-09 and handoffs M35–M40 for signed Stream webhook/participant moderation, social image attachments, revision-scoped editorial sources, guarded channel administration, claim/deliver/result APIs, Meta/Telegram adapters and the disabled Logic Apps workflow template. Migrations 0027–0037 are committed but unapplied; dispatcher roles/Hyperdrives and provider credentials are not provisioned; current provider E2E and CMS/Studio staging proof remain open. No production change is claimed.
