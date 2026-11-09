@@ -299,6 +299,15 @@ export async function reviewRightsAndAttachVideo(input: {
           ${JSON.stringify({ videoId: input.videoId, position, rightsStatus: input.rightsStatus })}::jsonb
         )
       `;
+      await tx`
+        INSERT INTO public.media_editorial_audit_events
+          (actor_user_id, action, article_id, revision_id, details)
+        VALUES (
+          ${authorization.user.domainUserId}::uuid, 'media_video_attached',
+          ${input.articleId}::uuid, ${revisions[0].id}::uuid,
+          ${JSON.stringify({ videoId: input.videoId, position })}::jsonb
+        )
+      `;
     }));
     revalidatePath('/admin/media'); revalidatePath('/admin/news');
     return { success: true };
