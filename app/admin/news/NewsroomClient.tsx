@@ -69,6 +69,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const [statusFilter, setStatusFilter] = useState('all');
   const [message, setMessage] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewViewport, setPreviewViewport] = useState<'desktop' | 'mobile'>('desktop');
   const [historyArticleId, setHistoryArticleId] = useState<string | null>(null);
   const [historyRecords, setHistoryRecords] = useState<RevisionRecord[]>([]);
   const [historySelectedId, setHistorySelectedId] = useState<string | null>(null);
@@ -106,6 +107,10 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const previewTeam2 = activeRevisionMedia.find(asset => asset.placement === 'team_2');
   const previewInline = activeRevisionMedia.filter(asset => asset.placement === 'inline').sort((a, b) => a.position - b.position);
   const previewVideos = currentRevisionVideos.filter(video => !video.remove_video && video.video_id).sort((a, b) => a.position - b.position);
+  const previewSeoTitle = form.seoTitle.trim() || form.title || 'Untitled article';
+  const previewSeoDescription = form.seoDescription.trim() || form.excerpt.trim() ||
+    form.bodyMarkdown.replace(/[#*_>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 160);
+  const previewCanonical = form.canonicalUrl.trim() || (form.slug ? 'https://factsport.com/news/' + form.slug : 'https://factsport.com/news/your-article-slug');
 
   const filtered = useMemo(() => articles.filter(article => {
     const matchesSearch = !search || article.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -394,12 +399,18 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
             <label className="md:col-span-2 text-xs font-bold text-slate-600">Article body (Markdown)
               <textarea value={form.bodyMarkdown} onChange={e => setForm({ ...form, bodyMarkdown: e.target.value })} rows={14} className="mt-1 w-full rounded-xl border border-slate-200 p-3 font-mono text-sm" placeholder="Write the complete article. Use Markdown for headings, links and lists." />
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs text-slate-500">Preview uses the same sanitized Markdown renderer as published articles.</p>
-                <button type="button" onClick={() => setPreviewOpen(value => !value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700">
-                  {previewOpen ? 'Hide article preview' : 'Preview article'}
-                </button>
+                <p className="text-xs text-slate-500">Preview uses the same sanitized Markdown renderer as published articles. No ad or analytics scripts are loaded.</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {previewOpen && <div className="inline-flex rounded-lg border border-slate-200 p-1" role="group" aria-label="Preview viewport">
+                    <button type="button" onClick={() => setPreviewViewport('desktop')} aria-pressed={previewViewport === 'desktop'} className={previewViewport === 'desktop' ? 'rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-bold text-white' : 'rounded-md px-3 py-1.5 text-[11px] font-bold text-slate-600'}>Desktop preview</button>
+                    <button type="button" onClick={() => setPreviewViewport('mobile')} aria-pressed={previewViewport === 'mobile'} className={previewViewport === 'mobile' ? 'rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-bold text-white' : 'rounded-md px-3 py-1.5 text-[11px] font-bold text-slate-600'}>Mobile preview</button>
+                  </div>}
+                  <button type="button" onClick={() => setPreviewOpen(value => !value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                    {previewOpen ? 'Hide article preview' : 'Preview article'}
+                  </button>
+                </div>
               </div>
-              {previewOpen && <section aria-label="Article preview" className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              {previewOpen && <section aria-label="Article preview" className={previewViewport === 'mobile' ? 'mx-auto mt-4 max-w-[390px] overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-lg' : 'mt-4 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white'}>
                 <div className="relative h-[42vh] min-h-[260px] max-h-[520px] overflow-hidden border-b-4 border-blue-600 bg-[#0a1428]">
                   <NewsArtwork
                     image={previewHero?.media_id ? '/api/admin/media/' + encodeURIComponent(previewHero.media_id) : null}
@@ -473,6 +484,46 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                     <p className="mt-3 text-[11px] leading-5 text-slate-500">Private preview only. The public article layout may include live match context and approved site modules; no advertising is shown in this editor preview.</p>
                   </aside>
                 </div>
+                <div className="grid gap-3 border-t border-slate-200 bg-slate-50 p-4 lg:grid-cols-2">
+                  <section className="rounded-xl border border-slate-200 bg-white p-4" aria-label="Search result preview">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <h3 className="text-xs font-black uppercase tracking-wide text-slate-600">Search result preview</h3>
+                      <span className="text-[10px] text-slate-400">{previewSeoTitle.length}/60 title characters</span>
+                    </div>
+                    <p className="truncate text-xs text-emerald-800">{previewCanonical}</p>
+                    <h4 className="mt-1 line-clamp-2 text-lg font-medium text-blue-800">{previewSeoTitle}</h4>
+                    <p className="mt-1 text-xs leading-5 text-slate-600">{previewSeoDescription || 'Add an excerpt or SEO description to improve this search snippet.'}</p>
+                    <p className="mt-2 text-[10px] text-slate-400">{previewSeoDescription.length}/160 description characters · {form.canonicalUrl.trim() ? 'Custom canonical set' : 'Default article URL'}</p>
+                  </section>
+                  <section className="rounded-xl border border-slate-200 bg-white p-4" aria-label="Social sharing preview">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <h3 className="text-xs font-black uppercase tracking-wide text-slate-600">Social share preview</h3>
+                      <span className="text-[10px] text-slate-400">Open Graph / large card</span>
+                    </div>
+                    <div className="overflow-hidden rounded-lg border border-slate-200">
+                      <div className="relative aspect-[1.91/1] overflow-hidden bg-[#0a1428]">
+                        <NewsArtwork
+                          image={previewHero?.media_id ? '/api/admin/media/' + encodeURIComponent(previewHero.media_id) : null}
+                          team1Logo={previewTeam1?.media_id ? '/api/admin/media/' + encodeURIComponent(previewTeam1.media_id) : null}
+                          team2Logo={previewTeam2?.media_id ? '/api/admin/media/' + encodeURIComponent(previewTeam2.media_id) : null}
+                          imageAlt={previewHero?.alt_text || form.title}
+                          team1Alt={form.team1Name || 'Team 1'}
+                          team2Alt={form.team2Name || 'Team 2'}
+                          title={form.title}
+                          className="h-full w-full opacity-70"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </div>
+                      <div className="p-3">
+                        <p className="text-[10px] font-bold uppercase text-slate-400">factsport.com</p>
+                        <p className="mt-1 line-clamp-2 text-sm font-bold text-slate-900">{previewSeoTitle}</p>
+                        <p className="mt-1 line-clamp-2 text-xs text-slate-600">{previewSeoDescription}</p>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+                <p className="border-t border-slate-200 px-4 py-2 text-[10px] text-slate-500">Private editor preview only. Advertising, analytics, third-party trackers and public publication endpoints are not loaded.</p>
               </section>}
             </label>
             <label className="text-xs font-bold text-slate-600">Tags (comma separated)
