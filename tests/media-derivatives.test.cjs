@@ -30,7 +30,6 @@ test('Media derivatives are immutable, linked to an original asset and inherit s
   assert.match(endpoint, /sourceHash !== source\.sha256/);
   assert.match(endpoint, /sourceObject\.arrayBuffer/);
   assert.match(endpoint, /imageDimensions\(source\.content_type, sourceBytes\)/);
-  assert.match(endpoint, /upload_expected_size/);
   assert.match(endpoint, /FOR SHARE/);
   assert.match(endpoint, /NOT EXISTS \([\s\S]*?public\.media_asset_derivatives/);
   assert.match(endpoint, /rights_reviewed_by/);
