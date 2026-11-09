@@ -55,7 +55,7 @@ export function isEntraExternalConfigured(): boolean {
     const redirectUrl = new URL(required('ENTRA_EXTERNAL_REDIRECT_URI'));
     required('ENTRA_EXTERNAL_CLIENT_ID');
     if (discoveryUrl.protocol !== 'https:' || issuerUrl.protocol !== 'https:' ||
-        redirectUrl.protocol !== 'https:' || !redirectUrl.pathname.endsWith('/api/auth/entra/callback')) {
+        redirectUrl.protocol !== 'https:' || redirectUrl.pathname !== '/api/auth/entra/callback') {
       return false;
     }
     sessionKey();
