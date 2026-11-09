@@ -2,7 +2,7 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
-import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
+import { isFactsportSocialReconciliationReady, withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 import SocialClient from './SocialClient';
 
 export default async function AdminSocialPage() {
@@ -23,10 +23,10 @@ export default async function AdminSocialPage() {
         JOIN public.media_social_channels c ON c.id=p.channel_id
         ORDER BY p.created_at DESC LIMIT 100
       `;
-      const reconciliations = await sql`
+      const reconciliations = isFactsportSocialReconciliationReady() ? await sql`
         SELECT * FROM public.media_social_operator_reconciliation
         ORDER BY started_at DESC LIMIT 30
-      `;
+      ` : [];
       return { channels, publications, reconciliations };
     });
     return <div className="mx-auto max-w-7xl space-y-6 pb-24">
@@ -35,7 +35,7 @@ export default async function AdminSocialPage() {
         <h1 className="mt-1 text-3xl font-black tracking-tight">Social Publishing</h1>
         <p className="mt-1 text-sm text-slate-500">Prepare and schedule channel-specific social posts independently from match-event automation.</p>
       </header>
-      <SocialClient channels={data.channels as any[]} publications={data.publications as any[]} reconciliations={data.reconciliations as any[]} />
+      <SocialClient channels={data.channels as any[]} publications={data.publications as any[]} reconciliations={data.reconciliations as any[]} reconciliationReady={isFactsportSocialReconciliationReady()} />
     </div>;
   } catch (error) {
     console.error('V2 social publishing workspace unavailable', error);
