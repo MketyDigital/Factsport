@@ -46,3 +46,5 @@ Status: source implementation committed; current CI verification is running; mig
 - Follow-up audit found that an article-level source table could otherwise expose a source added to a draft of an already-published article before review. Migration 0035 adds revision_id to source records and redefines the public view to expose only sources attached to the latest published revision.
 - Adding a source now requires a current draft revision. New draft saves carry source records forward from the previous pending/rejected revision, or seed from the latest published revision when editing a published article. Revision restore also carries the source records.
 - The newsroom displays sources from the current draft revision, falling back to the latest published revision. Private rights-reference notes remain excluded from the public projection.
+
+- Migration 0035 also backfills existing pending revisions from the latest published source list, so an already-open draft does not lose source references at cutover.
