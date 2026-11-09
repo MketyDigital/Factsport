@@ -105,7 +105,17 @@ jobs:
             ) THEN
               RAISE EXCEPTION 'Prediction API role cannot execute the submission function';
             END IF;
-            IF has_function_privilege('PUBLIC', function_oid, 'EXECUTE') THEN
+            IF EXISTS (
+              SELECT 1
+              FROM pg_proc AS proc,
+                   LATERAL aclexplode(COALESCE(
+                     proc.proacl,
+                     pg_catalog.acldefault('f', proc.proowner)
+                   )) AS privilege
+              WHERE proc.oid = function_oid
+                AND privilege.grantee = 0
+                AND privilege.privilege_type = 'EXECUTE'
+            ) THEN
               RAISE EXCEPTION 'PUBLIC must not execute the Prediction submission function';
             END IF;
             IF NOT EXISTS (
