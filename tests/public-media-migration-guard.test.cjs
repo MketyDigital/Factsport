@@ -125,7 +125,7 @@ test('Cloudflare Stream VOD migration is inventoried and public playback require
   assert.ok(migration.includes('media_video_assets'));
   assert.ok(migration.includes('editorial_article_revision_videos'));
   assert.ok(migration.includes('public_editorial_article_video_tokens'));
-  assert.ok(migration.includes("v.upload_status='ready'"));
+  assert.match(migration, /v\\.upload_status\\s*=\\s*'ready'/);
   assert.ok(migration.includes("v.rights_status IN ('owned','licensed','editorial_exception')"));
   assert.ok(migration.includes('v.rights_reviewed_by IS NOT NULL'));
   assert.ok(!migration.includes('GRANT SELECT ON public.media_video_assets TO factsport_v2_reader'));
