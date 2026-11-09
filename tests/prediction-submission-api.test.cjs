@@ -45,7 +45,11 @@ test('Prediction API uses only the dedicated DB function and keyed privacy-safe 
   assert.doesNotMatch(route, /createClient|SUPABASE|DATABASE_URL|console\.(log|error)/);
 });
 
-test('Prediction submit endpoint does not accept marketing consent before a separate consent API exists', () => {
-  assert.match(route, /const acceptedFields = new Set/);
-  assert.doesNotMatch(route, /marketingOptIn|marketingConsent/);
+test('Prediction marketing opt-in is explicit, optional and pending confirmation only', () => {
+  assert.match(route, /marketingOptIn\?: unknown/);
+  assert.match(route, /body\.marketingOptIn !== undefined && typeof body\.marketingOptIn !== 'boolean'/);
+  assert.match(route, /body\.marketingOptIn === true/);
+  assert.match(route, /pending_confirmation/);
+  assert.match(route, /MARKETING_CONSENT_TEXT/);
+  assert.doesNotMatch(route, /subscribed|sendMarketingEmail|sendMail/);
 });
