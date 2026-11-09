@@ -264,10 +264,10 @@ export async function reviewRightsAndAttachVideo(input: {
       `;
       if (!revisions.length) throw new Error('Save a draft revision before attaching a video.');
       const videos = await tx`
-        SELECT id, upload_status, rights_status FROM public.media_video_assets
+        SELECT id, upload_status, rights_status, playback_host FROM public.media_video_assets
         WHERE id=${input.videoId}::uuid FOR UPDATE
       `;
-      if (!videos.length || videos[0].upload_status !== 'ready') {
+      if (!videos.length || videos[0].upload_status !== 'ready' || !videos[0].playback_host) {
         throw new Error('Only fully processed Cloudflare Stream videos can be attached.');
       }
       if (videos[0].rights_status === 'rejected' || videos[0].rights_status === 'expired') {
