@@ -102,6 +102,20 @@ export async function POST(request: Request) {
     });
 
     const asset = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+      const lockedSources = await tx`
+        SELECT id, rights_status, rights_reference, attribution_text, alt_text,
+               usage_expires_at, rights_reviewed_by, rights_reviewed_at
+        FROM public.media_assets
+        WHERE id=${sourceAssetId}::uuid AND media_kind='image'
+        FOR SHARE
+      `;
+      const lockedSource = lockedSources[0];
+      if (!lockedSource ||
+          !['owned', 'licensed', 'editorial_exception'].includes(lockedSource.rights_status) ||
+          !lockedSource.rights_reviewed_by || !lockedSource.rights_reviewed_at ||
+          (lockedSource.usage_expires_at && new Date(lockedSource.usage_expires_at).valueOf() <= Date.now())) {
+        throw new Error('Source rights changed before the derivative could be committed.');
+      }
       const inserted = await tx`
         INSERT INTO public.media_assets (
           object_key, media_kind, content_type, byte_size, sha256, width, height, alt_text,
@@ -109,10 +123,10 @@ export async function POST(request: Request) {
           rights_reviewed_by, rights_reviewed_at, is_public, uploaded_by
         ) VALUES (
           ${objectKey}, 'image', 'image/webp', ${file.size}, ${sha256},
-          ${dimensions.width}, ${dimensions.height}, ${source.alt_text},
-          ${source.rights_status}, ${source.rights_reference}, ${source.attribution_text},
-          ${source.usage_expires_at}, ${source.rights_reviewed_by}::uuid,
-          ${source.rights_reviewed_at}, false, ${actorId}::uuid
+          ${dimensions.width}, ${dimensions.height}, ${lockedSource.alt_text},
+          ${lockedSource.rights_status}, ${lockedSource.rights_reference}, ${lockedSource.attribution_text},
+          ${lockedSource.usage_expires_at}, ${lockedSource.rights_reviewed_by}::uuid,
+          ${lockedSource.rights_reviewed_at}, false, ${actorId}::uuid
         ) RETURNING id, object_key, rights_status
       `;
       const transformSpec = {
