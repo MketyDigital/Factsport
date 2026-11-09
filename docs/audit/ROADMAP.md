@@ -534,3 +534,13 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 
 - Follow-up: isolated regression passed on `6f083d51a8738fb8c69953e92b51c528951ed551` (run `42576199656`). Disposable PostgreSQL migration CI now seeds the Prediction API role as a NOLOGIN fixture so the upcoming grant migration can be tested without provisioning an Azure login; run `42576290658` was in progress. This does not provision staging credentials or grants.
 - Follow-up verification: native Vinext build passed on `6f083d51a8738fb8c69953e92b51c528951ed551` (run `42576199686`); disposable PostgreSQL migration chain passed on `84b9ee27f58439582cb534441ecc1149b1ba51aa` (run `42576290658`), applying 0001–0042 and validating existing Media/VOD/social grants. This does not test Prediction grants because no Prediction grant migration has been added. Protected application staging was still in progress.
+
+
+## 2026-11-09 Prediction submission security preflight — M49
+
+- Re-read the actual core/prediction migrations, match-status normalization, AUTH-005 contract, public middleware and Prediction runtime adapter.
+- Confirmed the submission API, visitor cookie and rate-limit path are still absent. The current readiness probe's direct table-grant requirement is broader than the preferred least-privilege target.
+- Target: a narrowly scoped SECURITY DEFINER submission function with fixed safe search_path, fully qualified SQL, PUBLIC EXECUTE revoked, and EXECUTE granted only to the dedicated Prediction API role. The API role should not receive general contact/participant/prediction table writes.
+- Match admission must use a strict scheduled/pre-match status allowlist plus a database-time kickoff check; reject unknown, live and terminal states. Contact reuse is by opaque same-browser visitor cookie, not email-based history transfer.
+- Exact evidence, risks and acceptance criteria: `docs/audit/handoffs/M49-PREDICTION-SUBMISSION-PREFLIGHT.md`.
+- Audit/design only: no SQL, route, cookie, rate limiter, staging resource or production resource changed. Next: implement and disposable-PostgreSQL-test the scoped submission function, then replace readiness checks and wire the API.
