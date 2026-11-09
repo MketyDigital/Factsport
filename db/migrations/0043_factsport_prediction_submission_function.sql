@@ -155,7 +155,7 @@ GRANT EXECUTE ON FUNCTION public.submit_public_prediction(
 -- visitor tokens and client IP addresses never enter this table.
 CREATE TABLE public.prediction_submission_rate_limits (
   scope text NOT NULL CHECK (scope IN ('visitor', 'network')),
-  key_hash char(64) NOT NULL CHECK (key_hash ~ '^[0-9a-f]{64}),
+  key_hash char(64) NOT NULL CHECK (pg_catalog.char_length(key_hash) = 64 AND key_hash !~ '[^0-9a-f]'),
   window_started_at timestamptz NOT NULL,
   request_count integer NOT NULL CHECK (request_count > 0),
   PRIMARY KEY (scope, key_hash, window_started_at)
@@ -180,10 +180,10 @@ DECLARE
   v_window_start timestamptz;
   v_count integer;
 BEGIN
-  IF p_scope NOT IN ('visitor', 'network')
-     OR p_key_hash IS NULL OR p_key_hash !~ '^[0-9a-f]{64}
-     OR p_window_seconds NOT BETWEEN 1 AND 3600
-     OR p_limit NOT BETWEEN 1 AND 1000 THEN
+  IF p_scope IS NULL OR p_scope NOT IN ('visitor', 'network')
+     OR p_key_hash IS NULL OR pg_catalog.char_length(p_key_hash) <> 64 OR p_key_hash ~ '[^0-9a-f]'
+     OR p_window_seconds IS NULL OR p_window_seconds NOT BETWEEN 1 AND 3600
+     OR p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 1000 THEN
     RAISE EXCEPTION 'invalid_rate_limit_parameters' USING ERRCODE = '22023';
   END IF;
 
