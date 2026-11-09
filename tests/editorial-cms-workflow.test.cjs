@@ -300,3 +300,24 @@ test('editorial revision history is role-protected and restore creates a new dra
   assert.match(client, /Restore as new draft/);
   assert.match(client, /live published article has not been changed/);
 });
+
+
+test('draft saves carry forward the previous draft revision media attachments', () => {
+  assert.match(actions, /let previousRevisionId: string \| null = null/);
+  assert.match(actions, /workflow_status IN \('draft','in_review','approved'\)[\s\S]*ORDER BY revision_number DESC LIMIT 1 FOR UPDATE/);
+  assert.match(actions, /INSERT INTO public\.editorial_article_revision_media[\s\S]*SELECT \$\{newRevision\[0\]\.id\}::uuid, placement, position, media_id, remove_media, now\(\)/);
+  assert.match(actions, /WHERE revision_id=\$\{previousRevisionId\}::uuid/);
+});
+
+test('newsroom lists current revision media and allows audited removal from a draft', () => {
+  const newsroomPage = read('app/admin/news/page.tsx');
+  assert.match(newsroomPage, /COALESCE\(revision_media\.items, '\[\]'::jsonb\) AS revision_media/);
+  assert.match(newsroomPage, /LEFT JOIN LATERAL \([\s\S]*editorial_article_revision_media/);
+  assert.match(ui, /Attached to this draft revision/);
+  assert.match(ui, /Remove from draft/);
+  assert.match(ui, /removeRevisionMedia/);
+  assert.match(mediaActions, /export async function removeRevisionMedia/);
+  assert.match(mediaActions, /media_id, remove_media, updated_at/);
+  assert.match(mediaActions, /media_detached/);
+  assert.match(mediaActions, /remove_media=true/);
+});
