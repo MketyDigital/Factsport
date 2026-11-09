@@ -29,6 +29,9 @@ export default function MediaLibraryClient() {
   const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [message, setMessage] = useState('Loading private media assets…');
   const [pending, setPending] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [altText, setAltText] = useState('');
+  const [uploadPending, setUploadPending] = useState(false);
 
   async function load(offset = 0, append = false) {
     setPending(true);
@@ -71,6 +74,39 @@ export default function MediaLibraryClient() {
         </select>
       </label>
       <button type="submit" disabled={pending} className="self-end rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{pending ? 'Loading…' : 'Search library'}</button>
+    </form>
+
+    <form className="grid gap-3 rounded-2xl border border-blue-200 bg-blue-50/40 p-4 md:grid-cols-[1fr_1fr_auto]" onSubmit={async event => {
+      event.preventDefault();
+      if (!selectedFile) { setMessage('Choose a JPEG, PNG or WebP image first.'); return; }
+      setUploadPending(true);
+      setMessage('');
+      try {
+        const body = new FormData();
+        body.append('file', selectedFile);
+        body.append('altText', altText);
+        const response = await fetch('/api/admin/media', {
+          method: 'POST', body, credentials: 'same-origin', cache: 'no-store',
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || 'Media upload failed.');
+        setSelectedFile(null);
+        setAltText('');
+        setMessage('Image uploaded to private R2 storage. It remains unavailable publicly until rights are reviewed and it is attached to an approved published article.');
+        await load(0, false);
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : 'Media upload failed.');
+      } finally {
+        setUploadPending(false);
+      }
+    }}>
+      <label className="text-xs font-bold text-slate-700">Upload image (JPEG, PNG or WebP · max 8 MB)
+        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setSelectedFile(event.target.files?.[0] || null)} className="mt-1 block w-full text-xs font-normal" />
+      </label>
+      <label className="text-xs font-bold text-slate-700">Alternative text
+        <input value={altText} onChange={event => setAltText(event.target.value)} maxLength={500} className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm font-normal" placeholder="Describe the image for accessibility" />
+      </label>
+      <button type="submit" disabled={uploadPending || !selectedFile} className="self-end rounded-xl bg-slate-950 px-5 py-2.5 text-xs font-bold text-white disabled:opacity-50">{uploadPending ? 'Uploading…' : 'Upload privately'}</button>
     </form>
 
     {message && <p role="status" className="rounded-xl bg-slate-100 p-4 text-sm text-slate-700">{message}</p>}
