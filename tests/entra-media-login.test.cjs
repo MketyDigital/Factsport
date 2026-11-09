@@ -11,6 +11,11 @@ test('Media sign-in stays hidden until Entra and dedicated editorial PostgreSQL 
   const postgres = read('lib/adapters/postgres-client.ts');
   const login = read('app/media-login/page.tsx');
   const authorization = read('app/lib/admin/v2-editorial-authorization.ts');
+  const middleware = read('middleware.ts');
+  const startRoute = read('app/api/auth/entra/start/route.ts');
+  const callbackRoute = read('app/api/auth/entra/callback/route.ts');
+  const adminLayout = read('app/admin/layout.tsx');
+  const mediaLogin = read('app/media-login/page.tsx');
   assert.match(entra, /export function isEntraExternalConfigured/);
   assert.match(entra, /ENTRA_EXTERNAL_DISCOVERY_URL/);
   assert.match(entra, /ENTRA_EXTERNAL_ISSUER/);
@@ -26,4 +31,12 @@ test('Media sign-in stays hidden until Entra and dedicated editorial PostgreSQL 
   assert.doesNotMatch(login, /createClient|supabase/i);
   assert.match(authorization, /readFactsportEntraSession/);
   assert.match(authorization, /No legacy admin fallback is allowed/);
+  assert.match(entra, /export function isEntraMediaRequestHost/);
+  assert.match(startRoute, /isEntraMediaRequestHost\(requestUrl\)/);
+  assert.match(callbackRoute, /isEntraMediaRequestHost\(url\)/);
+  assert.match(middleware, /redirect\(new URL\('\/media-login'/);
+  assert.match(middleware, /Only the private Prediction host retains the legacy Supabase session refresh/);
+  assert.doesNotMatch(middleware, /ADMIN_EMAILS|adminEmails/);
+  assert.match(adminLayout, /rejectPrivateProductHost/);
+  assert.match(mediaLogin, /rejectPrivateProductHost/);
 });
