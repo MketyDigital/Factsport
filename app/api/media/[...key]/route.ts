@@ -14,7 +14,8 @@ const SAFE_IMAGE_TYPES = new Set([
   'image/avif', 'image/gif', 'image/jpeg', 'image/png', 'image/webp',
 ]);
 
-const MEDIA_CACHE = 'public, max-age=60, s-maxage=60, must-revalidate';
+// Keep the shared edge TTL short because rights withdrawal must take effect promptly.
+const MEDIA_CACHE = 'public, max-age=0, s-maxage=15, must-revalidate';
 
 export async function GET(
   request: Request,
