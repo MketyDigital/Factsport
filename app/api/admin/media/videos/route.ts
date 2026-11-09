@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
+import { isFactsportMediaVideoSchemaReady } from '@/lib/media/readiness';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -10,6 +11,7 @@ export async function GET() {
   if (!authorization.ok) return NextResponse.json({ error: authorization.error }, {
     status: authorization.status, headers: { 'Cache-Control': 'private, no-store' },
   });
+  if (!isFactsportMediaVideoSchemaReady()) return NextResponse.json({ success: true, videos: [], schemaReady: false }, { headers: { 'Cache-Control': 'private, no-store' } });
   try {
     const videos = await withFactsportEditorialPostgres(sql => sql`
       SELECT id, title, description, upload_status, upload_expires_at,
