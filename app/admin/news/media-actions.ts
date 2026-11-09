@@ -25,6 +25,10 @@ export async function reviewRightsAndAttachMedia(input: MediaReviewInput) {
     return { success: false, error: 'Inline media position must be a whole number from 0 to 100.' };
   }
   const rightsReference = typeof input.rightsReference === 'string' ? input.rightsReference.trim().slice(0, 2048) : '';
+  const altText = typeof input.altText === 'string' ? input.altText.trim().slice(0, 240) : '';
+  if ((input.placement === 'hero' || input.placement === 'inline') && altText.length < 3) {
+    return { success: false, error: 'Hero and inline images require descriptive alt text.' };
+  }
   if (input.rightsStatus !== 'owned' && !rightsReference) {
     return { success: false, error: 'Licensed and editorial-exception media require a rights reference.' };
   }
@@ -64,7 +68,7 @@ export async function reviewRightsAndAttachMedia(input: MediaReviewInput) {
           rights_status=${input.rightsStatus},
           rights_reference=${rightsReference || null},
           attribution_text=${typeof input.attributionText === 'string' ? input.attributionText.trim().slice(0, 500) || null : null},
-          alt_text=${typeof input.altText === 'string' ? input.altText.trim().slice(0, 500) || null : null},
+          alt_text=${altText || null},
           usage_expires_at=${expiry ? expiry.toISOString() : null}::timestamptz,
           rights_reviewed_by=${actorId}::uuid,
           rights_reviewed_at=now(),
