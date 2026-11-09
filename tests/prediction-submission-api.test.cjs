@@ -53,3 +53,26 @@ test('Prediction marketing opt-in is explicit, optional and pending confirmation
   assert.match(route, /MARKETING_CONSENT_TEXT/);
   assert.doesNotMatch(route, /subscribed|sendMarketingEmail|sendMail/);
 });
+
+const publicUi = fs.readFileSync(
+  path.join(__dirname, '../app/components/PublicPredictionSubmit.tsx'),
+  'utf8'
+);
+const matchPage = fs.readFileSync(
+  path.join(__dirname, '../app/match/[id]/page.tsx'),
+  'utf8'
+);
+
+test('Public prediction form reveals email only after explicit submit and reuses known visitor state', () => {
+  assert.match(publicUi, /function openSubmitForm/);
+  assert.match(publicUi, /method: 'GET'/);
+  assert.match(publicUi, /emailRequired\) &&/);
+  assert.match(publicUi, /emailRequired: data\.emailRequired/);
+  assert.match(publicUi, /name="email"/);
+  assert.match(publicUi, /Submit Prediction/);
+  assert.match(publicUi, /Confirm Prediction/);
+  assert.match(publicUi, /checked=\{marketingOptIn\}/);
+  assert.match(publicUi, /useState\(false\)/);
+  assert.match(matchPage, /publicPredictionSubmissionReady && isPredictionOpen/);
+  assert.match(matchPage, /process\.env\.NODE_ENV === 'development'.*PredictionBoard/);
+});
