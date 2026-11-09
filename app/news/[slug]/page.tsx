@@ -106,7 +106,10 @@ export default async function ArticlePage({ params }: { params: { slug: string }
         <NewsArtwork 
             image={article.image_url} 
             team1Logo={article.team_1_logo} 
-            team2Logo={article.team_2_logo} 
+            team2Logo={article.team_2_logo}
+            imageAlt={article.hero_media_alt_text || article.title}
+            team1Alt={article.team_1_name || 'Team 1'}
+            team2Alt={article.team_2_name || 'Team 2'}
             title={article.title} 
             className="w-full h-full opacity-60 transition duration-[2000ms] ease-out group-hover:scale-105 group-hover:opacity-40" 
         />
