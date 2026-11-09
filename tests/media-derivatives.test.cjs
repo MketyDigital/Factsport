@@ -16,11 +16,13 @@ test('Media derivatives are immutable, linked to an original asset and inherit s
   assert.match(migration, /derivative_asset_id uuid NOT NULL UNIQUE/);
   assert.match(migration, /GRANT SELECT, INSERT ON public\.media_asset_derivatives TO factsport_v2_editorial_writer/);
   assert.doesNotMatch(migration, /GRANT UPDATE|GRANT DELETE/);
+  assert.match(migration, /reject_nested_media_derivative/);
+  assert.match(migration, /A derivative cannot be used as the source/);
   assert.match(endpoint, /isSameOriginRequest/);
   assert.match(endpoint, /image\/webp/);
   assert.match(endpoint, /webpDimensions/);
   assert.match(endpoint, /FOR SHARE/);
-  assert.match(endpoint, /NOT EXISTS \\(SELECT 1 FROM public\\.media_asset_derivatives/);
+  assert.match(endpoint, /NOT EXISTS \(SELECT 1 FROM public\.media_asset_derivatives/);
   assert.match(endpoint, /rights_reviewed_by/);
   assert.match(endpoint, /usage_expires_at/);
   assert.match(endpoint, /media_asset_derivatives/);
