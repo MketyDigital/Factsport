@@ -294,7 +294,7 @@ test('editorial revision history is role-protected and restore creates a new dra
   const actions = read('app/admin/news/actions.ts');
   const client = read('app/admin/news/NewsroomClient.tsx');
   assert.match(route, /authorizeMediaEditorialAction\('read'\)/);
-  assert.match(route, /ORDER BY revision_number DESC/);
+  assert.match(route, /ORDER BY (?:r\.)?revision_number DESC/);
   assert.match(route, /LIMIT 50/);
   assert.match(route, /private, no-store/);
   assert.match(actions, /export async function restoreEditorialRevision/);
