@@ -47,10 +47,11 @@ function readFactsportTusMetadata(request: Request) {
     if (separator <= 0) throw new Error('Invalid TUS metadata entry.');
     const key = part.slice(0, separator).trim().toLowerCase();
     const encoded = part.slice(separator + 1).trim();
-    if (!allowedKeys.has(key) || metadata.has(key) || !encoded) {
+    if (!allowedKeys.has(key) || metadata.has(key) ||
+        (!encoded && key !== 'factsportdescription')) {
       throw new Error('Unsupported TUS metadata entry.');
     }
-    metadata.set(key, decodeTusMetadataValue(encoded));
+    metadata.set(key, encoded ? decodeTusMetadataValue(encoded) : '');
   }
   return {
     title: metadata.get('factsporttitle') || '',
