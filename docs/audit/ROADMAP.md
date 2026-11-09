@@ -441,3 +441,14 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - Current source and CI branch head at this checkpoint: `8d0586bf1db6855a23f3bb51d51ee8cf5f074ab0`.
 - This proves clean-database migration-chain applicability, not Azure staging/production migration execution, legacy data reconciliation, Stream/provider E2E or AdSense acceptance. No production resources or data were changed.
 - Next: review 0026 attestation preflight against actual isolated staging data, run CMS/VOD/Stream E2E, add social dead-letter/unknown-result reconciliation UI, and continue SQL-backed Prediction parity audit.
+
+
+## 2026-11-09 Social delivery reconciliation — M43
+
+- Added migration 0042 with a private `media_social_operator_reconciliation` view for dead-letter `unknown_result` posts, granted only to the editorial writer. Public reader and dispatcher roles cannot select it.
+- Added explicit operator actions to mark a post published from a verified provider receipt or requeue only after confirming no provider post exists. Both actions require evidence and an explicit confirmation, lock publication/outbox rows, respect the six-attempt ceiling and append audit events. Original attempt records remain unchanged.
+- Added a readiness gate, `FACTSPORT_SOCIAL_RECONCILIATION_READY`, which remains unset until migration 0042 and the private role grant are verified in isolated Azure staging.
+- Disposable PostgreSQL migration chain 0001–0042 and reconciliation view/grant assertions passed (run `42572684152`). Isolated verification passed (run `42572757675`); native Vinext build passed (run `42572757657`).
+- Protected application staging run `42572757656` was still in progress when the handoff was written. No Azure staging or production migration/flag activation occurred.
+- Detailed implementation and acceptance checklist: `docs/audit/handoffs/M43-SOCIAL-DELIVERY-RECONCILIATION.md`.
+- Next: finish protected staging, apply 0042 only to owner-approved isolated Azure staging, test both reconciliation decisions against private provider destinations, then continue the legacy Prediction SQL/parity audit.
