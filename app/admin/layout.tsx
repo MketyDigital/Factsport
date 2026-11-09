@@ -32,7 +32,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin/studio" className="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-white/10"><Radio size={16}/> Studio</Link>
             <Link href="/admin/settings" className="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-white/10"><Settings size={16}/> Settings</Link>
           </nav>
-          <Link href="/api/auth/entra/logout" className="flex items-center gap-2 text-xs text-slate-300 hover:text-white"><LogOut size={14}/> Sign out</Link>
+          <form action="/api/auth/entra/logout" method="post">
+            <button type="submit" className="flex items-center gap-2 text-xs text-slate-300 hover:text-white"><LogOut size={14}/> Sign out</button>
+          </form>
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-6 md:px-6">{children}</main>
