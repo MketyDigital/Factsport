@@ -53,10 +53,17 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
 
       let articleId = input.id || null;
       let currentStatus = 'draft';
+      let previousRevisionId: string | null = null;
       if (articleId) {
         const rows = await tx`SELECT id, status FROM public.editorial_articles WHERE id=${articleId}::uuid FOR UPDATE`;
         if (!rows[0] || rows[0].status === 'archived') throw new Error('Article was not found or has been archived.');
         currentStatus = rows[0].status;
+        const previousRevision = await tx`
+          SELECT id FROM public.editorial_article_revisions
+          WHERE article_id=${articleId}::uuid AND workflow_status IN ('draft','in_review','approved')
+          ORDER BY revision_number DESC LIMIT 1 FOR UPDATE
+        `;
+        previousRevisionId = previousRevision[0]?.id || null;
         // Published content is immutable until its replacement revision is approved.
         if (currentStatus !== 'published') {
           await tx`
@@ -101,6 +108,16 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
           ${JSON.stringify(snapshot)}::jsonb, ${actorId}::uuid, 'Editorial revision saved', 'draft'
         ) RETURNING id
       `;
+      if (previousRevisionId) {
+        await tx`
+          INSERT INTO public.editorial_article_revision_media
+            (revision_id, placement, position, media_id, remove_media, updated_at)
+          SELECT ${newRevision[0].id}::uuid, placement, position, media_id, remove_media, now()
+          FROM public.editorial_article_revision_media
+          WHERE revision_id=${previousRevisionId}::uuid
+          ON CONFLICT (revision_id, placement, position) DO NOTHING
+        `;
+      }
       await tx`
         INSERT INTO public.media_editorial_audit_events (actor_user_id, action, article_id, revision_id, details)
         VALUES (${actorId}::uuid, 'draft_saved', ${articleId}::uuid, ${newRevision[0].id}::uuid,
