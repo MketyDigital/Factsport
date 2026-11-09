@@ -236,16 +236,17 @@ LANGUAGE sql
 SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $visitor_state$
-  SELECT CASE
-    WHEN p_visitor_token_hash IS NULL
-      OR pg_catalog.char_length(p_visitor_token_hash) <> 64
-      OR p_visitor_token_hash ~ '[^0-9a-f]' THEN false
-    ELSE EXISTS (
+  SELECT COALESCE(
+    p_visitor_token_hash IS NOT NULL
+    AND pg_catalog.char_length(p_visitor_token_hash) = 64
+    AND p_visitor_token_hash !~ '[^0-9a-f]'
+    AND EXISTS (
       SELECT 1
       FROM public.prediction_participants AS participant
       WHERE participant.visitor_token_hash = p_visitor_token_hash
-    )
-  END;
+    ),
+    false
+  );
 $visitor_state$;
 
 REVOKE ALL ON FUNCTION public.get_public_prediction_visitor_state(text) FROM PUBLIC;
