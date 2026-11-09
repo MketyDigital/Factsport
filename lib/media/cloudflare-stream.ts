@@ -5,7 +5,7 @@ function streamConfig() {
     accountId: process.env.CLOUDFLARE_ACCOUNT_ID || '',
     apiToken: process.env.CLOUDFLARE_STREAM_API_TOKEN || '',
     signingKeyId: process.env.CLOUDFLARE_STREAM_SIGNING_KEY_ID || '',
-    signingKeyPem: process.env.CLOUDFLARE_STREAM_SIGNING_KEY_PEM || '',
+    signingKeyJwk: process.env.CLOUDFLARE_STREAM_SIGNING_KEY_JWK || '',
     allowedOrigins: (process.env.FACTSPORT_STREAM_ALLOWED_ORIGINS || 'factsport.com,www.factsport.com')
       .split(',').map(value => value.trim().toLowerCase()).filter(Boolean),
   };
@@ -17,7 +17,7 @@ export function isFactsportStreamVideoReady(): boolean {
     /^[a-f0-9]{32}$/i.test(config.accountId) &&
     config.apiToken.length >= 32 &&
     /^[a-f0-9]{32}$/i.test(config.signingKeyId) &&
-    config.signingKeyPem.includes('BEGIN PRIVATE KEY') &&
+    config.signingKeyJwk.length >= 100 &&
     config.allowedOrigins.length > 0 &&
     config.allowedOrigins.every(origin => /^(?:[a-z0-9-]+\.)*[a-z0-9-]+\.[a-z]{2,}$/.test(origin));
 }
@@ -107,22 +107,26 @@ function base64Url(bytes: Uint8Array) {
   return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
-function pemBytes(pem: string) {
-  const encoded = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
-  const binary = atob(encoded);
-  return Uint8Array.from(binary, character => character.charCodeAt(0));
+function signingJwk(encodedOrJson: string) {
+  const raw = encodedOrJson.trim().startsWith('{') ? encodedOrJson : atob(encodedOrJson.trim());
+  const jwk = JSON.parse(raw);
+  if (jwk?.kty !== 'RSA' || typeof jwk.d !== 'string' || typeof jwk.n !== 'string') {
+    throw new Error('Cloudflare Stream signing JWK is invalid.');
+  }
+  return jwk;
 }
 
-export async function createFactsportStreamSignedToken(): Promise<string> {
+export async function createFactsportStreamSignedToken(videoUid: string): Promise<string> {
   const config = requireConfig();
+  if (!/^[a-f0-9]{32}$/i.test(videoUid)) throw new Error('Invalid Stream video identifier.');
   const now = Math.floor(Date.now() / 1000);
   const header = base64Url(new TextEncoder().encode(JSON.stringify({ alg: 'RS256', kid: config.signingKeyId })));
   const payload = base64Url(new TextEncoder().encode(JSON.stringify({
-    kid: config.signingKeyId, exp: now + 60 * 60, nbf: now - 30,
+    sub: videoUid, kid: config.signingKeyId, exp: now + 60 * 60, nbf: now - 30,
   })));
   const signingInput = header + '.' + payload;
   const key = await crypto.subtle.importKey(
-    'pkcs8', pemBytes(config.signingKeyPem),
+    'jwk', signingJwk(config.signingKeyJwk),
     { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign'],
   );
   const signature = new Uint8Array(await crypto.subtle.sign(
