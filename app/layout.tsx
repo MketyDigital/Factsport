@@ -41,7 +41,15 @@ const baseMetadata: Metadata = {
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
-  const configuredPrivateHost = (process.env.FACTSPORT_PRIVATE_PRODUCT_HOST || '').trim().toLowerCase();
+  const rawPrivateHost = (process.env.FACTSPORT_PRIVATE_PRODUCT_HOST || '').trim();
+  let configuredPrivateHost = '';
+  try {
+    configuredPrivateHost = rawPrivateHost
+      ? new URL(rawPrivateHost.includes('://') ? rawPrivateHost : 'https://' + rawPrivateHost).hostname.toLowerCase()
+      : '';
+  } catch {
+    configuredPrivateHost = '';
+  }
   const requestHost = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '')
     .split(',')[0].trim().toLowerCase().split(':')[0];
   const isPrivateProductHost = !!configuredPrivateHost && requestHost === configuredPrivateHost;
