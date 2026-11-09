@@ -19,7 +19,7 @@ CREATE OR REPLACE FUNCTION public.reject_nested_media_derivative()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
-AS $
+AS $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM public.media_asset_derivatives
@@ -29,7 +29,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS media_asset_derivative_no_nesting ON public.media_asset_derivatives;
 CREATE TRIGGER media_asset_derivative_no_nesting
