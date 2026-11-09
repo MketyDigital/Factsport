@@ -88,7 +88,7 @@ export async function createFactsportStreamDirectUpload(input: {
 }) {
   const config = requireConfig();
   if (!Number.isSafeInteger(input.fileSizeBytes) ||
-      input.fileSizeBytes < 1 || input.fileSizeBytes > FACTSPORT_STREAM_BASIC_UPLOAD_MAX_BYTES) {
+      input.fileSizeBytes < 1 || input.fileSizeBytes >= FACTSPORT_STREAM_BASIC_UPLOAD_MAX_BYTES) {
     throw new Error('Basic Stream uploads must be between 1 byte and 200 MB.');
   }
   const result = await streamRequest('/direct_upload', {
@@ -117,7 +117,7 @@ export async function createFactsportStreamTusUpload(input: {
 }) {
   const config = requireConfig();
   if (!Number.isSafeInteger(input.fileSizeBytes) ||
-      input.fileSizeBytes < 1 || input.fileSizeBytes > FACTSPORT_STREAM_MAX_UPLOAD_BYTES) {
+      input.fileSizeBytes < 1 || input.fileSizeBytes >= FACTSPORT_STREAM_MAX_UPLOAD_BYTES) {
     throw new Error('Resumable Stream uploads must be between 1 byte and 30 GB.');
   }
   const maxDurationSeconds = input.maxDurationSeconds || 900;
