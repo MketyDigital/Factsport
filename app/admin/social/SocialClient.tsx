@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react';
 import { cancelSocialPublication, scheduleSocialPublication } from './actions';
 
-type Channel = { id: string; display_name: string; provider: string };
+type Channel = { id: string; display_name: string; provider: string; supports_media: boolean };
 type SocialAsset = { id: string; object_key: string; content_type: string; width: number | null; height: number | null; alt_text: string | null; attribution_text: string | null };
 type Publication = {
   id: string; content_text: string; status: string; scheduled_at: string | null;
