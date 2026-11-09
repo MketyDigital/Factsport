@@ -208,7 +208,7 @@ export async function revokeMediaRights(input: { assetId: string; reason: string
           })}::jsonb
         )
       `;
-      return linkedArticles.map((article: { slug: string }) => article.slug);
+      return linkedArticles.map(article => String((article as any).slug));
     }));
     revalidatePath('/admin/media');
     revalidatePath('/admin/news');
