@@ -56,3 +56,33 @@ Relevant commits:
 ## Safety
 
 No production migrations, Cloudflare Stream settings, R2 objects, secrets, DNS, public articles or live workflows were changed.
+
+
+## Verification follow-up — 2026-11-09
+
+The later failures exposed additional source/typecheck issues and were fixed:
+
+- Corrected the derivative editor JSX conditional in `app/admin/media/MediaLibraryClient.tsx`.
+- Removed a duplicate `currentRevisionStatus` declaration and restored the `EditorialVideoAttachments` import in `app/admin/news/NewsroomClient.tsx`.
+- Replaced target-incompatible `for...of` iteration over `Uint8Array` in the Stream JWT base64 helper with an indexed loop.
+- Updated the Social Publishing status copy to describe the implemented durable dispatcher and the still-closed activation gates accurately.
+- Expanded `.github/workflows/v2-verify.yml` to include all `lib/**` changes, so media adapters, shared policy and scoring/library logic cannot silently bypass isolated verification.
+
+## Confirmed verification evidence
+
+- Full engine regression: 210/210 passed on the corrected Media test slice.
+- Isolated verification passed on commit `298e8dedae206d2efb6b3c56cd9c6d674bfb1313`, run [42572034766](https://github.com/MketyDigital/Factsport/actions/runs/42572034766).
+- Native Vinext build passed on commit `298e8dedae206d2efb6b3c56cd9c6d674bfb1313`, run [42572034689](https://github.com/MketyDigital/Factsport/actions/runs/42572034689).
+- Protected Cloudflare application staging passed on commit `298e8dedae206d2efb6b3c56cd9c6d674bfb1313`, run [42572034712](https://github.com/MketyDigital/Factsport/actions/runs/42572034712). This is an isolated protected Worker deployment; it does not prove CMS/VOD runtime parity or apply migrations to the staging database.
+- The new `.github/workflows/v2-db-migration-verify.yml` applied all 41 migrations sequentially to an ephemeral PostgreSQL 16 service and verified the Media/VOD objects plus least-privilege column grants. Run [42572207610](https://github.com/MketyDigital/Factsport/actions/runs/42572207610) passed.
+- Current branch head when recorded: `8d0586bf1db6855a23f3bb51d51ee8cf5f074ab0`.
+
+The disposable PostgreSQL pass proves the migration chain is syntactically applicable from a clean database and that the asserted roles/grants/views exist. It does not prove production-data reconciliation, Azure staging migration application, Cloudflare Stream provisioning, provider E2E, AdSense approval or public cutover.
+
+## Updated next actions
+
+1. Apply migrations only to the owner-approved isolated Azure staging database after a verified backup/restore point and explicit review of 0026's attestation preflight; never infer permission to apply them to production.
+2. Configure the Stream signer and provider credentials in staging only; run direct upload, refresh, cleanup, preview, rights review/revocation, publication and signed playback end-to-end.
+3. Add the operator-facing social unknown-result/dead-letter reconciliation interface with append-only operator audit and no blind retry.
+4. Continue the full legacy-to-V2 prediction parity audit, especially SQL scoring/settlement, registered-account/VIP/campaign behavior and the old match identity crosswalk.
+5. Keep production DNS, Worker routes, database, R2/Stream assets and public publishing untouched until the release gates are signed off.
