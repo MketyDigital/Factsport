@@ -30,6 +30,7 @@ export default async function AdminNewsPage() {
         a.status,
         COALESCE(r.workflow_status, a.review_status) AS review_status,
         r.workflow_status AS revision_status,
+        COALESCE(revision_media.items, '[]'::jsonb) AS revision_media,
         r.review_comment,
         COALESCE((r.snapshot->>'is_headline')::boolean, a.is_headline) AS is_headline,
         COALESCE((r.snapshot->>'is_breaking')::boolean, a.is_breaking) AS is_breaking,
@@ -40,11 +41,27 @@ export default async function AdminNewsPage() {
         a.updated_at
       FROM public.editorial_articles a
       LEFT JOIN LATERAL (
-        SELECT snapshot, workflow_status, review_comment, created_at
+        SELECT id, snapshot, workflow_status, review_comment, created_at
         FROM public.editorial_article_revisions
         WHERE article_id=a.id AND workflow_status IN ('draft','in_review','approved','rejected')
         ORDER BY revision_number DESC LIMIT 1
       ) r ON true
+      LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+          'placement', rm.placement,
+          'position', rm.position,
+          'remove_media', rm.remove_media,
+          'media_id', m.id,
+          'object_key', m.object_key,
+          'content_type', m.content_type,
+          'rights_status', m.rights_status,
+          'alt_text', m.alt_text,
+          'attribution_text', m.attribution_text
+        ) ORDER BY rm.placement, rm.position) AS items
+        FROM public.editorial_article_revision_media rm
+        LEFT JOIN public.media_assets m ON m.id = rm.media_id
+        WHERE rm.revision_id = r.id
+      ) revision_media ON true
       ORDER BY GREATEST(a.updated_at, COALESCE(r.created_at, a.updated_at)) DESC
       LIMIT 200
     `);
