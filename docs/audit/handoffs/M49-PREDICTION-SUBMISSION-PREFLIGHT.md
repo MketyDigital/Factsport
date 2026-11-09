@@ -116,3 +116,13 @@ Documentation-only audit slice. Future SQL/API changes must be reverted independ
 - Isolated regression passed on `4aa20c507bbdbf743b2f1e7c72f04e5cd5733e11` (run `42582325642`); native Vinext build passed on the same commit (run `42582325545`). Protected Cloudflare staging for that commit was still in progress at the time of this note.
 - A subsequent CI-only workflow change adds an information_schema assertion that the Prediction API role has zero direct public-schema table grants; its database verification run is pending.
 - No isolated Azure database migration, dedicated login/Hyperdrive provisioning, HMAC secret, feature flag activation or production resource change has occurred.
+
+
+## M49 verification closeout — source/staging and disposable database passed
+
+- Disposable PostgreSQL run `42582443798` passed on commit `455c267c6cac7d3c9d142a2f041b06616774b7f9`. It applies the ordered 0001–0043 migration chain and verifies: dedicated role EXECUTE access; zero direct public-schema table grants; SECURITY DEFINER and pinned search_path; no PUBLIC EXECUTE; exact-score validation; visitor-state lookup; duplicate retry; same-email/different-browser separation; live/unknown/kickoff-equality rejection; explicit pending marketing consent; per-visitor rate limits; and concurrent same-token submission from two PostgreSQL connections yielding one participant and one prediction.
+- Isolated verification passed on `4aa20c507bbdbf743b2f1e7c72f04e5cd5733e11` (run `42582325642`).
+- Native Vinext build passed on the same source commit (run `42582325545`).
+- Protected Cloudflare staging deployment passed on the same source commit (run `42582325595`). This is an application staging deployment/build gate only; it did not provision the Prediction login/Hyperdrive/HMAC secret, apply migration 0043 to Azure staging, enable the submission flag, or run live database/browser/provider E2E.
+- Latest documentation-only isolated verification is still running; the code-bearing commit above is the verified application baseline.
+- **M49 status:** source implemented; disposable PostgreSQL DB behavior verified; isolated tests/native build/protected Cloudflare staging passed. Real isolated Azure role/Hyperdrive migration and full browser/API E2E remain OPEN. Feature flag remains off.
