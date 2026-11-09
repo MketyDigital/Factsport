@@ -502,18 +502,23 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                     </div>
                     <div className="overflow-hidden rounded-lg border border-slate-200">
                       <div className="relative aspect-[1.91/1] overflow-hidden bg-[#0a1428]">
-                        <NewsArtwork
-                          image={previewHero?.media_id ? '/api/admin/media/' + encodeURIComponent(previewHero.media_id) : null}
-                          team1Logo={previewTeam1?.media_id ? '/api/admin/media/' + encodeURIComponent(previewTeam1.media_id) : null}
-                          team2Logo={previewTeam2?.media_id ? '/api/admin/media/' + encodeURIComponent(previewTeam2.media_id) : null}
-                          imageAlt={previewHero?.alt_text || form.title}
-                          team1Alt={form.team1Name || 'Team 1'}
-                          team2Alt={form.team2Name || 'Team 2'}
-                          title={form.title}
-                          className="h-full w-full opacity-70"
-                          loading="lazy"
-                          decoding="async"
-                        />
+                        {previewHero?.media_id || (previewTeam1?.media_id && previewTeam2?.media_id)
+                          ? <NewsArtwork
+                              image={previewHero?.media_id ? '/api/admin/media/' + encodeURIComponent(previewHero.media_id) : null}
+                              team1Logo={previewTeam1?.media_id ? '/api/admin/media/' + encodeURIComponent(previewTeam1.media_id) : null}
+                              team2Logo={previewTeam2?.media_id ? '/api/admin/media/' + encodeURIComponent(previewTeam2.media_id) : null}
+                              imageAlt={previewHero?.alt_text || form.title}
+                              team1Alt={form.team1Name || 'Team 1'}
+                              team2Alt={form.team2Name || 'Team 2'}
+                              title={form.title}
+                              className="h-full w-full opacity-70"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          : <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-6 text-center text-white">
+                              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-200">Factsport</span>
+                              <span className="mt-3 line-clamp-3 text-lg font-black">{form.title || 'Your article headline'}</span>
+                            </div>}
                       </div>
                       <div className="p-3">
                         <p className="text-[10px] font-bold uppercase text-slate-400">factsport.com</p>
