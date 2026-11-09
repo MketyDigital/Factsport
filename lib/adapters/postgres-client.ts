@@ -132,7 +132,7 @@ export function isFactsportSocialProviderReady(provider: FactsportSocialProvider
   }
   if (provider === 'telegram') {
     return typeof bindings.FACTSPORT_TELEGRAM_BOT_TOKEN === 'string' &&
-      /^\\d{5,15}:[A-Za-z0-9_-]{20,}$/.test(String(bindings.FACTSPORT_TELEGRAM_BOT_TOKEN));
+      /^\d{5,15}:[A-Za-z0-9_-]{20,}$/.test(String(bindings.FACTSPORT_TELEGRAM_BOT_TOKEN));
   }
   const adapterUrl = typeof bindings.FACTSPORT_LOGIC_APPS_SOCIAL_ADAPTER_URL === 'string'
     ? String(bindings.FACTSPORT_LOGIC_APPS_SOCIAL_ADAPTER_URL) : '';
