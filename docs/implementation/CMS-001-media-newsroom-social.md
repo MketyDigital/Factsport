@@ -118,3 +118,11 @@ Migration `0038_factsport_media_asset_column_grants.sql` removes the editorial w
 - Added Media Library crop/resize controls for hero 16:9, social square, thumbnail 4:3 and team square, with horizontal/vertical focus controls. The browser creates a high-quality WebP derivative; the server validates and stores it as a new immutable asset.
 - Updated public article, inline gallery, general media and social media projections so a derivative is not public if its original source has been rejected, has lost its rights review or has expired.
 - Migrations 0038/0039 are committed but unapplied. CI for the latest derivative implementation is pending; no real R2 transformation or public delivery has been exercised.
+
+
+## 2026-11-09 continuation — rights withdrawal and usage discovery
+
+- Added a Media-admin-only rights withdrawal action. It marks the asset rejected/private, records reviewer identity/time and a required reason, retains the R2 object and audit history, and suppresses dependent derivatives in public views.
+- Revalidates the homepage, newsroom index and all affected article routes after withdrawal. Public image shared-cache TTL is now 15 seconds with browser revalidation.
+- Added protected usage discovery across direct/derived asset lineage, article hero/inline/team-logo attachments and scheduled/published social posts. The Media library shows provider post links where available and warns that already-published third-party posts must be removed separately.
+- Migration 0040 registers the rights-withdrawal audit event. It is committed but unapplied; latest CI for the rights-withdrawal and usage-discovery source is running.
