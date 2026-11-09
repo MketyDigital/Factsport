@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS public.media_video_assets (
   CONSTRAINT media_video_title_valid
     CHECK (char_length(btrim(title)) BETWEEN 3 AND 200),
   CONSTRAINT media_video_provider_uid_valid
-    CHECK (provider_video_id ~ '^[a-z0-9]{32,64},
+    CHECK (char_length(provider_video_id) BETWEEN 32 AND 64 AND provider_video_id !~ '[^a-z0-9]'),
   CONSTRAINT media_video_duration_limit
     CHECK (duration_seconds IS NULL OR duration_seconds BETWEEN 0.001 AND 900),
   CONSTRAINT media_video_playback_host_valid
