@@ -86,3 +86,10 @@ The disposable PostgreSQL pass proves the migration chain is syntactically appli
 3. Add the operator-facing social unknown-result/dead-letter reconciliation interface with append-only operator audit and no blind retry.
 4. Continue the full legacy-to-V2 prediction parity audit, especially SQL scoring/settlement, registered-account/VIP/campaign behavior and the old match identity crosswalk.
 5. Keep production DNS, Worker routes, database, R2/Stream assets and public publishing untouched until the release gates are signed off.
+
+
+## M50 follow-up — resumable uploads and migration re-audit (2026-11-09)
+
+- The M50 VOD continuation added Cloudflare Stream TUS uploads for large files and expected-size validation.
+- A fresh full-file inspection found an orphan duplicated SQL tail after the first COMMIT in migration 0041 despite the earlier M42 repair note. The tail was removed; migration 0041 is now one complete transaction and the disposable PostgreSQL workflow re-applies it from a clean database.
+- No Azure staging/production migration was applied. See `docs/audit/handoffs/M50-RESUMABLE-CLOUDFLARE-STREAM-UPLOADS.md` for current status and staging acceptance.
