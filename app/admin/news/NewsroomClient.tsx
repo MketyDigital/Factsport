@@ -440,7 +440,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                   <div>
                     <div className="prose prose-lg prose-slate max-w-none text-slate-800">
                       {form.bodyMarkdown.trim()
-                        ? <MarkdownRenderer content={form.bodyMarkdown} />
+                        ? <MarkdownRenderer content={form.bodyMarkdown} disableExternalMedia />
                         : <p className="italic text-slate-500">Article body preview will appear here.</p>}
                     </div>
                     {currentSources.length > 0 && <section className="mt-10 border-t border-slate-200 pt-7" aria-label="Preview source references">
@@ -528,7 +528,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                     </div>
                   </section>
                 </div>
-                <p className="border-t border-slate-200 px-4 py-2 text-[10px] text-slate-500">Private editor preview only. Advertising, analytics, third-party trackers and public publication endpoints are not loaded.</p>
+                <p className="border-t border-slate-200 px-4 py-2 text-[10px] text-slate-500">Private editor preview only. Ad and analytics scripts are not loaded; third-party Markdown images, match widgets and video embeds are shown as placeholders. Approved Stream clips use the signed, editor-only preview endpoint.</p>
               </section>}
             </label>
             <label className="text-xs font-bold text-slate-600">Tags (comma separated)
