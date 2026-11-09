@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
-import { cancelSocialPublication, scheduleSocialPublication, updateSocialChannel } from './actions';
+import { cancelSocialPublication, reconcileSocialDelivery, scheduleSocialPublication, updateSocialChannel } from './actions';
 
 type Channel = { id: string; channel_key: string; display_name: string; provider: 'meta' | 'telegram' | 'buffer' | 'make'; is_enabled: boolean; supports_media: boolean; settings: Record<string, unknown> };
 type SocialAsset = { id: string; object_key: string; content_type: string; width: number | null; height: number | null; alt_text: string | null; attribution_text: string | null };
@@ -10,7 +10,18 @@ type Publication = {
   published_at: string | null; provider_post_url: string | null; display_name: string; provider: string; media_asset_ids: string[];
 };
 
-export default function SocialClient({ channels, publications }: { channels: Channel[]; publications: Publication[] }) {
+type Reconciliation = {
+  publication_id: string; content_text: string; publication_status: string;
+  scheduled_at: string | null; publication_provider_post_id: string | null; provider_post_url: string | null;
+  publication_error_code: string | null; publication_error_message: string | null;
+  display_name: string; provider: string; outbox_id: string; outbox_status: string;
+  attempts: number; outbox_error_code: string | null; attempt_number: number; outcome: string;
+  provider_request_id: string | null; attempt_provider_post_id: string | null;
+  provider_response: Record<string, unknown>; attempt_error_code: string | null;
+  attempt_error_message: string | null; started_at: string; finished_at: string | null;
+};
+
+export default function SocialClient({ channels, publications, reconciliations }: { channels: Channel[]; publications: Publication[]; reconciliations: Reconciliation[] }) {
   const [channelId, setChannelId] = useState(channels.find(channel => channel.is_enabled)?.id || '');
   const [channelDrafts, setChannelDrafts] = useState<Record<string, { isEnabled: boolean; supportsMedia: boolean; providerSetting: string }>>(() => Object.fromEntries(channels.map(channel => [channel.id, {
     isEnabled: channel.is_enabled,
@@ -31,6 +42,9 @@ export default function SocialClient({ channels, publications }: { channels: Cha
   const [availableAssets, setAvailableAssets] = useState<SocialAsset[]>([]);
   const [selectedMediaAssetIds, setSelectedMediaAssetIds] = useState<string[]>([]);
   const [mediaLoading, setMediaLoading] = useState(false);
+  const [reconciliationDrafts, setReconciliationDrafts] = useState<Record<string, {
+    providerPostId: string; providerPostUrl: string; evidence: string; confirmed: boolean;
+  }>>({});
 
   useEffect(() => {
     if (!channels.some(channel => channel.supports_media)) return;
@@ -70,6 +84,39 @@ export default function SocialClient({ channels, publications }: { channels: Cha
   function invalidatePublicApproval() {
     setPublicContentConfirmed(false);
     setIdempotencyKey('');
+  }
+
+  function reconciliationDraft(publicationId: string) {
+    return reconciliationDrafts[publicationId] || { providerPostId: '', providerPostUrl: '', evidence: '', confirmed: false };
+  }
+
+  function updateReconciliationDraft(publicationId: string, patch: Partial<{
+    providerPostId: string; providerPostUrl: string; evidence: string; confirmed: boolean;
+  }>) {
+    setReconciliationDrafts(current => ({
+      ...current,
+      [publicationId]: { ...reconciliationDraft(publicationId), ...patch },
+    }));
+  }
+
+  function reconcileDelivery(item: Reconciliation, decision: 'confirmed_published' | 'confirmed_not_published') {
+    const draft = reconciliationDraft(item.publication_id);
+    startTransition(async () => {
+      const result = await reconcileSocialDelivery({
+        publicationId: item.publication_id,
+        decision,
+        providerPostId: draft.providerPostId,
+        providerPostUrl: draft.providerPostUrl,
+        evidence: draft.evidence,
+        confirmed: draft.confirmed,
+      });
+      setMessage(result.success
+        ? (decision === 'confirmed_published'
+          ? 'Delivery marked published from the verified provider receipt. The original ambiguous attempt remains in the audit history.'
+          : 'No provider post was found. The post has been returned to the durable retry queue with an audited operator decision.')
+        : result.error);
+      if (result.success) window.location.reload();
+    });
   }
 
   function schedule() {
@@ -183,6 +230,54 @@ export default function SocialClient({ channels, publications }: { channels: Cha
           </div>
         </aside>
       </section>
+
+
+      {reconciliations.length > 0 && <section className="overflow-hidden rounded-2xl border border-amber-300 bg-white shadow-sm">
+        <div className="border-b border-amber-200 bg-amber-50 p-4">
+          <h2 className="font-black text-amber-950">Delivery reconciliation · {reconciliations.length}</h2>
+          <p className="mt-1 text-xs text-amber-900">These posts have an ambiguous provider result. A provider may already have accepted them. Verify the provider account before taking action; no automatic replay is allowed.</p>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {reconciliations.map(item => {
+            const draft = reconciliationDraft(item.publication_id);
+            const hasProviderReceipt = !!(item.attempt_provider_post_id || item.publication_provider_post_id || item.provider_post_url);
+            return <article key={item.publication_id} className="space-y-3 p-4">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase text-slate-500">
+                <span>{item.display_name}</span><span>·</span><span>{item.provider}</span><span>·</span>
+                <span>Attempt {item.attempt_number} / {item.attempts}</span><span>·</span><span>{item.outcome}</span>
+              </div>
+              <p className="text-sm font-semibold text-slate-900">{item.content_text}</p>
+              <div className="grid gap-1 text-xs text-slate-600 sm:grid-cols-2">
+                <p>Provider request: <span className="font-mono">{item.provider_request_id || 'Not returned'}</span></p>
+                <p>Error: <span className="font-mono">{item.attempt_error_code || item.outbox_error_code || 'Unknown'}</span></p>
+              </div>
+              {item.attempt_error_message && <p className="rounded-lg bg-slate-50 p-2 text-xs text-slate-600">{item.attempt_error_message}</p>}
+              {item.provider_response && Object.keys(item.provider_response).length > 0 &&
+                <p className="break-all text-[10px] text-slate-500">Sanitized provider response: {JSON.stringify(item.provider_response)}</p>}
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="block text-xs font-bold text-slate-600">Verified provider post ID
+                  <input value={draft.providerPostId || item.attempt_provider_post_id || item.publication_provider_post_id || ''} onChange={event => updateReconciliationDraft(item.publication_id, { providerPostId: event.target.value })} maxLength={2000} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm font-normal" placeholder="Required only if the post exists" />
+                </label>
+                <label className="block text-xs font-bold text-slate-600">Verified provider post URL
+                  <input value={draft.providerPostUrl || item.provider_post_url || ''} onChange={event => updateReconciliationDraft(item.publication_id, { providerPostUrl: event.target.value })} maxLength={2048} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm font-normal" placeholder="https://…" />
+                </label>
+              </div>
+              <label className="block text-xs font-bold text-slate-600">Operator evidence / verification note
+                <textarea value={draft.evidence} onChange={event => updateReconciliationDraft(item.publication_id, { evidence: event.target.value })} minLength={10} maxLength={1000} rows={2} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm font-normal" placeholder="Describe the provider account, request ID or post search used to verify the outcome. Do not paste credentials." />
+              </label>
+              <label className="flex items-start gap-2 text-xs text-slate-700">
+                <input type="checkbox" checked={draft.confirmed} onChange={event => updateReconciliationDraft(item.publication_id, { confirmed: event.target.checked })} className="mt-0.5" />
+                I checked the provider account and verified the outcome before changing this delivery.
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" disabled={pending || !draft.confirmed || draft.evidence.trim().length < 10 || !(draft.providerPostId || item.attempt_provider_post_id || item.publication_provider_post_id) || !(draft.providerPostUrl || item.provider_post_url)} onClick={() => reconcileDelivery(item, 'confirmed_published')} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">Confirm published · no retry</button>
+                {!hasProviderReceipt && <button type="button" disabled={pending || !draft.confirmed || draft.evidence.trim().length < 10 || Number(item.attempts) >= 6} onClick={() => reconcileDelivery(item, 'confirmed_not_published')} className="rounded-lg border border-amber-400 px-3 py-2 text-xs font-bold text-amber-900 disabled:opacity-40">Confirm no post · requeue</button>}
+                {Number(item.attempts) >= 6 && !hasProviderReceipt && <span className="self-center text-[11px] text-amber-800">Retry limit reached; resolve this item before creating a new publication.</span>}
+              </div>
+            </article>;
+          })}
+        </div>
+      </section>}
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 p-4"><h2 className="font-black">Recent social publications</h2></div>
