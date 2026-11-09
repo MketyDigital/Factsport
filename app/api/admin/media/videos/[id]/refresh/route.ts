@@ -26,7 +26,8 @@ export async function POST(request: Request, context: { params: { id: string } }
   try {
     const existing = await withFactsportEditorialPostgres(async sql => {
       const rows = await sql`
-        SELECT id, provider_video_id, upload_status, rights_status, upload_expires_at
+        SELECT id, provider_video_id, upload_status, upload_protocol,
+               upload_expected_size_bytes, rights_status, upload_expires_at
         FROM public.media_video_assets WHERE id=${assetId}::uuid LIMIT 1
       `;
       return rows[0] || null;
@@ -34,8 +35,13 @@ export async function POST(request: Request, context: { params: { id: string } }
     if (!existing) return NextResponse.json({ error: 'Video asset not found.' }, { status: 404 });
     const result = await getFactsportStreamVideo(existing.provider_video_id);
     const providerState = String(result.status?.state || '').toLowerCase();
-    const ready = result.readyToStream === true && typeof result.playback?.hls === 'string';
-    const failed = providerState === 'error';
+    const providerReady = result.readyToStream === true && typeof result.playback?.hls === 'string';
+    const expectedSize = Number(existing.upload_expected_size_bytes);
+    const actualSize = Number(result.size);
+    const sizeMismatch = providerReady && Number.isSafeInteger(expectedSize) && expectedSize > 0 &&
+      (!Number.isSafeInteger(actualSize) || actualSize !== expectedSize);
+    const ready = providerReady && !sizeMismatch;
+    const failed = providerState === 'error' || sizeMismatch;
     const expiredUnuploaded = !ready && !failed && providerState === 'pendingupload' &&
       existing.upload_status === 'pending_upload' && existing.upload_expires_at &&
       new Date(existing.upload_expires_at).valueOf() <= Date.now();
@@ -68,13 +74,20 @@ export async function POST(request: Request, context: { params: { id: string } }
           VALUES (
             ${authorization.user.domainUserId}::uuid,
             ${ready ? 'media_video_uploaded' : 'media_video_upload_failed'},
-            ${JSON.stringify({ assetId, providerStatus: result.status?.state || null })}::jsonb
+            ${JSON.stringify({
+              assetId,
+              providerStatus: result.status?.state || null,
+              uploadProtocol: existing.upload_protocol,
+              expectedSizeBytes: Number.isSafeInteger(expectedSize) ? expectedSize : null,
+              actualSizeBytes: Number.isSafeInteger(actualSize) ? actualSize : null,
+              failureReason: sizeMismatch ? 'uploaded_size_mismatch' : expiredUnuploaded ? 'upload_expired' : null,
+            })}::jsonb
           )
         `;
       }
       return rows[0];
     }));
-    if (expiredUnuploaded) {
+    if (expiredUnuploaded || sizeMismatch) {
       try {
         await deleteFactsportStreamVideo(existing.provider_video_id);
       } catch (cleanupError) {
