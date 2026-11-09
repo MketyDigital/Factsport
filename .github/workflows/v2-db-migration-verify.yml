@@ -372,6 +372,39 @@ jobs:
               RAISE EXCEPTION 'Required Media/VOD/social objects are missing after migration apply';
             END IF;
 
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema='public' AND table_name='media_video_assets'
+                AND column_name='upload_protocol' AND data_type='text'
+            ) OR NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema='public' AND table_name='media_video_assets'
+                AND column_name='upload_expected_size_bytes' AND data_type='bigint'
+            ) THEN
+              RAISE EXCEPTION 'VOD upload protocol/expected-size columns are missing';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint
+              WHERE conrelid='public.media_video_assets'::regclass
+                AND contype='c'
+                AND pg_get_constraintdef(oid) LIKE '%upload_expected_size_bytes%30000000000%'
+            ) THEN
+              RAISE EXCEPTION 'VOD expected-size database limit is missing';
+            END IF;
+            IF NOT has_column_privilege(
+              'factsport_v2_editorial_writer',
+              'public.media_video_assets',
+              'upload_expected_size_bytes',
+              'INSERT'
+            ) OR NOT has_column_privilege(
+              'factsport_v2_editorial_writer',
+              'public.media_video_assets',
+              'upload_protocol',
+              'INSERT'
+            ) THEN
+              RAISE EXCEPTION 'Editorial writer cannot record VOD upload protocol and expected size';
+            END IF;
+
             IF NOT has_column_privilege(
               'factsport_v2_editorial_writer',
               'public.media_video_assets',
