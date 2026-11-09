@@ -139,6 +139,25 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
       }
       if (previousRevisionId) {
         await tx`
+          INSERT INTO public.editorial_article_revision_videos
+            (revision_id, position, video_id, remove_video, updated_at)
+          SELECT ${newRevision[0].id}::uuid, position, video_id, remove_video, now()
+          FROM public.editorial_article_revision_videos
+          WHERE revision_id=${previousRevisionId}::uuid
+          ON CONFLICT (revision_id, position) DO NOTHING
+        `;
+      } else if (currentStatus === 'published') {
+        await tx`
+          INSERT INTO public.editorial_article_revision_videos
+            (revision_id, position, video_id, remove_video, updated_at)
+          SELECT ${newRevision[0].id}::uuid, position, video_id, false, now()
+          FROM public.editorial_article_videos
+          WHERE article_id=${articleId}::uuid
+          ON CONFLICT (revision_id, position) DO NOTHING
+        `;
+      }
+      if (previousRevisionId) {
+        await tx`
           INSERT INTO public.editorial_article_sources
             (article_id, revision_id, source_title, publisher, canonical_url, attribution_text, rights_reference, accessed_at)
           SELECT article_id, ${newRevision[0].id}::uuid, source_title, publisher,
@@ -469,6 +488,14 @@ export async function restoreEditorialRevision(articleId: string, revisionId: st
         FROM public.editorial_article_revision_media
         WHERE revision_id=${revisionId}::uuid
         ON CONFLICT (revision_id, placement, position) DO NOTHING
+      `;
+      await tx`
+        INSERT INTO public.editorial_article_revision_videos
+          (revision_id, position, video_id, remove_video, updated_at)
+        SELECT ${created[0].id}::uuid, position, video_id, remove_video, now()
+        FROM public.editorial_article_revision_videos
+        WHERE revision_id=${revisionId}::uuid
+        ON CONFLICT (revision_id, position) DO NOTHING
       `;
       await tx`
         INSERT INTO public.editorial_article_sources
