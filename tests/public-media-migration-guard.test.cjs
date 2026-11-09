@@ -7,7 +7,7 @@ const root = path.join(__dirname, '..');
 const migrationDir = path.join(root, 'db/migrations');
 const readMigration = name => fs.readFileSync(path.join(migrationDir, name), 'utf8');
 
-test('V2 migration inventory remains contiguous through the public Media policy boundary', () => {
+test('V2 migration inventory remains contiguous through the full V2 Media implementation chain', () => {
   const files = fs.readdirSync(migrationDir).filter(name => /^[0-9]{4}_/.test(name) && name.endsWith('.sql'));
   for (let number = 1; number <= 37; number += 1) {
     const prefix = String(number).padStart(4, '0');
