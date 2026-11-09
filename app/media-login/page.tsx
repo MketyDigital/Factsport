@@ -15,8 +15,9 @@ export default async function MediaLoginPage({ searchParams }: { searchParams?: 
   let isConfiguredMediaHost = false;
   try { isConfiguredMediaHost = !!host && isEntraMediaRequestHost(new URL(protocol + '://' + host)); } catch { isConfiguredMediaHost = false; }
   const hasError = Boolean(searchParams?.error);
-  const editorialDatabaseReady = await isFactsportEditorialPostgresReady();
-  const signInReady = isEntraExternalConfigured() && editorialDatabaseReady && isConfiguredMediaHost;
+  const entraHostReady = isEntraExternalConfigured() && isConfiguredMediaHost;
+  const editorialDatabaseReady = entraHostReady ? await isFactsportEditorialPostgresReady() : false;
+  const signInReady = entraHostReady && editorialDatabaseReady;
   return <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-12 text-white">
     <section className="w-full max-w-md rounded-3xl border border-white/10 bg-white p-8 text-slate-950 shadow-2xl">
       <p className="text-xs font-black uppercase tracking-[.2em] text-blue-700">Factsport Media</p>
