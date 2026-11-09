@@ -23,6 +23,7 @@ const page = read('app/admin/news/page.tsx');
 const adapter = read('lib/adapters/postgres-client.ts');
 const ui = read('app/admin/news/NewsroomClient.tsx');
 const mediaUpload = read('app/api/admin/media/route.ts');
+const imageInspection = read('lib/media/image-inspection.ts');
 const mediaActions = read('app/admin/news/media-actions.ts');
 
 test('social publishing is a separate durable Media workflow', () => {
@@ -119,8 +120,10 @@ test('social scheduling is attributed and cancellation cannot race an active del
 
 
 test('editorial media uploads are private, validated, hashed and rights-reviewed before attachment', () => {
-  assert.match(mediaUpload, /MAX_BYTES = 8 \* 1024 \* 1024/i);
-  assert.match(mediaUpload, /image\/jpeg.*image\/png.*image\/webp/i);
+  assert.match(imageInspection, /MAX_EDITORIAL_IMAGE_BYTES = 8 \* 1024 \* 1024/i);
+  assert.match(mediaUpload, /MAX_EDITORIAL_IMAGE_BYTES/);
+  assert.match(imageInspection, /image\/jpeg[\s\S]*image\/png[\s\S]*image\/webp/i);
+  assert.match(mediaUpload, /EDITORIAL_IMAGE_MIME_TYPES\.has\(file\.type\)/);
   assert.match(mediaUpload, /validImageSignature/i);
   assert.match(mediaUpload, /SHA-256/i);
   assert.match(mediaUpload, /factsportMediaBucket/);
@@ -376,12 +379,15 @@ test('newsroom lists current revision media and allows audited removal from a dr
 
 
 test('editorial uploads persist intrinsic dimensions and reject oversized image canvases', () => {
-  assert.match(mediaUpload, /function imageDimensions/);
-  assert.match(mediaUpload, /getUint32\(16, false\)/);
-  assert.match(mediaUpload, /frameMarkers/);
-  assert.match(mediaUpload, /VP8X/);
-  assert.match(mediaUpload, /VP8L/);
-  assert.match(mediaUpload, /width > 16000 \|\| height > 16000 \|\| width \* height > 40000000/);
+  assert.match(imageInspection, /function imageDimensions/);
+  assert.match(mediaUpload, /imageDimensions\(file\.type, bytes\)/);
+  assert.match(imageInspection, /getUint32\(16, false\)/);
+  assert.match(imageInspection, /frameMarkers/);
+  assert.match(imageInspection, /VP8X/);
+  assert.match(imageInspection, /VP8L/);
+  assert.match(imageInspection, /width > 16000 \|\| height > 16000/);
+  assert.match(imageInspection, /width \* height > MAX_EDITORIAL_IMAGE_PIXELS/);
+  assert.match(imageInspection, /MAX_EDITORIAL_IMAGE_PIXELS = 8_000_000/);
   assert.match(mediaUpload, /\$\{dimensions\.width\}, \$\{dimensions\.height\}/);
   assert.match(mediaUpload, /width, height, alt_text/);
 });
@@ -398,7 +404,7 @@ test('editing a published article seeds its current hero, team logos and inline 
 
 test('editorial upload rejects oversized request bodies before multipart parsing', () => {
   assert.match(mediaUpload, /content-length/);
-  assert.match(mediaUpload, /MAX_BYTES \+ 64 \* 1024/);
+  assert.match(mediaUpload, /MAX_EDITORIAL_IMAGE_BYTES \+ 64 \* 1024/);
   assert.match(mediaUpload, /status: 413/);
   assert.match(mediaUpload, /request\.formData\(\)/);
 });
