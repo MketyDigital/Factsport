@@ -107,7 +107,7 @@ export default function MediaLibraryClient({ canRevokeRights = false, derivative
         setUploadPending(false);
       }
     }}>
-      <label className="text-xs font-bold text-slate-700">Upload image (JPEG, PNG or WebP · max 8 MB)
+      <label className="text-xs font-bold text-slate-700">Upload image (JPEG, PNG or WebP · max 8 MB / 8 megapixels)
         <input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setSelectedFile(event.target.files?.[0] || null)} className="mt-1 block w-full text-xs font-normal" />
       </label>
       <label className="text-xs font-bold text-slate-700">Alternative text
