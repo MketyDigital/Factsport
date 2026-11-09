@@ -107,7 +107,7 @@ export async function removeRevisionMedia(input: {
       !['hero', 'team_1', 'team_2', 'inline'].includes(input?.placement)) {
     return { success: false, error: 'Invalid article or media placement.' };
   }
-  const position = input.placement === 'inline' ? input.position : 0;
+  const position = input.placement === 'inline' ? (input.position ?? 0) : 0;
   if (!Number.isInteger(position) || (position as number) < 0 || (position as number) > 100 ||
       (input.placement !== 'inline' && position !== 0)) {
     return { success: false, error: 'Invalid media position.' };
