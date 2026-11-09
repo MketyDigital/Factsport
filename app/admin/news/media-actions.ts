@@ -353,3 +353,58 @@ export async function removeEditorialVideoFromRevision(input: { articleId: strin
     return { success: false, error: error instanceof Error ? error.message : 'Unable to remove video.' };
   }
 }
+
+
+export async function revokeMediaVideoRights(input: { videoId: string; reason: string }) {
+  const authorization = await authorizeMediaEditorialAction('rights_admin');
+  if (!authorization.ok) return { success: false, error: authorization.error };
+  if (!/^[0-9a-f-]{36}$/i.test(input?.videoId || '')) {
+    return { success: false, error: 'Invalid video asset identifier.' };
+  }
+  const reason = typeof input.reason === 'string' ? input.reason.trim().slice(0, 500) : '';
+  if (reason.length < 10) return { success: false, error: 'Record at least 10 characters explaining why this video is being withdrawn.' };
+  try {
+    const affectedSlugs = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+      const videos = await tx`
+        SELECT id, rights_status, is_public
+        FROM public.media_video_assets
+        WHERE id=${input.videoId}::uuid FOR UPDATE
+      `;
+      if (!videos.length) throw new Error('Video asset was not found.');
+      if (videos[0].rights_status === 'rejected') throw new Error('This video has already been withdrawn.');
+      const linkedArticles = await tx`
+        SELECT DISTINCT a.slug
+        FROM public.editorial_article_videos av
+        JOIN public.editorial_articles a ON a.id=av.article_id
+        WHERE av.video_id=${input.videoId}::uuid
+      `;
+      await tx`
+        UPDATE public.media_video_assets
+        SET rights_status='rejected', is_public=false,
+            rights_reviewed_by=${authorization.user.domainUserId}::uuid,
+            rights_reviewed_at=now(), updated_at=now()
+        WHERE id=${input.videoId}::uuid
+      `;
+      await tx`
+        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, details)
+        VALUES (
+          ${authorization.user.domainUserId}::uuid, 'media_video_rights_revoked',
+          ${JSON.stringify({
+            videoId: input.videoId,
+            previousRightsStatus: videos[0].rights_status,
+            wasPublic: videos[0].is_public,
+            reason,
+          })}::jsonb
+        )
+      `;
+      return linkedArticles.map(article => String((article as any).slug));
+    }));
+    revalidatePath('/admin/media'); revalidatePath('/admin/news');
+    revalidatePath('/news'); revalidatePath('/');
+    for (const slug of affectedSlugs) revalidatePath('/news/' + slug);
+    return { success: true };
+  } catch (error) {
+    console.error('Media video rights revocation failed', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to withdraw video rights.' };
+  }
+}
