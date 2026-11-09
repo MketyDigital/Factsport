@@ -36,9 +36,14 @@ export async function scheduleSocialPublication(input: {
 
     const id = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
       const actorId = authorization.user.domainUserId;
-      const channels = await tx`SELECT id, supports_media FROM public.media_social_channels WHERE id=${input.channelId}::uuid AND is_enabled=true AND surface_scope='public_media' FOR SHARE`;
+      const channels = await tx`SELECT id, provider, supports_media FROM public.media_social_channels WHERE id=${input.channelId}::uuid AND is_enabled=true AND surface_scope='public_media' FOR SHARE`;
       if (!channels.length) throw new Error('This social channel is not enabled for publishing.');
       if (mediaAssetIds.length && !channels[0].supports_media) throw new Error('This channel has not passed image-delivery verification; schedule a text-only post or use a verified image-capable channel.');
+      if (channels[0].provider === 'meta' && mediaAssetIds.length > 1) throw new Error('The current Meta adapter supports one image per post.');
+      const telegramTextLength = content.length + (linkUrl ? linkUrl.length + 1 : 0);
+      if (channels[0].provider === 'telegram' && telegramTextLength > (mediaAssetIds.length ? 1024 : 4096)) {
+        throw new Error(mediaAssetIds.length ? 'Telegram image captions are limited to 1,024 characters.' : 'Telegram text messages are limited to 4,096 characters.');
+      }
       if (input.articleId) {
         const articles = await tx`
           SELECT id FROM public.editorial_articles
@@ -49,7 +54,7 @@ export async function scheduleSocialPublication(input: {
       }
       if (mediaAssetIds.length) {
         const eligibleAssets = await tx`
-          SELECT m.id
+          SELECT m.id, m.byte_size
           FROM public.media_assets m
           WHERE m.id = ANY(${mediaAssetIds}::uuid[])
             AND m.media_kind='image'
@@ -72,6 +77,9 @@ export async function scheduleSocialPublication(input: {
         `;
         if (eligibleAssets.length !== mediaAssetIds.length) {
           throw new Error('Every social image must already be rights-approved and attached to public published Media content.');
+        }
+        if (channels[0].provider === 'telegram' && eligibleAssets.some((asset: any) => Number(asset.byte_size) > 5 * 1024 * 1024)) {
+          throw new Error('Telegram URL-based photo delivery is limited to 5 MB per image.');
         }
       }
       const matchesRequest = (row: any) =>
@@ -212,8 +220,8 @@ export async function updateSocialChannel(input: {
         settings = raw ? { profile_id: raw } : {};
       } else if (provider === 'telegram') {
         const chatIds = raw.split(',').map(value => value.trim()).filter(Boolean);
-        if (chatIds.length > 20 || chatIds.some(value => !/^(?:-?\d{1,20}|@[A-Za-z0-9_]{5,32})$/.test(value))) {
-          throw new Error('Enter up to 20 Telegram chat IDs or @channel usernames, separated by commas.');
+        if (chatIds.length > 5 || chatIds.some(value => !/^(?:-?\d{1,20}|@[A-Za-z0-9_]{5,32})$/.test(value))) {
+          throw new Error('Enter up to 5 Telegram chat IDs or @channel usernames, separated by commas.');
         }
         settings = chatIds.length ? { chat_ids: chatIds } : {};
       } else if (provider === 'make') {
