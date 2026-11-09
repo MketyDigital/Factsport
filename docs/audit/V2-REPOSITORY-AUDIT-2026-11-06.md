@@ -87,3 +87,8 @@ Do not merge to `main`, enable production routes, change DNS, modify the product
 7. Only then prepare a separate production cutover proposal.
 
 **Conclusion:** V2 has a working, protected Cloudflare staging foundation and green native build, but it is not a complete Factsport replacement and is not approved for production cutover.
+
+
+## Continuation update — 2026-11-09
+
+The audit snapshot has been continued through M35–M40. New source-level implementation covers Stream webhook-backed participant presence and moderation; rights-cleared social image attachments and provider capability gating; append-only revision-scoped editorial source provenance; non-secret social channel configuration; durable social claim/deliver/result APIs; direct Meta/Telegram adapters; and a disabled Logic Apps recurrence template. The CI migration inventory now covers 0001–0037. This does not mean migrations 0027–0037 have been applied or that CMS/social/Studio staging E2E has passed. See ROADMAP and the M35–M40 handoffs for exact status and remaining acceptance gates.
