@@ -51,3 +51,11 @@ The existing implementation already includes:
 ## Safety
 
 No production database, legacy Supabase rows, Cloudflare production route, DNS, R2 bucket policy, social credentials, Stream configuration, AdSense account or production deployment was changed. No legacy data was imported or deleted.
+
+
+## Follow-on refinements
+
+- Added direct private image upload to `/admin/media`; the asset remains pending/private until rights review and attachment through an editorial revision.
+- Expanded the newsroom preview to reuse the public `NewsArtwork` and `MarkdownRenderer` components and display current revision hero/team marks and ordered inline gallery with captions. It deliberately omits ads and live sidebar modules.
+- Added an early Content-Length guard before multipart parsing; the per-file size, MIME/signature and intrinsic dimension/pixel checks remain enforced server-side.
+- Latest code now includes these refinements; CI for the newest source commit is pending. The preview is article-surface parity, not a complete page shell with live modules.
