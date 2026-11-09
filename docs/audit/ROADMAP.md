@@ -544,3 +544,13 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - Match admission must use a strict scheduled/pre-match status allowlist plus a database-time kickoff check; reject unknown, live and terminal states. Contact reuse is by opaque same-browser visitor cookie, not email-based history transfer.
 - Exact evidence, risks and acceptance criteria: `docs/audit/handoffs/M49-PREDICTION-SUBMISSION-PREFLIGHT.md`.
 - Audit/design only: no SQL, route, cookie, rate limiter, staging resource or production resource changed. Next: implement and disposable-PostgreSQL-test the scoped submission function, then replace readiness checks and wire the API.
+
+
+### M49 implementation continuation — scoped Prediction submit function
+
+- Added migration 0043 with a SECURITY DEFINER anonymous submission function, pinned search_path, per-visitor transaction lock, match row lock, strict scheduled/pre-match plus database-time kickoff enforcement, participant reuse and duplicate retry recognition.
+- The dedicated API role receives EXECUTE only; the migration adds no direct table grants. Anonymous rows remain prize-ineligible.
+- Prediction runtime readiness now checks function existence and EXECUTE privilege rather than broad table-level write grants.
+- Disposable PostgreSQL CI now targets 43 migrations and includes ACL/role/function/duplicate-retry assertions. The new run must complete before this is marked DB/runtime verified.
+- API route, visitor cookie, rate limiting, marketing confirmation, public UI, campaign engine, account claim and settlement are still not implemented. No staging/production DB was changed.
+- See `docs/audit/handoffs/M49-PREDICTION-SUBMISSION-PREFLIGHT.md`.
