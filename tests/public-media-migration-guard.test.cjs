@@ -9,7 +9,7 @@ const readMigration = name => fs.readFileSync(path.join(migrationDir, name), 'ut
 
 test('V2 migration inventory remains contiguous through the full V2 Media implementation chain', () => {
   const files = fs.readdirSync(migrationDir).filter(name => /^[0-9]{4}_/.test(name) && name.endsWith('.sql'));
-  for (let number = 1; number <= 41; number += 1) {
+  for (let number = 1; number <= 42; number += 1) {
     const prefix = String(number).padStart(4, '0');
     const matches = files.filter(name => name.slice(0, 5) === prefix + '_');
     assert.equal(matches.length, 1, 'expected exactly one migration for ' + prefix);
@@ -129,4 +129,29 @@ test('Cloudflare Stream VOD migration is inventoried and public playback require
   assert.ok(migration.includes("v.rights_status IN ('owned','licensed','editorial_exception')"));
   assert.ok(migration.includes('v.rights_reviewed_by IS NOT NULL'));
   assert.ok(!migration.includes('GRANT SELECT ON public.media_video_assets TO factsport_v2_reader'));
+});
+
+
+test('Social operator reconciliation is private, evidence-backed and never blindly replays unknown deliveries', () => {
+  const migration = readMigration('0042_factsport_social_operator_reconciliation.sql');
+  const action = fs.readFileSync(path.join(__dirname, '..', 'app/admin/social/actions.ts'), 'utf8');
+  const client = fs.readFileSync(path.join(__dirname, '..', 'app/admin/social/SocialClient.tsx'), 'utf8');
+  assert.ok(migration.includes('public.media_social_operator_reconciliation'));
+  assert.ok(migration.includes("latest.outcome = 'unknown_result'"));
+  assert.ok(migration.includes("o.status = 'dead_letter'"));
+  assert.ok(migration.includes('GRANT SELECT ON public.media_social_operator_reconciliation'));
+  assert.ok(migration.includes('TO factsport_v2_editorial_writer'));
+  assert.ok(migration.includes('social_delivery_reconciled_published'));
+  assert.ok(migration.includes('social_delivery_requeued_after_no_post'));
+  assert.ok(action.includes('isFactsportSocialReconciliationReady'));
+  assert.ok(action.includes('FOR UPDATE OF p, o'));
+  assert.ok(action.includes("current.outcome !== 'unknown_result'"));
+  assert.ok(action.includes('SOCIAL_RECONCILIATION_MAX_ATTEMPTS'));
+  assert.ok(action.includes('confirmedNoProviderPost: true'));
+  assert.ok(action.includes('social_delivery_reconciled_published'));
+  assert.ok(action.includes('social_delivery_requeued_after_no_post'));
+  assert.ok(!action.includes('UPDATE public.media_social_delivery_attempts'));
+  assert.ok(client.includes('I checked the provider account'));
+  assert.ok(client.includes('Confirm no post · requeue'));
+  assert.ok(client.includes('never blindly replayed'));
 });
