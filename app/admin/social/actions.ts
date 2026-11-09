@@ -8,7 +8,7 @@ import { inspectPublicMediaArticle } from '@/lib/public-media-content-policy';
 type Result = { success: true; id?: string } | { success: false; error: string };
 
 export async function scheduleSocialPublication(input: {
-  channelId: string; contentText: string; articleId?: string; linkUrl?: string; scheduledAt: string; idempotencyKey: string; publicContentConfirmed: boolean;
+  channelId: string; contentText: string; articleId?: string; mediaAssetIds?: string[]; linkUrl?: string; scheduledAt: string; idempotencyKey: string; publicContentConfirmed: boolean;
 }): Promise<Result> {
   const authorization = await authorizeMediaEditorialAction('social');
   if (!authorization.ok) return { success: false, error: authorization.error };
@@ -29,6 +29,10 @@ export async function scheduleSocialPublication(input: {
     const contentPolicy = inspectPublicMediaArticle({ title: content, body_markdown: content, canonical_url: linkUrl });
     if (!contentPolicy.eligible) return { success: false, error: 'This post contains betting promotion, an affiliate link or private Prediction content and cannot be distributed through public Media channels.' };
     if (input.articleId && !/^[0-9a-f-]{36}$/i.test(input.articleId)) return { success: false, error: 'Invalid linked article.' };
+    const mediaAssetIds = Array.isArray(input.mediaAssetIds) ? Array.from(new Set(input.mediaAssetIds)) : [];
+    if (mediaAssetIds.length > 4 || mediaAssetIds.some(id => !/^[0-9a-f-]{36}$/i.test(id))) {
+      return { success: false, error: 'Choose up to four valid public media assets.' };
+    }
 
     const id = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
       const actorId = authorization.user.domainUserId;
@@ -42,6 +46,23 @@ export async function scheduleSocialPublication(input: {
         `;
         if (!articles.length) throw new Error('Linked article must already be published and approved.');
       }
+      if (mediaAssetIds.length) {
+        const eligibleAssets = await tx`
+          SELECT m.id
+          FROM public.media_assets m
+          JOIN public.public_media_assets public_asset ON public_asset.object_key=m.object_key
+          WHERE m.id = ANY(${mediaAssetIds}::uuid[])
+            AND m.media_kind='image'
+            AND m.is_public=true
+            AND m.rights_status IN ('owned','licensed','editorial_exception')
+            AND m.rights_reviewed_by IS NOT NULL AND m.rights_reviewed_at IS NOT NULL
+            AND (m.usage_expires_at IS NULL OR m.usage_expires_at > now())
+          FOR SHARE OF m
+        `;
+        if (eligibleAssets.length !== mediaAssetIds.length) {
+          throw new Error('Every social image must already be rights-approved and attached to public published Media content.');
+        }
+      }
       const matchesRequest = (row: any) =>
         row.created_by === actorId &&
         row.channel_id === input.channelId &&
@@ -50,7 +71,7 @@ export async function scheduleSocialPublication(input: {
         (row.link_url || null) === linkUrl &&
         new Date(row.scheduled_at).valueOf() === scheduledAt.valueOf();
       const existing = await tx`
-        SELECT id, article_id, channel_id, content_text, link_url, scheduled_at, created_by
+        SELECT id, article_id, channel_id, media_asset_ids, content_text, link_url, scheduled_at, created_by
         FROM public.media_social_publications
         WHERE idempotency_key=${input.idempotencyKey} FOR UPDATE
       `;
@@ -60,11 +81,11 @@ export async function scheduleSocialPublication(input: {
       }
       const publication = await tx`
         INSERT INTO public.media_social_publications (
-          article_id, channel_id, content_text, link_url, status, scheduled_at,
+          article_id, channel_id, content_text, media_asset_ids, link_url, status, scheduled_at,
           idempotency_key, created_by, updated_by, distribution_scope,
           public_content_confirmed_by, public_content_confirmed_at
         ) VALUES (
-          ${input.articleId || null}::uuid, ${input.channelId}::uuid, ${content}, ${linkUrl},
+          ${input.articleId || null}::uuid, ${input.channelId}::uuid, ${content}, ${mediaAssetIds}::uuid[], ${linkUrl},
           'scheduled', ${scheduledAt.toISOString()}::timestamptz, ${input.idempotencyKey},
           ${actorId}::uuid, ${actorId}::uuid, 'public_media', ${actorId}::uuid, now()
         ) ON CONFLICT (idempotency_key) DO NOTHING RETURNING id
