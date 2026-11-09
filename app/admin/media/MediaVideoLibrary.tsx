@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import MediaVideoRightsRevocationControl from './MediaVideoRightsRevocationControl';
+import MediaVideoUsagePanel from './MediaVideoUsagePanel';
 
 type VideoAsset = {
   id: string; title: string; description: string | null; upload_status: string;
@@ -110,6 +111,7 @@ export default function MediaVideoLibrary({ ready, canRevokeRights = false }: { 
           <p className="truncate text-sm font-bold text-slate-900">{video.title}</p>
           <p className="mt-1 text-[10px] text-slate-500">{video.upload_status} · {video.rights_status} · {video.duration_seconds ? Math.round(video.duration_seconds) + ' sec' : 'duration pending'} · {video.width && video.height ? video.width + '×' + video.height : 'dimensions pending'}</p>
           {video.is_public && <p className="mt-1 text-[10px] font-bold text-emerald-700">Public on an approved article</p>}
+          <MediaVideoUsagePanel videoId={video.id} />
           {canRevokeRights && ['owned','licensed','editorial_exception'].includes(video.rights_status) && <MediaVideoRightsRevocationControl videoId={video.id} onRevoked={() => void load()} />}
         </div>
         <button type="button" disabled={pending} onClick={() => startTransition(async () => {
