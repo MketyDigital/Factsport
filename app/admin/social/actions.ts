@@ -183,7 +183,7 @@ export async function updateSocialChannel(input: {
     return { success: false, error: 'Invalid social channel configuration.' };
   }
   try {
-    const updated = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+    await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
       const rows = await tx`
         SELECT id, provider FROM public.media_social_channels
         WHERE id=${input.channelId}::uuid
@@ -235,7 +235,7 @@ export async function updateSocialChannel(input: {
           ${JSON.stringify({ channelId: input.channelId, provider, enabled: input.isEnabled, supportsMedia: input.supportsMedia })}::jsonb
         )
       `;
-      return { provider };
+      return true;
     }));
     revalidatePath('/admin/social');
     return { success: true };
