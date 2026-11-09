@@ -4,69 +4,14 @@ import { isSameOriginRequest } from '@/app/lib/admin/authorization';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 import { factsportMediaBucket } from '@/lib/adapters/factsport-cloudflare-bindings';
 import { isFactsportMediaDerivativesReady } from '@/lib/media/readiness';
+import {
+  EDITORIAL_IMAGE_EDITORIAL_IMAGE_MIME_TYPES,
+  imageDimensions,
+  MAX_EDITORIAL_IMAGE_BYTES,
+  validImageSignature,
+} from '@/lib/media/image-inspection';
 
 export const runtime = 'edge';
-
-const MAX_BYTES = 8 * 1024 * 1024;
-const MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-
-function validImageSignature(type: string, bytes: Uint8Array) {
-  if (type === 'image/png') return bytes.length >= 8 &&
-    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 &&
-    bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
-  if (type === 'image/jpeg') return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-  if (type === 'image/webp') return bytes.length >= 12 &&
-    String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) === 'RIFF' &&
-    String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]) === 'WEBP';
-  return false;
-}
-
-function imageDimensions(type: string, bytes: Uint8Array): { width: number; height: number } | null {
-  let width = 0;
-  let height = 0;
-  if (type === 'image/png' && bytes.length >= 24 &&
-      String.fromCharCode(bytes[12], bytes[13], bytes[14], bytes[15]) === 'IHDR') {
-    width = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(16, false);
-    height = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(20, false);
-  } else if (type === 'image/jpeg') {
-    let offset = 2;
-    const frameMarkers = new Set([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf]);
-    while (offset + 4 < bytes.length) {
-      if (bytes[offset] !== 0xff) { offset += 1; continue; }
-      while (bytes[offset] === 0xff) offset += 1;
-      const marker = bytes[offset++];
-      if (marker === 0xd9 || marker === 0xda) break;
-      if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8)) continue;
-      if (offset + 2 > bytes.length) break;
-      const segmentLength = (bytes[offset] << 8) | bytes[offset + 1];
-      if (segmentLength < 2 || offset + segmentLength > bytes.length) break;
-      if (frameMarkers.has(marker) && segmentLength >= 7) {
-        height = (bytes[offset + 3] << 8) | bytes[offset + 4];
-        width = (bytes[offset + 5] << 8) | bytes[offset + 6];
-        break;
-      }
-      offset += segmentLength;
-    }
-  } else if (type === 'image/webp' && bytes.length >= 25) {
-    const chunk = String.fromCharCode(bytes[12], bytes[13], bytes[14], bytes[15]);
-    if (chunk === 'VP8X' && bytes.length >= 30) {
-      width = 1 + bytes[24] + (bytes[25] << 8) + (bytes[26] << 16);
-      height = 1 + bytes[27] + (bytes[28] << 8) + (bytes[29] << 16);
-    } else if (chunk === 'VP8 ' && bytes.length >= 30 &&
-      bytes[23] === 0x9d && bytes[24] === 0x01 && bytes[25] === 0x2a) {
-      width = ((bytes[26] | (bytes[27] << 8)) & 0x3fff);
-      height = ((bytes[28] | (bytes[29] << 8)) & 0x3fff);
-    } else if (chunk === 'VP8L' && bytes.length >= 25 && bytes[20] === 0x2f) {
-      width = 1 + bytes[21] + ((bytes[22] & 0x3f) << 8);
-      height = 1 + ((bytes[22] >> 6) | (bytes[23] << 2) | ((bytes[24] & 0x0f) << 10));
-    }
-  }
-  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) ||
-      width < 1 || height < 1 || width > 16000 || height > 16000 || width * height > 40000000) {
-    return null;
-  }
-  return { width, height };
-}
 
 export async function GET(request: Request) {
   const authorization = await authorizeMediaEditorialAction('media');
@@ -154,7 +99,7 @@ export async function POST(request: Request) {
   if (!authorization.ok) return NextResponse.json({ error: authorization.error }, { status: authorization.status });
   if (!isSameOriginRequest(request)) return NextResponse.json({ error: 'Same-origin request required.' }, { status: 403 });
   const declaredLength = Number(request.headers.get('content-length') || 0);
-  if (declaredLength > MAX_BYTES + 64 * 1024) {
+  if (declaredLength > MAX_EDITORIAL_IMAGE_BYTES + 64 * 1024) {
     return NextResponse.json({ error: 'Upload request exceeds the 8 MB image limit.' }, { status: 413 });
   }
 
@@ -164,13 +109,13 @@ export async function POST(request: Request) {
     const file = form.get('file');
     const altText = typeof form.get('altText') === 'string' ? String(form.get('altText')).trim().slice(0, 500) : '';
     if (!(file instanceof File)) return NextResponse.json({ error: 'An image file is required.' }, { status: 400 });
-    if (!MIME_TYPES.has(file.type) || file.size < 1 || file.size > MAX_BYTES) {
+    if (!EDITORIAL_IMAGE_MIME_TYPES.has(file.type) || file.size < 1 || file.size > MAX_EDITORIAL_IMAGE_BYTES) {
       return NextResponse.json({ error: 'Upload a JPEG, PNG or WebP image up to 8 MB.' }, { status: 400 });
     }
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (!validImageSignature(file.type, bytes)) return NextResponse.json({ error: 'The file contents do not match the declared image type.' }, { status: 400 });
     const dimensions = imageDimensions(file.type, bytes);
-    if (!dimensions) return NextResponse.json({ error: 'The image header is invalid or its dimensions exceed the 40-megapixel safety limit.' }, { status: 400 });
+    if (!dimensions) return NextResponse.json({ error: 'The image header is invalid or its dimensions exceed the 8-megapixel safety limit.' }, { status: 400 });
     const digest = await crypto.subtle.digest('SHA-256', bytes);
     const sha256 = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join('');
     objectKey = `editorial/${crypto.randomUUID().replace(/-/g, '')}`;
