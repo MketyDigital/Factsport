@@ -68,7 +68,7 @@ test('social delivery adapter locks each attempt and uses direct Meta/Telegram p
   assert.match(deliver, /FACTSPORT_LOGIC_APPS_SOCIAL_ADAPTER_URL/);
   assert.match(deliver, /Idempotency-Key/);
   assert.match(result, /!attempt\[0\]\.provider_started_at/);
-  assert.match(action, /meta_multiple_images_not_supported/);
+  assert.match(action, /supports one image per post/);
   assert.match(action, /Telegram image captions are limited to 1,024 characters/);
   assert.match(lockMigration, /provider_started_at timestamptz/);
   assert.match(lockMigration, /GRANT UPDATE \(provider_started_at\)/);
