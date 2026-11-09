@@ -175,7 +175,7 @@ export async function middleware(request: NextRequest) {
   // not authorize Media admin or any Prediction business-data operation.
   await supabase.auth.getUser();
   return response;
-}}
+}
 
 export const config = {
   matcher: [
