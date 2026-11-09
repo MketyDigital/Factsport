@@ -17,7 +17,9 @@ WHERE a.status='published'
   AND a.review_status='approved'
   AND a.reviewed_by IS NOT NULL
   AND a.reviewed_at IS NOT NULL
-  AND a.published_at <= now();
+  AND a.published_at <= now()
+  AND s.canonical_url ~* '^https?://'
+  AND s.canonical_url !~* '^https?://[^/]*@';
 
 REVOKE ALL ON public.public_editorial_article_sources
   FROM PUBLIC, factsport_v2_editorial_writer,
