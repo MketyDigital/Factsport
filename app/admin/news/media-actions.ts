@@ -96,3 +96,57 @@ export async function reviewRightsAndAttachMedia(input: MediaReviewInput) {
     return { success: false, error: error instanceof Error ? error.message : 'Unable to review and attach media.' };
   }
 }
+
+
+export async function removeRevisionMedia(input: {
+  articleId: string; placement: 'hero' | 'team_1' | 'team_2' | 'inline'; position?: number;
+}) {
+  const authorization = await authorizeMediaEditorialAction('media');
+  if (!authorization.ok) return { success: false, error: authorization.error };
+  if (!/^[0-9a-f-]{36}$/i.test(input?.articleId || '') ||
+      !['hero', 'team_1', 'team_2', 'inline'].includes(input?.placement)) {
+    return { success: false, error: 'Invalid article or media placement.' };
+  }
+  const position = input.placement === 'inline' ? input.position : 0;
+  if (!Number.isInteger(position) || (position as number) < 0 || (position as number) > 100 ||
+      (input.placement !== 'inline' && position !== 0)) {
+    return { success: false, error: 'Invalid media position.' };
+  }
+  try {
+    await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+      const articles = await tx`
+        SELECT id FROM public.editorial_articles
+        WHERE id=${input.articleId}::uuid AND status <> 'archived'
+        FOR UPDATE
+      `;
+      if (!articles.length) throw new Error('Article was not found or has been archived.');
+      const revisions = await tx`
+        SELECT id FROM public.editorial_article_revisions
+        WHERE article_id=${input.articleId}::uuid AND workflow_status='draft'
+        ORDER BY revision_number DESC LIMIT 1 FOR UPDATE
+      `;
+      if (!revisions.length) throw new Error('Save a draft revision before removing media.');
+      await tx`
+        INSERT INTO public.editorial_article_revision_media
+          (revision_id, placement, position, media_id, remove_media, updated_at)
+        VALUES (${revisions[0].id}::uuid, ${input.placement}, ${position}, NULL, true, now())
+        ON CONFLICT (revision_id, placement, position) DO UPDATE SET
+          media_id=NULL, remove_media=true, updated_at=now()
+      `;
+      await tx`
+        INSERT INTO public.media_editorial_audit_events
+          (actor_user_id, action, article_id, revision_id, details)
+        VALUES (
+          ${authorization.user.domainUserId}::uuid, 'media_detached',
+          ${input.articleId}::uuid, ${revisions[0].id}::uuid,
+          ${JSON.stringify({ placement: input.placement, position })}::jsonb
+        )
+      `;
+    }));
+    revalidatePath('/admin/news');
+    return { success: true };
+  } catch (error) {
+    console.error('Editorial media removal failed', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to remove media from this revision.' };
+  }
+}
