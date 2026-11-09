@@ -429,3 +429,15 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - Detailed evidence and commits: `docs/audit/handoffs/M42-VOD-DERIVATIVE-MIGRATION-INTEGRITY.md`. Latest head at handoff: `b6d3d8810ad46cda7e8754438ddfcc5e0a67eff8`.
 - Current-head isolated verification, native build and protected staging are not yet confirmed green. Migrations 0039–0041 remain unapplied; no production resources changed.
 - Next: complete current CI, parse/apply the complete chain in disposable PostgreSQL, provision a dedicated least-privilege Stream token lookup identity, then test VOD upload/preview/rights/public playback end-to-end in isolated staging.
+
+
+## 2026-11-09 M42 verification follow-up — CI and disposable migration apply passed
+
+- Fixed the JSX, Newsroom declaration/import and Stream JWT typed-array issues exposed after the 210-test engine suite passed.
+- Updated Social Publishing dispatcher status copy to reflect the implemented dispatcher while clearly retaining disabled activation gates.
+- Expanded isolated verification path filters to include `lib/**`.
+- Isolated verification, native Vinext build and protected Cloudflare staging passed on `298e8dedae206d2efb6b3c56cd9c6d674bfb1313` (runs `42572034766`, `42572034689`, `42572034712`).
+- Added `.github/workflows/v2-db-migration-verify.yml`. It applies migrations 0001–0041 to a disposable PostgreSQL 16 database and verifies Media/VOD objects and critical least-privilege grants. Run `42572207610` passed.
+- Current source and CI branch head at this checkpoint: `8d0586bf1db6855a23f3bb51d51ee8cf5f074ab0`.
+- This proves clean-database migration-chain applicability, not Azure staging/production migration execution, legacy data reconciliation, Stream/provider E2E or AdSense acceptance. No production resources or data were changed.
+- Next: review 0026 attestation preflight against actual isolated staging data, run CMS/VOD/Stream E2E, add social dead-letter/unknown-result reconciliation UI, and continue SQL-backed Prediction parity audit.
