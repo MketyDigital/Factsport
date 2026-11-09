@@ -92,8 +92,8 @@ export default function MediaLibraryClient() {
         if (!response.ok || !data.success) throw new Error(data.error || 'Media upload failed.');
         setSelectedFile(null);
         setAltText('');
-        setMessage('Image uploaded to private R2 storage. It remains unavailable publicly until rights are reviewed and it is attached to an approved published article.');
         await load(0, false);
+        setMessage('Image uploaded to private R2 storage. It remains unavailable publicly until rights are reviewed and it is attached to an approved published article.');
       } catch (error) {
         setMessage(error instanceof Error ? error.message : 'Media upload failed.');
       } finally {
