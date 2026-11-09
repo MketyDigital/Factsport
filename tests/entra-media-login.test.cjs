@@ -23,7 +23,10 @@ test('Media sign-in stays hidden until Entra and dedicated editorial PostgreSQL 
   assert.match(entra, /ENTRA_EXTERNAL_CLIENT_ID/);
   assert.match(entra, /ENTRA_EXTERNAL_REDIRECT_URI/);
   assert.match(entra, /sessionKey\(\)/);
-  assert.match(postgres, /export function isFactsportEditorialPostgresReady/);
+  assert.match(postgres, /export async function isFactsportEditorialPostgresReady/);
+  assert.match(postgres, /current_user = 'factsport_v2_editorial_writer'/);
+  assert.match(postgres, /has_column_privilege/);
+  assert.match(postgres, /has_table_privilege/);
   assert.match(postgres, /FACTSPORT_EDITORIAL_HYPERDRIVE/);
   assert.match(login, /isEntraExternalConfigured\(\)/);
   assert.match(login, /isFactsportEditorialPostgresReady\(\)/);
