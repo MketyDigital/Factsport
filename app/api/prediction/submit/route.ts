@@ -196,6 +196,10 @@ export async function POST(request: Request) {
     return noStoreJson({ error: 'invalid_display_name' }, 400);
   }
 
+  const matchId = body.matchId as string;
+  const outcome = body.outcome as 'home' | 'draw' | 'away';
+  const homeScore = (body.homeScore ?? null) as number | null;
+  const awayScore = (body.awayScore ?? null) as number | null;
   const visitorHash = await sha256Hex(visitorToken);
   const clientIp = request.headers.get('cf-connecting-ip');
   if (!clientIp || clientIp.length > 128) {
@@ -228,15 +232,15 @@ export async function POST(request: Request) {
           ${visitorHash},
           ${typeof body.email === 'string' ? body.email.trim() : null},
           ${typeof body.displayName === 'string' ? body.displayName.trim() : null},
-          ${body.matchId}::uuid,
-          ${body.outcome},
+          ${matchId}::uuid,
+          ${outcome},
           ${RULES_VERSION},
           ${RULES_ACCEPTANCE_TEXT},
           ${body.marketingOptIn === true},
           ${body.marketingOptIn === true ? MARKETING_CONSENT_VERSION : null},
           ${body.marketingOptIn === true ? MARKETING_CONSENT_TEXT : null},
-          ${body.homeScore ?? null},
-          ${body.awayScore ?? null}
+          ${homeScore},
+          ${awayScore}
         )
       `;
       return {
