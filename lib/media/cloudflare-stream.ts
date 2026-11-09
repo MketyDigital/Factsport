@@ -11,15 +11,25 @@ function streamConfig() {
   };
 }
 
-export function isFactsportStreamVideoReady(): boolean {
+export function isFactsportStreamPlaybackReady(): boolean {
   const config = streamConfig();
   return process.env.FACTSPORT_STREAM_VIDEO_READY === 'true' &&
-    /^[a-f0-9]{32}$/i.test(config.accountId) &&
-    config.apiToken.length >= 32 &&
     /^[a-f0-9]{31,32}$/i.test(config.signingKeyId) &&
     config.signingKeyJwk.length >= 100 &&
     config.allowedOrigins.length > 0 &&
     config.allowedOrigins.every(origin => /^(?:[a-z0-9-]+\.)*[a-z0-9-]+\.[a-z]{2,}$/.test(origin));
+}
+
+export function isFactsportStreamVideoReady(): boolean {
+  const config = streamConfig();
+  return isFactsportStreamPlaybackReady() &&
+    /^[a-f0-9]{32}$/i.test(config.accountId) &&
+    config.apiToken.length >= 32;
+}
+
+function requirePlaybackConfig() {
+  if (!isFactsportStreamPlaybackReady()) throw new Error('Cloudflare Stream signed playback is not provisioned.');
+  return streamConfig();
 }
 
 function requireConfig() {
@@ -117,7 +127,7 @@ function signingJwk(encodedOrJson: string) {
 }
 
 export async function createFactsportStreamSignedToken(videoUid: string): Promise<string> {
-  const config = requireConfig();
+  const config = requirePlaybackConfig();
   if (!/^[a-f0-9]{32}$/i.test(videoUid)) throw new Error('Invalid Stream video identifier.');
   const now = Math.floor(Date.now() / 1000);
   const header = base64Url(new TextEncoder().encode(JSON.stringify({ alg: 'RS256', kid: config.signingKeyId })));
