@@ -45,3 +45,11 @@ Status: source implementation and disposable migration apply verified; protected
 ## Safety
 
 No Azure or production migration was applied. No staging or production flag was enabled. No provider credentials, public social posts, DNS, Worker routes, R2 objects or Cloudflare Stream assets were changed.
+
+
+## Protected staging follow-up — 2026-11-09
+
+- Protected Cloudflare application staging completed successfully on source commit `28f87f2969a4e5793889b366e396972835ff6fa5`, run [42572757656](https://github.com/MketyDigital/Factsport/actions/runs/42572757656).
+- The run passed the regression suite, TypeScript, native Cloudflare Worker build, isolated Worker deployment, deny-by-default probes and protected /matches health checks.
+- Scope limitation: this staging workflow does not apply migrations 0042 to Azure PostgreSQL and does not enable `FACTSPORT_SOCIAL_RECONCILIATION_READY`. It does not exercise real provider reconciliation or post publication.
+- Migration 0042 remains unapplied to Azure staging and production; all activation controls remain disabled.
