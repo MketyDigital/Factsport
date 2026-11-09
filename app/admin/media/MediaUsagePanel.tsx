@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 type Usage = {
   relatedAssetCount: number;
-  derivatives: Array<{ id: string; variant: string; objectKey: string; rightsStatus: string; isPublic: boolean }>;
+  derivatives: Array<{ id: string; sourceAssetId: string; sourceObjectKey: string; variant: string; objectKey: string; rightsStatus: string; isPublic: boolean }>;
   articles: Array<{ id: string; slug: string; title: string; status: string; placement: string; position: number; reference_type: string }>;
   socialPosts: Array<{ id: string; status: string; scheduled_at: string | null; published_at: string | null; provider_post_url: string | null; display_name: string; provider: string }>;
 };
@@ -48,7 +48,7 @@ export default function MediaUsagePanel({ assetId }: { assetId: string }) {
           <h4 className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Derivative lineage</h4>
           {usage.derivatives.length ? <ul className="mt-1 space-y-1">
             {usage.derivatives.map(item => <li key={item.id} className="text-[11px] text-slate-700">
-              {item.variant.replaceAll('_', ' ')} · {item.rightsStatus} · {item.isPublic ? 'public flag on' : 'private'} · {item.id.slice(0, 8)}
+              {item.variant.replaceAll('_', ' ')} · {item.rightsStatus} · {item.isPublic ? 'public flag on' : 'private'} · source {item.sourceObjectKey}
             </li>)}
           </ul> : <p className="mt-1 text-[11px] text-slate-400">No derivative lineage found.</p>}
         </div>
