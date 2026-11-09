@@ -72,3 +72,8 @@ The newsroom composer now has a draft article preview using the exact public `Ma
 - `db/migrations/0027_factsport_revision_inline_media_gallery.sql` extends revision-scoped attachments with ordered inline placement and adds a public inline-media projection limited to published/reviewed articles and rights-cleared, unexpired assets.
 - The newsroom can search/reuse approved library assets; public article pages render the ordered gallery with attribution. Reusing an asset preserves its existing global public state.
 - Isolated verification passed on commit `c78b64029ea89706339243f3ad161e37953b353e` (run `42491443003`). TypeScript passed in native Worker build run `42491442888`, with final build still in progress at handoff time. Protected staging run `42491443017` was building/deploying staging; do not claim deployment passed until completion. Migration 0027 has not been applied to staging.
+
+
+## M36 continuation
+
+The follow-on Media lifecycle pass adds central private upload to `/admin/media`, revision-scoped attached-media display/removal, carry-forward of pending media choices, seeding of new drafts from currently published media, intrinsic image dimension validation/storage, and a richer preview using the public `NewsArtwork` and sanitized `MarkdownRenderer` components. See `M36-EDITORIAL-MEDIA-LIFECYCLE-CONTINUATION.md`. This remains source-only until the current CI run and isolated editorial/R2 runtime verification complete.
