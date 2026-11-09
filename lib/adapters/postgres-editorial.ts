@@ -5,6 +5,7 @@
  */
 import 'server-only';
 import { withFactsportPostgres } from '@/lib/adapters/postgres-client';
+import { isFactsportMediaVideoSchemaReady } from '@/lib/media/readiness';
 
 export interface PublicEditorialArticle {
   id: string; slug: string; title: string; excerpt: string | null;
@@ -99,12 +100,12 @@ export async function getPublicEditorialArticle(slug: string): Promise<PublicEdi
       WHERE article_id = ${article.id}::uuid
       ORDER BY accessed_at DESC, source_title ASC
     `;
-    const videos = await sql`
+    const videos = isFactsportMediaVideoSchemaReady() ? await sql`
       SELECT video_id, title, description, duration_seconds, width, height, attribution_text, position
       FROM public.public_editorial_article_videos
       WHERE article_id = ${article.id}::uuid
       ORDER BY position ASC, video_id ASC
-    `;
+    ` : [];
     return {
       ...article,
       inline_media: inlineMedia as unknown as PublicEditorialArticle['inline_media'],
