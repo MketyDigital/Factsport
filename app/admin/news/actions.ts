@@ -18,6 +18,7 @@ function safeHttpUrl(value: string | undefined): string | null {
   if (!value?.trim()) return null;
   const parsed = new URL(value.trim());
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new Error('Only HTTP or HTTPS URLs are allowed.');
+  if (parsed.username || parsed.password) throw new Error('Source URLs cannot contain embedded credentials.');
   return parsed.toString();
 }
 
@@ -480,5 +481,59 @@ export async function archiveEditorialArticle(articleId: string): Promise<Action
     revalidateEditorial(); return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unable to archive article.' };
+  }
+}
+
+
+export async function addEditorialSource(input: {
+  articleId: string; sourceTitle: string; publisher?: string;
+  canonicalUrl: string; attributionText?: string; rightsReference?: string;
+}): Promise<ActionResult<{ id: string }>> {
+  const authorization = await authorizeMediaEditorialAction('draft');
+  if (!authorization.ok) return { success: false, error: authorization.error };
+  try {
+    if (!/^[0-9a-f-]{36}$/i.test(input?.articleId || '')) {
+      return { success: false, error: 'Invalid article reference.' };
+    }
+    const sourceTitle = cleanText(input.sourceTitle, 240);
+    const publisher = cleanText(input.publisher, 160) || null;
+    const canonicalUrl = safeHttpUrl(cleanText(input.canonicalUrl, 2048));
+    const attributionText = cleanText(input.attributionText, 500) || null;
+    const rightsReference = cleanText(input.rightsReference, 2048) || null;
+    if (sourceTitle.length < 3 || !canonicalUrl) {
+      return { success: false, error: 'Provide a source title and a valid HTTP or HTTPS source URL.' };
+    }
+    const result = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+      const articles = await tx`
+        SELECT id, slug, status FROM public.editorial_articles
+        WHERE id=${input.articleId}::uuid AND status <> 'archived'
+        FOR UPDATE
+      `;
+      if (!articles.length) throw new Error('Article was not found or has been archived.');
+      const inserted = await tx`
+        INSERT INTO public.editorial_article_sources
+          (article_id, source_title, publisher, canonical_url, attribution_text, rights_reference)
+        VALUES (
+          ${input.articleId}::uuid, ${sourceTitle}, ${publisher},
+          ${canonicalUrl}, ${attributionText}, ${rightsReference}
+        )
+        RETURNING id
+      `;
+      await tx`
+        INSERT INTO public.media_editorial_audit_events
+          (actor_user_id, action, article_id, details)
+        VALUES (
+          ${authorization.user.domainUserId}::uuid, 'source_added', ${input.articleId}::uuid,
+          ${JSON.stringify({ sourceTitle, publisher, canonicalUrl })}::jsonb
+        )
+      `;
+      return { id: inserted[0].id as string, slug: articles[0].slug as string, status: articles[0].status as string };
+    }));
+    revalidatePath('/admin/news');
+    if (result.status === 'published') revalidatePath('/news/' + result.slug);
+    return { success: true, data: { id: result.id } };
+  } catch (error) {
+    console.error('Editorial source creation failed', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to add the editorial source.' };
   }
 }
