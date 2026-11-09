@@ -183,6 +183,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                                     <h3 className="text-base font-black text-slate-900">{video.title}</h3>
                                     {video.description && <p className="text-sm leading-6 text-slate-600">{video.description}</p>}
                                     {video.duration_seconds && <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{Math.round(video.duration_seconds)} seconds</p>}
+                                    {video.attribution_text && <p className="text-xs text-slate-500">{video.attribution_text}</p>}
                                 </article>
                             ))}
                         </div>
