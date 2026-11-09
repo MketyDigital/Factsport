@@ -77,43 +77,39 @@ export default function MediaVideoLibrary({ ready, schemaReady, canRevokeRights 
           const assetStorageKey = 'factsport-stream-asset:' + fingerprintValue;
           assetId = localStorage.getItem(assetStorageKey) || '';
 
-          const uploader = new tus.Upload(file, {
-            endpoint: '/api/admin/media/videos/tus-upload',
-            chunkSize: 50 * 1024 * 1024,
-            retryDelays: [0, 3000, 5000, 10000, 20000],
-            uploadSize: file.size,
-            storeFingerprintForResuming: true,
-            removeFingerprintOnSuccess: true,
-            fingerprint,
-            metadata: { filename: file.name, filetype: file.type },
-            headers: {
-              'X-Factsport-Video-Title': title.trim(),
-              'X-Factsport-Video-Description': description.trim(),
-              'X-Factsport-Video-Content-Type': file.type,
-              'X-Factsport-Video-Max-Duration': '900',
-            },
-            onAfterResponse: async (_request, response) => {
-              const createdAssetId = response.getHeader('X-Factsport-Video-Asset-Id');
-              if (createdAssetId) {
-                assetId = createdAssetId;
-                localStorage.setItem(assetStorageKey, createdAssetId);
-              }
-            },
-            onProgress: (uploadedBytes, totalBytes) => {
-              setUploadProgress(Math.min(100, Math.round((uploadedBytes / totalBytes) * 100)));
-            },
-            onError: error => { throw error; },
-          });
-
-          const previousUploads = await uploader.findPreviousUploads();
-          if (previousUploads.length) {
-            uploader.resumeFromPreviousUpload(previousUploads[0]);
-          }
-
           await new Promise<void>((resolve, reject) => {
-            uploader.options.onError = reject;
-            uploader.options.onSuccess = () => resolve();
-            uploader.start();
+            const uploader = new tus.Upload(file, {
+              endpoint: '/api/admin/media/videos/tus-upload',
+              chunkSize: 50 * 1024 * 1024,
+              retryDelays: [0, 3000, 5000, 10000, 20000],
+              uploadSize: file.size,
+              storeFingerprintForResuming: true,
+              removeFingerprintOnSuccess: true,
+              fingerprint,
+              metadata: { filename: file.name, filetype: file.type },
+              headers: {
+                'X-Factsport-Video-Title': title.trim(),
+                'X-Factsport-Video-Description': description.trim(),
+                'X-Factsport-Video-Content-Type': file.type,
+                'X-Factsport-Video-Max-Duration': '900',
+              },
+              onAfterResponse: async (_request, response) => {
+                const createdAssetId = response.getHeader('X-Factsport-Video-Asset-Id');
+                if (createdAssetId) {
+                  assetId = createdAssetId;
+                  localStorage.setItem(assetStorageKey, createdAssetId);
+                }
+              },
+              onProgress: (uploadedBytes, totalBytes) => {
+                setUploadProgress(Math.min(100, Math.round((uploadedBytes / totalBytes) * 100)));
+              },
+              onError: reject,
+              onSuccess: () => resolve(),
+            });
+            void uploader.findPreviousUploads().then(previousUploads => {
+              if (previousUploads.length) uploader.resumeFromPreviousUpload(previousUploads[0]);
+              uploader.start();
+            }).catch(reject);
           });
           if (!assetId) assetId = localStorage.getItem(assetStorageKey) || '';
           if (!assetId) {
