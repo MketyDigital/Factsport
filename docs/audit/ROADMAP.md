@@ -481,3 +481,9 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - Isolated verification passed on `7be8065d8ad75f6796ca572ef71853daf3eee61a`: 213/213 engine tests, 5/5 ingestion tests, TypeScript and migration inventory (run `42573678384`). Native Vinext build passed (run `42573678410`). Protected staging run `42573678448` was still in progress at the time of the handoff.
 - M45 details: `docs/audit/handoffs/M45-NEWSROOM-REVISION-DIFF-AND-PRIVATE-VOD-PREVIEW.md`.
 - Remaining: protected staging completion, isolated Azure revision/media/video E2E, optional VOD flag activation after migration 0041, and full responsive public article preview parity. No production change or migration application.
+
+
+## 2026-11-09 M45 protected staging follow-up
+
+- Protected Cloudflare application staging passed on source commit `7be8065d8ad75f6796ca572ef71853daf3eee61a` (run `42573678448`), including regression, TypeScript, native Worker build, isolated deployment, deny-by-default and protected `/matches` checks.
+- The run did not apply optional VOD migration 0041 to Azure PostgreSQL, enable `FACTSPORT_MEDIA_VIDEO_SCHEMA_READY`, or perform Newsroom/Stream browser E2E. M45 remains source/build/staging-deployment verified, with isolated database and browser acceptance open.
