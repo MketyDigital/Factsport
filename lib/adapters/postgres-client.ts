@@ -218,11 +218,11 @@ export async function isFactsportPredictionPostgresReady(): Promise<boolean> {
         to_regclass('public.prediction_participants') IS NOT NULL AS participants_ready,
         to_regclass('public.predictions') IS NOT NULL AS predictions_ready,
         to_regprocedure(
-          'public.submit_public_prediction(text,text,text,uuid,text,integer,integer)'
+          'public.submit_public_prediction(text,text,text,uuid,text,text,text,integer,integer)'
         ) IS NOT NULL AS submission_function_ready,
         has_function_privilege(
           current_user,
-          'public.submit_public_prediction(text,text,text,uuid,text,integer,integer)',
+          'public.submit_public_prediction(text,text,text,uuid,text,text,text,integer,integer)',
           'EXECUTE'
         ) AS submission_function_executable,
         to_regclass('public.prediction_submission_rate_limits') IS NOT NULL AS rate_limits_ready,
