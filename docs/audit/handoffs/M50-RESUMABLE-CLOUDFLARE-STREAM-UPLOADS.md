@@ -68,3 +68,12 @@ No live Cloudflare Stream upload has been performed. No Entra, Stream token, edi
 ## Rollback
 
 The change is source/migration-only. Keep the new TUS UI path and feature flag disabled until staging acceptance. If TUS fails, editors can continue using the existing under-200MB basic direct upload. Do not drop columns or delete uploaded assets as a rollback shortcut. Migration 0041 has not been applied to staging/production.
+
+
+## Verification update — source checks passed, staging deploy in progress
+
+- Isolated verification passed on source commit `e3dac371fa40293ae73e0a1c75c1cd78419b6fff` (run `42584448535`): 226 regression tests, TypeScript, migration inventory and Media contract checks passed.
+- Native Vinext build passed on the same source commit (run `42584448487`).
+- Protected Cloudflare staging run `42584448515` completed dependency installation, regression suite, TypeScript and native Worker build; deployment and deny-by-default checks were still in progress at this update.
+- Disposable PostgreSQL migration chain through 0043 passed on commit `55464ea4a8d3000a836d109d1ad4c20397922d50` (run `42584159460`), including the revised migration 0041 transaction and VOD expected-size columns/constraint.
+- No actual Stream upload, TUS browser interruption/resume, Stream UID response validation, Azure staging migration or media-provider E2E has been performed.
