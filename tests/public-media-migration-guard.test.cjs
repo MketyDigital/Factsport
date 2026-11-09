@@ -56,3 +56,13 @@ test('public editorial sources view exposes references only for approved publish
   assert.ok(migration.includes('GRANT SELECT ON public.public_editorial_article_sources TO factsport_v2_reader'));
   assert.ok(!migration.includes('rights_reference'));
 });
+
+
+test('social channel admin migration grants only bounded settings updates and registers audit actions', () => {
+  const migration = readMigration('0034_factsport_editorial_audit_and_social_channel_admin.sql');
+  assert.ok(migration.includes("'source_added'"));
+  assert.ok(migration.includes("'social_channel_configured'"));
+  assert.ok(migration.includes("'media_detached'"));
+  assert.ok(migration.includes('GRANT UPDATE (is_enabled, supports_media, settings, updated_at)'));
+  assert.ok(!migration.includes('GRANT UPDATE ON public.media_social_channels'));
+});
