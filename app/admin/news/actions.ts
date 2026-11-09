@@ -61,7 +61,7 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
         currentStatus = rows[0].status;
         const previousRevision = await tx`
           SELECT id FROM public.editorial_article_revisions
-          WHERE article_id=${articleId}::uuid AND workflow_status IN ('draft','in_review','approved')
+          WHERE article_id=${articleId}::uuid AND workflow_status IN ('draft','in_review','approved','rejected')
           ORDER BY revision_number DESC LIMIT 1 FOR UPDATE
         `;
         previousRevisionId = previousRevision[0]?.id || null;
