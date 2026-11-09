@@ -8,7 +8,7 @@ import MediaVideoPreview from './MediaVideoPreview';
 
 type VideoAsset = {
   id: string; title: string; description: string | null; upload_status: string;
-  upload_protocol: 'basic' | 'tus'; upload_expected_size_bytes: number | null;
+  upload_protocol: 'basic' | 'tus'; upload_expected_size_bytes: number | string | null;
   upload_expires_at: string | null; duration_seconds: number | null;
   width: number | null; height: number | null; size_bytes: number | null;
   rights_status: string; rights_reviewed_at: string | null; is_public: boolean;
