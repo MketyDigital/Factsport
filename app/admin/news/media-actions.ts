@@ -161,7 +161,7 @@ export async function revokeMediaRights(input: { assetId: string; reason: string
   const reason = typeof input.reason === 'string' ? input.reason.trim().slice(0, 500) : '';
   if (reason.length < 10) return { success: false, error: 'Record at least 10 characters explaining why this asset is being withdrawn.' };
   try {
-    await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+    const affectedSlugs = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
       const assets = await tx`
         SELECT id, rights_status, is_public
         FROM public.media_assets
@@ -170,6 +170,25 @@ export async function revokeMediaRights(input: { assetId: string; reason: string
       `;
       if (!assets.length) throw new Error('Media asset was not found.');
       if (assets[0].rights_status === 'rejected') throw new Error('This asset has already been withdrawn.');
+      const linkedArticles = await tx`
+        WITH affected_assets AS (
+          SELECT ${input.assetId}::uuid AS id
+          UNION
+          SELECT derivative_asset_id FROM public.media_asset_derivatives
+          WHERE source_asset_id=${input.assetId}::uuid
+        )
+        SELECT DISTINCT a.slug
+        FROM public.editorial_articles a
+        WHERE EXISTS (
+          SELECT 1 FROM public.editorial_article_media am
+          JOIN affected_assets aa ON aa.id=am.media_id
+          WHERE am.article_id=a.id
+        ) OR EXISTS (
+          SELECT 1 FROM public.editorial_article_team_media tm
+          JOIN affected_assets aa ON aa.id=tm.media_id
+          WHERE tm.article_id=a.id
+        )
+      `;
       await tx`
         UPDATE public.media_assets
         SET rights_status='rejected', is_public=false,
@@ -189,9 +208,13 @@ export async function revokeMediaRights(input: { assetId: string; reason: string
           })}::jsonb
         )
       `;
+      return linkedArticles.map((article: { slug: string }) => article.slug);
     }));
     revalidatePath('/admin/media');
     revalidatePath('/admin/news');
+    revalidatePath('/news');
+    revalidatePath('/');
+    for (const slug of affectedSlugs) revalidatePath('/news/' + slug);
     return { success: true };
   } catch (error) {
     console.error('Media rights revocation failed', error);
