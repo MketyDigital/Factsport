@@ -339,3 +339,11 @@ P8 remains OPEN. The 2026-11-08 Publisher Restrictions recheck confirms that onl
 
 **P3/P8 blockers:** Entra tenant and Media-host callback/session configuration; editorial writer binding and migrations 0004–0026 on isolated staging; migration 0026 attestation reconciliation; CMS and social end-to-end journeys; current production content/legal/consent remediation; live robots/sitemap/ads.txt verification; AdSense account “Ready” evidence. Preserve private VIP, payment, affiliate, campaign and prize workflows behind the approved private product boundary.
 
+
+
+## Media continuation — 2026-11-09
+
+- Source implementation now includes M35–M40. Before any staging deployment, review the complete ordered migrations 0027–0037, verify checksums and provision the separate editorial writer, social dispatcher and broadcast token-issuer identities/Hyperdrives with least-privilege grants.
+- Do not enable the social dispatcher readiness flag, provider readiness flags or Logic Apps workflow until dispatcher Hyperdrive, bearer secrets, Meta/Telegram credentials, secured Buffer/Make APIM adapter and private provider-destination E2E are complete. The Logic Apps template is disabled by default and is the single intended scheduler; do not add a Cloudflare Cron duplicate.
+- Validate editorial source visibility against the latest published revision, rights-reference exclusion, image eligibility after rights/expiry changes, Telegram/Meta provider limits, one-provider-call locking, retry/backoff and unknown-result manual reconciliation.
+- Studio participant moderation and role demotion require signed Stream webhook/token issuer staging proof. No Stream room activation, production migration or production write is implied by the source commits.
