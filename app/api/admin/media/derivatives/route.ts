@@ -80,6 +80,7 @@ export async function POST(request: Request) {
                usage_expires_at, rights_reviewed_by, rights_reviewed_at
         FROM public.media_assets
         WHERE id=${sourceAssetId}::uuid AND media_kind='image'
+          AND NOT EXISTS (SELECT 1 FROM public.media_asset_derivatives WHERE derivative_asset_id=media_assets.id)
         LIMIT 1
       `;
       return rows[0] || null;
@@ -107,6 +108,7 @@ export async function POST(request: Request) {
                usage_expires_at, rights_reviewed_by, rights_reviewed_at
         FROM public.media_assets
         WHERE id=${sourceAssetId}::uuid AND media_kind='image'
+          AND NOT EXISTS (SELECT 1 FROM public.media_asset_derivatives WHERE derivative_asset_id=media_assets.id)
         FOR SHARE
       `;
       const lockedSource = lockedSources[0];
