@@ -85,7 +85,7 @@ BEGIN
     END IF;
   END IF;
 
-  IF pg_catalog.upper(pg_catalog.coalesce(v_status, '')) NOT IN ('SCHEDULED', 'PRE_MATCH')
+  IF pg_catalog.upper(COALESCE(v_status, '')) NOT IN ('SCHEDULED', 'PRE_MATCH')
      OR v_match_date <= pg_catalog.transaction_timestamp() THEN
     RAISE EXCEPTION 'prediction_closed' USING ERRCODE = '55000';
   END IF;
