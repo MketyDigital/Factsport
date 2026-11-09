@@ -11,11 +11,22 @@ function streamConfig() {
   };
 }
 
+function hasValidSigningJwk(value: string) {
+  try {
+    const raw = value.trim().startsWith('{') ? value : atob(value.trim());
+    const jwk = JSON.parse(raw);
+    return jwk?.kty === 'RSA' && typeof jwk.n === 'string' &&
+      typeof jwk.e === 'string' && typeof jwk.d === 'string';
+  } catch {
+    return false;
+  }
+}
+
 export function isFactsportStreamPlaybackReady(): boolean {
   const config = streamConfig();
   return process.env.FACTSPORT_STREAM_VIDEO_READY === 'true' &&
     /^[a-f0-9]{31,32}$/i.test(config.signingKeyId) &&
-    config.signingKeyJwk.length >= 100 &&
+    hasValidSigningJwk(config.signingKeyJwk) &&
     config.allowedOrigins.length > 0 &&
     config.allowedOrigins.every(origin => /^(?:[a-z0-9-]+\.)*[a-z0-9-]+\.[a-z]{2,}$/.test(origin));
 }
