@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 import { isSameOriginRequest } from '@/app/lib/admin/authorization';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
+import { isFactsportMediaVideoSchemaReady } from '@/lib/media/readiness';
 import {
   deleteFactsportStreamVideo, getFactsportStreamPlaybackHost, getFactsportStreamVideo,
   isFactsportStreamVideoReady,
@@ -16,6 +17,7 @@ export async function POST(request: Request, context: { params: { id: string } }
     status: authorization.status, headers: { 'Cache-Control': 'private, no-store' },
   });
   if (!isSameOriginRequest(request)) return NextResponse.json({ error: 'Same-origin request required.' }, { status: 403 });
+  if (!isFactsportMediaVideoSchemaReady()) return NextResponse.json({ error: 'Video schema migration is not enabled.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   if (!isFactsportStreamVideoReady()) return NextResponse.json({ error: 'Cloudflare Stream VOD is not provisioned.' }, { status: 503 });
   const assetId = context.params?.id || '';
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(assetId)) {
