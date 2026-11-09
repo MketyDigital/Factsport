@@ -56,7 +56,7 @@ export async function POST(request: Request) {
   }
 
   const providerRequestId = boundedText(input.providerRequestId, 200);
-  const providerPostId = boundedText(input.providerPostId, 300);
+  const providerPostId = boundedText(input.providerPostId, 2000);
   const providerPostUrl = safeProviderUrl(input.providerPostUrl);
   const errorCodeInput = boundedText(input.errorCode, 100);
   const errorCode = errorCodeInput && /^[a-zA-Z0-9_.-]+$/.test(errorCodeInput) ? errorCodeInput : null;
