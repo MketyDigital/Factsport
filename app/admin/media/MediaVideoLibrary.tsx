@@ -98,7 +98,7 @@ export default function MediaVideoLibrary({ ready, canRevokeRights = false }: { 
       <div className="md:col-span-2">
         <button type="button" onClick={upload} disabled={pending || !file || title.trim().length < 3} className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{pending ? 'Uploading video…' : 'Create secure upload & send video'}</button>
       </div>
-    </div> : <p className="mt-4 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">Cloudflare Stream ingestion is fail-closed. It requires the account ID, Stream Write API token, signing-key ID and PEM, allowed playback origins, and FACTSPORT_STREAM_VIDEO_READY=true. No video is uploaded until those values are provisioned.</p>}
+    </div> : <p className="mt-4 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">Cloudflare Stream ingestion is fail-closed. It requires the account ID, Stream Write API token, signing-key ID and JWK, allowed playback origins, and FACTSPORT_STREAM_VIDEO_READY=true. No video is uploaded until those values are provisioned.</p>}
     {message && <p role="status" className="mt-3 text-xs text-slate-600">{message}</p>}
     <div className="mt-5 flex items-center justify-between">
       <h3 className="text-sm font-black text-slate-800">Recent video assets</h3>
