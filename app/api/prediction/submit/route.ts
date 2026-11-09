@@ -68,7 +68,8 @@ function noStoreJson(body: Record<string, unknown>, status = 200) {
 
 async function readBoundedJson(request: Request): Promise<SubmissionBody | null> {
   const declaredLength = Number(request.headers.get('content-length') || 0);
-  if (declaredLength > MAX_BODY_BYTES || !request.body) return null;
+  const contentType = (request.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  if (contentType !== 'application/json' || declaredLength > MAX_BODY_BYTES || !request.body) return null;
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -83,6 +84,9 @@ async function readBoundedJson(request: Request): Promise<SubmissionBody | null>
       }
       chunks.push(value);
     }
+  } catch {
+    await reader.cancel();
+    return null;
   } finally {
     reader.releaseLock();
   }
