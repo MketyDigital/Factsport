@@ -98,7 +98,6 @@ export async function createFactsportStreamDirectUpload(input: {
       allowedOrigins: config.allowedOrigins,
       creator: input.creatorId.slice(0, 64),
       expiry: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-      maxDurationSeconds: input.maxDurationSeconds || 900,
       meta: { factsportMediaVideoId: input.assetId, title: input.title.slice(0, 200) },
       requireSignedURLs: true,
       thumbnailTimestampPct: 0.1,
