@@ -23,7 +23,7 @@ export interface PublicEditorialArticle {
   team_1_logo_key: string | null; team_2_logo_key: string | null;
   inline_media?: Array<{ position: number; object_key: string; content_type: string; width: number | null; height: number | null; alt_text: string | null; attribution_text: string | null }>;
   sources?: Array<{ id: string; source_title: string; publisher: string | null; canonical_url: string; attribution_text: string | null; accessed_at: string }>;
-  videos?: Array<{ video_id: string; title: string; description: string | null; duration_seconds: number | null; width: number | null; height: number | null; position: number }>;
+  videos?: Array<{ video_id: string; title: string; description: string | null; duration_seconds: number | null; width: number | null; height: number | null; attribution_text: string | null; position: number }>;
 }
 export interface PublicMediaAsset {
   object_key: string; content_type: string; byte_size: number;
@@ -100,7 +100,7 @@ export async function getPublicEditorialArticle(slug: string): Promise<PublicEdi
       ORDER BY accessed_at DESC, source_title ASC
     `;
     const videos = await sql`
-      SELECT video_id, title, description, duration_seconds, width, height, position
+      SELECT video_id, title, description, duration_seconds, width, height, attribution_text, position
       FROM public.public_editorial_article_videos
       WHERE article_id = ${article.id}::uuid
       ORDER BY position ASC, video_id ASC
