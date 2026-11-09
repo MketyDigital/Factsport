@@ -76,7 +76,7 @@ jobs:
           grep -q "CREATE OR REPLACE VIEW public.public_competition_player_stats" db/migrations/0007_factsport_competition_player_stats.sql
           grep -q "ADD COLUMN IF NOT EXISTS legacy_match_id uuid" db/migrations/0008_factsport_match_identity_alias.sql
           grep -q "CREATE TABLE IF NOT EXISTS public.predictions" db/migrations/0003_factsport_public_predictions.sql
-          for migration_number in $(seq 9 31); do
+          for migration_number in $(seq 9 32); do
             migration_prefix="$(printf '%04d' "$migration_number")"
             migration_matches=(db/migrations/"$migration_prefix"_*.sql)
             if [ "${#migration_matches[@]}" -ne 1 ] || [ ! -s "${migration_matches[0]}" ]; then
@@ -93,4 +93,6 @@ jobs:
           grep -q "media_broadcast_token_rate_limits" db/migrations/0029_factsport_broadcast_token_rate_limits.sql
           grep -q "media_broadcast_webhook_events" db/migrations/0030_factsport_broadcast_token_identity_and_webhooks.sql
           grep -q "supports_media boolean NOT NULL DEFAULT false" db/migrations/0031_factsport_social_channel_media_capability.sql
-          echo "Migrations 0001-0031 present; Media gallery, broadcast, social capability and attestation contracts inventoried; live migration NOT executed"
+          grep -q "public_social_media_assets" db/migrations/0032_factsport_social_dispatcher_media_and_receipts.sql
+          grep -q "unknown_result" db/migrations/0032_factsport_social_dispatcher_media_and_receipts.sql
+          echo "Migrations 0001-0032 present; Media gallery, broadcast, social capability, dispatcher and attestation contracts inventoried; live migration NOT executed"
