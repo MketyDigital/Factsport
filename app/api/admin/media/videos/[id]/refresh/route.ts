@@ -24,16 +24,21 @@ export async function POST(request: Request, context: { params: { id: string } }
   try {
     const existing = await withFactsportEditorialPostgres(async sql => {
       const rows = await sql`
-        SELECT id, provider_video_id, upload_status, rights_status
+        SELECT id, provider_video_id, upload_status, rights_status, upload_expires_at
         FROM public.media_video_assets WHERE id=${assetId}::uuid LIMIT 1
       `;
       return rows[0] || null;
     });
     if (!existing) return NextResponse.json({ error: 'Video asset not found.' }, { status: 404 });
     const result = await getFactsportStreamVideo(existing.provider_video_id);
+    const providerState = String(result.status?.state || '').toLowerCase();
     const ready = result.readyToStream === true && typeof result.playback?.hls === 'string';
-    const failed = String(result.status?.state || '').toLowerCase() === 'error';
-    const uploadStatus = ready ? 'ready' : failed ? 'failed' : 'processing';
+    const failed = providerState === 'error';
+    const expiredUnuploaded = !ready && !failed && providerState === 'pendingupload' &&
+      existing.upload_status === 'pending_upload' && existing.upload_expires_at &&
+      new Date(existing.upload_expires_at).valueOf() <= Date.now();
+    const uploadStatus = ready ? 'ready' : failed || expiredUnuploaded ? 'failed' :
+      providerState === 'pendingupload' ? 'pending_upload' : 'processing';
     const playbackHost = ready ? getFactsportStreamPlaybackHost(result.playback.hls) : null;
     const duration = Number(result.duration);
     const width = Number(result.input?.width);
@@ -55,7 +60,7 @@ export async function POST(request: Request, context: { params: { id: string } }
         RETURNING id, title, upload_status, duration_seconds, width, height,
                   size_bytes, rights_status, rights_reviewed_at, is_public, updated_at
       `;
-      if (existing.upload_status !== uploadStatus && (ready || failed)) {
+      if (existing.upload_status !== uploadStatus && (ready || failed || expiredUnuploaded)) {
         await tx`
           INSERT INTO public.media_editorial_audit_events (actor_user_id, action, details)
           VALUES (
@@ -67,6 +72,14 @@ export async function POST(request: Request, context: { params: { id: string } }
       }
       return rows[0];
     }));
+    if (expiredUnuploaded) {
+      try {
+        const { deleteFactsportStreamVideo } = await import('@/lib/media/cloudflare-stream');
+        await deleteFactsportStreamVideo(existing.provider_video_id);
+      } catch (cleanupError) {
+        console.error('Expired unuploaded Stream video cleanup failed', cleanupError);
+      }
+    }
     return NextResponse.json({ success: true, asset }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     console.error('Cloudflare Stream video status refresh failed', error);
