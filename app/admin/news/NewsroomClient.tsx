@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import {
-  archiveEditorialArticle, approveEditorialRevision, rejectEditorialRevision, publishApprovedEditorial, restoreEditorialRevision, saveEditorialDraft,
+  addEditorialSource, archiveEditorialArticle, approveEditorialRevision, rejectEditorialRevision, publishApprovedEditorial, restoreEditorialRevision, saveEditorialDraft,
   submitEditorialForReview,
 } from './actions';
 import { removeRevisionMedia, reviewRightsAndAttachMedia } from './media-actions';
@@ -40,6 +40,7 @@ type Article = {
   canonical_url: string | null;
   author_display_name: string;
   updated_at: string;
+  sources?: Array<{ id: string; source_title: string; publisher: string | null; canonical_url: string; attribution_text: string | null; rights_reference: string | null; accessed_at: string }>;
   revision_media?: Array<{ placement: 'hero' | 'team_1' | 'team_2' | 'inline'; position: number; remove_media: boolean; media_id: string | null; object_key: string | null; content_type: string | null; width: number | null; height: number | null; rights_status: string | null; alt_text: string | null; attribution_text: string | null }>;
 };
 
@@ -67,6 +68,11 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const [historySelectedId, setHistorySelectedId] = useState<string | null>(null);
   const [historyPending, setHistoryPending] = useState(false);
   const [reviewComment, setReviewComment] = useState('');
+  const [sourceTitle, setSourceTitle] = useState('');
+  const [sourcePublisher, setSourcePublisher] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [sourceAttribution, setSourceAttribution] = useState('');
+  const [sourceRightsReference, setSourceRightsReference] = useState('');
   const [publicPolicyConfirmed, setPublicPolicyConfirmed] = useState<Record<string, boolean>>({});
   const [isPending, startTransition] = useTransition();
   const [mediaPending, startMediaTransition] = useTransition();
@@ -84,6 +90,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const [mediaPosition, setMediaPosition] = useState(0);
 
   const currentRevisionMedia = articles.find(article => article.id === form.id)?.revision_media || [];
+  const currentSources = articles.find(article => article.id === form.id)?.sources || [];
   const activeRevisionMedia = currentRevisionMedia.filter(asset => !asset.remove_media && asset.media_id);
   const previewHero = activeRevisionMedia.find(asset => asset.placement === 'hero');
   const previewTeam1 = activeRevisionMedia.find(asset => asset.placement === 'team_1');
@@ -328,6 +335,47 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                 </div>}
               </>}
             </div>
+            <section className="md:col-span-2 rounded-2xl border border-slate-200 bg-white p-4">
+              <h3 className="font-black text-slate-800">Sources and editorial provenance</h3>
+              <p className="mt-1 text-xs text-slate-500">Record source URLs and attribution for this article. Source entries are append-only for audit integrity; rights-reference notes stay private and are not published.</p>
+              {currentSources.length > 0 && <ul className="mt-3 space-y-2">
+                {currentSources.map(source => <li key={source.id} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                  <a href={source.canonical_url} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-blue-700 underline">{source.source_title}</a>
+                  {source.publisher && <span className="ml-2 text-[10px] text-slate-500">{source.publisher}</span>}
+                  {source.attribution_text && <p className="mt-1 text-[11px] text-slate-600">{source.attribution_text}</p>}
+                  {source.rights_reference && <p className="mt-1 text-[10px] text-amber-700">Private rights reference recorded</p>}
+                </li>)}
+              </ul>}
+              {!form.id ? <p className="mt-3 text-xs text-amber-700">Save the article draft before adding sources.</p> : <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="text-xs font-bold text-slate-600">Source title
+                  <input value={sourceTitle} onChange={event => setSourceTitle(event.target.value)} maxLength={240} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
+                </label>
+                <label className="text-xs font-bold text-slate-600">Publisher / organization
+                  <input value={sourcePublisher} onChange={event => setSourcePublisher(event.target.value)} maxLength={160} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
+                </label>
+                <label className="md:col-span-2 text-xs font-bold text-slate-600">Canonical source URL
+                  <input type="url" value={sourceUrl} onChange={event => setSourceUrl(event.target.value)} maxLength={2048} placeholder="https://…" className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
+                </label>
+                <label className="text-xs font-bold text-slate-600">Attribution / citation note
+                  <input value={sourceAttribution} onChange={event => setSourceAttribution(event.target.value)} maxLength={500} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
+                </label>
+                <label className="text-xs font-bold text-slate-600">Private rights / licence reference
+                  <input value={sourceRightsReference} onChange={event => setSourceRightsReference(event.target.value)} maxLength={2048} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
+                </label>
+                <div className="md:col-span-2">
+                  <button type="button" disabled={isPending || sourceTitle.trim().length < 3 || !sourceUrl.trim()} onClick={() => startTransition(async () => {
+                    const result = await addEditorialSource({
+                      articleId: form.id!, sourceTitle, publisher: sourcePublisher,
+                      canonicalUrl: sourceUrl, attributionText: sourceAttribution, rightsReference: sourceRightsReference,
+                    });
+                    if (!result.success) { setMessage(result.error); return; }
+                    setSourceTitle(''); setSourcePublisher(''); setSourceUrl(''); setSourceAttribution(''); setSourceRightsReference('');
+                    setMessage('Source provenance added. Refreshing newsroom…');
+                    window.location.reload();
+                  })} className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{isPending ? 'Saving source…' : 'Add source reference'}</button>
+                </div>
+              </div>}
+            </section>
             <label className="md:col-span-2 text-xs font-bold text-slate-600">Excerpt / social preview
               <textarea value={form.excerpt} onChange={e => setForm({ ...form, excerpt: e.target.value })} maxLength={500} rows={2} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
             </label>
