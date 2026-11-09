@@ -587,3 +587,6 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - Migration 0041 records upload protocol and expected byte size. Refresh verifies actual provider size before marking ready; mismatch fails closed and cleans up the provider asset. Stream assets remain signed/private and rights review remains mandatory.
 - Re-audit also removed an orphan duplicate SQL tail after migration 0041's COMMIT, restoring a single clean transaction. This migration has not been applied to Azure staging or production.
 - M50 handoff: `docs/audit/handoffs/M50-RESUMABLE-CLOUDFLARE-STREAM-UPLOADS.md`. Current-head isolated/native/protected staging verification is pending; no live Stream upload or provider E2E is claimed.
+
+
+- **M50 verification update:** isolated verification passed with 226 regression tests and TypeScript on `e3dac371fa40293ae73e0a1c75c1cd78419b6fff` (run `42584448535`); native Vinext build passed (run `42584448487`). Protected Cloudflare staging deployment/deny-by-default checks were still in progress. Disposable PostgreSQL migration chain including the revised 0041 VOD size/protocol columns passed on `55464ea4a8d3000a836d109d1ad4c20397922d50` (run `42584159460`). No Stream upload or Azure staging DB migration was performed.
