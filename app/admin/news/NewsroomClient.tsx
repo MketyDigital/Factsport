@@ -5,7 +5,7 @@ import {
   archiveEditorialArticle, approveEditorialRevision, rejectEditorialRevision, publishApprovedEditorial, restoreEditorialRevision, saveEditorialDraft,
   submitEditorialForReview,
 } from './actions';
-import { reviewRightsAndAttachMedia } from './media-actions';
+import { removeRevisionMedia, reviewRightsAndAttachMedia } from './media-actions';
 import MarkdownRenderer from '@/app/components/MarkdownRenderer';
 
 type ReusableMediaAsset = {
@@ -39,6 +39,7 @@ type Article = {
   canonical_url: string | null;
   author_display_name: string;
   updated_at: string;
+  revision_media?: Array<{ placement: 'hero' | 'team_1' | 'team_2' | 'inline'; position: number; remove_media: boolean; media_id: string | null; object_key: string | null; content_type: string | null; rights_status: string | null; alt_text: string | null; attribution_text: string | null }>;
 };
 
 const blank = {
@@ -80,6 +81,8 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const [usageExpiresAt, setUsageExpiresAt] = useState('');
   const [placement, setPlacement] = useState<'hero' | 'team_1' | 'team_2' | 'inline'>('hero');
   const [mediaPosition, setMediaPosition] = useState(0);
+
+  const currentRevisionMedia = articles.find(article => article.id === form.id)?.revision_media || [];
 
   const filtered = useMemo(() => articles.filter(article => {
     const matchesSearch = !search || article.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -161,8 +164,9 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
       if (!result.data) { setMessage('Draft save returned no article identifier.'); return; }
       const savedArticleId = result.data.id;
       setPublicPolicyConfirmed(current => ({ ...current, [savedArticleId]: false }));
-      setMessage('Draft saved. Reload the newsroom to see the updated record.');
+      setMessage('Draft saved. Refreshing the newsroom to load its revision-scoped media state…');
       setForm(current => ({ ...current, id: savedArticleId }));
+      window.location.reload();
     });
   }
 
@@ -211,6 +215,25 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
               <h3 className="font-black text-slate-800">Rights-aware media library</h3>
               <p className="mt-1 text-xs text-slate-500">Upload JPEG, PNG or WebP files to private R2 storage. Every image stays private until its rights are reviewed and it is attached to a draft.</p>
               {!form.id ? <p className="mt-3 text-sm font-semibold text-amber-800">Save the article draft first to attach media.</p> : <>
+                {currentRevisionMedia.filter(asset => !asset.remove_media && asset.media_id).length > 0 && <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+                  <h4 className="text-xs font-black uppercase tracking-wide text-slate-700">Attached to this draft revision</h4>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {currentRevisionMedia.filter(asset => !asset.remove_media && asset.media_id).map(asset => <div key={asset.placement + ':' + asset.position} className="flex gap-3 rounded-lg border border-slate-100 p-2">
+                      {asset.media_id && <img src={"/api/admin/media/" + encodeURIComponent(asset.media_id)} alt={asset.alt_text || "Private editorial media"} className="h-20 w-24 rounded-md border border-slate-200 object-contain" />}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-800">{asset.placement === 'hero' ? 'Hero image' : asset.placement === 'team_1' ? 'Team 1 logo' : asset.placement === 'team_2' ? 'Team 2 logo' : 'Inline gallery · position ' + asset.position}</p>
+                        <p className="mt-1 truncate text-[10px] text-slate-500">{asset.object_key || 'Media asset'}</p>
+                        <p className="mt-1 text-[10px] text-emerald-700">{(asset.rights_status || 'pending').replace('_', ' ')}</p>
+                        <button type="button" disabled={mediaPending} onClick={() => startMediaTransition(async () => {
+                          const result = await removeRevisionMedia({ articleId: form.id!, placement: asset.placement, position: asset.position });
+                          if (!result.success) { setMessage(result.error || 'Unable to remove attached media.'); return; }
+                          setMessage('Media removal saved to this draft revision. Refreshing…');
+                          window.location.reload();
+                        })} className="mt-2 rounded-md border border-red-200 px-2 py-1 text-[10px] font-bold text-red-700 disabled:opacity-50">Remove from draft</button>
+                      </div>
+                    </div>)}
+                  </div>
+                </div>}
                 <div className="mt-3 grid gap-3 md:grid-cols-2">
                   <label className="text-xs font-bold text-slate-600">Image file
                     <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setSelectedFile(e.target.files?.[0] || null)} className="mt-1 block w-full text-xs" />
