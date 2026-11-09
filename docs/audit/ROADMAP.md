@@ -459,3 +459,14 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - Protected Cloudflare application staging passed on source commit `28f87f2969a4e5793889b366e396972835ff6fa5` (run `42572757656`), including regression, TypeScript, native Worker build, isolated deployment, deny-by-default and protected /matches checks.
 - This did not apply migration 0042 to Azure PostgreSQL or enable `FACTSPORT_SOCIAL_RECONCILIATION_READY`; no provider delivery/reconciliation E2E was performed.
 - M43 remains source-implemented and staging-build-verified; isolated Azure migration and private provider destination tests are still release gates.
+
+
+## 2026-11-09 Legacy Prediction parity audit — M44
+
+- Re-read the sanitized legacy SQL evidence in DB-001/002/003 and compared it with the current V2 migration/API/component tree and AUTH-005.
+- Confirmed the recorded legacy settlement behavior: correct outcome 3 points, exact score adds 10 (normally 13 total); configurable campaign bonus markets; eligibility counters are distinct. The SQL monthly audit uses `points_awarded=10`, which conflicts with 13-point settlement. The TypeScript audit also differs in period, candidate count, eligibility filtering and prize schedule.
+- Confirmed the legacy daily eligibility trigger `secure_prediction_insert()` is dormant (no trigger attachment in supplied SQL 18/20 evidence); the active PredictionBoard explicitly writes `is_eligible_for_prize=false`. Do not attach the dormant COUNT+INSERT trigger unchanged.
+- V2 migration 0003 is schema-only: normalized unique email contacts, hashed visitor participants, prediction rows, marketing consent and account-claim conflict records exist, but there is no public prediction submit/read API, visitor cookie, dedicated Prediction API writer/Hyperdrive, campaign schema, settlement ledger, Predict account/claim runtime, VIP/payment/entitlement service or monthly audit/reset implementation.
+- The current legacy PredictionBoard remains Supabase-backed and is rendered only in development on the V2 match page. Legacy settlement/reset/audit routes fail closed; do not re-enable them to fill the V2 gap.
+- The full comparison and safe implementation sequence are in `docs/audit/handoffs/M44-LEGACY-PREDICTION-PARITY-MATRIX.md`. Prediction parity is explicitly OPEN; no scoring or prize policy was inferred or activated.
+- Next implementation focus remains the Media product; Prediction API and campaign work must use a dedicated Prediction identity and preserve the AUTH-005 anonymous/email/marketing rules. Monthly qualification/prize policy requires owner approval because legacy implementations conflict.
