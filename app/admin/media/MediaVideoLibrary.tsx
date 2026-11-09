@@ -89,12 +89,13 @@ export default function MediaVideoLibrary({ ready, schemaReady, canRevokeRights 
               storeFingerprintForResuming: true,
               removeFingerprintOnSuccess: true,
               fingerprint,
-              metadata: { filename: file.name, filetype: file.type },
-              headers: {
-                'X-Factsport-Video-Title': title.trim(),
-                'X-Factsport-Video-Description': description.trim(),
-                'X-Factsport-Video-Content-Type': file.type,
-                'X-Factsport-Video-Max-Duration': '900',
+              metadata: {
+                filename: file.name,
+                filetype: file.type,
+                factsporttitle: title.trim(),
+                factsportdescription: description.trim(),
+                factsportcontenttype: file.type,
+                factsportmaxdurationseconds: '900',
               },
               onAfterResponse: async (_request, response) => {
                 const createdAssetId = response.getHeader('X-Factsport-Video-Asset-Id');
