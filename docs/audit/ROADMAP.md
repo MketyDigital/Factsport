@@ -503,3 +503,10 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - No ad units/scripts or CMP are configured. The publisher ID in the repository is not verified against the owner's active AdSense account or live production ads.txt response. Account approval, certified CMP setup, consent tests, legal review and approved ad-unit IDs remain owner gates.
 - Isolated verification passed on `3b915b0b...` (run `42574256321`); native Vinext build passed (run `42574256073`). No production changes.
 - Details: `docs/audit/handoffs/M46-ADSENSE-AND-SEO-FAIL-CLOSED-GATES.md`.
+
+
+## 2026-11-09 M45/M46 protected staging follow-up
+
+- Protected Cloudflare application staging passed on source commit `67c7d8b13138fa9da4242bb3aabf6b70a106f8cf` (run `42574631386`), including regression, TypeScript, native Worker build, isolated deployment, deny-by-default and protected `/matches` checks.
+- The pass includes the newsroom preview/Markdown external-media isolation and the host-aware robots metadata/ads.txt format guard. It does not verify real Entra sign-in, Azure VOD migration, full CMS browser E2E, production ads.txt/account approval or certified CMP integration.
+- M45/M46 remain source/build/protected-staging verified; the owner/account and isolated database/browser gates remain open.
