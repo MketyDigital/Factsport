@@ -23,9 +23,16 @@ test('Media derivatives are immutable, linked to an original asset and inherit s
   assert.match(migration, /A derivative cannot be used as the source/);
   assert.match(endpoint, /isSameOriginRequest/);
   assert.match(endpoint, /image\/webp/);
-  assert.match(endpoint, /webpDimensions/);
+  assert.match(endpoint, /PhotonImage\.new_from_byteslice/);
+  assert.match(endpoint, /crop\(/);
+  assert.match(endpoint, /SamplingFilter\.Lanczos3/);
+  assert.match(endpoint, /get_bytes_webp/);
+  assert.match(endpoint, /sourceHash !== source\.sha256/);
+  assert.match(endpoint, /sourceObject\.arrayBuffer/);
+  assert.match(endpoint, /imageDimensions\(source\.content_type, sourceBytes\)/);
+  assert.match(endpoint, /upload_expected_size/);
   assert.match(endpoint, /FOR SHARE/);
-  assert.ok(endpoint.includes('NOT EXISTS (SELECT 1 FROM public.media_asset_derivatives'));
+  assert.match(endpoint, /NOT EXISTS \([\s\S]*?public\.media_asset_derivatives/);
   assert.match(endpoint, /rights_reviewed_by/);
   assert.match(endpoint, /usage_expires_at/);
   assert.match(endpoint, /media_asset_derivatives/);
@@ -34,6 +41,8 @@ test('Media derivatives are immutable, linked to an original asset and inherit s
   assert.match(editor, /createImageBitmap/);
   assert.match(editor, /drawImage/);
   assert.match(editor, /toBlob/);
+  assert.match(editor, /Content-Type': 'application\/json'/);
+  assert.doesNotMatch(editor, /new FormData\(\)|new File\(/);
   assert.match(editor, /focusX/);
   assert.match(editor, /focusY/);
   assert.match(editor, /hero_16_9/);
@@ -59,4 +68,17 @@ test('Every public Media projection rechecks the original asset rights for a der
   assert.ok(migration.includes('source.rights_reviewed_by IS NULL'));
   assert.ok(migration.includes('source.usage_expires_at <= now()'));
   assert.ok(migration.includes('GRANT SELECT ON public.public_social_media_assets TO factsport_v2_social_dispatcher'));
+});
+
+test('Editorial image ingestion and derivative processing enforce Worker memory bounds', () => {
+  const inspection = read('lib/media/image-inspection.ts');
+  const upload = read('app/api/admin/media/route.ts');
+  const packageJson = JSON.parse(read('package.json'));
+  assert.match(inspection, /MAX_EDITORIAL_IMAGE_BYTES = 8 \* 1024 \* 1024/);
+  assert.match(inspection, /MAX_EDITORIAL_IMAGE_PIXELS = 8_000_000/);
+  assert.match(inspection, /validImageSignature/);
+  assert.match(inspection, /imageDimensions/);
+  assert.match(upload, /MAX_EDITORIAL_IMAGE_BYTES/);
+  assert.match(upload, /imageDimensions\(file\.type, bytes\)/);
+  assert.equal(packageJson.dependencies['@cf-wasm/photon'], '^0.4.0');
 });
