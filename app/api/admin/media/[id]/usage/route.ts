@@ -30,11 +30,13 @@ export async function GET(_request: Request, context: { params: { id: string } }
         SELECT
           (SELECT count(*)::integer FROM affected_assets) AS related_asset_count,
           (SELECT COALESCE(jsonb_agg(jsonb_build_object(
-            'id', d.derivative_asset_id, 'variant', d.variant_key,
+            'id', d.derivative_asset_id, 'sourceAssetId', d.source_asset_id,
+            'sourceObjectKey', source.object_key, 'variant', d.variant_key,
             'objectKey', m.object_key, 'rightsStatus', m.rights_status,
             'isPublic', m.is_public
           ) ORDER BY d.created_at DESC), '[]'::jsonb)
            FROM public.media_asset_derivatives d
+           JOIN public.media_assets source ON source.id=d.source_asset_id
            JOIN public.media_assets m ON m.id=d.derivative_asset_id
            WHERE d.source_asset_id=${assetId}::uuid OR d.derivative_asset_id=${assetId}::uuid) AS derivatives
       `;
