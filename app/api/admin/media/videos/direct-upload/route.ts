@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     const maxDurationSeconds = Number(body.maxDurationSeconds ?? 900);
     const fileSizeBytes = Number(body.fileSizeBytes);
     if (title.length < 3 || !Number.isSafeInteger(fileSizeBytes) ||
-        fileSizeBytes < 1 || fileSizeBytes > 200_000_000 || !Number.isInteger(maxDurationSeconds) ||
+        fileSizeBytes < 1 || fileSizeBytes >= 200_000_000 || !Number.isInteger(maxDurationSeconds) ||
         maxDurationSeconds < 1 || maxDurationSeconds > 900) {
       return NextResponse.json({ error: 'Provide a title and a maximum clip duration between 1 and 900 seconds.' }, { status: 400 });
     }
