@@ -75,3 +75,10 @@ test('source provenance is scoped to the latest published editorial revision', (
   assert.ok(migration.includes('latest.revision_number DESC'));
   assert.ok(migration.includes('s.revision_id'));
 });
+
+
+test('social provider delivery lock migration is included in the migration chain', () => {
+  const migration = readMigration('0036_factsport_social_provider_dispatch_lock.sql');
+  assert.ok(migration.includes('provider_started_at timestamptz'));
+  assert.ok(migration.includes('GRANT UPDATE (provider_started_at)'));
+});
