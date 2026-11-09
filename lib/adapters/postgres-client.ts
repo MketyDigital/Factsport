@@ -217,17 +217,21 @@ export async function isFactsportPredictionPostgresReady(): Promise<boolean> {
         to_regclass('public.prediction_contacts') IS NOT NULL AS contacts_ready,
         to_regclass('public.prediction_participants') IS NOT NULL AS participants_ready,
         to_regclass('public.predictions') IS NOT NULL AS predictions_ready,
-        has_table_privilege(current_user, 'public.matches', 'SELECT') AS matches_readable,
-        has_table_privilege(current_user, 'public.prediction_contacts', 'SELECT,INSERT,UPDATE') AS contacts_writable,
-        has_table_privilege(current_user, 'public.prediction_participants', 'SELECT,INSERT,UPDATE') AS participants_writable,
-        has_table_privilege(current_user, 'public.predictions', 'SELECT,INSERT') AS predictions_writable
+        to_regprocedure(
+          'public.submit_public_prediction(text,text,text,uuid,text,integer,integer)'
+        ) IS NOT NULL AS submission_function_ready,
+        has_function_privilege(
+          current_user,
+          'public.submit_public_prediction(text,text,text,uuid,text,integer,integer)',
+          'EXECUTE'
+        ) AS submission_function_executable
     `);
     const ready = rows[0];
     return !!ready && ready.role_ready === true &&
       ready.matches_ready === true && ready.contacts_ready === true &&
       ready.participants_ready === true && ready.predictions_ready === true &&
-      ready.matches_readable === true && ready.contacts_writable === true &&
-      ready.participants_writable === true && ready.predictions_writable === true;
+      ready.submission_function_ready === true &&
+      ready.submission_function_executable === true;
   } catch {
     return false;
   }
