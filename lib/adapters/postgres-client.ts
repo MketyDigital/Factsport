@@ -125,7 +125,22 @@ export function isFactsportSocialProviderReady(provider: FactsportSocialProvider
     buffer: 'FACTSPORT_SOCIAL_PROVIDER_BUFFER_READY',
     make: 'FACTSPORT_SOCIAL_PROVIDER_MAKE_READY',
   };
-  return bindings[readiness[provider]] === 'true';
+  if (bindings[readiness[provider]] !== 'true') return false;
+  if (provider === 'meta') {
+    return typeof bindings.FACTSPORT_META_PAGE_ACCESS_TOKEN === 'string' &&
+      String(bindings.FACTSPORT_META_PAGE_ACCESS_TOKEN).length >= 40;
+  }
+  if (provider === 'telegram') {
+    return typeof bindings.FACTSPORT_TELEGRAM_BOT_TOKEN === 'string' &&
+      /^\\d{5,15}:[A-Za-z0-9_-]{20,}$/.test(String(bindings.FACTSPORT_TELEGRAM_BOT_TOKEN));
+  }
+  const adapterUrl = typeof bindings.FACTSPORT_LOGIC_APPS_SOCIAL_ADAPTER_URL === 'string'
+    ? String(bindings.FACTSPORT_LOGIC_APPS_SOCIAL_ADAPTER_URL) : '';
+  const adapterToken = typeof bindings.FACTSPORT_LOGIC_APPS_SOCIAL_ADAPTER_TOKEN === 'string'
+    ? String(bindings.FACTSPORT_LOGIC_APPS_SOCIAL_ADAPTER_TOKEN) : '';
+  try {
+    return new URL(adapterUrl).protocol === 'https:' && adapterToken.length >= 32;
+  } catch { return false; }
 }
 
 export function isFactsportSocialMediaProviderReady(provider: FactsportSocialProvider): boolean {
