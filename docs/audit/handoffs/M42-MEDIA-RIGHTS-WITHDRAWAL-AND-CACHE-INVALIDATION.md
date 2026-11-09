@@ -13,6 +13,7 @@ Status: source implementation committed; CI verification running; migration 0040
 - Public article, team-media, inline-gallery, general-media and social-media views stop returning the revoked asset. Derivatives are also suppressed when their original source is revoked or expired.
 - Revalidates /news, the homepage and each affected public article route after the transaction.
 - Added Media Library controls visible only to media_admin users. The operator must enter a reason; the UI explicitly warns that a post already published on a third-party social network must be removed separately at that provider.
+- Added a protected asset usage endpoint and Media Library panel. It discovers original/derivative lineage, article hero/inline/team-logo references, and scheduled/published social publications with provider post URLs where available. The rights administrator can inspect affected references before withdrawing an asset.
 - Reduced public media shared-cache TTL to 15 seconds while requiring browser revalidation (max-age=0), bounding stale public media exposure after a rights withdrawal.
 
 ## Database and tests
@@ -31,6 +32,5 @@ Status: source implementation committed; CI verification running; migration 0040
 
 1. Complete latest isolated regression, native Worker build and protected staging checks.
 2. Exercise rights withdrawal against staging PostgreSQL/R2 and verify effective UPDATE privileges.
-3. Add rights usage/reference discovery so the Media admin can see every article and scheduled social post that references an asset before withdrawing it.
-4. Add controlled operator reconciliation for external social posts affected by a rights withdrawal.
-5. Continue the separate video/clip ingestion and transformation workflow, full-page preview parity, and scheduled editorial publication.
+3. Add controlled operator reconciliation for external social posts affected by a rights withdrawal.
+4. Continue the separate video/clip ingestion and transformation workflow, full-page preview parity, and scheduled editorial publication.
