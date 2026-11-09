@@ -18,7 +18,9 @@ export function createPredictionVisitorToken(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
+  for (let index = 0; index < bytes.length; index += 1) {
+    binary += String.fromCharCode(bytes[index]);
+  }
   return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
@@ -36,8 +38,10 @@ function decodeBase64Url(value: string): Uint8Array {
 export async function keyedPredictionHash(secret: string, value: string): Promise<string> {
   const keyBytes = decodeBase64Url(secret);
   if (keyBytes.byteLength !== 32) throw new Error('Prediction rate-limit secret must be a base64url-encoded 32-byte key');
+  const keyBuffer = new ArrayBuffer(keyBytes.byteLength);
+  new Uint8Array(keyBuffer).set(keyBytes);
   const key = await crypto.subtle.importKey(
-    'raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+    'raw', keyBuffer, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
   );
   const signature = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value)));
   return Array.from(signature, byte => byte.toString(16).padStart(2, '0')).join('');
