@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
-import { cancelSocialPublication, scheduleSocialPublication } from './actions';
+import { cancelSocialPublication, scheduleSocialPublication, updateSocialChannel } from './actions';
 
-type Channel = { id: string; display_name: string; provider: string; supports_media: boolean };
+type Channel = { id: string; channel_key: string; display_name: string; provider: 'meta' | 'telegram' | 'buffer' | 'make'; is_enabled: boolean; supports_media: boolean; settings: Record<string, unknown> };
 type SocialAsset = { id: string; object_key: string; content_type: string; width: number | null; height: number | null; alt_text: string | null; attribution_text: string | null };
 type Publication = {
   id: string; content_text: string; status: string; scheduled_at: string | null;
@@ -11,7 +11,15 @@ type Publication = {
 };
 
 export default function SocialClient({ channels, publications }: { channels: Channel[]; publications: Publication[] }) {
-  const [channelId, setChannelId] = useState(channels[0]?.id || '');
+  const [channelId, setChannelId] = useState(channels.find(channel => channel.is_enabled)?.id || '');
+  const [channelDrafts, setChannelDrafts] = useState<Record<string, { isEnabled: boolean; supportsMedia: boolean; providerSetting: string }>>(() => Object.fromEntries(channels.map(channel => [channel.id, {
+    isEnabled: channel.is_enabled,
+    supportsMedia: channel.supports_media,
+    providerSetting: channel.provider === 'meta' ? String(channel.settings.page_id || '') :
+      channel.provider === 'buffer' ? String(channel.settings.profile_id || '') :
+      channel.provider === 'telegram' ? (Array.isArray(channel.settings.chat_ids) ? channel.settings.chat_ids.join(', ') : '') :
+      String(channel.settings.route_key || ''),
+  }])));
   const [contentText, setContentText] = useState('');
   const [articleId, setArticleId] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
@@ -39,7 +47,25 @@ export default function SocialClient({ channels, publications }: { channels: Cha
     return () => { active = false; };
   }, [channels]);
 
-  const selectedChannel = channels.find(channel => channel.id === channelId);
+  const selectedChannel = channels.find(channel => channel.id === channelId && channel.is_enabled);
+
+  function updateChannelDraft(channelId: string, patch: Partial<{ isEnabled: boolean; supportsMedia: boolean; providerSetting: string }>) {
+    setChannelDrafts(current => ({ ...current, [channelId]: { ...current[channelId], ...patch } }));
+  }
+
+  function saveChannel(channel: Channel) {
+    const draft = channelDrafts[channel.id];
+    if (!draft) return;
+    startTransition(async () => {
+      const result = await updateSocialChannel({
+        channelId: channel.id, isEnabled: draft.isEnabled,
+        supportsMedia: draft.supportsMedia, providerSetting: draft.providerSetting,
+      });
+      if (!result.success) { setMessage(result.error); return; }
+      setMessage('Channel configuration saved. Any activation still requires the configured dispatcher and provider readiness gates.');
+      window.location.reload();
+    });
+  }
 
   function invalidatePublicApproval() {
     setPublicContentConfirmed(false);
@@ -65,6 +91,30 @@ export default function SocialClient({ channels, publications }: { channels: Cha
 
   return (
     <div className="space-y-6">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-lg font-black">Social channel connections</h2>
+        <p className="mt-1 text-xs text-slate-500">Manage non-secret account routing only. Access tokens, bot tokens and webhook URLs belong in secure Cloudflare/Logic Apps secrets, never in this database or browser form. Channels stay disabled until the dispatcher and provider readiness checks pass.</p>
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {channels.map(channel => {
+            const draft = channelDrafts[channel.id];
+            const settingLabel = channel.provider === 'meta' ? 'Meta Page ID' : channel.provider === 'buffer' ? 'Buffer profile/channel ID' : channel.provider === 'telegram' ? 'Telegram chat IDs (comma separated)' : 'Make route key';
+            return <div key={channel.id} className="rounded-xl border border-slate-200 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><p className="text-sm font-bold text-slate-900">{channel.display_name}</p><p className="text-[10px] uppercase tracking-wide text-slate-500">{channel.channel_key} · {channel.provider}</p></div>
+                <span className={channel.is_enabled ? 'rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700' : 'rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600'}>{channel.is_enabled ? 'Enabled' : 'Disabled'}</span>
+              </div>
+              <label className="mt-3 block text-xs font-bold text-slate-600">{settingLabel}
+                <input value={draft?.providerSetting || ''} onChange={event => updateChannelDraft(channel.id, { providerSetting: event.target.value })} maxLength={500} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
+              </label>
+              <div className="mt-3 flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" checked={!!draft?.isEnabled} onChange={event => updateChannelDraft(channel.id, { isEnabled: event.target.checked })} /> Enable channel</label>
+                <label className="flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" checked={!!draft?.supportsMedia} onChange={event => updateChannelDraft(channel.id, { supportsMedia: event.target.checked })} /> Image delivery verified</label>
+              </div>
+              <button type="button" disabled={pending} onClick={() => saveChannel(channel)} className="mt-3 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold disabled:opacity-50">Save channel settings</button>
+            </div>;
+          })}
+        </div>
+      </section>
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,.55fr)]">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-black">Compose social post</h2>
@@ -72,7 +122,7 @@ export default function SocialClient({ channels, publications }: { channels: Cha
           <div className="mt-4 space-y-4">
             <label className="block text-xs font-bold text-slate-600">Destination channel
               <select value={channelId} onChange={e => { setChannelId(e.target.value); setSelectedMediaAssetIds([]); invalidatePublicApproval(); }} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm">
-                {channels.map(channel => <option key={channel.id} value={channel.id}>{channel.display_name} · {channel.provider}</option>)}
+                {channels.filter(channel => channel.is_enabled).map(channel => <option key={channel.id} value={channel.id}>{channel.display_name} · {channel.provider}</option>)}
               </select>
             </label>
             <label className="block text-xs font-bold text-slate-600">Post copy
