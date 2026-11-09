@@ -46,3 +46,13 @@ test('public Media attestation enforcement fails closed and never rewrites exist
   assert.equal(executableLines[0], 'BEGIN;');
   assert.equal(executableLines[executableLines.length - 1], 'COMMIT;');
 });
+
+
+test('public editorial sources view exposes references only for approved published articles', () => {
+  const migration = readMigration('0033_factsport_public_editorial_sources.sql');
+  assert.ok(migration.includes('public.public_editorial_article_sources'));
+  assert.ok(migration.includes("a.status='published'"));
+  assert.ok(migration.includes("a.review_status='approved'"));
+  assert.ok(migration.includes('GRANT SELECT ON public.public_editorial_article_sources TO factsport_v2_reader'));
+  assert.ok(!migration.includes('rights_reference'));
+});
