@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS public.media_video_assets (
   upload_protocol text NOT NULL DEFAULT 'basic'
     CHECK (upload_protocol IN ('basic','tus')),
   upload_expected_size_bytes bigint
-    CHECK (upload_expected_size_bytes IS NULL OR upload_expected_size_bytes BETWEEN 1 AND 30000000000),
+    CHECK (upload_expected_size_bytes IS NULL OR upload_expected_size_bytes > 0 AND upload_expected_size_bytes < 30000000000),
   upload_expires_at timestamptz,
   duration_seconds numeric(10,3),
   width integer CHECK (width IS NULL OR width BETWEEN 1 AND 16384),
