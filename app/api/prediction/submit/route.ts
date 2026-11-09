@@ -21,6 +21,9 @@ export const revalidate = 0;
 const RULES_VERSION = 'free-prediction-v1';
 const RULES_ACCEPTANCE_TEXT =
   'I have read and accept the Factsport free prediction rules and privacy notice.';
+const MARKETING_CONSENT_VERSION = 'factsport-email-marketing-v1';
+const MARKETING_CONSENT_TEXT =
+  'Yes, email me Factsport product updates and offers. I understand I can unsubscribe at any time.';
 const MAX_BODY_BYTES = 8192;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -32,6 +35,7 @@ type SubmissionBody = {
   email?: unknown;
   displayName?: unknown;
   acceptRules?: unknown;
+  marketingOptIn?: unknown;
 };
 
 function runtimeConfig() {
@@ -144,12 +148,15 @@ export async function POST(request: Request) {
   const body = await readBoundedJson(request);
   if (!body) return noStoreJson({ error: 'invalid_request_body' }, 400);
   const acceptedFields = new Set([
-    'matchId', 'outcome', 'homeScore', 'awayScore', 'email', 'displayName', 'acceptRules',
+    'matchId', 'outcome', 'homeScore', 'awayScore', 'email', 'displayName', 'acceptRules', 'marketingOptIn',
   ]);
   if (Object.keys(body).some(field => !acceptedFields.has(field))) {
     return noStoreJson({ error: 'unsupported_request_field' }, 400);
   }
   if (body.acceptRules !== true) return noStoreJson({ error: 'rules_acceptance_required' }, 400);
+  if (body.marketingOptIn !== undefined && typeof body.marketingOptIn !== 'boolean') {
+    return noStoreJson({ error: 'invalid_marketing_consent' }, 400);
+  }
   if (typeof body.matchId !== 'string' || !UUID_PATTERN.test(body.matchId)) {
     return noStoreJson({ error: 'invalid_match' }, 400);
   }
@@ -205,6 +212,9 @@ export async function POST(request: Request) {
           ${body.outcome},
           ${RULES_VERSION},
           ${RULES_ACCEPTANCE_TEXT},
+          ${body.marketingOptIn === true},
+          ${body.marketingOptIn === true ? MARKETING_CONSENT_VERSION : null},
+          ${body.marketingOptIn === true ? MARKETING_CONSENT_TEXT : null},
           ${body.homeScore ?? null},
           ${body.awayScore ?? null}
         )
@@ -222,6 +232,7 @@ export async function POST(request: Request) {
     return noStoreJson({
       predictionId: result.predictionId,
       duplicate: result.duplicate,
+      marketingConsentStatus: body.marketingOptIn === true ? 'pending_confirmation' : 'not_requested',
     }, result.duplicate ? 200 : 201);
   } catch (error) {
     const code = error && typeof error === 'object' && 'code' in error
