@@ -4,8 +4,10 @@ export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 import { isEntraExternalConfigured } from '@/lib/auth/entra-external';
 import { isFactsportEditorialPostgresReady } from '@/lib/adapters/postgres-client';
+import { rejectPrivateProductHost } from '@/app/lib/private-product-host';
 
-export default function MediaLoginPage({ searchParams }: { searchParams?: { error?: string } }) {
+export default async function MediaLoginPage({ searchParams }: { searchParams?: { error?: string } }) {
+  await rejectPrivateProductHost();
   const hasError = Boolean(searchParams?.error);
   const signInReady = isEntraExternalConfigured() && isFactsportEditorialPostgresReady();
   return <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-12 text-white">
