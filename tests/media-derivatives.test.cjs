@@ -17,6 +17,9 @@ test('Media derivatives are immutable, linked to an original asset and inherit s
   assert.match(migration, /GRANT SELECT, INSERT ON public\.media_asset_derivatives TO factsport_v2_editorial_writer/);
   assert.doesNotMatch(migration, /GRANT UPDATE|GRANT DELETE/);
   assert.match(migration, /reject_nested_media_derivative/);
+  assert.equal((migration.match(/\bBEGIN;/g) || []).length, 1);
+  assert.equal((migration.match(/\bCOMMIT;/g) || []).length, 1);
+  assert.match(migration, /AS \$\$[\s\S]*?\$\$;/);
   assert.match(migration, /A derivative cannot be used as the source/);
   assert.match(endpoint, /isSameOriginRequest/);
   assert.match(endpoint, /image\/webp/);
