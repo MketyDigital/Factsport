@@ -329,7 +329,7 @@ export async function publishApprovedEditorial(articleId: string, publicContentC
         const mediaId = attachment.media_id as string | null;
         if (mediaId && !attachment.remove_media) {
           const approvedAsset = await tx`
-            SELECT id FROM public.media_assets
+            SELECT id, alt_text FROM public.media_assets
             WHERE id=${mediaId}::uuid AND media_kind='image'
               AND rights_status IN ('owned', 'licensed', 'editorial_exception')
               AND rights_reviewed_by IS NOT NULL AND rights_reviewed_at IS NOT NULL
@@ -337,6 +337,16 @@ export async function publishApprovedEditorial(articleId: string, publicContentC
             FOR SHARE
           `;
           if (!approvedAsset.length) throw new Error('A revision image no longer has valid rights approval. Publishing is blocked.');
+          if ((attachment.placement === 'hero' || attachment.placement === 'inline') &&
+              !String(approvedAsset[0].alt_text || '').trim()) {
+            throw new Error('Hero and inline images require descriptive alt text before publication.');
+          }
+          if (attachment.placement === 'team_1' && !String(snapshot.team_1_name || '').trim()) {
+            throw new Error('A team 1 logo requires the corresponding team name.');
+          }
+          if (attachment.placement === 'team_2' && !String(snapshot.team_2_name || '').trim()) {
+            throw new Error('A team 2 logo requires the corresponding team name.');
+          }
         }
       }
       await tx`
