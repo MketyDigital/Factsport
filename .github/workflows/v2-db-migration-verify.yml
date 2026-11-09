@@ -139,14 +139,31 @@ jobs:
               SELECT 1 FROM pg_proc
               WHERE oid = function_oid AND prosecdef = true
                 AND proconfig @> ARRAY['search_path=pg_catalog, public']
+            ) OR EXISTS (
+              SELECT 1
+              FROM pg_proc AS proc,
+                   LATERAL aclexplode(COALESCE(
+                     proc.proacl,
+                     pg_catalog.acldefault('f', proc.proowner)
+                   )) AS privilege
+              WHERE proc.oid IN (
+                'public.get_public_prediction_visitor_state(text)'::regprocedure,
+                'public.consume_public_prediction_rate_limit(text,text,integer,integer)'::regprocedure
+              )
+                AND (
+                  NOT proc.prosecdef
+                  OR NOT (proc.proconfig @> ARRAY['search_path=pg_catalog, public'])
+                  OR (privilege.grantee = 0 AND privilege.privilege_type = 'EXECUTE')
+                )
             ) THEN
-              RAISE EXCEPTION 'Prediction function must be SECURITY DEFINER with pinned search_path';
+              RAISE EXCEPTION 'Prediction functions must be SECURITY DEFINER, search_path-pinned and closed to PUBLIC';
             END IF;
             IF has_table_privilege('factsport_v2_prediction_api', 'public.matches', 'SELECT')
               OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_contacts', 'SELECT,INSERT,UPDATE,DELETE')
               OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_participants', 'SELECT,INSERT,UPDATE,DELETE')
               OR has_table_privilege('factsport_v2_prediction_api', 'public.predictions', 'SELECT,INSERT,UPDATE,DELETE')
               OR has_table_privilege('factsport_v2_prediction_api', 'public.marketing_subscriptions', 'SELECT,INSERT,UPDATE,DELETE')
+              OR has_table_privilege('factsport_v2_prediction_api', 'public.marketing_consent_events', 'SELECT,INSERT,UPDATE,DELETE')
               OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_participant_claims', 'SELECT,INSERT,UPDATE,DELETE')
               OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_claim_conflicts', 'SELECT,INSERT,UPDATE,DELETE')
               OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_rule_acceptances', 'SELECT,INSERT,UPDATE,DELETE')
