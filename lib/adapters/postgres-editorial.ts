@@ -22,6 +22,7 @@ export interface PublicEditorialArticle {
   team_1_name: string | null; team_2_name: string | null;
   team_1_logo_key: string | null; team_2_logo_key: string | null;
   inline_media?: Array<{ position: number; object_key: string; content_type: string; width: number | null; height: number | null; alt_text: string | null; attribution_text: string | null }>;
+  sources?: Array<{ id: string; source_title: string; publisher: string | null; canonical_url: string; attribution_text: string | null; accessed_at: string }>;
 }
 export interface PublicMediaAsset {
   object_key: string; content_type: string; byte_size: number;
@@ -91,7 +92,17 @@ export async function getPublicEditorialArticle(slug: string): Promise<PublicEdi
       WHERE article_id = ${article.id}::uuid
       ORDER BY position ASC, object_key ASC
     `;
-    return { ...article, inline_media: inlineMedia as unknown as PublicEditorialArticle['inline_media'] };
+    const sources = await sql`
+      SELECT id, source_title, publisher, canonical_url, attribution_text, accessed_at
+      FROM public.public_editorial_article_sources
+      WHERE article_id = ${article.id}::uuid
+      ORDER BY accessed_at DESC, source_title ASC
+    `;
+    return {
+      ...article,
+      inline_media: inlineMedia as unknown as PublicEditorialArticle['inline_media'],
+      sources: sources as unknown as PublicEditorialArticle['sources'],
+    };
   });
 }
 
