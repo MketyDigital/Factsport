@@ -33,9 +33,29 @@ export function withFactsportPostgres<T>(operation: (sql: FactsportSql) => Promi
  * backed by factsport_v2_editorial_writer, never the public or sports writer.
  * There is deliberately no DATABASE_URL or Supabase service-role fallback.
  */
-export function isFactsportEditorialPostgresReady(): boolean {
+export async function isFactsportEditorialPostgresReady(): Promise<boolean> {
   const bindings = env as unknown as Record<string, HyperdriveBinding | undefined>;
-  return !!bindings.FACTSPORT_EDITORIAL_HYPERDRIVE?.connectionString;
+  if (!bindings.FACTSPORT_EDITORIAL_HYPERDRIVE?.connectionString) return false;
+  try {
+    const rows = await withFactsportEditorialPostgres(sql => sql`
+      SELECT
+        current_user = 'factsport_v2_editorial_writer' AS role_ready,
+        to_regclass('public.external_identities') IS NOT NULL AS identities_table_ready,
+        to_regclass('public.media_editorial_memberships') IS NOT NULL AS memberships_table_ready,
+        has_column_privilege(current_user, 'public.external_identities', 'issuer', 'SELECT')
+          AND has_column_privilege(current_user, 'public.external_identities', 'subject', 'SELECT')
+          AND has_column_privilege(current_user, 'public.external_identities', 'user_id', 'SELECT')
+          AS identity_columns_readable,
+        has_table_privilege(current_user, 'public.media_editorial_memberships', 'SELECT')
+          AS memberships_readable
+    `);
+    const ready = rows[0];
+    return !!ready && ready.role_ready === true && ready.identities_table_ready === true &&
+      ready.memberships_table_ready === true && ready.identity_columns_readable === true &&
+      ready.memberships_readable === true;
+  } catch {
+    return false;
+  }
 }
 
 export function withFactsportEditorialPostgres<T>(operation: (sql: FactsportSql) => Promise<T> | T): Promise<T> {
