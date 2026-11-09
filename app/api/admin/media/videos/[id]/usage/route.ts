@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
+import { isFactsportMediaVideoSchemaReady } from '@/lib/media/readiness';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,7 @@ export async function GET(_request: Request, context: { params: { id: string } }
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(videoId)) {
     return NextResponse.json({ error: 'Not found' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
   }
+  if (!isFactsportMediaVideoSchemaReady()) return NextResponse.json({ success: true, articles: [] }, { headers: { 'Cache-Control': 'private, no-store' } });
   try {
     const articles = await withFactsportEditorialPostgres(sql => sql`
       SELECT DISTINCT a.id, a.slug, a.title, a.status,
