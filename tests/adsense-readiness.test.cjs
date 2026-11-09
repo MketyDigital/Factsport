@@ -14,6 +14,26 @@ test('AdSense gate is opt-in, approved, consent-ready and exact public domain on
   assert.doesNotMatch(read('app/layout.tsx'), /pagead2\.googlesyndication\.com|adsbygoogle/);
 });
 
+test('root robots metadata fails closed for private host and until all public indexing backends are ready', () => {
+  const rootLayout = read('app/layout.tsx');
+  assert.match(rootLayout, /export async function generateMetadata/);
+  assert.match(rootLayout, /isPrivateProductHost \|\| !publicIndexingReady/);
+  assert.match(rootLayout, /googleBot: \{ index: false, follow: false \}/);
+  assert.doesNotMatch(rootLayout, /robots: "index, follow"/);
+});
+
+test('publisher transparency and ads.txt are present but do not imply account approval', () => {
+  const privacy = read('app/privacy-policy/page.tsx');
+  const advertising = read('app/advertising-policy/page.tsx');
+  const adsTxt = read('public/ads.txt').trim().split(/\\r?\\n/).filter(Boolean);
+  assert.match(privacy, /AdSense is not currently enabled/);
+  assert.match(privacy, /Google-certified consent management platform/);
+  assert.match(advertising, /AdSense is not currently enabled/);
+  assert.equal(adsTxt.length, 1);
+  assert.match(adsTxt[0], /^google\\.com, pub-[0-9]{16}, DIRECT, f08c47fec0942fa0$/);
+});
+
+
 test('only editorial pages can be eligible; interaction and private surfaces are excluded', () => {
   assert.match(policy, /PUBLIC_EDITORIAL_PATHS/);
   assert.match(policy, /match\|matches\|live\|leaderboard\|embed/);
