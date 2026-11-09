@@ -47,5 +47,5 @@ test('dispatcher migration exposes only published rights-cleared media and permi
   assert.match(migration, /usage_expires_at IS NULL OR m\.usage_expires_at > now\(\)/);
   assert.match(migration, /GRANT SELECT ON public\.public_social_media_assets TO factsport_v2_social_dispatcher/);
   assert.match(migration, /unknown_result/);
-  assert.ok(migration.includes('GRANT UPDATE (') && migration.includes('finished_at) ON public.media_social_delivery_attempts'));
+  assert.ok(migration.includes('GRANT UPDATE (') && migration.includes('finished_at\n) ON public.media_social_delivery_attempts'));
 });
