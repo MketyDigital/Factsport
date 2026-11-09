@@ -316,9 +316,9 @@ jobs:
           COMMIT;
 
           SQL
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SET ROLE factsport_v2_prediction_api; SELECT * FROM public.submit_public_prediction('gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg', 'race@example.test', 'Race Visitor', '00000000-0000-4000-8000-000000000048', 'home', 'free-prediction-v1', 'I have read and accept the Factsport free prediction rules and privacy notice.', false, NULL, NULL, 1, 0);" > /tmp/prediction-race-1.log &
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SET ROLE factsport_v2_prediction_api; SELECT * FROM public.submit_public_prediction('9999999999999999999999999999999999999999999999999999999999999999', 'race@example.test', 'Race Visitor', '00000000-0000-4000-8000-000000000048', 'home', 'free-prediction-v1', 'I have read and accept the Factsport free prediction rules and privacy notice.', false, NULL, NULL, 1, 0);" > /tmp/prediction-race-1.log &
           race_pid_1=$!
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SET ROLE factsport_v2_prediction_api; SELECT * FROM public.submit_public_prediction('gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg', 'race@example.test', 'Race Visitor', '00000000-0000-4000-8000-000000000048', 'away', 'free-prediction-v1', 'I have read and accept the Factsport free prediction rules and privacy notice.', false, NULL, NULL, 0, 1);" > /tmp/prediction-race-2.log &
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SET ROLE factsport_v2_prediction_api; SELECT * FROM public.submit_public_prediction('9999999999999999999999999999999999999999999999999999999999999999', 'race@example.test', 'Race Visitor', '00000000-0000-4000-8000-000000000048', 'away', 'free-prediction-v1', 'I have read and accept the Factsport free prediction rules and privacy notice.', false, NULL, NULL, 0, 1);" > /tmp/prediction-race-2.log &
           race_pid_2=$!
           wait "$race_pid_1"
           wait "$race_pid_2"
@@ -333,7 +333,7 @@ jobs:
               OR (SELECT count(*) FROM public.predictions
                   WHERE match_id='00000000-0000-4000-8000-000000000048') <> 1
               OR (SELECT count(*) FROM public.prediction_participants
-                  WHERE visitor_token_hash='gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg') <> 1 THEN
+                  WHERE visitor_token_hash='9999999999999999999999999999999999999999999999999999999999999999') <> 1 THEN
               RAISE EXCEPTION 'Prediction and versioned rules acceptance were not persisted atomically';
             END IF;
             IF (SELECT count(*) FROM public.marketing_subscriptions
