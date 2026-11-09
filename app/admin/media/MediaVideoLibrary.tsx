@@ -110,8 +110,26 @@ export default function MediaVideoLibrary({ ready, schemaReady, canRevokeRights 
               onError: reject,
               onSuccess: () => resolve(),
             });
-            void uploader.findPreviousUploads().then(previousUploads => {
-              if (previousUploads.length) uploader.resumeFromPreviousUpload(previousUploads[0]);
+            void uploader.findPreviousUploads().then(async previousUploads => {
+              const resumeWindowMs = 55 * 60 * 1000;
+              const resumable = previousUploads.find(previous => {
+                const createdAt = Date.parse(previous.creationTime);
+                return Boolean(previous.uploadUrl) && Number.isFinite(createdAt) &&
+                  Date.now() - createdAt < resumeWindowMs;
+              });
+              const expired = previousUploads.filter(previous => previous !== resumable);
+              const urlStorage = tus.defaultOptions.urlStorage;
+              if (urlStorage) {
+                await Promise.all(expired.map(previous =>
+                  urlStorage.removeUpload(previous.urlStorageKey)
+                ));
+              }
+              if (resumable) {
+                uploader.resumeFromPreviousUpload(resumable);
+              } else {
+                assetId = '';
+                localStorage.removeItem(assetStorageKey);
+              }
               uploader.start();
             }).catch(reject);
           });
