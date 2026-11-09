@@ -236,7 +236,7 @@ test('editorial composer preview reuses the exact sanitized public Markdown rend
   const renderer = read('app/components/MarkdownRenderer.tsx');
   assert.match(client, /import MarkdownRenderer from '@\/app\/components\/MarkdownRenderer'/);
   assert.match(client, /Preview uses the same sanitized Markdown renderer/);
-  assert.match(client, /<MarkdownRenderer content={form.bodyMarkdown} disableExternalMedia />/);
+  assert.ok(client.includes('<MarkdownRenderer content={form.bodyMarkdown} disableExternalMedia />'));
   assert.match(client, /Not published/);
   assert.match(renderer, /rehypeSanitize/);
   assert.match(renderer, /rehypeSafeEmbeds/);
@@ -412,7 +412,7 @@ test('editorial draft preview includes the same NewsArtwork and sanitized Markdo
   assert.match(ui, /previewTeam2/);
   assert.match(ui, /previewInline\.map/);
   assert.match(ui, /Private preview only/);
-  assert.match(ui, /<MarkdownRenderer content={form.bodyMarkdown} disableExternalMedia />/);
+  assert.ok(ui.includes('<MarkdownRenderer content={form.bodyMarkdown} disableExternalMedia />'));
 });
 
 
