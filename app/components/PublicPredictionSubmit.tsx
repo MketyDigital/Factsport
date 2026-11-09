@@ -173,13 +173,14 @@ export default function PublicPredictionSubmit({ matchId, matchDate, homeTeam, a
               <label className="flex items-start gap-2 text-xs text-slate-700">
                 <input type="checkbox" required checked={acceptRules}
                   onChange={event => setAcceptRules(event.target.checked)} className="mt-0.5" />
-                <span>I accept the <a href="/how-to-play" target="_blank" rel="noreferrer" className="underline">free prediction rules</a> and <a href="/privacy-policy" target="_blank" rel="noreferrer" className="underline">privacy notice</a>.</span>
+                <span>I have read and accept the Factsport <a href="/how-to-play" target="_blank" rel="noreferrer" className="underline">free prediction rules</a> and <a href="/privacy-policy" target="_blank" rel="noreferrer" className="underline">privacy notice</a>.</span>
               </label>
               <label className="flex items-start gap-2 text-xs text-slate-700">
                 <input type="checkbox" checked={marketingOptIn}
                   onChange={event => setMarketingOptIn(event.target.checked)} className="mt-0.5" />
-                <span>Yes, email me Factsport product updates and offers. I understand I can unsubscribe at any time. This is optional and does not affect my prediction.</span>
+                <span>Yes, email me Factsport product updates and offers. I understand I can unsubscribe at any time.</span>
               </label>
+              <p className="text-[11px] text-slate-500">This is optional and does not affect your prediction.</p>
               <button type="submit" disabled={loading}
                 className="w-full rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
                 {loading ? 'Submitting…' : 'Confirm Prediction'}
