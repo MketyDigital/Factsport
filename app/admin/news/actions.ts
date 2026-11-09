@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 import { inspectPublicMediaArticle, PUBLIC_MEDIA_POLICY_VERSION } from '@/lib/public-media-content-policy';
+import { isFactsportStreamVideoReady } from '@/lib/media/cloudflare-stream';
 
 type EditorialInput = {
   id?: string; title: string; slug: string; excerpt?: string; bodyMarkdown: string;
@@ -349,6 +350,9 @@ export async function publishApprovedEditorial(articleId: string, publicContentC
         FROM public.editorial_article_revision_videos
         WHERE revision_id=${revision.id}::uuid FOR UPDATE
       `;
+      if (revisionVideos.some(video => video.video_id && !video.remove_video) && !isFactsportStreamVideoReady()) {
+        throw new Error('Cloudflare Stream playback is not ready in this environment. Video publication is blocked.');
+      }
       const existingVideoIds = await tx`
         SELECT video_id FROM public.editorial_article_videos
         WHERE article_id=${articleId}::uuid
