@@ -160,6 +160,7 @@ jobs:
           DECLARE
             first_result record;
             retry_result record;
+            consent_result record;
             rate_first boolean;
             rate_second boolean;
           BEGIN
@@ -183,6 +184,19 @@ jobs:
               OR retry_result.duplicate IS NOT TRUE THEN
               RAISE EXCEPTION 'Prediction retry was not idempotently recognized';
             END IF;
+            SELECT * INTO consent_result FROM public.submit_public_prediction(
+              'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              NULL, NULL,
+              '00000000-0000-4000-8000-000000000043',
+              'draw', 'free-prediction-v1', 'I accept the free prediction rules and privacy notice.',
+              true, 'factsport-email-marketing-v1',
+              'Yes, email me Factsport product updates and offers. I understand I can unsubscribe at any time.',
+              1, 1
+            );
+            IF consent_result.prediction_id IS DISTINCT FROM first_result.prediction_id
+              OR consent_result.duplicate IS NOT TRUE THEN
+              RAISE EXCEPTION 'Marketing consent retry must not create a second prediction';
+            END IF;
             rate_first := public.consume_public_prediction_rate_limit(
               'visitor',
               'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
@@ -199,8 +213,24 @@ jobs:
           END
           $verify$;
           RESET ROLE;
+
+          DO $verify$
+          BEGIN
+            IF (SELECT count(*) FROM public.predictions
+                WHERE match_id='00000000-0000-4000-8000-000000000043') <> 1
+              OR (SELECT count(*) FROM public.prediction_rule_acceptances) <> 1 THEN
+              RAISE EXCEPTION 'Prediction and versioned rules acceptance were not persisted atomically';
+            END IF;
+            IF (SELECT count(*) FROM public.marketing_subscriptions
+                WHERE status='pending_confirmation') <> 1
+              OR (SELECT count(*) FROM public.marketing_consent_events
+                  WHERE event_type='opt_in') <> 1 THEN
+              RAISE EXCEPTION 'Explicit marketing opt-in was not stored as pending confirmation with evidence';
+            END IF;
+          END
+          $verify$;
           SQL
-          echo "Prediction API function is executable only by its dedicated role; direct table access is denied and duplicate retry is idempotent."
+          echo "Prediction API role is EXECUTE-only; submission, rules acceptance, optional pending marketing consent and rate limits verified."
 
       - name: Verify Media, VOD and least-privilege database contracts
         run: |
