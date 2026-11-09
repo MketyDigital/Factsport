@@ -105,7 +105,7 @@ export async function createFactsportStreamDirectUpload(input: {
   });
   const uploadURL = typeof result.uploadURL === 'string' ? result.uploadURL : '';
   const uid = typeof result.uid === 'string' ? result.uid : '';
-  if (!uploadURL.startsWith('https://') || !/^[a-f0-9]{32}$/i.test(uid)) {
+  if (!uploadURL.startsWith('https://') || !/^[a-z0-9]{32,64}$/i.test(uid)) {
     throw new Error('Cloudflare Stream returned an invalid direct-upload response.');
   }
   return { uploadURL, uid, expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() };
@@ -157,21 +157,23 @@ export async function createFactsportStreamTusUpload(input: {
   try { location = new URL(uploadURL); } catch {
     throw new Error('Cloudflare Stream returned an invalid resumable upload location.');
   }
-  const expectedPath = '/client/v4/accounts/' + config.accountId + '/stream/' + uid;
+  const expectedPathPrefix = '/client/v4/accounts/' + config.accountId + '/stream/';
   if (location.protocol !== 'https:' || location.hostname !== 'api.cloudflare.com' ||
-      location.pathname !== expectedPath || !/^[a-f0-9]{32}$/i.test(uid)) {
+      !location.pathname.startsWith(expectedPathPrefix) ||
+      location.pathname.length <= expectedPathPrefix.length ||
+      !/^[a-z0-9]{32,64}$/i.test(uid)) {
     throw new Error('Cloudflare Stream returned an invalid resumable upload response.');
   }
   return { uploadURL, uid, expiresAt, maxDurationSeconds };
 }
 
 export async function getFactsportStreamVideo(uid: string) {
-  if (!/^[a-f0-9]{32}$/i.test(uid)) throw new Error('Invalid Stream video identifier.');
+  if (!/^[a-z0-9]{32,64}$/i.test(uid)) throw new Error('Invalid Stream video identifier.');
   return streamRequest('/' + uid, { method: 'GET' });
 }
 
 export async function deleteFactsportStreamVideo(uid: string) {
-  if (!/^[a-f0-9]{32}$/i.test(uid)) return;
+  if (!/^[a-z0-9]{32,64}$/i.test(uid)) return;
   const config = requireConfig();
   const response = await fetch(API + '/accounts/' + config.accountId + '/stream/' + uid, {
     method: 'DELETE', headers: { Authorization: 'Bearer ' + config.apiToken, Accept: 'application/json' },
@@ -207,7 +209,7 @@ function signingJwk(encodedOrJson: string) {
 
 export async function createFactsportStreamSignedToken(videoUid: string): Promise<string> {
   const config = requirePlaybackConfig();
-  if (!/^[a-f0-9]{32}$/i.test(videoUid)) throw new Error('Invalid Stream video identifier.');
+  if (!/^[a-z0-9]{32,64}$/i.test(videoUid)) throw new Error('Invalid Stream video identifier.');
   const now = Math.floor(Date.now() / 1000);
   const header = base64Url(new TextEncoder().encode(JSON.stringify({ alg: 'RS256', kid: config.signingKeyId })));
   const payload = base64Url(new TextEncoder().encode(JSON.stringify({
