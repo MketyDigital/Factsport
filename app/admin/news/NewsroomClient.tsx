@@ -7,6 +7,7 @@ import {
 } from './actions';
 import { removeRevisionMedia, reviewRightsAndAttachMedia } from './media-actions';
 import MarkdownRenderer from '@/app/components/MarkdownRenderer';
+import NewsArtwork from '@/app/components/NewsArtwork';
 
 type ReusableMediaAsset = {
   id: string; object_key: string; rights_status: string; rights_reference: string | null;
@@ -83,6 +84,11 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const [mediaPosition, setMediaPosition] = useState(0);
 
   const currentRevisionMedia = articles.find(article => article.id === form.id)?.revision_media || [];
+  const activeRevisionMedia = currentRevisionMedia.filter(asset => !asset.remove_media && asset.media_id);
+  const previewHero = activeRevisionMedia.find(asset => asset.placement === 'hero');
+  const previewTeam1 = activeRevisionMedia.find(asset => asset.placement === 'team_1');
+  const previewTeam2 = activeRevisionMedia.find(asset => asset.placement === 'team_2');
+  const previewInline = activeRevisionMedia.filter(asset => asset.placement === 'inline').sort((a, b) => a.position - b.position);
 
   const filtered = useMemo(() => articles.filter(article => {
     const matchesSearch = !search || article.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -334,16 +340,52 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                 </button>
               </div>
               {previewOpen && <section aria-label="Article preview" className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                <div className="border-b border-slate-100 bg-slate-50 p-5">
-                  <p className="text-[10px] font-black uppercase tracking-[.18em] text-blue-700">{form.category || 'Football'} · Draft preview</p>
-                  <h2 className="mt-2 text-2xl font-black leading-tight text-slate-950">{form.title || 'Untitled article'}</h2>
-                  {form.excerpt && <p className="mt-2 text-sm leading-6 text-slate-600">{form.excerpt}</p>}
-                  <p className="mt-3 text-[11px] font-semibold text-slate-500">{form.authorDisplayName || 'FactSport Desk'} · Not published</p>
+                <div className="relative h-[42vh] min-h-[260px] max-h-[520px] overflow-hidden border-b-4 border-blue-600 bg-[#0a1428]">
+                  <NewsArtwork
+                    image={previewHero?.media_id ? '/api/admin/media/' + encodeURIComponent(previewHero.media_id) : null}
+                    team1Logo={previewTeam1?.media_id ? '/api/admin/media/' + encodeURIComponent(previewTeam1.media_id) : null}
+                    team2Logo={previewTeam2?.media_id ? '/api/admin/media/' + encodeURIComponent(previewTeam2.media_id) : null}
+                    title={form.title}
+                    className="h-full w-full opacity-70"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0a1428] via-[#0a1428]/70 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 z-10 p-5 md:p-8">
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {form.isBreaking && <span className="rounded-md bg-red-600 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">Breaking</span>}
+                      <span className="rounded-md bg-blue-600 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">{form.category || 'Football'}</span>
+                      <span className="rounded-md border border-white/30 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">Draft preview</span>
+                    </div>
+                    <h2 className="max-w-4xl text-2xl font-black leading-tight text-white md:text-4xl">{form.title || 'Untitled article'}</h2>
+                    {form.excerpt && <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">{form.excerpt}</p>}
+                    <p className="mt-3 text-[11px] font-semibold text-slate-300">{form.authorDisplayName || 'FactSport Desk'} · Not published</p>
+                  </div>
                 </div>
-                <div className="prose prose-lg prose-slate max-w-none p-5 text-slate-800">
-                  {form.bodyMarkdown.trim()
-                    ? <MarkdownRenderer content={form.bodyMarkdown} />
-                    : <p className="italic text-slate-500">Article body preview will appear here.</p>}
+                <div className="mx-auto grid max-w-6xl gap-8 px-5 py-8 lg:grid-cols-[minmax(0,1fr)_280px]">
+                  <div>
+                    <div className="prose prose-lg prose-slate max-w-none text-slate-800">
+                      {form.bodyMarkdown.trim()
+                        ? <MarkdownRenderer content={form.bodyMarkdown} />
+                        : <p className="italic text-slate-500">Article body preview will appear here.</p>}
+                    </div>
+                    {previewInline.length > 0 && <section className="mt-10 border-t border-slate-200 pt-7" aria-label="Preview media gallery">
+                      <h3 className="mb-4 text-lg font-black text-slate-900">More from this story</h3>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {previewInline.map(asset => <figure key={asset.placement + ':' + asset.position} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                          <img src={'/api/admin/media/' + encodeURIComponent(asset.media_id!)} alt={asset.alt_text || 'Editorial image'} width={asset.width || undefined} height={asset.height || undefined} className="h-auto max-h-[420px] w-full object-contain" loading="lazy" decoding="async" />
+                          {asset.attribution_text && <figcaption className="border-t border-slate-200 px-3 py-2 text-xs text-slate-500">{asset.attribution_text}</figcaption>}
+                        </figure>)}
+                      </div>
+                    </section>}
+                  </div>
+                  <aside className="h-fit rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Media placement preview</p>
+                    <p className="mt-2 text-xs text-slate-700">Hero: {previewHero ? 'Attached' : 'No image'}</p>
+                    <p className="mt-1 text-xs text-slate-700">Team marks: {previewTeam1 || previewTeam2 ? 'Attached' : 'None'}</p>
+                    <p className="mt-1 text-xs text-slate-700">Inline gallery: {previewInline.length} image(s)</p>
+                    <p className="mt-3 text-[11px] leading-5 text-slate-500">Private preview only. The public article layout may include live match context and approved site modules; no advertising is shown in this editor preview.</p>
+                  </aside>
                 </div>
               </section>}
             </label>
