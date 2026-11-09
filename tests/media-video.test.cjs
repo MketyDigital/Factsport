@@ -39,7 +39,8 @@ test('Cloudflare Stream VOD is separate, signed, fail-closed and revision-scoped
   assert.match(refresh, /expiredUnuploaded/);
   assert.match(playback, /public_editorial_article_video_tokens/);
   assert.match(playback, /createFactsportStreamSignedToken\(String\(rows\[0\]\.provider_video_id\)\)/);
-  assert.match(player, /\/iframe/);
+  assert.match(playback, /\/iframe/);
+  assert.match(player, /src={iframeUrl}/);
   assert.match(articleAdapter, /public\.public_editorial_article_videos/);
   assert.doesNotMatch(articleAdapter, /provider_video_id/);
   assert.match(articlePage, /MediaVideoPlayer/);
