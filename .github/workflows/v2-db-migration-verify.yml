@@ -95,7 +95,7 @@ jobs:
             function_oid regprocedure;
           BEGIN
             function_oid := to_regprocedure(
-              'public.submit_public_prediction(text,text,text,uuid,text,integer,integer)'
+              'public.submit_public_prediction(text,text,text,uuid,text,text,text,integer,integer)'
             );
             IF function_oid IS NULL THEN
               RAISE EXCEPTION 'Prediction submission function is missing';
@@ -141,6 +141,7 @@ jobs:
               OR has_table_privilege('factsport_v2_prediction_api', 'public.marketing_subscriptions', 'SELECT,INSERT,UPDATE,DELETE')
               OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_participant_claims', 'SELECT,INSERT,UPDATE,DELETE')
               OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_claim_conflicts', 'SELECT,INSERT,UPDATE,DELETE')
+              OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_rule_acceptances', 'SELECT,INSERT,UPDATE,DELETE')
               OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_submission_rate_limits', 'SELECT,INSERT,UPDATE,DELETE') THEN
               RAISE EXCEPTION 'Prediction API role has direct table access; only function execution is allowed';
             END IF;
@@ -167,13 +168,13 @@ jobs:
               'ci-prediction@example.test',
               'CI Visitor',
               '00000000-0000-4000-8000-000000000043',
-              'home', 2, 1
+              'home', 'free-prediction-v1', 'I accept the free prediction rules and privacy notice.', 2, 1
             );
             SELECT * INTO retry_result FROM public.submit_public_prediction(
               'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
               NULL, NULL,
               '00000000-0000-4000-8000-000000000043',
-              'away', 0, 1
+              'away', 'free-prediction-v1', 'I accept the free prediction rules and privacy notice.', 0, 1
             );
             IF first_result.prediction_id IS NULL OR first_result.duplicate IS NOT FALSE THEN
               RAISE EXCEPTION 'First Prediction submission did not create one prediction';
