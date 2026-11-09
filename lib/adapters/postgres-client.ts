@@ -228,6 +228,11 @@ export async function isFactsportPredictionPostgresReady(): Promise<boolean> {
           'public.submit_public_prediction(text,text,text,uuid,text,text,text,boolean,text,text,integer,integer)',
           'EXECUTE'
         ) AS submission_function_executable,
+        to_regprocedure('public.get_public_prediction_visitor_state(text)') IS NOT NULL
+          AS visitor_state_function_ready,
+        has_function_privilege(
+          current_user, 'public.get_public_prediction_visitor_state(text)', 'EXECUTE'
+        ) AS visitor_state_function_executable,
         to_regclass('public.prediction_submission_rate_limits') IS NOT NULL AS rate_limits_ready,
         to_regprocedure(
           'public.consume_public_prediction_rate_limit(text,text,integer,integer)'
@@ -247,6 +252,8 @@ export async function isFactsportPredictionPostgresReady(): Promise<boolean> {
       ready.marketing_events_ready === true &&
       ready.submission_function_ready === true &&
       ready.submission_function_executable === true &&
+      ready.visitor_state_function_ready === true &&
+      ready.visitor_state_function_executable === true &&
       ready.rate_limits_ready === true &&
       ready.rate_limit_function_ready === true &&
       ready.rate_limit_function_executable === true;
