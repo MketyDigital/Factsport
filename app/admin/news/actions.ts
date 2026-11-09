@@ -558,10 +558,10 @@ export async function addEditorialSource(input: {
       `;
       await tx`
         INSERT INTO public.media_editorial_audit_events
-          (actor_user_id, action, article_id, details)
+          (actor_user_id, action, article_id, revision_id, details)
         VALUES (
-          ${authorization.user.domainUserId}::uuid, 'source_added', ${input.articleId}::uuid,
-          ${JSON.stringify({ revisionId: draftRevision[0].id, sourceTitle, publisher, canonicalUrl })}::jsonb
+          ${authorization.user.domainUserId}::uuid, 'source_added', ${input.articleId}::uuid, ${draftRevision[0].id}::uuid,
+          ${JSON.stringify({ sourceTitle, publisher, canonicalUrl })}::jsonb
         )
       `;
       return { id: inserted[0].id as string, slug: articles[0].slug as string, status: articles[0].status as string };
