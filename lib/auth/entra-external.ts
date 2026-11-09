@@ -39,6 +39,15 @@ function required(name: string): string {
   return value;
 }
 
+export function isEntraMediaRequestHost(requestUrl: URL): boolean {
+  try {
+    const redirectUrl = new URL(required('ENTRA_EXTERNAL_REDIRECT_URI'));
+    return redirectUrl.protocol === 'https:' && requestUrl.origin === redirectUrl.origin;
+  } catch {
+    return false;
+  }
+}
+
 export function isEntraExternalConfigured(): boolean {
   try {
     const discoveryUrl = new URL(required('ENTRA_EXTERNAL_DISCOVERY_URL'));
