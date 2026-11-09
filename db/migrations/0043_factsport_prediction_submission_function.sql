@@ -46,6 +46,7 @@ DECLARE
   v_email_normalized text;
   v_display_name text;
   v_subscription_id uuid;
+  v_duplicate boolean := false;
 BEGIN
   IF p_visitor_token_hash IS NULL
      OR p_visitor_token_hash !~ '^[0-9a-f]{64}$' THEN
@@ -108,78 +109,77 @@ BEGIN
    WHERE pp.visitor_token_hash = p_visitor_token_hash
    FOR UPDATE;
 
-  -- Idempotent retry of an existing prediction remains recognizable even
-  -- after kickoff; it cannot create or alter a prediction.
+  -- Existing retries are recognized even after kickoff. A duplicate cannot
+  -- alter the locked prediction, but may still submit a separate explicit
+  -- marketing opt-in for the already-associated contact.
   IF v_participant_id IS NOT NULL THEN
     SELECT p.id INTO v_prediction_id
       FROM public.predictions AS p
      WHERE p.participant_id = v_participant_id
        AND p.match_id = p_match_id;
-    IF FOUND THEN
-      RETURN QUERY SELECT v_prediction_id, true;
-      RETURN;
-    END IF;
+    v_duplicate := FOUND;
   END IF;
 
-  IF pg_catalog.upper(COALESCE(v_status, '')) NOT IN ('SCHEDULED', 'PRE_MATCH')
-     OR v_match_date <= pg_catalog.transaction_timestamp() THEN
-    RAISE EXCEPTION 'prediction_closed' USING ERRCODE = '55000';
-  END IF;
-
-  IF v_participant_id IS NULL THEN
-    v_email := pg_catalog.btrim(COALESCE(p_email_address, ''));
-    v_email_normalized := pg_catalog.lower(v_email);
-    IF pg_catalog.char_length(v_email) NOT BETWEEN 3 AND 254
-       OR v_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' THEN
-      RAISE EXCEPTION 'valid_email_required' USING ERRCODE = '22023';
+  IF NOT v_duplicate THEN
+    IF pg_catalog.upper(COALESCE(v_status, '')) NOT IN ('SCHEDULED', 'PRE_MATCH')
+       OR v_match_date <= pg_catalog.transaction_timestamp() THEN
+      RAISE EXCEPTION 'prediction_closed' USING ERRCODE = '55000';
     END IF;
 
-    INSERT INTO public.prediction_contacts (email_address, email_normalized)
-    VALUES (v_email, v_email_normalized)
-    ON CONFLICT (email_normalized) DO UPDATE
-      SET email_address = EXCLUDED.email_address,
-          updated_at = pg_catalog.transaction_timestamp()
-    RETURNING id INTO v_contact_id;
+    IF v_participant_id IS NULL THEN
+      v_email := pg_catalog.btrim(COALESCE(p_email_address, ''));
+      v_email_normalized := pg_catalog.lower(v_email);
+      IF pg_catalog.char_length(v_email) NOT BETWEEN 3 AND 254
+         OR v_email !~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$' THEN
+        RAISE EXCEPTION 'valid_email_required' USING ERRCODE = '22023';
+      END IF;
 
-    INSERT INTO public.prediction_participants (
-      visitor_token_hash, contact_id, display_name, last_seen_at
+      INSERT INTO public.prediction_contacts (email_address, email_normalized)
+      VALUES (v_email, v_email_normalized)
+      ON CONFLICT (email_normalized) DO UPDATE
+        SET email_address = EXCLUDED.email_address,
+            updated_at = pg_catalog.transaction_timestamp()
+      RETURNING id INTO v_contact_id;
+
+      INSERT INTO public.prediction_participants (
+        visitor_token_hash, contact_id, display_name, last_seen_at
+      ) VALUES (
+        p_visitor_token_hash, v_contact_id, v_display_name, pg_catalog.transaction_timestamp()
+      )
+      RETURNING id INTO v_participant_id;
+    ELSE
+      UPDATE public.prediction_participants
+         SET last_seen_at = pg_catalog.transaction_timestamp(),
+             display_name = COALESCE(v_display_name, display_name)
+       WHERE id = v_participant_id;
+    END IF;
+
+    INSERT INTO public.predictions (
+      participant_id, match_id, predicted_outcome,
+      predicted_home_score, predicted_away_score,
+      is_eligible_for_prize, locked_at
     ) VALUES (
-      p_visitor_token_hash, v_contact_id, v_display_name, pg_catalog.transaction_timestamp()
+      v_participant_id, p_match_id, p_predicted_outcome,
+      p_predicted_home_score, p_predicted_away_score,
+      false, v_match_date
     )
-    RETURNING id INTO v_participant_id;
-  ELSE
-    UPDATE public.prediction_participants
-       SET last_seen_at = pg_catalog.transaction_timestamp(),
-           display_name = COALESCE(v_display_name, display_name)
-     WHERE id = v_participant_id;
+    ON CONFLICT (participant_id, match_id) DO NOTHING
+    RETURNING id INTO v_prediction_id;
+
+    IF v_prediction_id IS NULL THEN
+      SELECT p.id INTO v_prediction_id
+        FROM public.predictions AS p
+       WHERE p.participant_id = v_participant_id
+         AND p.match_id = p_match_id;
+      v_duplicate := true;
+    ELSE
+      INSERT INTO public.prediction_rule_acceptances (
+        participant_id, prediction_id, rules_version, rules_text
+      ) VALUES (
+        v_participant_id, v_prediction_id, p_rules_version, p_rules_text
+      );
+    END IF;
   END IF;
-
-  INSERT INTO public.predictions (
-    participant_id, match_id, predicted_outcome,
-    predicted_home_score, predicted_away_score,
-    is_eligible_for_prize, locked_at
-  ) VALUES (
-    v_participant_id, p_match_id, p_predicted_outcome,
-    p_predicted_home_score, p_predicted_away_score,
-    false, v_match_date
-  )
-  ON CONFLICT (participant_id, match_id) DO NOTHING
-  RETURNING id INTO v_prediction_id;
-
-  IF v_prediction_id IS NULL THEN
-    SELECT p.id INTO v_prediction_id
-      FROM public.predictions AS p
-     WHERE p.participant_id = v_participant_id
-       AND p.match_id = p_match_id;
-    RETURN QUERY SELECT v_prediction_id, true;
-    RETURN;
-  END IF;
-
-  INSERT INTO public.prediction_rule_acceptances (
-    participant_id, prediction_id, rules_version, rules_text
-  ) VALUES (
-    v_participant_id, v_prediction_id, p_rules_version, p_rules_text
-  );
 
   -- Marketing is a separate, optional purpose. Only an explicit affirmative
   -- opt-in creates a pending subscription; no send is authorized here.
@@ -213,7 +213,7 @@ BEGIN
     );
   END IF;
 
-  RETURN QUERY SELECT v_prediction_id, false;
+  RETURN QUERY SELECT v_prediction_id, v_duplicate;
 END;
 $function$;
 
