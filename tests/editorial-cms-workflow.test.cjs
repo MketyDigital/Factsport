@@ -333,3 +333,12 @@ test('editorial uploads persist intrinsic dimensions and reject oversized image 
   assert.match(mediaUpload, /dimensions\.width, dimensions\.height/);
   assert.match(mediaUpload, /width, height, alt_text/);
 });
+
+
+test('editing a published article seeds its current hero, team logos and inline gallery into the new revision', () => {
+  assert.match(actions, /else if \(currentStatus === 'published'\)/);
+  assert.match(actions, /FROM public\.editorial_article_media[\s\S]*placement='hero'/);
+  assert.match(actions, /placement='inline'/);
+  assert.match(actions, /FROM public\.editorial_article_team_media/);
+  assert.match(actions, /SELECT \$\{newRevision\[0\]\.id\}::uuid, team_side, 0, media_id, false, now\(\)/);
+});
