@@ -127,25 +127,30 @@ export async function GET(request: Request) {
 
   const existing = readPredictionVisitorToken(request);
   const token = existing || createPredictionVisitorToken();
-  const response = noStoreJson({ ready: false, emailRequired: true }, 503);
   const host = new URL(request.url).hostname.toLowerCase();
-  if (!existing) {
-    response.cookies.set(
-      FACTSPORT_PREDICTION_VISITOR_COOKIE,
-      token,
-      predictionVisitorCookieOptions(host, config.environment),
-    );
-  }
+  const withVisitorCookie = (response: ReturnType<typeof noStoreJson>) => {
+    if (!existing) {
+      response.cookies.set(
+        FACTSPORT_PREDICTION_VISITOR_COOKIE,
+        token,
+        predictionVisitorCookieOptions(host, config.environment),
+      );
+    }
+    return response;
+  };
+  const unavailable = () => withVisitorCookie(
+    noStoreJson({ ready: false, emailRequired: true }, 503)
+  );
 
-  if (!config.ready || !(await isFactsportPredictionPostgresReady())) return response;
+  if (!config.ready || !(await isFactsportPredictionPostgresReady())) return unavailable();
   try {
     const visitorHash = await sha256Hex(token);
     const [state] = await withFactsportPredictionPostgres(sql => sql`
       SELECT public.get_public_prediction_visitor_state(${visitorHash}) AS known
     `);
-    return noStoreJson({ ready: true, emailRequired: state?.known !== true });
+    return withVisitorCookie(noStoreJson({ ready: true, emailRequired: state?.known !== true }));
   } catch {
-    return response;
+    return unavailable();
   }
 }
 
