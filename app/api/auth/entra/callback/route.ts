@@ -2,10 +2,11 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { completeEntraCallback, entraCookieNames, entraCookieOptions } from '@/lib/auth/entra-external';
+import { completeEntraCallback, entraCookieNames, entraCookieOptions, isEntraMediaRequestHost } from '@/lib/auth/entra-external';
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  if (!isEntraMediaRequestHost(url)) return new NextResponse('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
   const error = url.searchParams.get('error');
   if (error) {
     const response = NextResponse.redirect(new URL('/media-login?error=identity-provider-error', url.origin));
