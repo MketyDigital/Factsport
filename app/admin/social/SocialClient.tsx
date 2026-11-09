@@ -95,7 +95,7 @@ export default function SocialClient({ channels, publications, reconciliations }
   }>) {
     setReconciliationDrafts(current => ({
       ...current,
-      [publicationId]: { ...reconciliationDraft(publicationId), ...patch },
+      [publicationId]: { ...(current[publicationId] || { providerPostId: '', providerPostUrl: '', evidence: '', confirmed: false }), ...patch },
     }));
   }
 
