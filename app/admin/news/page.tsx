@@ -48,6 +48,11 @@ export default async function AdminNewsPage() {
         ORDER BY revision_number DESC LIMIT 1
       ) r ON true
       LEFT JOIN LATERAL (
+        SELECT id FROM public.editorial_article_revisions
+        WHERE article_id=a.id AND workflow_status='published'
+        ORDER BY revision_number DESC LIMIT 1
+      ) published_revision ON true
+      LEFT JOIN LATERAL (
         SELECT jsonb_agg(jsonb_build_object(
           'placement', rm.placement,
           'position', rm.position,
@@ -76,7 +81,7 @@ export default async function AdminNewsPage() {
           'accessed_at', s.accessed_at
         ) ORDER BY s.created_at DESC) AS items
         FROM public.editorial_article_sources s
-        WHERE s.article_id=a.id
+        WHERE s.article_id=a.id AND s.revision_id=COALESCE(r.id, published_revision.id)
       ) article_sources ON true
       ORDER BY GREATEST(a.updated_at, COALESCE(r.created_at, a.updated_at)) DESC
       LIMIT 200
