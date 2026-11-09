@@ -179,7 +179,13 @@ jobs:
             ('00000000-0000-4000-8000-000000000043',
              'CI', 'Home', 'Away', '2099-01-01T12:00:00Z', 'SCHEDULED'),
             ('00000000-0000-4000-8000-000000000044',
-             'CI', 'Home 2', 'Away 2', '2099-01-02T12:00:00Z', 'SCHEDULED');
+             'CI', 'Home 2', 'Away 2', '2099-01-02T12:00:00Z', 'SCHEDULED'),
+            ('00000000-0000-4000-8000-000000000045',
+             'CI', 'Home 3', 'Away 3', '2099-01-03T12:00:00Z', 'LIVE'),
+            ('00000000-0000-4000-8000-000000000046',
+             'CI', 'Home 4', 'Away 4', '2099-01-04T12:00:00Z', 'UNRECOGNIZED'),
+            ('00000000-0000-4000-8000-000000000047',
+             'CI', 'Home 5', 'Away 5', transaction_timestamp(), 'SCHEDULED');
 
           SET ROLE factsport_v2_prediction_api;
           DO $verify$
@@ -262,6 +268,42 @@ jobs:
               OR second_browser_result.duplicate IS NOT FALSE THEN
               RAISE EXCEPTION 'A second browser sharing the email did not get an independent participant/prediction';
             END IF;
+
+            BEGIN
+              PERFORM * FROM public.submit_public_prediction(
+                'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+                'live@example.test', 'Live Check',
+                '00000000-0000-4000-8000-000000000045',
+                'home', 'free-prediction-v1', 'I have read and accept the Factsport free prediction rules and privacy notice.',
+                false, NULL, NULL, 1, 0
+              );
+              RAISE EXCEPTION 'Live match was incorrectly accepted';
+            EXCEPTION WHEN SQLSTATE '55000' THEN NULL;
+            END;
+
+            BEGIN
+              PERFORM * FROM public.submit_public_prediction(
+                'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+                'unknown@example.test', 'Unknown Check',
+                '00000000-0000-4000-8000-000000000046',
+                'home', 'free-prediction-v1', 'I have read and accept the Factsport free prediction rules and privacy notice.',
+                false, NULL, NULL, 1, 0
+              );
+              RAISE EXCEPTION 'Unknown match status was incorrectly accepted';
+            EXCEPTION WHEN SQLSTATE '55000' THEN NULL;
+            END;
+
+            BEGIN
+              PERFORM * FROM public.submit_public_prediction(
+                'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+                'past@example.test', 'Kickoff Check',
+                '00000000-0000-4000-8000-000000000047',
+                'home', 'free-prediction-v1', 'I have read and accept the Factsport free prediction rules and privacy notice.',
+                false, NULL, NULL, 1, 0
+              );
+              RAISE EXCEPTION 'Kickoff equality was incorrectly accepted';
+            EXCEPTION WHEN SQLSTATE '55000' THEN NULL;
+            END;
           END
           $verify$;
           RESET ROLE;
