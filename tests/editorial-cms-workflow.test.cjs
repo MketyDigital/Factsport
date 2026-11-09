@@ -365,3 +365,22 @@ test('editorial draft preview includes the same NewsArtwork and sanitized Markdo
   assert.match(ui, /Private preview only/);
   assert.match(ui, /<MarkdownRenderer content=\{form\.bodyMarkdown\} \/>/);
 });
+
+
+test('social publishing can attach only rights-cleared assets already exposed by the public Media view', () => {
+  const socialAction = read('app/admin/social/actions.ts');
+  const socialMediaRoute = read('app/api/admin/social/media/route.ts');
+  const socialClient = read('app/admin/social/SocialClient.tsx');
+  const socialPage = read('app/admin/social/page.tsx');
+  assert.match(socialAction, /mediaAssetIds\?: string\[\]/);
+  assert.match(socialAction, /JOIN public\.public_media_assets public_asset/);
+  assert.match(socialAction, /rights_reviewed_by IS NOT NULL/);
+  assert.match(socialAction, /usage_expires_at IS NULL OR m\.usage_expires_at > now\(\)/);
+  assert.match(socialAction, /media_asset_ids/);
+  assert.match(socialAction, /JSON\.stringify\(row\.media_asset_ids \|\| \[\]\)/);
+  assert.match(socialMediaRoute, /authorizeMediaEditorialAction\('social'\)/);
+  assert.match(socialMediaRoute, /JOIN public\.public_media_assets/);
+  assert.match(socialClient, /Attach public media \(up to four images\)/);
+  assert.match(socialClient, /selectedMediaAssetIds\.length >= 4/);
+  assert.match(socialPage, /p\.media_asset_ids/);
+});
