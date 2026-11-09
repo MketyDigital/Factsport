@@ -32,6 +32,7 @@ export default async function AdminNewsPage() {
         r.workflow_status AS revision_status,
         COALESCE(revision_media.items, '[]'::jsonb) AS revision_media,
         COALESCE(article_sources.items, '[]'::jsonb) AS sources,
+        COALESCE(revision_videos.items, '[]'::jsonb) AS revision_videos,
         r.review_comment,
         COALESCE((r.snapshot->>'is_headline')::boolean, a.is_headline) AS is_headline,
         COALESCE((r.snapshot->>'is_breaking')::boolean, a.is_breaking) AS is_breaking,
@@ -83,6 +84,23 @@ export default async function AdminNewsPage() {
         FROM public.editorial_article_sources s
         WHERE s.article_id=a.id AND s.revision_id=COALESCE(r.id, published_revision.id)
       ) article_sources ON true
+      LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+          'position', rv.position,
+          'video_id', rv.video_id,
+          'remove_video', rv.remove_video,
+          'title', v.title,
+          'upload_status', v.upload_status,
+          'rights_status', v.rights_status,
+          'rights_reference', v.rights_reference,
+          'attribution_text', v.attribution_text,
+          'usage_expires_at', v.usage_expires_at,
+          'duration_seconds', v.duration_seconds
+        ) ORDER BY rv.position) AS items
+        FROM public.editorial_article_revision_videos rv
+        LEFT JOIN public.media_video_assets v ON v.id=rv.video_id
+        WHERE rv.revision_id=COALESCE(r.id, published_revision.id)
+      ) revision_videos ON true
       ORDER BY GREATEST(a.updated_at, COALESCE(r.created_at, a.updated_at)) DESC
       LIMIT 200
     `);
