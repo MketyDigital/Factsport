@@ -79,8 +79,8 @@ jobs:
             echo "::endgroup::"
             count=$((count + 1))
           done
-          [ "$count" -eq 41 ] || {
-            echo "::error::Expected 41 ordered migrations; applied $count."
+          [ "$count" -eq 42 ] || {
+            echo "::error::Expected 42 ordered migrations; applied $count."
             exit 1
           }
           echo "Applied $count migrations to the disposable CI database."
@@ -97,7 +97,8 @@ jobs:
               OR to_regclass('public.public_editorial_article_videos') IS NULL
               OR to_regclass('public.public_editorial_article_video_tokens') IS NULL
               OR to_regclass('public.media_social_delivery_attempts') IS NULL
-              OR to_regclass('public.media_social_outbox') IS NULL THEN
+              OR to_regclass('public.media_social_outbox') IS NULL
+              OR to_regclass('public.media_social_operator_reconciliation') IS NULL THEN
               RAISE EXCEPTION 'Required Media/VOD/social objects are missing after migration apply';
             END IF;
 
@@ -148,6 +149,36 @@ jobs:
               RAISE EXCEPTION 'VOD signed-playback default is missing';
             END IF;
 
+ 
+            IF NOT has_table_privilege(
+              'factsport_v2_editorial_writer',
+              'public.media_social_operator_reconciliation',
+              'SELECT'
+            ) THEN
+              RAISE EXCEPTION 'Editorial writer cannot inspect the private reconciliation queue';
+            END IF;
+
+            IF has_table_privilege(
+              'factsport_v2_reader',
+              'public.media_social_operator_reconciliation',
+              'SELECT'
+            ) OR has_table_privilege(
+              'factsport_v2_social_dispatcher',
+              'public.media_social_operator_reconciliation',
+              'SELECT'
+            ) THEN
+              RAISE EXCEPTION 'Reconciliation queue must remain private to the editorial operator';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_constraint
+              WHERE conrelid='public.media_editorial_audit_events'::regclass
+                AND conname='media_editorial_audit_events_action_check'
+                AND pg_get_constraintdef(oid) LIKE '%social_delivery_reconciled_published%'
+            ) THEN
+              RAISE EXCEPTION 'Social reconciliation audit actions are not registered';
+            END IF;
+
             IF NOT EXISTS (
               SELECT 1 FROM pg_constraint
               WHERE conrelid='public.media_video_assets'::regclass
@@ -158,4 +189,4 @@ jobs:
           END
           $$;
           SQL
-          echo "Disposable PostgreSQL migration chain and privilege assertions passed."
+          echo "Disposable PostgreSQL migrations 0001–0042 and Media/VOD/social privilege assertions passed."
