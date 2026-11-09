@@ -53,3 +53,11 @@ This is a connection boundary and readiness probe only. It does not yet provide 
 ## Rollback
 
 Revert commits `184519eea565d5b84e75ff771170970c86475b67` and `6f083d51a8738fb8c69953e92b51c528951ed551` if the adapter boundary causes an issue. This code is unused until a Prediction route imports it; reverting it does not require database rollback.
+
+
+## Verification follow-up — 2026-11-09
+
+- Isolated verification passed on commit `6f083d51a8738fb8c69953e92b51c528951ed551`, run [42576199656](https://github.com/MketyDigital/Factsport/actions/runs/42576199656). This includes the new Prediction runtime boundary tests, engine regression suite, TypeScript and migration inventory.
+- The disposable PostgreSQL migration workflow was prepared to seed `factsport_v2_prediction_api` as a NOLOGIN role for future grants testing. This changes only the ephemeral CI database role fixture; it does not create a staging/Azure login or grant table access.
+- The updated disposable migration run [42576290658](https://github.com/MketyDigital/Factsport/actions/runs/42576290658) was in progress. Native build [42576199686](https://github.com/MketyDigital/Factsport/actions/runs/42576199686) and protected application staging [42576199616](https://github.com/MketyDigital/Factsport/actions/runs/42576199616) were also still in progress at this follow-up.
+- No Prediction Hyperdrive, database login, grants, API or visitor cookie has been provisioned.
