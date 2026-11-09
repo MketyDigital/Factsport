@@ -13,8 +13,8 @@ export default async function AdminSocialPage() {
   try {
     const data = await withFactsportEditorialPostgres(async sql => {
       const channels = await sql`
-        SELECT id, display_name, provider, supports_media FROM public.media_social_channels
-        WHERE is_enabled=true ORDER BY display_name
+        SELECT id, channel_key, display_name, provider, is_enabled, supports_media, settings FROM public.media_social_channels
+        ORDER BY display_name
       `;
       const publications = await sql`
         SELECT p.id, p.content_text, p.status, p.scheduled_at, p.published_at,
