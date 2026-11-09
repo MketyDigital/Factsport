@@ -143,6 +143,12 @@ export async function POST(request: Request) {
 
   const body = await readBoundedJson(request);
   if (!body) return noStoreJson({ error: 'invalid_request_body' }, 400);
+  const acceptedFields = new Set([
+    'matchId', 'outcome', 'homeScore', 'awayScore', 'email', 'displayName', 'acceptRules',
+  ]);
+  if (Object.keys(body).some(field => !acceptedFields.has(field))) {
+    return noStoreJson({ error: 'unsupported_request_field' }, 400);
+  }
   if (body.acceptRules !== true) return noStoreJson({ error: 'rules_acceptance_required' }, 400);
   if (typeof body.matchId !== 'string' || !UUID_PATTERN.test(body.matchId)) {
     return noStoreJson({ error: 'invalid_match' }, 400);
