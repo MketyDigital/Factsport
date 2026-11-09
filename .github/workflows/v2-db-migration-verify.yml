@@ -80,11 +80,92 @@ jobs:
             echo "::endgroup::"
             count=$((count + 1))
           done
-          [ "$count" -eq 42 ] || {
-            echo "::error::Expected 42 ordered migrations; applied $count."
+          [ "$count" -eq 43 ] || {
+            echo "::error::Expected 43 ordered migrations; applied $count."
             exit 1
           }
           echo "Applied $count migrations to the disposable CI database."
+
+      - name: Verify Prediction submission function and least-privilege boundary
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $
+          DECLARE
+            function_oid regprocedure;
+          BEGIN
+            function_oid := to_regprocedure(
+              'public.submit_public_prediction(text,text,text,uuid,text,integer,integer)'
+            );
+            IF function_oid IS NULL THEN
+              RAISE EXCEPTION 'Prediction submission function is missing';
+            END IF;
+            IF NOT has_function_privilege(
+              'factsport_v2_prediction_api', function_oid, 'EXECUTE'
+            ) THEN
+              RAISE EXCEPTION 'Prediction API role cannot execute the submission function';
+            END IF;
+            IF has_function_privilege('PUBLIC', function_oid, 'EXECUTE') THEN
+              RAISE EXCEPTION 'PUBLIC must not execute the Prediction submission function';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_proc
+              WHERE oid = function_oid AND prosecdef = true
+                AND proconfig @> ARRAY['search_path=pg_catalog, public']
+            ) THEN
+              RAISE EXCEPTION 'Prediction function must be SECURITY DEFINER with pinned search_path';
+            END IF;
+            IF has_table_privilege('factsport_v2_prediction_api', 'public.matches', 'SELECT')
+              OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_contacts', 'SELECT,INSERT,UPDATE,DELETE')
+              OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_participants', 'SELECT,INSERT,UPDATE,DELETE')
+              OR has_table_privilege('factsport_v2_prediction_api', 'public.predictions', 'SELECT,INSERT,UPDATE,DELETE')
+              OR has_table_privilege('factsport_v2_prediction_api', 'public.marketing_subscriptions', 'SELECT,INSERT,UPDATE,DELETE')
+              OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_participant_claims', 'SELECT,INSERT,UPDATE,DELETE')
+              OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_claim_conflicts', 'SELECT,INSERT,UPDATE,DELETE') THEN
+              RAISE EXCEPTION 'Prediction API role has direct table access; only function execution is allowed';
+            END IF;
+          END
+          $;
+
+          INSERT INTO public.matches (
+            id, league, home_team, away_team, match_date, status
+          ) VALUES (
+            '00000000-0000-4000-8000-000000000043',
+            'CI', 'Home', 'Away', '2099-01-01T12:00:00Z', 'SCHEDULED'
+          );
+
+          SET ROLE factsport_v2_prediction_api;
+          DO $
+          DECLARE
+            first_result record;
+            retry_result record;
+          BEGIN
+            SELECT * INTO first_result FROM public.submit_public_prediction(
+              'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              'ci-prediction@example.test',
+              'CI Visitor',
+              '00000000-0000-4000-8000-000000000043',
+              'home', 2, 1
+            );
+            SELECT * INTO retry_result FROM public.submit_public_prediction(
+              'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              NULL, NULL,
+              '00000000-0000-4000-8000-000000000043',
+              'away', 0, 1
+            );
+            IF first_result.prediction_id IS NULL OR first_result.duplicate IS NOT FALSE THEN
+              RAISE EXCEPTION 'First Prediction submission did not create one prediction';
+            END IF;
+            IF retry_result.prediction_id IS DISTINCT FROM first_result.prediction_id
+              OR retry_result.duplicate IS NOT TRUE THEN
+              RAISE EXCEPTION 'Prediction retry was not idempotently recognized';
+            END IF;
+          END
+          $;
+          RESET ROLE;
+          SQL
+          echo "Prediction API function is executable only by its dedicated role; direct table access is denied and duplicate retry is idempotent."
+
       - name: Verify Media, VOD and least-privilege database contracts
         run: |
           set -euo pipefail
@@ -190,4 +271,4 @@ jobs:
           END
           $$;
           SQL
-          echo "Disposable PostgreSQL migrations 0001–0042 and Media/VOD/social privilege assertions passed."
+          echo "Disposable PostgreSQL migrations 0001–0043 and Media/VOD/social privilege assertions passed."
