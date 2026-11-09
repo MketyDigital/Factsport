@@ -521,3 +521,13 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - Isolated verification passed on `5e87b07c098c19e7cc037ea7acefa56c49f9b473` (run `42575473484`). Native build and protected staging were running at handoff time.
 - Actual Entra tenant/app registration, Cloudflare secret provisioning, editorial Hyperdrive role/grants and live OIDC E2E remain owner-provisioning gates. No Cloudflare API token or 2FA configuration was changed.
 - Details: `docs/audit/handoffs/M47-MEDIA-ENTRA-HOST-ISOLATION.md`.
+
+
+## 2026-11-09 Prediction runtime boundary — M48
+
+- Added a dedicated `withFactsportPredictionPostgres()` adapter using only `FACTSPORT_PREDICTION_HYPERDRIVE`; no shared reader/editorial/Supabase/`DATABASE_URL` fallback exists.
+- Added a fail-closed readiness probe requiring the exact `factsport_v2_prediction_api` role, the matches/contact/participant/prediction schema objects and the minimum effective grants for anonymous submission.
+- Added static regression tests for the separate database identity and readiness contract.
+- Source commits: `184519eea565d5b84e75ff771170970c86475b67` and `6f083d51a8738fb8c69953e92b51c528951ed551`. Isolated verification and native build were running at handoff; no pass is claimed until complete.
+- This is only a connection boundary. No prediction API, visitor cookie, role/grants, campaign, claim, settlement or public UI was activated. Dedicated role/Hyperdrive provisioning and isolated DB grant tests are still required.
+- Full next actions and rollback are recorded in `docs/audit/handoffs/M48-PREDICTION-DATABASE-RUNTIME-BOUNDARY.md`.
