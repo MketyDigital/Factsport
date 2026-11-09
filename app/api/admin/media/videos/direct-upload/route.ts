@@ -26,12 +26,18 @@ export async function POST(request: Request) {
 
   let streamUid = '';
   try {
-    const body = await request.json() as { title?: unknown; description?: unknown; fileSizeBytes?: unknown; maxDurationSeconds?: unknown };
+    const body = await request.json() as { title?: unknown; description?: unknown; fileSizeBytes?: unknown; fileType?: unknown; maxDurationSeconds?: unknown };
     const title = typeof body.title === 'string' ? body.title.trim().slice(0, 200) : '';
     const description = typeof body.description === 'string' ? body.description.trim().slice(0, 3000) : '';
     const maxDurationSeconds = Number(body.maxDurationSeconds ?? 900);
     const fileSizeBytes = Number(body.fileSizeBytes);
-    if (title.length < 3 || !Number.isSafeInteger(fileSizeBytes) ||
+    const fileType = typeof body.fileType === 'string' ? body.fileType.toLowerCase() : '';
+    const allowedTypes = new Set([
+      'video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska',
+      'video/mpeg', 'video/ogg', 'video/x-msvideo', 'video/x-flv',
+      'video/mp2t', 'video/3gpp', 'video/mxf', 'application/mxf',
+    ]);
+    if (title.length < 3 || !allowedTypes.has(fileType) || !Number.isSafeInteger(fileSizeBytes) ||
         fileSizeBytes < 1 || fileSizeBytes >= 200_000_000 || !Number.isInteger(maxDurationSeconds) ||
         maxDurationSeconds < 1 || maxDurationSeconds > 900) {
       return NextResponse.json({ error: 'Provide a title and a maximum clip duration between 1 and 900 seconds.' }, { status: 400 });
