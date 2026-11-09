@@ -26,7 +26,7 @@ test('Prediction readiness requires only the scoped function capability, not dir
   assert.match(readiness, /if \(!bindings\.FACTSPORT_PREDICTION_HYPERDRIVE\?\.connectionString\) return false/);
   assert.match(readiness, /current_user = 'factsport_v2_prediction_api'/);
   assert.match(readiness, /to_regprocedure\(/);
-  assert.match(readiness, /public\.submit_public_prediction\(text,text,text,uuid,text,text,text,integer,integer\)/);
+  assert.match(readiness, /public\.submit_public_prediction\(text,text,text,uuid,text,text,text,boolean,text,text,integer,integer\)/);
   assert.match(readiness, /has_function_privilege\([\s\S]*?'EXECUTE'/);
   assert.match(readiness, /consume_public_prediction_rate_limit/);
   assert.match(readiness, /rate_limit_function_executable === true/);
