@@ -122,6 +122,10 @@ export async function POST(request: Request) {
   const authorization = await authorizeMediaEditorialAction('media');
   if (!authorization.ok) return NextResponse.json({ error: authorization.error }, { status: authorization.status });
   if (!isSameOriginRequest(request)) return NextResponse.json({ error: 'Same-origin request required.' }, { status: 403 });
+  const declaredLength = Number(request.headers.get('content-length') || 0);
+  if (declaredLength > MAX_BYTES + 64 * 1024) {
+    return NextResponse.json({ error: 'Upload request exceeds the 8 MB image limit.' }, { status: 413 });
+  }
 
   let objectKey: string | null = null;
   try {
