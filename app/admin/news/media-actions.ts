@@ -150,3 +150,51 @@ export async function removeRevisionMedia(input: {
     return { success: false, error: error instanceof Error ? error.message : 'Unable to remove media from this revision.' };
   }
 }
+
+
+export async function revokeMediaRights(input: { assetId: string; reason: string }) {
+  const authorization = await authorizeMediaEditorialAction('rights_admin');
+  if (!authorization.ok) return { success: false, error: authorization.error };
+  if (!/^[0-9a-f-]{36}$/i.test(input?.assetId || '')) {
+    return { success: false, error: 'Invalid media asset identifier.' };
+  }
+  const reason = typeof input.reason === 'string' ? input.reason.trim().slice(0, 500) : '';
+  if (reason.length < 10) return { success: false, error: 'Record at least 10 characters explaining why this asset is being withdrawn.' };
+  try {
+    await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+      const assets = await tx`
+        SELECT id, rights_status, is_public
+        FROM public.media_assets
+        WHERE id=${input.assetId}::uuid AND media_kind='image'
+        FOR UPDATE
+      `;
+      if (!assets.length) throw new Error('Media asset was not found.');
+      if (assets[0].rights_status === 'rejected') throw new Error('This asset has already been withdrawn.');
+      await tx`
+        UPDATE public.media_assets
+        SET rights_status='rejected', is_public=false,
+            rights_reviewed_by=${authorization.user.domainUserId}::uuid,
+            rights_reviewed_at=now(), updated_at=now()
+        WHERE id=${input.assetId}::uuid
+      `;
+      await tx`
+        INSERT INTO public.media_editorial_audit_events (actor_user_id, action, details)
+        VALUES (
+          ${authorization.user.domainUserId}::uuid, 'media_rights_revoked',
+          ${JSON.stringify({
+            assetId: input.assetId,
+            previousRightsStatus: assets[0].rights_status,
+            wasPublic: assets[0].is_public,
+            reason,
+          })}::jsonb
+        )
+      `;
+    }));
+    revalidatePath('/admin/media');
+    revalidatePath('/admin/news');
+    return { success: true };
+  } catch (error) {
+    console.error('Media rights revocation failed', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to withdraw media rights.' };
+  }
+}
