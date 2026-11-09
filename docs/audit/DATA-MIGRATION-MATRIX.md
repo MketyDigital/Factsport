@@ -115,3 +115,5 @@ The signed Stream webhook endpoint now verifies raw-body HMAC, handles gzip payl
 - Migration 0031 adds per-channel supports_media (default false) so image posting is opt-in only after provider E2E. Migration 0032 adds a dispatcher-only published-media projection and unknown_result receipt outcome; neither migration is applied to staging/production.
 
 - Migration 0033 exposes published editorial source references without private rights_reference; migration 0034 adds source/media/social-channel audit actions and scoped social-channel configuration updates. Both remain unapplied.
+
+- Migration 0036 adds a single-provider-call lock timestamp to social delivery attempts; migration 0037 restricts provider values to the implemented V2 adapter set (meta, telegram, buffer, make). Both remain unapplied.
