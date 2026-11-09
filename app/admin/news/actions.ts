@@ -372,7 +372,7 @@ export async function publishApprovedEditorial(articleId: string, publicContentC
           if (!approvedVideo.length) throw new Error('A revision video is not processed or no longer has valid rights approval. Publishing is blocked.');
           const videoPolicy = inspectPublicMediaArticle({
             ...snapshot,
-            body_markdown: [snapshot.body_markdown, approvedVideo[0].title, approvedVideo[0].description || ''].join('\\n'),
+            body_markdown: [snapshot.body_markdown, approvedVideo[0].title, approvedVideo[0].description || ''].join('\n'),
           });
           if (!videoPolicy.eligible) throw new Error('Video title or description contains content that is not eligible for public Media publication.');
         }
