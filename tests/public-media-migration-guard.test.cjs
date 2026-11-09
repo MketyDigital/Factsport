@@ -9,7 +9,7 @@ const readMigration = name => fs.readFileSync(path.join(migrationDir, name), 'ut
 
 test('V2 migration inventory remains contiguous through the full V2 Media implementation chain', () => {
   const files = fs.readdirSync(migrationDir).filter(name => /^[0-9]{4}_/.test(name) && name.endsWith('.sql'));
-  for (let number = 1; number <= 37; number += 1) {
+  for (let number = 1; number <= 41; number += 1) {
     const prefix = String(number).padStart(4, '0');
     const matches = files.filter(name => name.slice(0, 5) === prefix + '_');
     assert.equal(matches.length, 1, 'expected exactly one migration for ' + prefix);
@@ -125,7 +125,7 @@ test('Cloudflare Stream VOD migration is inventoried and public playback require
   assert.ok(migration.includes('media_video_assets'));
   assert.ok(migration.includes('editorial_article_revision_videos'));
   assert.ok(migration.includes('public_editorial_article_video_tokens'));
-  assert.match(migration, /v\\.upload_status\\s*=\\s*'ready'/);
+  assert.match(migration, /v\.upload_status\s*=\s*'ready'/);
   assert.ok(migration.includes("v.rights_status IN ('owned','licensed','editorial_exception')"));
   assert.ok(migration.includes('v.rights_reviewed_by IS NOT NULL'));
   assert.ok(!migration.includes('GRANT SELECT ON public.media_video_assets TO factsport_v2_reader'));
