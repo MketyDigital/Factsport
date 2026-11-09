@@ -25,6 +25,9 @@ CREATE OR REPLACE FUNCTION public.submit_public_prediction(
   p_predicted_outcome text,
   p_rules_version text,
   p_rules_text text,
+  p_marketing_opt_in boolean,
+  p_marketing_consent_version text,
+  p_marketing_consent_text text,
   p_predicted_home_score integer,
   p_predicted_away_score integer
 )
@@ -42,6 +45,7 @@ DECLARE
   v_email text;
   v_email_normalized text;
   v_display_name text;
+  v_subscription_id uuid;
 BEGIN
   IF p_visitor_token_hash IS NULL
      OR p_visitor_token_hash !~ '^[0-9a-f]{64}$' THEN
@@ -58,6 +62,18 @@ BEGIN
      OR p_rules_text IS NULL OR pg_catalog.char_length(p_rules_text) NOT BETWEEN 10 AND 4000 THEN
     RAISE EXCEPTION 'rules_acceptance_required' USING ERRCODE = '22023';
   END IF;
+  IF p_marketing_opt_in IS NULL THEN
+    RAISE EXCEPTION 'invalid_marketing_consent' USING ERRCODE = '22023';
+  END IF;
+  IF p_marketing_opt_in AND (
+    p_marketing_consent_version IS NULL
+    OR pg_catalog.char_length(p_marketing_consent_version) NOT BETWEEN 1 AND 32
+    OR p_marketing_consent_text IS NULL
+    OR pg_catalog.char_length(p_marketing_consent_text) NOT BETWEEN 10 AND 1000
+  ) THEN
+    RAISE EXCEPTION 'invalid_marketing_consent' USING ERRCODE = '22023';
+  END IF;
+
   IF (p_predicted_home_score IS NULL) <> (p_predicted_away_score IS NULL)
      OR p_predicted_home_score < 0 OR p_predicted_away_score < 0
      OR p_predicted_home_score > 99 OR p_predicted_away_score > 99 THEN
@@ -165,16 +181,48 @@ BEGIN
     v_participant_id, v_prediction_id, p_rules_version, p_rules_text
   );
 
+  -- Marketing is a separate, optional purpose. Only an explicit affirmative
+  -- opt-in creates a pending subscription; no send is authorized here.
+  IF p_marketing_opt_in THEN
+    INSERT INTO public.marketing_subscriptions (
+      contact_id, channel, purpose, status,
+      consent_version, consent_text, source, consented_at
+    ) VALUES (
+      v_contact_id, 'email', 'factsport_updates_and_offers',
+      'pending_confirmation', p_marketing_consent_version,
+      p_marketing_consent_text, 'public_prediction_submission',
+      pg_catalog.transaction_timestamp()
+    )
+    ON CONFLICT (contact_id, channel, purpose) DO UPDATE
+      SET status = 'pending_confirmation',
+          consent_version = EXCLUDED.consent_version,
+          consent_text = EXCLUDED.consent_text,
+          source = EXCLUDED.source,
+          consented_at = EXCLUDED.consented_at,
+          confirmed_at = NULL,
+          withdrawn_at = NULL,
+          updated_at = pg_catalog.transaction_timestamp()
+    RETURNING id INTO v_subscription_id;
+
+    INSERT INTO public.marketing_consent_events (
+      subscription_id, event_type, consent_version, consent_text, source, occurred_at
+    ) VALUES (
+      v_subscription_id, 'opt_in', p_marketing_consent_version,
+      p_marketing_consent_text, 'public_prediction_submission',
+      pg_catalog.transaction_timestamp()
+    );
+  END IF;
+
   RETURN QUERY SELECT v_prediction_id, false;
 END;
 $function$;
 
 REVOKE ALL ON FUNCTION public.submit_public_prediction(
-  text, text, text, uuid, text, text, text, integer, integer
+  text, text, text, uuid, text, text, text, boolean, text, text, integer, integer
 ) FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION public.submit_public_prediction(
-  text, text, text, uuid, text, text, text, integer, integer
+  text, text, text, uuid, text, text, text, boolean, text, text, integer, integer
 ) TO factsport_v2_prediction_api;
 
 -- Privacy-preserving rate-limit counters. Only keyed hashes are stored; raw
