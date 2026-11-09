@@ -102,11 +102,11 @@ export async function POST(request: Request) {
       }
 
       const attempt = await tx`
-        SELECT id, outcome FROM public.media_social_delivery_attempts
+        SELECT id, outcome, provider_started_at FROM public.media_social_delivery_attempts
         WHERE publication_id=${input.publicationId}::uuid AND attempt_number=${input.attemptNumber}
         FOR UPDATE
       `;
-      if (!attempt.length || attempt[0].outcome !== 'started') throw new Error('Delivery attempt is not awaiting a result.');
+      if (!attempt.length || attempt[0].outcome !== 'started' || !attempt[0].provider_started_at) throw new Error('Provider delivery was not started for this attempt.');
 
       await tx`
         UPDATE public.media_social_delivery_attempts SET
