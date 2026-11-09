@@ -20,11 +20,45 @@ export async function GET(_request: Request, context: { params: { id: string } }
   }
   try {
     const revisions = await withFactsportEditorialPostgres(async sql => sql`
-      SELECT id, revision_number, workflow_status, change_note, review_comment,
-             created_at, snapshot
-      FROM public.editorial_article_revisions
-      WHERE article_id=${articleId}::uuid
-      ORDER BY revision_number DESC
+      SELECT r.id, r.revision_number, r.workflow_status, r.change_note, r.review_comment,
+             r.created_at, r.snapshot,
+             COALESCE(revision_media.items, '[]'::jsonb) AS revision_media,
+             COALESCE(revision_videos.items, '[]'::jsonb) AS revision_videos,
+             COALESCE(revision_sources.items, '[]'::jsonb) AS revision_sources
+      FROM public.editorial_article_revisions r
+      LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+          'placement', rm.placement, 'position', rm.position, 'remove_media', rm.remove_media,
+          'media_id', m.id, 'object_key', m.object_key, 'content_type', m.content_type,
+          'width', m.width, 'height', m.height, 'rights_status', m.rights_status,
+          'alt_text', m.alt_text, 'attribution_text', m.attribution_text
+        ) ORDER BY rm.placement, rm.position) AS items
+        FROM public.editorial_article_revision_media rm
+        LEFT JOIN public.media_assets m ON m.id=rm.media_id
+        WHERE rm.revision_id=r.id
+      ) revision_media ON true
+      LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+          'position', rv.position, 'video_id', rv.video_id, 'remove_video', rv.remove_video,
+          'title', v.title, 'upload_status', v.upload_status, 'rights_status', v.rights_status,
+          'rights_reference', v.rights_reference, 'attribution_text', v.attribution_text,
+          'usage_expires_at', v.usage_expires_at, 'duration_seconds', v.duration_seconds
+        ) ORDER BY rv.position) AS items
+        FROM public.editorial_article_revision_videos rv
+        LEFT JOIN public.media_video_assets v ON v.id=rv.video_id
+        WHERE rv.revision_id=r.id
+      ) revision_videos ON true
+      LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+          'id', src.id, 'source_title', src.source_title, 'publisher', src.publisher,
+          'canonical_url', src.canonical_url, 'attribution_text', src.attribution_text,
+          'rights_reference', src.rights_reference, 'accessed_at', src.accessed_at
+        ) ORDER BY src.created_at DESC) AS items
+        FROM public.editorial_article_sources src
+        WHERE src.revision_id=r.id
+      ) revision_sources ON true
+      WHERE r.article_id=${articleId}::uuid
+      ORDER BY r.revision_number DESC
       LIMIT 50
     `);
     return NextResponse.json({ success: true, revisions }, {
