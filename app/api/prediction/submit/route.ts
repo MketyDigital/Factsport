@@ -187,8 +187,9 @@ export async function POST(request: Request) {
   if (body.outcome !== 'home' && body.outcome !== 'draw' && body.outcome !== 'away') {
     return noStoreJson({ error: 'invalid_outcome' }, 400);
   }
-  if (!validScore(body.homeScore ?? null) || !validScore(body.awayScore ?? null) ||
-      ((body.homeScore ?? null) === null) !== ((body.awayScore ?? null) === null)) {
+  if (body.homeScore === undefined || body.homeScore === null ||
+      body.awayScore === undefined || body.awayScore === null ||
+      !validScore(body.homeScore) || !validScore(body.awayScore)) {
     return noStoreJson({ error: 'invalid_score_pair' }, 400);
   }
   if (body.email !== undefined && body.email !== null && !validEmail(body.email)) {
