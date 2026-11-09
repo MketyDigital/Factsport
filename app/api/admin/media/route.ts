@@ -5,7 +5,7 @@ import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 import { factsportMediaBucket } from '@/lib/adapters/factsport-cloudflare-bindings';
 import { isFactsportMediaDerivativesReady } from '@/lib/media/readiness';
 import {
-  EDITORIAL_IMAGE_EDITORIAL_IMAGE_MIME_TYPES,
+  EDITORIAL_IMAGE_MIME_TYPES,
   imageDimensions,
   MAX_EDITORIAL_IMAGE_BYTES,
   validImageSignature,
