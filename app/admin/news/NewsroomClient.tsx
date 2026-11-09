@@ -95,6 +95,8 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const currentRevisionStatus = articles.find(article => article.id === form.id)?.revision_status || null;
   const canEditRevisionMedia = currentRevisionStatus === 'draft';
   const currentSources = articles.find(article => article.id === form.id)?.sources || [];
+  const currentRevisionVideos = articles.find(article => article.id === form.id)?.revision_videos || [];
+  const currentRevisionStatus = articles.find(article => article.id === form.id)?.revision_status || null;
   const activeRevisionMedia = currentRevisionMedia.filter(asset => !asset.remove_media && asset.media_id);
   const previewHero = activeRevisionMedia.find(asset => asset.placement === 'hero');
   const previewTeam1 = activeRevisionMedia.find(asset => asset.placement === 'team_1');
@@ -381,6 +383,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                 </div>
               </div>}
             </section>
+            <EditorialVideoAttachments articleId={form.id} revisionStatus={currentRevisionStatus} attachments={currentRevisionVideos} />
             <label className="md:col-span-2 text-xs font-bold text-slate-600">Excerpt / social preview
               <textarea value={form.excerpt} onChange={e => setForm({ ...form, excerpt: e.target.value })} maxLength={500} rows={2} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
             </label>
