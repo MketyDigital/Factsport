@@ -71,6 +71,7 @@ export default function MediaVideoLibrary({ ready, schemaReady, canRevokeRights 
 
         if (useTus) {
           if (!tus.isSupported) throw new Error('This browser does not support resumable uploads.');
+          if (!tus.canStoreURLs) throw new Error('Browser storage is unavailable, so this upload cannot be safely resumed. Enable site storage or use another browser.');
           const fingerprint = async (selected: File) =>
             `factsport-stream:${selected.name}:${selected.size}:${selected.lastModified}:${title.trim()}`;
           const fingerprintValue = await fingerprint(file);
