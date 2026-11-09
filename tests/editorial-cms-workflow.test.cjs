@@ -448,6 +448,7 @@ test('editorial source provenance follows immutable revision lifecycle and publi
   assert.match(sourceAction, /WHERE revision_id=\$\{revisionId\}::uuid/);
   assert.match(newsroomPage, /s\.revision_id=COALESCE\(r\.id, published_revision\.id\)/);
   assert.match(sourceMigration, /ADD COLUMN IF NOT EXISTS revision_id uuid/);
+  assert.match(sourceMigration, /FOREIGN KEY \(article_id, revision_id\)/);
   assert.match(sourceMigration, /latest\.workflow_status='published'/);
   assert.match(sourceMigration, /latest\.revision_number DESC/);
   assert.match(sourceMigration, /Existing pending revisions inherit the article's previously published source list/);
