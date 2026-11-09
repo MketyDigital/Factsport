@@ -137,6 +137,7 @@ async function dispatchTelegram(job: any, token: string) {
         : 'Telegram did not return a confirmed result; reconcile before retrying.');
     }
     const data = await readJson(response);
+    if (response.ok && !data) return providerError('unknown_result', 'telegram_response_unparseable', 'Telegram returned an unreadable result; reconcile before retrying.');
     if (!response.ok || data?.ok !== true) {
       if (sent.length) return providerError('unknown_result', 'telegram_partial_delivery', 'Telegram accepted some destinations before a later destination failed; reconcile before retrying.');
       if (response.status === 429 || Number(data?.error_code) === 429) {
@@ -204,11 +205,13 @@ async function dispatchLogicApps(job: any, adapterUrl: string, adapterToken: str
     return providerError('permanent_failure', 'logic_apps_adapter_rejected', 'The Logic Apps adapter rejected this post configuration.');
   }
   const providerPostId = textValue(data?.providerPostId || data?.postId, 300);
+  const providerPostUrl = textValue(data?.providerPostUrl, 2000) || undefined;
   if (!providerPostId) return providerError('unknown_result', 'logic_apps_provider_post_id_missing', 'The provider adapter returned no post ID; reconcile before retrying.');
+  if (providerPostUrl && !providerPostUrl.startsWith('https://')) return providerError('permanent_failure', 'logic_apps_provider_post_url_invalid', 'The provider adapter returned a non-HTTPS post URL.');
   return {
     success: true, outcome: 'succeeded' as const,
     providerPostId,
-    providerPostUrl: textValue(data?.providerPostUrl, 2000) || undefined,
+    providerPostUrl,
     providerRequestId: textValue(data?.requestId, 200) || undefined,
     responseSummary: { provider: job.provider, postId: providerPostId },
   };
