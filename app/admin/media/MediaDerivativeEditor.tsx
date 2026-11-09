@@ -43,11 +43,11 @@ export default function MediaDerivativeEditor({ asset, onCreated }: {
       let cropX = 0;
       let cropY = 0;
       if (sourceAspect > targetAspect) {
-        cropWidth = bitmap.height * targetAspect;
-        cropX = (bitmap.width - cropWidth) * focusX / 100;
+        cropWidth = Math.max(1, Math.floor(bitmap.height * targetAspect));
+        cropX = Math.min(bitmap.width - cropWidth, Math.max(0, Math.round((bitmap.width - cropWidth) * focusX / 100)));
       } else {
-        cropHeight = bitmap.width / targetAspect;
-        cropY = (bitmap.height - cropHeight) * focusY / 100;
+        cropHeight = Math.max(1, Math.floor(bitmap.width / targetAspect));
+        cropY = Math.min(bitmap.height - cropHeight, Math.max(0, Math.round((bitmap.height - cropHeight) * focusY / 100)));
       }
 
       const canvas = document.createElement('canvas');
@@ -62,8 +62,8 @@ export default function MediaDerivativeEditor({ asset, onCreated }: {
       const derivative = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('The browser could not encode the WebP image.')), 'image/webp', 0.88);
       });
-      if (derivative.type !== 'image/webp' || derivative.size > 8 * 1024 * 1024) {
-        throw new Error('The generated WebP derivative is unsupported or exceeds 8 MB.');
+      if (derivative.type !== 'image/webp') {
+        throw new Error('The browser could not generate a WebP preview.');
       }
 
       localPreview = URL.createObjectURL(derivative);
@@ -72,18 +72,16 @@ export default function MediaDerivativeEditor({ asset, onCreated }: {
         return localPreview;
       });
 
-      const form = new FormData();
-      form.append('file', new File([derivative], variant + '.webp', { type: 'image/webp' }));
-      form.append('sourceAssetId', asset.id);
-      form.append('variantKey', variant);
-      form.append('focusX', String(focusX));
-      form.append('focusY', String(focusY));
       const response = await fetch('/api/admin/media/derivatives', {
-        method: 'POST', body: form, credentials: 'same-origin', cache: 'no-store',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceAssetId: asset.id, variantKey: variant, focusX, focusY }),
+        credentials: 'same-origin',
+        cache: 'no-store',
       });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.error || 'Unable to save the derivative.');
-      setMessage('Immutable derivative saved. The original image was not changed; the new asset still needs attachment to an approved article before public delivery.');
+      setMessage('Server-generated immutable derivative saved from the verified R2 original. The source is unchanged; the new asset still needs attachment to an approved article before public delivery.');
       onCreated();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Image transformation failed.');
@@ -108,7 +106,7 @@ export default function MediaDerivativeEditor({ asset, onCreated }: {
         <input type="range" min="0" max="100" value={focusY} onChange={event => { setFocusY(Number(event.target.value)); setPreviewUrl(''); }} className="mt-1 w-full" />
       </label>
     </div>
-    <p className="text-[10px] text-slate-500">Output: {preset.width}×{preset.height} WebP · quality 88 · cover crop. Focus controls adjust the crop anchor when the source aspect ratio differs.</p>
+    <p className="text-[10px] text-slate-500">Output: {preset.width}×{preset.height} optimized WebP · Lanczos3 · cover crop. Preview is approximate; the saved derivative is generated server-side from the verified R2 original.</p>
     {previewUrl && <img src={previewUrl} alt="Generated crop preview" className="max-h-40 w-full rounded-lg bg-white object-contain" />}
     <button type="button" onClick={() => void createDerivative()} disabled={pending} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
       {pending ? 'Creating derivative…' : 'Generate and save derivative'}
