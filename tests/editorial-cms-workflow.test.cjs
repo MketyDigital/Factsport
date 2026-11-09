@@ -342,3 +342,11 @@ test('editing a published article seeds its current hero, team logos and inline 
   assert.match(actions, /FROM public\.editorial_article_team_media/);
   assert.match(actions, /SELECT \$\{newRevision\[0\]\.id\}::uuid, team_side, 0, media_id, false, now\(\)/);
 });
+
+
+test('editorial upload rejects oversized request bodies before multipart parsing', () => {
+  assert.match(mediaUpload, /content-length/);
+  assert.match(mediaUpload, /MAX_BYTES \+ 64 \* 1024/);
+  assert.match(mediaUpload, /status: 413/);
+  assert.match(mediaUpload, /request\.formData\(\)/);
+});
