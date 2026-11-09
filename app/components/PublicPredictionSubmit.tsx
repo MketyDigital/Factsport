@@ -133,7 +133,7 @@ export default function PublicPredictionSubmit({ matchId, matchDate, homeTeam, a
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
             <label className="text-center text-xs font-semibold text-slate-600">
               {homeTeam}
-              <input type="number" min="0" max="99" inputMode="numeric" value={homeScore}
+              <input type="number" min="0" max="99" required inputMode="numeric" value={homeScore}
                 onChange={event => setHomeScore(event.target.value)}
                 className="mt-1 w-full rounded-md border border-slate-300 p-2 text-center text-lg font-bold text-slate-900"
                 aria-label={`${homeTeam} predicted score`} />
@@ -141,7 +141,7 @@ export default function PublicPredictionSubmit({ matchId, matchDate, homeTeam, a
             <span className="pt-5 text-sm font-black text-slate-400">VS</span>
             <label className="text-center text-xs font-semibold text-slate-600">
               {awayTeam}
-              <input type="number" min="0" max="99" inputMode="numeric" value={awayScore}
+              <input type="number" min="0" max="99" required inputMode="numeric" value={awayScore}
                 onChange={event => setAwayScore(event.target.value)}
                 className="mt-1 w-full rounded-md border border-slate-300 p-2 text-center text-lg font-bold text-slate-900"
                 aria-label={`${awayTeam} predicted score`} />
