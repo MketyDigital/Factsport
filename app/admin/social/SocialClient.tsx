@@ -71,7 +71,7 @@ export default function SocialClient({ channels, publications }: { channels: Cha
           <p className="mt-1 text-sm text-slate-500">Create a public Media post without changing article publication status. Private Prediction channels use a separate system.</p>
           <div className="mt-4 space-y-4">
             <label className="block text-xs font-bold text-slate-600">Destination channel
-              <select value={channelId} onChange={e => { setChannelId(e.target.value); invalidatePublicApproval(); }} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm">
+              <select value={channelId} onChange={e => { setChannelId(e.target.value); setSelectedMediaAssetIds([]); invalidatePublicApproval(); }} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm">
                 {channels.map(channel => <option key={channel.id} value={channel.id}>{channel.display_name} · {channel.provider}</option>)}
               </select>
             </label>
