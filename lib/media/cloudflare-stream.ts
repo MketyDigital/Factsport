@@ -105,7 +105,14 @@ export async function createFactsportStreamDirectUpload(input: {
   });
   const uploadURL = typeof result.uploadURL === 'string' ? result.uploadURL : '';
   const uid = typeof result.uid === 'string' ? result.uid : '';
-  if (!uploadURL.startsWith('https://') || !/^[a-z0-9]{32,64}$/i.test(uid)) {
+  let uploadLocation: URL;
+  try { uploadLocation = new URL(uploadURL); } catch {
+    throw new Error('Cloudflare Stream returned an invalid direct-upload response.');
+  }
+  if (uploadLocation.protocol !== 'https:' ||
+      uploadLocation.hostname !== 'upload.videodelivery.net' ||
+      uploadLocation.pathname.length < 2 ||
+      !/^[a-z0-9]{32,64}$/i.test(uid)) {
     throw new Error('Cloudflare Stream returned an invalid direct-upload response.');
   }
   return { uploadURL, uid, expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() };
