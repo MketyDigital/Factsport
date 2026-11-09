@@ -15,8 +15,14 @@ export async function requirePrivateProductHost(): Promise<void> {
 
 /** Keep Media-only authentication and administration off the private Prediction host. */
 export async function rejectPrivateProductHost(): Promise<void> {
-  const configuredHost = (process.env.FACTSPORT_PRIVATE_PRODUCT_HOST || '').trim().toLowerCase();
-  if (!configuredHost || configuredHost.includes('://') || configuredHost.includes('/')) return;
+  const rawConfiguredHost = (process.env.FACTSPORT_PRIVATE_PRODUCT_HOST || '').trim();
+  if (!rawConfiguredHost) return;
+  let configuredHost = '';
+  try {
+    configuredHost = new URL(rawConfiguredHost.includes('://') ? rawConfiguredHost : 'https://' + rawConfiguredHost).hostname.toLowerCase();
+  } catch {
+    return;
+  }
 
   const requestHeaders = await headers();
   const requestHost = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '')
