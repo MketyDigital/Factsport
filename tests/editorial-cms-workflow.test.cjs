@@ -331,6 +331,18 @@ test('revision history compares metadata, media, videos and sources and previews
   assert.match(previewRoute, /private, no-store/);
 });
 
+test('optional VOD schema does not take the core newsroom or public article read path offline', () => {
+  const revisionRoute = read('app/api/admin/news/[id]/revisions/route.ts');
+  const publicEditorialAdapter = read('lib/adapters/postgres-editorial.ts');
+  assert.match(page, /isFactsportMediaVideoSchemaReady\(\)/);
+  assert.match(page, /revision_videos: \[\]/);
+  assert.match(revisionRoute, /isFactsportMediaVideoSchemaReady\(\)/);
+  assert.match(revisionRoute, /revision_videos: \[\]/);
+  assert.match(publicEditorialAdapter, /isFactsportMediaVideoSchemaReady\(\)/);
+  assert.match(publicEditorialAdapter, /: \[\]/);
+  assert.doesNotMatch(page.slice(0, page.indexOf('if (!isFactsportMediaVideoSchemaReady')), /editorial_article_revision_videos|media_video_assets/);
+});
+
 test('draft saves carry forward the previous draft revision media attachments', () => {
   assert.match(actions, /let previousRevisionId: string \| null = null/);
   assert.match(actions, /workflow_status IN \('draft','in_review','approved'\)[\s\S]*ORDER BY revision_number DESC LIMIT 1 FOR UPDATE/);
