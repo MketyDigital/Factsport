@@ -58,3 +58,16 @@ test('article metadata uses approved SEO fields and safe JSON-LD serialization',
   assert.ok(article.includes('article.seo_description'));
   assert.ok(article.includes('article.canonical_url'));
 });
+
+
+test('public article artwork uses reviewed media alt text and meaningful team names', () => {
+  const artwork = read('app/components/NewsArtwork.tsx');
+  const article = read('app/news/[slug]/page.tsx');
+  const newsroom = read('app/admin/news/NewsroomClient.tsx');
+  assert.match(artwork, /imageAlt\?: string/);
+  assert.match(artwork, /team1Alt\?: string/);
+  assert.match(artwork, /alt=\{imageAlt \|\| title \|\| "News"\}/);
+  assert.match(article, /imageAlt=\{article\.hero_media_alt_text \|\| article\.title\}/);
+  assert.match(article, /team1Alt=\{article\.team_1_name/);
+  assert.match(newsroom, /imageAlt=\{previewHero\?\.alt_text \|\| form\.title\}/);
+});
