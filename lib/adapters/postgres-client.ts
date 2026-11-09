@@ -104,3 +104,37 @@ export function withFactsportSocialDispatcherPostgres<T>(operation: (sql: Factsp
     'Factsport social dispatcher',
   );
 }
+
+
+export type FactsportSocialProvider = 'meta' | 'telegram' | 'buffer' | 'make';
+
+export function isFactsportSocialDispatchReady(): boolean {
+  const bindings = env as unknown as Record<string, unknown>;
+  const hyperdrive = bindings.FACTSPORT_SOCIAL_DISPATCHER_HYPERDRIVE as HyperdriveBinding | undefined;
+  return bindings.FACTSPORT_SOCIAL_DISPATCH_READY === 'true' &&
+    Boolean(hyperdrive?.connectionString) &&
+    typeof bindings.FACTSPORT_SOCIAL_DISPATCH_TOKEN === 'string' &&
+    String(bindings.FACTSPORT_SOCIAL_DISPATCH_TOKEN).length >= 32;
+}
+
+export function isFactsportSocialProviderReady(provider: FactsportSocialProvider): boolean {
+  const bindings = env as unknown as Record<string, unknown>;
+  const readiness: Record<FactsportSocialProvider, string> = {
+    meta: 'FACTSPORT_SOCIAL_PROVIDER_META_READY',
+    telegram: 'FACTSPORT_SOCIAL_PROVIDER_TELEGRAM_READY',
+    buffer: 'FACTSPORT_SOCIAL_PROVIDER_BUFFER_READY',
+    make: 'FACTSPORT_SOCIAL_PROVIDER_MAKE_READY',
+  };
+  return bindings[readiness[provider]] === 'true';
+}
+
+export function isFactsportSocialMediaProviderReady(provider: FactsportSocialProvider): boolean {
+  const bindings = env as unknown as Record<string, unknown>;
+  const readiness: Record<FactsportSocialProvider, string> = {
+    meta: 'FACTSPORT_SOCIAL_MEDIA_META_READY',
+    telegram: 'FACTSPORT_SOCIAL_MEDIA_TELEGRAM_READY',
+    buffer: 'FACTSPORT_SOCIAL_MEDIA_BUFFER_READY',
+    make: 'FACTSPORT_SOCIAL_MEDIA_MAKE_READY',
+  };
+  return isFactsportSocialProviderReady(provider) && bindings[readiness[provider]] === 'true';
+}
