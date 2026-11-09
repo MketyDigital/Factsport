@@ -29,7 +29,7 @@ export async function GET(_request: Request, context: { params: { id: string } }
     if (!/^[a-z0-9-]+\.cloudflarestream\.com$/i.test(host)) {
       return NextResponse.json({ error: 'Video playback is unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     }
-    const token = await createFactsportStreamSignedToken();
+    const token = await createFactsportStreamSignedToken(String(rows[0].provider_video_id));
     const base = 'https://' + host + '/' + token;
     return NextResponse.json({
       success: true,
