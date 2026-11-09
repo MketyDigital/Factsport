@@ -30,7 +30,7 @@ test('social result callback records provider receipts, bounded retries and unkn
   assert.match(result, /status='published'/);
   assert.match(result, /status='retry'/);
   assert.match(result, /status='dead_letter'/);
-  assert.match(result, /outcome='unknown_result'/);
+  assert.match(result, /input\.outcome === 'unknown_result'/);
   assert.match(result, /MAX_ATTEMPTS = 6/);
   assert.match(result, /make_interval\(secs =>/);
   assert.match(result, /lease_owner/);
