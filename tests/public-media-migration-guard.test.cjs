@@ -99,3 +99,15 @@ test('editorial writer media asset updates are column-scoped to rights and publi
   }
   assert.ok(!migration.includes('GRANT UPDATE ON public.media_assets TO factsport_v2_editorial_writer'));
 });
+
+
+test('Media derivative lineage migration is contiguous and preserves source-rights enforcement', () => {
+  const migration = readMigration('0039_factsport_media_derivative_lineage.sql');
+  assert.ok(migration.includes('media_asset_derivatives'));
+  assert.ok(migration.includes('source_asset_id'));
+  assert.ok(migration.includes('derivative_asset_id'));
+  assert.ok(migration.includes('CREATE OR REPLACE VIEW public.public_media_assets'));
+  assert.ok(migration.includes('CREATE OR REPLACE VIEW public.public_social_media_assets'));
+  assert.ok(migration.includes('CREATE OR REPLACE VIEW public.public_editorial_articles'));
+  assert.ok(migration.includes('CREATE OR REPLACE VIEW public.public_editorial_article_inline_media'));
+});
