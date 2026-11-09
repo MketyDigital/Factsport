@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { isFactsportSocialDispatchReady, isFactsportSocialMediaProviderReady, isFactsportSocialProviderReady, withFactsportEditorialPostgres, type FactsportSocialProvider } from '@/lib/adapters/postgres-client';
+import { isFactsportSocialDispatchReady, isFactsportSocialMediaProviderReady, isFactsportSocialProviderReady, isFactsportSocialReconciliationReady, withFactsportEditorialPostgres, type FactsportSocialProvider } from '@/lib/adapters/postgres-client';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 import { inspectPublicMediaArticle } from '@/lib/public-media-content-policy';
 
@@ -271,6 +271,7 @@ export async function reconcileSocialDelivery(input: {
   evidence: string;
   confirmed: boolean;
 }): Promise<Result> {
+  if (!isFactsportSocialReconciliationReady()) return { success: false, error: 'Social reconciliation is not activated until migration 0042 and its role grants are verified in this environment.' };
   const authorization = await authorizeMediaEditorialAction('social');
   if (!authorization.ok) return { success: false, error: authorization.error };
   if (!/^[0-9a-f-]{36}$/i.test(input?.publicationId || '')) {
