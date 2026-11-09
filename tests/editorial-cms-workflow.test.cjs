@@ -321,3 +321,15 @@ test('newsroom lists current revision media and allows audited removal from a dr
   assert.match(mediaActions, /media_detached/);
   assert.match(mediaActions, /remove_media=true/);
 });
+
+
+test('editorial uploads persist intrinsic dimensions and reject oversized image canvases', () => {
+  assert.match(mediaUpload, /function imageDimensions/);
+  assert.match(mediaUpload, /getUint32\(16, false\)/);
+  assert.match(mediaUpload, /frameMarkers/);
+  assert.match(mediaUpload, /VP8X/);
+  assert.match(mediaUpload, /VP8L/);
+  assert.match(mediaUpload, /width > 16000 \|\| height > 16000 \|\| width \* height > 40000000/);
+  assert.match(mediaUpload, /dimensions\.width, dimensions\.height/);
+  assert.match(mediaUpload, /width, height, alt_text/);
+});
