@@ -12,6 +12,7 @@ test('Media usage lookup discovers original/derivative references across article
   const revoke = read('app/admin/news/media-actions.ts');
   assert.match(route, /authorizeMediaEditorialAction\('media'\)/);
   assert.match(route, /media_asset_derivatives/);
+  assert.match(route, /sourceObjectKey/);
   assert.match(route, /editorial_article_media/);
   assert.match(route, /editorial_article_team_media/);
   assert.match(route, /media_social_publications/);
