@@ -57,3 +57,14 @@ No migration, Azure database, production route, DNS, Cloudflare Stream asset, R2
 - Regression suite, TypeScript, native Worker build, protected Worker deployment, deny-by-default probes and the protected PostgreSQL-backed `/matches` checks passed.
 - This run does not apply optional VOD migration 0041 to Azure PostgreSQL or enable `FACTSPORT_MEDIA_VIDEO_SCHEMA_READY`. It does not exercise the full Newsroom browser journey, revision restore, or actual Stream private preview.
 - No production route, database, R2 object, Stream asset or AdSense configuration changed.
+
+
+## Responsive SEO/share preview and external-media isolation — 2026-11-09
+
+- Added desktop/mobile viewport controls to the private article preview.
+- Added a Google-style search snippet preview with title/description length counts and canonical URL status, plus an Open Graph/social card preview using only local admin media assets or a local Factsport placeholder.
+- The preview explicitly loads no ad or analytics scripts.
+- Added `disableExternalMedia` to the shared sanitized Markdown renderer. The private preview replaces external Markdown images, protocol-relative images, match widgets and third-party iframes with placeholders. Public rendering remains unchanged by default.
+- Approved Stream clips remain available through the short-lived, editor-authorized preview endpoint.
+- Isolated verification passed on source commit `67c7d8b13138fa9da4242bb3aabf6b70a106f8cf`, run [42574631125](https://github.com/MketyDigital/Factsport/actions/runs/42574631125): engine regression, TypeScript, anonymous prediction/consent schema contract and migration inventory passed.
+- Native build run [42574631124](https://github.com/MketyDigital/Factsport/actions/runs/42574631124) and protected staging run [42574631386](https://github.com/MketyDigital/Factsport/actions/runs/42574631386) were still in progress when this follow-up was written.
