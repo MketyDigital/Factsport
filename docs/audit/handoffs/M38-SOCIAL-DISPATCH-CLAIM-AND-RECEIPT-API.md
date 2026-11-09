@@ -20,7 +20,7 @@ Status: source implementation committed; CI verification running; scheduler, pro
 ## Scheduler and provider boundary
 
 - Azure Logic Apps remains the owner-confirmed Day 1 scheduler/orchestrator. These endpoints are designed to be called by that workflow; no Cloudflare Cron duplicate was added.
-- No Logic Apps workflow was enabled or provisioned. No provider adapter or provider credential is active yet.
+- Added direct Meta and Telegram delivery adapters plus a secured HTTPS Logic Apps/APIM adapter for Buffer and Make. Added a disabled-by-default Logic Apps recurrence workflow template that calls claim, deliver and result sequentially with secure inputs/outputs. No workflow was enabled or provisioned and no provider credential is active.
 - Direct Facebook and Telegram delivery and Buffer/Make through the Logic Apps adapter remain the provider integration targets. Provider-side idempotency, response parsing and private test-destination E2E must be completed before any channel is enabled.
 - The scheduled-post outbox remains separate from the match-event outbox. The pure match-event detector is still not wired to canonical ingestion; this claim API currently handles editorial scheduled publications only.
 
@@ -33,10 +33,10 @@ Status: source implementation committed; CI verification running; scheduler, pro
 ## Remaining acceptance
 
 1. Configure Logic Apps with a secure recurrence trigger that calls the claim endpoint and processes each claimed item exactly once; keep the workflow disabled until connector references and secrets are configured.
-2. Implement direct Facebook and Telegram actions, plus Buffer/Make adapter routing, using whitelisted channel config and secure Logic Apps connections.
+2. Complete private-destination E2E for the direct Meta/Telegram adapters and the Buffer/Make Logic Apps/APIM adapter; verify current API permissions, provider receipts and idempotency.
 3. Implement provider response normalization and post-ID/URL extraction. Ambiguous timeouts must report unknown_result, not retry automatically.
 4. Add operator reconciliation UI for dead-letter/unknown-result items, controlled replay after external verification, and provider receipt history.
-5. Run staging PostgreSQL migration/grant tests, dispatcher role identity checks, concurrent claim tests, expired lease tests, duplicate callback tests and private provider-destination E2E.
+5. Run staging PostgreSQL migration/grant tests, dispatcher role identity checks, concurrent claim tests, duplicate deliver lock tests, expired lease tests, duplicate callback tests and private provider-destination E2E.
 6. Keep all channel records disabled and FACTSPORT_SOCIAL_DISPATCH_READY unset until the full path is verified.
 
 ## Safety
