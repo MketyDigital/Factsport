@@ -119,19 +119,34 @@ function sameOriginRequest(request: Request): boolean {
 export async function GET(request: Request) {
   const config = runtimeConfig();
   if (!requestHostAllowed(request, config)) return noStoreJson({ error: 'not_found' }, 404);
+  const origin = request.headers.get('origin');
+  const fetchSite = request.headers.get('sec-fetch-site');
+  if ((origin && origin !== new URL(request.url).origin) || (fetchSite && fetchSite !== 'same-origin')) {
+    return noStoreJson({ error: 'same_origin_required' }, 403);
+  }
 
   const existing = readPredictionVisitorToken(request);
   const token = existing || createPredictionVisitorToken();
-  const response = noStoreJson({ ready: true });
+  const response = noStoreJson({ ready: false, emailRequired: true }, 503);
+  const host = new URL(request.url).hostname.toLowerCase();
   if (!existing) {
-    const host = new URL(request.url).hostname.toLowerCase();
     response.cookies.set(
       FACTSPORT_PREDICTION_VISITOR_COOKIE,
       token,
       predictionVisitorCookieOptions(host, config.environment),
     );
   }
-  return response;
+
+  if (!config.ready || !(await isFactsportPredictionPostgresReady())) return response;
+  try {
+    const visitorHash = await sha256Hex(token);
+    const [state] = await withFactsportPredictionPostgres(sql => sql`
+      SELECT public.get_public_prediction_visitor_state(${visitorHash}) AS known
+    `);
+    return noStoreJson({ ready: true, emailRequired: state?.known !== true });
+  } catch {
+    return response;
+  }
 }
 
 export async function POST(request: Request) {
