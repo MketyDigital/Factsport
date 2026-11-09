@@ -67,6 +67,10 @@ CREATE TABLE IF NOT EXISTS public.editorial_article_revision_videos (
   )
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS editorial_article_revision_videos_unique_asset_idx
+  ON public.editorial_article_revision_videos (revision_id, video_id)
+  WHERE video_id IS NOT NULL AND remove_video=false;
+
 CREATE TABLE IF NOT EXISTS public.editorial_article_videos (
   article_id uuid NOT NULL REFERENCES public.editorial_articles(id) ON DELETE RESTRICT,
   position integer NOT NULL DEFAULT 0 CHECK (position BETWEEN 0 AND 100),
@@ -101,7 +105,7 @@ ALTER TABLE public.media_editorial_audit_events
     'draft_saved', 'submitted_for_review', 'review_approved', 'review_rejected',
     'published', 'archived', 'media_uploaded', 'media_rights_reviewed',
     'media_detached', 'media_derivative_created', 'media_rights_revoked',
-    'media_video_upload_started', 'media_video_uploaded', 'media_video_upload_failed', 'media_video_rights_reviewed', 'media_video_attached',
+    'media_video_upload_started', 'media_video_uploaded', 'media_video_upload_failed', 'media_video_rights_reviewed', 'media_video_attached', 'media_video_detached',
     'source_added', 'social_scheduled', 'social_cancelled',
     'social_channel_configured', 'membership_granted', 'membership_revoked'
   ));
