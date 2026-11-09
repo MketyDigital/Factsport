@@ -111,3 +111,10 @@ test('Media derivative lineage migration is contiguous and preserves source-righ
   assert.ok(migration.includes('CREATE OR REPLACE VIEW public.public_editorial_articles'));
   assert.ok(migration.includes('CREATE OR REPLACE VIEW public.public_editorial_article_inline_media'));
 });
+
+
+test('Media rights revocation is registered in the audit action constraint', () => {
+  const migration = readMigration('0040_factsport_media_rights_revocation.sql');
+  assert.ok(migration.includes("'media_rights_revoked'"));
+  assert.ok(migration.includes('media_editorial_audit_events_action_check'));
+});
