@@ -39,6 +39,24 @@ function required(name: string): string {
   return value;
 }
 
+export function isEntraExternalConfigured(): boolean {
+  try {
+    const discoveryUrl = new URL(required('ENTRA_EXTERNAL_DISCOVERY_URL'));
+    const issuerUrl = new URL(required('ENTRA_EXTERNAL_ISSUER'));
+    const redirectUrl = new URL(required('ENTRA_EXTERNAL_REDIRECT_URI'));
+    required('ENTRA_EXTERNAL_CLIENT_ID');
+    if (discoveryUrl.protocol !== 'https:' || issuerUrl.protocol !== 'https:' ||
+        redirectUrl.protocol !== 'https:' || !redirectUrl.pathname.endsWith('/api/auth/entra/callback')) {
+      return false;
+    }
+    sessionKey();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+
 function sessionKey(): Uint8Array {
   const encoded = required('FACTSPORT_AUTH_SESSION_SECRET');
   const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/');
