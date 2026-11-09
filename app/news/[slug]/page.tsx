@@ -161,7 +161,7 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                         <div className="grid gap-5 sm:grid-cols-2">
                             {article.inline_media.map((asset: any) => (
                                 <figure key={asset.object_key} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                                    <img src={`/api/media/${asset.object_key}`} alt={asset.alt_text || 'Editorial image'} className="h-auto max-h-[520px] w-full object-contain" loading="lazy" />
+                                    <img src={`/api/media/${asset.object_key}`} alt={asset.alt_text || 'Editorial image'} width={asset.width || undefined} height={asset.height || undefined} className="h-auto max-h-[520px] w-full object-contain" loading="lazy" decoding="async" />
                                     {asset.attribution_text && <figcaption className="border-t border-slate-200 px-3 py-2 text-xs text-slate-500">{asset.attribution_text}</figcaption>}
                                 </figure>
                             ))}
