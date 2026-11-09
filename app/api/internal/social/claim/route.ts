@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { withFactsportSocialDispatcherPostgres } from '@/lib/adapters/postgres-client';
+import { isFactsportSocialMediaProviderReady, isFactsportSocialProviderReady, withFactsportSocialDispatcherPostgres, type FactsportSocialProvider } from '@/lib/adapters/postgres-client';
 import { isSocialDispatcherRequestAuthorized } from '../_auth';
 
 export const runtime = 'edge';
@@ -14,6 +14,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Not found' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
   }
   const workerId = crypto.randomUUID();
+  const providerIds: FactsportSocialProvider[] = ['meta', 'telegram', 'buffer', 'make'];
+  const readyProviders = providerIds.filter(isFactsportSocialProviderReady);
+  const mediaReadyProviders = providerIds.filter(isFactsportSocialMediaProviderReady);
   const publicOrigin = new URL(request.url).origin;
   try {
     const result = await withFactsportSocialDispatcherPostgres(async sql => sql.begin(async tx => {
@@ -98,6 +101,8 @@ export async function POST(request: Request) {
             AND p.scheduled_at <= now()
             AND c.is_enabled=true
             AND c.surface_scope='public_media'
+            AND c.provider = ANY(${readyProviders}::text[])
+            AND (cardinality(p.media_asset_ids)=0 OR (c.supports_media=true AND c.provider = ANY(${mediaReadyProviders}::text[])))
             AND p.distribution_scope='public_media'
             AND p.public_content_confirmed_by IS NOT NULL
             AND p.public_content_confirmed_at IS NOT NULL
