@@ -202,6 +202,7 @@ export async function updateSocialChannel(input: {
       }
 
       const raw = typeof input.providerSetting === 'string' ? input.providerSetting.trim() : '';
+      if ((input.isEnabled || input.supportsMedia) && !raw) throw new Error('Set the non-secret account routing identifier before enabling this channel.');
       let settings: Record<string, unknown> = {};
       if (provider === 'meta') {
         if (raw && !/^\d{5,30}$/.test(raw)) throw new Error('Enter a numeric Meta Page ID; never enter a page access token here.');
