@@ -574,3 +574,6 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 
 - **Prediction concurrency/host follow-up:** disposable PostgreSQL run `42582368633` passed concurrent same-visitor/same-match requests (one participant/one prediction), same-email cross-browser separation, kickoff equality, live/unknown rejection, pending consent and rate-limit checks. Production API host is now pinned to `factsport.com`, never the private Predict host.
 - **Application checks:** isolated verification and native Vinext build passed on `4aa20c507bbdbf743b2f1e7c72f04e5cd5733e11`; protected staging for that commit was still running. A final CI-only assertion for zero direct public-schema table grants is pending.
+
+
+- **M49 verification closeout:** disposable PostgreSQL run `42582443798` passed migration 0001–0043, execute-only Prediction role (zero direct public table grants), rules/consent, rate limits, kickoff/status, same-email/different-browser and concurrent same-visitor race assertions. Isolated verification, native Vinext build and protected Cloudflare staging passed on `4aa20c507bbdbf743b2f1e7c72f04e5cd5733e11` (runs `42582325642`, `42582325545`, `42582325595`). No isolated Azure DB migration/role/Hyperdrive provisioning or feature activation occurred. The exact closeout is in `docs/audit/handoffs/M49-PREDICTION-SUBMISSION-PREFLIGHT.md`.
