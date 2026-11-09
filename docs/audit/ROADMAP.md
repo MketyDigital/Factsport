@@ -470,3 +470,14 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - The current legacy PredictionBoard remains Supabase-backed and is rendered only in development on the V2 match page. Legacy settlement/reset/audit routes fail closed; do not re-enable them to fill the V2 gap.
 - The full comparison and safe implementation sequence are in `docs/audit/handoffs/M44-LEGACY-PREDICTION-PARITY-MATRIX.md`. Prediction parity is explicitly OPEN; no scoring or prize policy was inferred or activated.
 - Next implementation focus remains the Media product; Prediction API and campaign work must use a dedicated Prediction identity and preserve the AUTH-005 anonymous/email/marketing rules. Monthly qualification/prize policy requires owner approval because legacy implementations conflict.
+
+
+## 2026-11-09 Newsroom revision diff and private VOD preview — M45
+
+- Revision history now returns revision-scoped image attachments, video clips and source provenance; the UI compares metadata fields, Markdown body, media placements, videos and source references.
+- The newsroom current-media query falls back to the latest published revision when no active draft exists, so published hero/team/inline assets remain visible in the editor.
+- Draft preview now includes ready video clips through the existing authorized, signed Cloudflare Stream preview endpoint. Raw Stream UIDs are never returned to the browser.
+- Public article, newsroom and revision-history video queries are gated by `FACTSPORT_MEDIA_VIDEO_SCHEMA_READY`; the core CMS/public article read path remains available before optional migration 0041 is activated.
+- Isolated verification passed on `7be8065d8ad75f6796ca572ef71853daf3eee61a`: 213/213 engine tests, 5/5 ingestion tests, TypeScript and migration inventory (run `42573678384`). Native Vinext build passed (run `42573678410`). Protected staging run `42573678448` was still in progress at the time of the handoff.
+- M45 details: `docs/audit/handoffs/M45-NEWSROOM-REVISION-DIFF-AND-PRIVATE-VOD-PREVIEW.md`.
+- Remaining: protected staging completion, isolated Azure revision/media/video E2E, optional VOD flag activation after migration 0041, and full responsive public article preview parity. No production change or migration application.
