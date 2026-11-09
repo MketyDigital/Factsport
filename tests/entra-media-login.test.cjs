@@ -34,6 +34,11 @@ test('Media sign-in stays hidden until Entra and dedicated editorial PostgreSQL 
   assert.match(entra, /export function isEntraMediaRequestHost/);
   assert.match(startRoute, /isEntraMediaRequestHost\(requestUrl\)/);
   assert.match(callbackRoute, /isEntraMediaRequestHost\(url\)/);
+  const logoutRoute = read('app/api/auth/entra/logout/route.ts');
+  assert.match(logoutRoute, /export async function POST/);
+  assert.match(logoutRoute, /Same-origin sign-out required/);
+  assert.doesNotMatch(logoutRoute, /export async function GET/);
+  assert.match(adminLayout, /method="post"/);
   assert.match(middleware, /redirect\(new URL\('\/media-login'/);
   assert.match(middleware, /Only the private Prediction host retains the legacy Supabase session refresh/);
   assert.doesNotMatch(middleware, /ADMIN_EMAILS|adminEmails/);
