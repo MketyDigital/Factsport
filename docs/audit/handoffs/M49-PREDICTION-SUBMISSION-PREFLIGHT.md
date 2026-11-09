@@ -54,3 +54,17 @@ Status: source audit only; no API, migration, role, cookie, database or public f
 ## Rollback
 
 Documentation-only audit slice. Future SQL/API changes must be reverted independently; never drop migration-owned data or change production resources as part of rollback.
+
+
+## Implementation continuation — scoped SQL function added
+
+- Added `db/migrations/0043_factsport_prediction_submission_function.sql`.
+- Function: `public.submit_public_prediction(text,text,text,uuid,text,integer,integer)`.
+- Uses SECURITY DEFINER with pinned `search_path`, fully-qualified table references, opaque visitor-token hash validation, per-token transaction advisory lock, match row lock, strict `SCHEDULED/PRE_MATCH` plus database-time kickoff check, one-time contact capture, participant reuse, and participant/match idempotency.
+- Anonymous predictions are explicitly inserted with `is_eligible_for_prize=false`. Existing browser identity retries can be recognized after kickoff without creating or changing a prediction.
+- PUBLIC EXECUTE is revoked; only `factsport_v2_prediction_api` receives EXECUTE. No direct table grants are added.
+- Updated `lib/adapters/postgres-client.ts` readiness to require the dedicated role, schema objects and function EXECUTE privilege rather than broad table writes.
+- Expanded `tests/prediction-runtime-boundary.test.cjs` and the disposable PostgreSQL workflow to apply 0001–0043, assert no direct table access, inspect SECURITY DEFINER/search_path/ACL, and exercise first submission plus duplicate retry under SET ROLE.
+- Source commits for this implementation slice: `e463f0abfcf7f47e3e7ca3b447ee24e02a1115b0`, `1db1b1e9d9a02e06b73bfccda7011557bd1f28e5`, `3d19370116045c7714a06d1d31835a0ea2cbb5b2`, `b13d477aba32edd7c12762d4be0fab7f75b59a0d`, `aaa683989f42a35ca891081858c32bb3520f3303`, `082d638ed1e3ee82edd626d8bcc8a036b03e74e1`.
+- **Not yet runtime-verified:** the migration and role behavior are awaiting disposable PostgreSQL CI. No API route, cookie, rate limiter, marketing-consent call, campaign logic, claim flow, settlement or UI is implemented. No staging/production database was touched.
+- Next: resolve any SQL/CI findings; add tests for kickoff equality, closed/unknown statuses, different visitor tokens sharing an email, and concurrency; then implement token cookie/API and privacy-safe rate limiting.
