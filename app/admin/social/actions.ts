@@ -253,3 +253,177 @@ export async function updateSocialChannel(input: {
     return { success: false, error: error instanceof Error ? error.message : 'Unable to update social channel.' };
   }
 }
+
+const SOCIAL_RECONCILIATION_MAX_ATTEMPTS = 6;
+
+function sanitizeReconciliationEvidence(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const text = value.trim()
+    .replace(/(access[_ -]?token|refresh[_ -]?token|api[_ -]?key|secret|password)[=: ]+[^\\s&]+/gi, '$1=[redacted]');
+  return text.length >= 10 && text.length <= 1000 ? text : null;
+}
+
+export async function reconcileSocialDelivery(input: {
+  publicationId: string;
+  decision: 'confirmed_published' | 'confirmed_not_published';
+  providerPostId?: string;
+  providerPostUrl?: string;
+  evidence: string;
+  confirmed: boolean;
+}): Promise<Result> {
+  const authorization = await authorizeMediaEditorialAction('social');
+  if (!authorization.ok) return { success: false, error: authorization.error };
+  if (!/^[0-9a-f-]{36}$/i.test(input?.publicationId || '')) {
+    return { success: false, error: 'Invalid social publication identifier.' };
+  }
+  if (!['confirmed_published', 'confirmed_not_published'].includes(input?.decision)) {
+    return { success: false, error: 'Choose a valid reconciliation decision.' };
+  }
+  if (input.confirmed !== true) {
+    return { success: false, error: 'Confirm that you checked the provider account before reconciling this delivery.' };
+  }
+  const evidence = sanitizeReconciliationEvidence(input.evidence);
+  if (!evidence) return { success: false, error: 'Add a 10–1,000 character operator note describing how the provider outcome was verified.' };
+
+  let providerPostId: string | null = null;
+  let providerPostUrl: string | null = null;
+  if (input.decision === 'confirmed_published') {
+    providerPostId = typeof input.providerPostId === 'string' ? input.providerPostId.trim().slice(0, 2000) : '';
+    if (!providerPostId) return { success: false, error: 'Enter the provider post ID found in the verified provider account.' };
+    if (typeof input.providerPostUrl !== 'string' || !input.providerPostUrl.trim()) {
+      return { success: false, error: 'Enter the HTTPS URL of the verified provider post.' };
+    }
+    try {
+      const parsed = new URL(input.providerPostUrl.trim());
+      if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.href.length > 2048) {
+        return { success: false, error: 'Provider post URL must be a valid HTTPS link without embedded credentials.' };
+      }
+      providerPostUrl = parsed.toString();
+    } catch {
+      return { success: false, error: 'Enter a valid HTTPS provider post URL.' };
+    }
+  } else if (input.providerPostId?.trim() || input.providerPostUrl?.trim()) {
+    return { success: false, error: 'Do not provide a provider post ID or URL when confirming that no post exists.' };
+  }
+
+  try {
+    await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+      const actorId = authorization.user.domainUserId;
+      const initial = await tx`
+        SELECT publication_id FROM public.media_social_operator_reconciliation
+        WHERE publication_id=${input.publicationId}::uuid
+      `;
+      if (!initial.length) throw new Error('This delivery is no longer awaiting reconciliation.');
+
+      const locked = await tx`
+        SELECT p.id, o.id AS outbox_id, o.status AS outbox_status
+        FROM public.media_social_publications p
+        JOIN public.media_social_outbox o ON o.publication_id=p.id
+        WHERE p.id=${input.publicationId}::uuid
+        FOR UPDATE OF p, o
+      `;
+      if (!locked.length || locked[0].outbox_status !== 'dead_letter') {
+        throw new Error('The delivery is no longer in the dead-letter queue.');
+      }
+
+      const rows = await tx`
+        SELECT * FROM public.media_social_operator_reconciliation
+        WHERE publication_id=${input.publicationId}::uuid
+      `;
+      const current = rows[0];
+      if (!current || current.outcome !== 'unknown_result' || current.outbox_status !== 'dead_letter') {
+        throw new Error('Only an ambiguous provider result can be manually reconciled.');
+      }
+
+      if (input.decision === 'confirmed_published') {
+        if ((current.attempt_provider_post_id && current.attempt_provider_post_id !== providerPostId) ||
+            (current.publication_provider_post_id && current.publication_provider_post_id !== providerPostId)) {
+          throw new Error('The supplied provider post ID conflicts with the stored delivery receipt.');
+        }
+        await tx`
+          UPDATE public.media_social_publications SET
+            status='published',
+            published_at=COALESCE(published_at, now()),
+            provider_post_id=${providerPostId},
+            provider_post_url=${providerPostUrl},
+            last_error_code=NULL,
+            last_error_message=NULL,
+            locked_at=NULL,
+            locked_by=NULL,
+            updated_at=now()
+          WHERE id=${input.publicationId}::uuid
+        `;
+        await tx`
+          UPDATE public.media_social_outbox SET
+            status='completed',
+            lease_owner=NULL,
+            lease_expires_at=NULL,
+            last_error_code=NULL,
+            updated_at=now()
+          WHERE publication_id=${input.publicationId}::uuid
+        `;
+        await tx`
+          INSERT INTO public.media_editorial_audit_events (actor_user_id, action, details)
+          VALUES (
+            ${actorId}::uuid,
+            'social_delivery_reconciled_published',
+            ${JSON.stringify({
+              publicationId: input.publicationId,
+              attemptNumber: current.attempt_number,
+              provider: current.provider,
+              providerPostId,
+              providerPostUrl,
+              evidence,
+            })}::jsonb
+          )
+        `;
+      } else {
+        if (current.attempt_provider_post_id || current.publication_provider_post_id || current.provider_post_url) {
+          throw new Error('A provider post ID or URL already exists. Verify and reconcile it as published instead of replaying.');
+        }
+        if (Number(current.attempts) >= SOCIAL_RECONCILIATION_MAX_ATTEMPTS) {
+          throw new Error('The automatic attempt limit has been reached. Create a new publication only after resolving this original delivery.');
+        }
+        await tx`
+          UPDATE public.media_social_publications SET
+            status='scheduled',
+            last_error_code=NULL,
+            last_error_message=NULL,
+            locked_at=NULL,
+            locked_by=NULL,
+            updated_at=now()
+          WHERE id=${input.publicationId}::uuid
+        `;
+        await tx`
+          UPDATE public.media_social_outbox SET
+            status='retry',
+            available_at=now(),
+            lease_owner=NULL,
+            lease_expires_at=NULL,
+            last_error_code=NULL,
+            updated_at=now()
+          WHERE publication_id=${input.publicationId}::uuid
+        `;
+        await tx`
+          INSERT INTO public.media_editorial_audit_events (actor_user_id, action, details)
+          VALUES (
+            ${actorId}::uuid,
+            'social_delivery_requeued_after_no_post',
+            ${JSON.stringify({
+              publicationId: input.publicationId,
+              attemptNumber: current.attempt_number,
+              provider: current.provider,
+              evidence,
+              confirmedNoProviderPost: true,
+            })}::jsonb
+          )
+        `;
+      }
+    }));
+    revalidatePath('/admin/social');
+    return { success: true, id: input.publicationId };
+  } catch (error) {
+    console.error('Social delivery reconciliation failed', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to reconcile social delivery.' };
+  }
+}
