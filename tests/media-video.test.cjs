@@ -1,0 +1,58 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+
+test('Cloudflare Stream VOD is separate, signed, fail-closed and revision-scoped', () => {
+  const migration = read('db/migrations/0041_factsport_media_video_assets.sql');
+  const adapter = read('lib/media/cloudflare-stream.ts');
+  const directUpload = read('app/api/admin/media/videos/direct-upload/route.ts');
+  const refresh = read('app/api/admin/media/videos/[id]/refresh/route.ts');
+  const playback = read('app/api/media/videos/[id]/playback/route.ts');
+  const player = read('app/components/MediaVideoPlayer.tsx');
+  const articleAdapter = read('lib/adapters/postgres-editorial.ts');
+  const articlePage = read('app/news/[slug]/page.tsx');
+  assert.match(migration, /media_video_assets/);
+  assert.match(migration, /editorial_article_revision_videos/);
+  assert.match(migration, /editorial_article_videos/);
+  assert.match(migration, /public_editorial_article_video_tokens/);
+  assert.match(migration, /requireSignedURLs/);
+  assert.match(migration, /rights_status IN \('owned','licensed','editorial_exception'\)/);
+  assert.match(migration, /media_video_upload_started/);
+  assert.match(adapter, /FACTSPORT_STREAM_VIDEO_READY === 'true'/);
+  assert.match(adapter, /CLOUDFLARE_STREAM_SIGNING_KEY_JWK/);
+  assert.match(adapter, /requireSignedURLs: true/);
+  assert.match(adapter, /sub: videoUid/);
+  assert.match(adapter, /RSASSA-PKCS1-v1_5/);
+  assert.match(directUpload, /authorizeMediaEditorialAction\('media'\)/);
+  assert.match(directUpload, /isSameOriginRequest/);
+  assert.match(directUpload, /createFactsportStreamDirectUpload/);
+  assert.doesNotMatch(directUpload, /INSERT INTO public\.media_video_assets[\s\S]*uploadURL/);
+  assert.match(refresh, /readyToStream/);
+  assert.match(refresh, /expiredUnuploaded/);
+  assert.match(playback, /public_editorial_article_video_tokens/);
+  assert.match(playback, /createFactsportStreamSignedToken\(String\(rows\[0\]\.provider_video_id\)\)/);
+  assert.match(player, /\/iframe/);
+  assert.match(articleAdapter, /public\.public_editorial_article_videos/);
+  assert.doesNotMatch(articleAdapter, /provider_video_id/);
+  assert.match(articlePage, /MediaVideoPlayer/);
+});
+
+test('Video revisions preserve attachments and publication enforces current rights', () => {
+  const actions = read('app/admin/news/actions.ts');
+  const mediaActions = read('app/admin/news/media-actions.ts');
+  const newsroom = read('app/admin/news/EditorialVideoAttachments.tsx');
+  const usage = read('app/api/admin/media/videos/[id]/usage/route.ts');
+  assert.match(actions, /editorial_article_revision_videos/);
+  assert.match(actions, /A revision video is not processed or no longer has valid rights approval/);
+  assert.match(actions, /isFactsportStreamVideoReady/);
+  assert.match(actions, /editorial_article_videos/);
+  assert.match(mediaActions, /reviewRightsAndAttachVideo/);
+  assert.match(mediaActions, /removeEditorialVideoFromRevision/);
+  assert.match(mediaActions, /revokeMediaVideoRights/);
+  assert.match(newsroom, /Review rights &amp; attach video/);
+  assert.match(usage, /editorial_article_revision_videos/);
+  assert.match(usage, /editorial_article_videos/);
+});
