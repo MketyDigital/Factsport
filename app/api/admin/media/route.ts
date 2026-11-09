@@ -90,8 +90,16 @@ export async function GET(request: Request) {
       SELECT id, object_key, media_kind, content_type, byte_size, sha256,
              width, height, alt_text, rights_status, rights_reference,
              attribution_text, usage_expires_at, is_public, uploaded_by,
-             created_at, updated_at
+             created_at, updated_at,
+             derivative.source_asset_id AS derived_from,
+             derivative.variant_key
       FROM public.media_assets
+      LEFT JOIN LATERAL (
+        SELECT source_asset_id, variant_key
+        FROM public.media_asset_derivatives
+        WHERE derivative_asset_id=media_assets.id
+        LIMIT 1
+      ) derivative ON true
       WHERE media_kind = 'image'
         AND (${status} = 'all' OR rights_status = ${status})
         AND (
