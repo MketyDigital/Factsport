@@ -106,3 +106,13 @@ Documentation-only audit slice. Future SQL/API changes must be reverted independ
 - Disposable PostgreSQL migration verification passed on commit `b0c2b1c95b127696e92f5351ed2970e1310ea500` (migration chain through 0043 with exact-score requirement and the preceding role/consent/rate-limit checks). A newer run adds the concurrent race test and is still pending.
 - Isolated regression passed on `9e0450902d4d9ff4aca6d415827f5f4feb5ec679`; native Vinext build and protected Cloudflare staging passed on `74fc53e533496088a102f996af6aa43ec6c459ca`. Later source refinement requiring exact scores has fresh isolated/native/staging checks in progress.
 - The marketing flow intentionally stops at `pending_confirmation`: no marketing email is sent. Confirmation, unsubscribe/withdrawal endpoints, token expiry/replay handling and reliable delivery/outbox are required before any promotional send.
+
+
+## Latest verification and host-isolation follow-up
+
+- Production API host validation is pinned to exactly `https://factsport.com`; it cannot be enabled on `predict.factsport.com`. Staging accepts only the protected `factsport-v2-staging.*.workers.dev` host pattern. The parent-domain visitor cookie is still scoped to `.factsport.com` only in production.
+- Disposable PostgreSQL migration verification passed on `95d8ddfa7f90765641caaa033871e77133f65c06` (run `42582368633`), including two simultaneous submissions on separate PostgreSQL connections using the same visitor token/match; one participant and one prediction remain.
+- The same run includes prior assertions for no direct table grants, function ACL/search_path, exact kickoff/status rejection, normalized contact reuse without cross-browser history transfer, duplicate retry, pending marketing consent and rate limiting.
+- Isolated regression passed on `4aa20c507bbdbf743b2f1e7c72f04e5cd5733e11` (run `42582325642`); native Vinext build passed on the same commit (run `42582325545`). Protected Cloudflare staging for that commit was still in progress at the time of this note.
+- A subsequent CI-only workflow change adds an information_schema assertion that the Prediction API role has zero direct public-schema table grants; its database verification run is pending.
+- No isolated Azure database migration, dedicated login/Hyperdrive provisioning, HMAC secret, feature flag activation or production resource change has occurred.
