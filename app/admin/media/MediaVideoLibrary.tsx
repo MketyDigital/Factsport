@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
+import MediaVideoRightsRevocationControl from './MediaVideoRightsRevocationControl';
 
 type VideoAsset = {
   id: string; title: string; description: string | null; upload_status: string;
@@ -10,7 +11,7 @@ type VideoAsset = {
   created_at: string; updated_at: string;
 };
 
-export default function MediaVideoLibrary({ ready }: { ready: boolean }) {
+export default function MediaVideoLibrary({ ready, canRevokeRights = false }: { ready: boolean; canRevokeRights?: boolean }) {
   const [videos, setVideos] = useState<VideoAsset[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -109,6 +110,7 @@ export default function MediaVideoLibrary({ ready }: { ready: boolean }) {
           <p className="truncate text-sm font-bold text-slate-900">{video.title}</p>
           <p className="mt-1 text-[10px] text-slate-500">{video.upload_status} · {video.rights_status} · {video.duration_seconds ? Math.round(video.duration_seconds) + ' sec' : 'duration pending'} · {video.width && video.height ? video.width + '×' + video.height : 'dimensions pending'}</p>
           {video.is_public && <p className="mt-1 text-[10px] font-bold text-emerald-700">Public on an approved article</p>}
+          {canRevokeRights && ['owned','licensed','editorial_exception'].includes(video.rights_status) && <MediaVideoRightsRevocationControl videoId={video.id} onRevoked={() => void load()} />}
         </div>
         <button type="button" disabled={pending} onClick={() => startTransition(async () => {
           try { const result = await refresh(video.id); setMessage(result.upload_status === 'ready' ? 'Video processing is complete; it still requires rights review and article publication.' : 'Video is still processing.'); }
