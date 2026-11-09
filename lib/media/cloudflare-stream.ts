@@ -73,10 +73,24 @@ export function factsportStreamAllowedOrigins() {
   return requireConfig().allowedOrigins;
 }
 
+export const FACTSPORT_STREAM_BASIC_UPLOAD_MAX_BYTES = 200_000_000;
+export const FACTSPORT_STREAM_MAX_UPLOAD_BYTES = 30_000_000_000;
+
+function encodeTusMetadata(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
+  return btoa(binary);
+}
+
 export async function createFactsportStreamDirectUpload(input: {
-  assetId: string; title: string; creatorId: string; maxDurationSeconds?: number;
+  assetId: string; title: string; creatorId: string; fileSizeBytes: number; maxDurationSeconds?: number;
 }) {
   const config = requireConfig();
+  if (!Number.isSafeInteger(input.fileSizeBytes) ||
+      input.fileSizeBytes < 1 || input.fileSizeBytes > FACTSPORT_STREAM_BASIC_UPLOAD_MAX_BYTES) {
+    throw new Error('Basic Stream uploads must be between 1 byte and 200 MB.');
+  }
   const result = await streamRequest('/direct_upload', {
     method: 'POST',
     body: JSON.stringify({
@@ -84,6 +98,7 @@ export async function createFactsportStreamDirectUpload(input: {
       allowedOrigins: config.allowedOrigins,
       creator: input.creatorId.slice(0, 64),
       expiry: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      maxDurationSeconds: input.maxDurationSeconds || 900,
       meta: { factsportMediaVideoId: input.assetId, title: input.title.slice(0, 200) },
       requireSignedURLs: true,
       thumbnailTimestampPct: 0.1,
@@ -95,6 +110,59 @@ export async function createFactsportStreamDirectUpload(input: {
     throw new Error('Cloudflare Stream returned an invalid direct-upload response.');
   }
   return { uploadURL, uid, expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() };
+}
+
+
+export async function createFactsportStreamTusUpload(input: {
+  assetId: string; title: string; creatorId: string; fileSizeBytes: number; maxDurationSeconds?: number;
+}) {
+  const config = requireConfig();
+  if (!Number.isSafeInteger(input.fileSizeBytes) ||
+      input.fileSizeBytes < 1 || input.fileSizeBytes > FACTSPORT_STREAM_MAX_UPLOAD_BYTES) {
+    throw new Error('Resumable Stream uploads must be between 1 byte and 30 GB.');
+  }
+  const maxDurationSeconds = input.maxDurationSeconds || 900;
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const metadata = [
+    'name ' + encodeTusMetadata(input.title.slice(0, 200)),
+    'maxDurationSeconds ' + encodeTusMetadata(String(maxDurationSeconds)),
+    'expiry ' + encodeTusMetadata(expiresAt),
+    'allowedorigins ' + encodeTusMetadata(config.allowedOrigins.join(',')),
+    'thumbnailtimestamppct ' + encodeTusMetadata('0.1'),
+    'requiresignedurls',
+  ].join(',');
+
+  const response = await fetch(
+    API + '/accounts/' + config.accountId + '/stream?direct_user=true',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + config.apiToken,
+        Accept: 'application/json',
+        'Tus-Resumable': '1.0.0',
+        'Upload-Length': String(input.fileSizeBytes),
+        'Upload-Metadata': metadata,
+        'Upload-Creator': input.creatorId.slice(0, 64),
+      },
+      signal: AbortSignal.timeout(20000),
+      cache: 'no-store',
+    },
+  );
+  if (response.status !== 201) {
+    throw new Error('Cloudflare Stream resumable upload creation failed (' + response.status + ').');
+  }
+  const uploadURL = response.headers.get('Location') || '';
+  const uid = response.headers.get('stream-media-id') || '';
+  let location: URL;
+  try { location = new URL(uploadURL); } catch {
+    throw new Error('Cloudflare Stream returned an invalid resumable upload location.');
+  }
+  const expectedPath = '/client/v4/accounts/' + config.accountId + '/stream/' + uid;
+  if (location.protocol !== 'https:' || location.hostname !== 'api.cloudflare.com' ||
+      location.pathname !== expectedPath || !/^[a-f0-9]{32}$/i.test(uid)) {
+    throw new Error('Cloudflare Stream returned an invalid resumable upload response.');
+  }
+  return { uploadURL, uid, expiresAt, maxDurationSeconds };
 }
 
 export async function getFactsportStreamVideo(uid: string) {
