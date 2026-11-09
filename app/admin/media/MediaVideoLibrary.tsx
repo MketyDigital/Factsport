@@ -117,14 +117,17 @@ export default function MediaVideoLibrary({ ready, schemaReady, canRevokeRights 
                 return Boolean(previous.uploadUrl) && Number.isFinite(createdAt) &&
                   Date.now() - createdAt < resumeWindowMs;
               });
-              const expired = previousUploads.filter(previous => previous !== resumable);
+              const canResume = Boolean(resumable && assetId);
+              const staleUploads = previousUploads.filter(previous =>
+                previous !== resumable || !canResume
+              );
               const urlStorage = tus.defaultOptions.urlStorage;
               if (urlStorage) {
-                await Promise.all(expired.map(previous =>
+                await Promise.all(staleUploads.map(previous =>
                   urlStorage.removeUpload(previous.urlStorageKey)
                 ));
               }
-              if (resumable) {
+              if (canResume && resumable) {
                 uploader.resumeFromPreviousUpload(resumable);
               } else {
                 assetId = '';
