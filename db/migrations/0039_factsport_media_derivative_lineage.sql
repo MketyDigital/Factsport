@@ -35,6 +35,8 @@ DROP TRIGGER IF EXISTS media_asset_derivative_no_nesting ON public.media_asset_d
 CREATE TRIGGER media_asset_derivative_no_nesting
   BEFORE INSERT ON public.media_asset_derivatives
   FOR EACH ROW EXECUTE FUNCTION public.reject_nested_media_derivative();
+REVOKE ALL ON FUNCTION public.reject_nested_media_derivative() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.reject_nested_media_derivative() TO factsport_v2_editorial_writer;
 
 REVOKE ALL ON public.media_asset_derivatives
   FROM PUBLIC, factsport_v2_reader, factsport_v2_schedule_writer,
