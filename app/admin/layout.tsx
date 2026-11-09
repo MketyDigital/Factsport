@@ -4,8 +4,10 @@ export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 import { Newspaper, Images, Send, Radio, Settings, LogOut } from 'lucide-react';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
+import { rejectPrivateProductHost } from '@/app/lib/private-product-host';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  await rejectPrivateProductHost();
   const access = await authorizeMediaEditorialAction('workspace');
   if (!access.ok) {
     return (
