@@ -128,7 +128,7 @@ export default function MediaVideoLibrary({ ready, schemaReady, canRevokeRights 
             method: 'POST', credentials: 'same-origin', cache: 'no-store',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              title, description, fileSizeBytes: file.size, maxDurationSeconds: 900,
+              title, description, fileSizeBytes: file.size, fileType: file.type, maxDurationSeconds: 900,
             }),
           });
           const uploadData = await created.json();
