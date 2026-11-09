@@ -120,6 +120,7 @@ SELECT
   v.width,
   v.height,
   v.thumbnail_url,
+  v.attribution_text,
   v.playback_host,
   av.position
 FROM public.editorial_article_videos av
