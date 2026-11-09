@@ -410,3 +410,11 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - **CI/runtime evidence:** earlier social attachment and dispatch-core slices passed isolated/native checks as documented in M37/M38. The latest M40 provider-delivery, channel-admin and revision-scoped source changes require their own fresh native build and isolated regression pass; provider E2E is not complete. Protected staging has not proven CMS, social dispatch, source provenance or Studio runtime parity.
 - **AdSense:** public Media remains separated from private Prediction/VIP/payment/admin surfaces. These code changes do not implement Google ad serving, prove ads.txt on the live host, prove consent/CMP readiness or establish AdSense approval. The live production site and owner account checks remain separate gates.
 - **Next:** complete current CI; verify migrations 0027–0037 and dedicated roles/Hyperdrives on isolated staging; configure Entra and Logic Apps/APIM securely; run full newsroom source/media/rights review, Studio Stream and private provider-destination social E2E; add operator reconciliation UI; then complete AdSense legal/consent/live-domain acceptance. No production change is authorized or claimed.
+
+
+## 2026-11-09 CI coverage audit — M41
+
+- Expanded `.github/workflows/v2-verify.yml` path filters to cover Media admin pages, admin/internal APIs, Azure orchestration templates, and audit/implementation documentation. This prevents these important changes from silently bypassing isolated verification.
+- Recorded the finding and exact remaining acceptance gates in `docs/audit/handoffs/M41-CI-SCOPE-AND-MEDIA-COVERAGE.md`.
+- Commit `c3ac3a693fcad8e5c70eb4dd19146198d5280b2a` contains the workflow change; the M41 handoff documentation was added in `599cc073422955e41b5756988b473d0ec216c2f7`.
+- Verification for the workflow commit was running when recorded. No pass is claimed until CI completes.
