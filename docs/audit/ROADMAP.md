@@ -452,3 +452,10 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - Protected application staging run `42572757656` was still in progress when the handoff was written. No Azure staging or production migration/flag activation occurred.
 - Detailed implementation and acceptance checklist: `docs/audit/handoffs/M43-SOCIAL-DELIVERY-RECONCILIATION.md`.
 - Next: finish protected staging, apply 0042 only to owner-approved isolated Azure staging, test both reconciliation decisions against private provider destinations, then continue the legacy Prediction SQL/parity audit.
+
+
+## 2026-11-09 M43 protected staging follow-up
+
+- Protected Cloudflare application staging passed on source commit `28f87f2969a4e5793889b366e396972835ff6fa5` (run `42572757656`), including regression, TypeScript, native Worker build, isolated deployment, deny-by-default and protected /matches checks.
+- This did not apply migration 0042 to Azure PostgreSQL or enable `FACTSPORT_SOCIAL_RECONCILIATION_READY`; no provider delivery/reconciliation E2E was performed.
+- M43 remains source-implemented and staging-build-verified; isolated Azure migration and private provider destination tests are still release gates.
