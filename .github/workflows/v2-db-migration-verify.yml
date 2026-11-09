@@ -187,6 +187,10 @@ jobs:
             ('00000000-0000-4000-8000-000000000047',
              'CI', 'Home 5', 'Away 5', transaction_timestamp(), 'SCHEDULED');
 
+          BEGIN;
+          UPDATE public.matches
+             SET match_date=transaction_timestamp()
+           WHERE id='00000000-0000-4000-8000-000000000047';
           SET ROLE factsport_v2_prediction_api;
           DO $verify$
           DECLARE
@@ -307,6 +311,7 @@ jobs:
           END
           $verify$;
           RESET ROLE;
+          COMMIT;
 
           DO $verify$
           BEGIN
