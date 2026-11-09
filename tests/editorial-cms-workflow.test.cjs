@@ -353,3 +353,15 @@ test('editorial upload rejects oversized request bodies before multipart parsing
   assert.match(mediaUpload, /status: 413/);
   assert.match(mediaUpload, /request\.formData\(\)/);
 });
+
+
+test('editorial draft preview includes the same NewsArtwork and sanitized Markdown components plus revision media', () => {
+  assert.match(ui, /import NewsArtwork from '@\/app\/components\/NewsArtwork'/);
+  assert.match(ui, /<NewsArtwork/);
+  assert.match(ui, /previewHero/);
+  assert.match(ui, /previewTeam1/);
+  assert.match(ui, /previewTeam2/);
+  assert.match(ui, /previewInline\.map/);
+  assert.match(ui, /Private preview only/);
+  assert.match(ui, /<MarkdownRenderer content=\{form\.bodyMarkdown\} \/>/);
+});
