@@ -397,6 +397,9 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                     image={previewHero?.media_id ? '/api/admin/media/' + encodeURIComponent(previewHero.media_id) : null}
                     team1Logo={previewTeam1?.media_id ? '/api/admin/media/' + encodeURIComponent(previewTeam1.media_id) : null}
                     team2Logo={previewTeam2?.media_id ? '/api/admin/media/' + encodeURIComponent(previewTeam2.media_id) : null}
+                    imageAlt={previewHero?.alt_text || form.title}
+                    team1Alt={form.team1Name || 'Team 1'}
+                    team2Alt={form.team2Name || 'Team 2'}
                     title={form.title}
                     className="h-full w-full opacity-70"
                     loading="lazy"
