@@ -99,6 +99,10 @@ test('Large VOD files use protected Cloudflare TUS with durable resume and size 
   assert.match(tusRoute, /isSameOriginRequest/);
   assert.match(tusRoute, /Tus-Resumable/);
   assert.match(tusRoute, /upload-length/);
+  assert.match(tusRoute, /upload-metadata/);
+  assert.match(tusRoute, /readFactsportTusMetadata/);
+  assert.match(tusRoute, /factsporttitle/);
+  assert.doesNotMatch(library, /X-Factsport-Video-Title/);
   assert.match(tusRoute, /Location: directUpload\.uploadURL/);
   assert.match(tusRoute, /X-Factsport-Video-Asset-Id/);
   const tusAssetInsert = tusRoute.match(/INSERT INTO public\.media_video_assets\s*\(([\s\S]*?)\)\s*VALUES/);
