@@ -117,4 +117,6 @@ test('Media rights revocation is Media-admin-only, audited and retains the origi
   assert.match(control, /revokeMediaRights/);
   assert.match(page, /roles\.includes\('media_admin'\)/);
   assert.match(migration, /media_rights_revoked/);
+  assert.match(control, /must be removed separately at that provider/);
+  assert.match(read('app/api/media/[...key]/route.ts'), /s-maxage=15/);
 });
