@@ -82,3 +82,9 @@ test('social provider delivery lock migration is included in the migration chain
   assert.ok(migration.includes('provider_started_at timestamptz'));
   assert.ok(migration.includes('GRANT UPDATE (provider_started_at)'));
 });
+
+
+test('social provider allowlist migration matches the implemented V2 adapter set', () => {
+  const migration = readMigration('0037_factsport_social_provider_allowlist.sql');
+  assert.ok(migration.includes("provider IN ('meta','telegram','buffer','make')"));
+});
