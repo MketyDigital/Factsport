@@ -67,6 +67,7 @@ export async function scheduleSocialPublication(input: {
         row.created_by === actorId &&
         row.channel_id === input.channelId &&
         (row.article_id || null) === (input.articleId || null) &&
+        JSON.stringify(row.media_asset_ids || []) === JSON.stringify(mediaAssetIds) &&
         row.content_text === content &&
         (row.link_url || null) === linkUrl &&
         new Date(row.scheduled_at).valueOf() === scheduledAt.valueOf();
@@ -92,7 +93,7 @@ export async function scheduleSocialPublication(input: {
       `;
       if (!publication.length) {
         const raced = await tx`
-          SELECT id, article_id, channel_id, content_text, link_url, scheduled_at, created_by
+          SELECT id, article_id, channel_id, media_asset_ids, content_text, link_url, scheduled_at, created_by
           FROM public.media_social_publications
           WHERE idempotency_key=${input.idempotencyKey} FOR UPDATE
         `;
