@@ -75,7 +75,9 @@ BEGIN
     RAISE EXCEPTION 'invalid_marketing_consent' USING ERRCODE = '22023';
   END IF;
 
-  IF (p_predicted_home_score IS NULL) <> (p_predicted_away_score IS NULL)
+  -- The no-campaign public game retains the legacy default require_score=true.
+  -- Campaign-specific optional-score rules remain disabled until mapped.
+  IF p_predicted_home_score IS NULL OR p_predicted_away_score IS NULL
      OR p_predicted_home_score < 0 OR p_predicted_away_score < 0
      OR p_predicted_home_score > 99 OR p_predicted_away_score > 99 THEN
     RAISE EXCEPTION 'invalid_score_pair' USING ERRCODE = '22023';
