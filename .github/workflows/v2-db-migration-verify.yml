@@ -158,6 +158,13 @@ jobs:
             ) THEN
               RAISE EXCEPTION 'Prediction functions must be SECURITY DEFINER, search_path-pinned and closed to PUBLIC';
             END IF;
+            IF EXISTS (
+              SELECT 1 FROM information_schema.role_table_grants
+              WHERE grantee = 'factsport_v2_prediction_api'
+                AND table_schema = 'public'
+            ) THEN
+              RAISE EXCEPTION 'Prediction API role must have zero direct public-schema table grants';
+            END IF;
             IF has_table_privilege('factsport_v2_prediction_api', 'public.matches', 'SELECT')
               OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_contacts', 'SELECT,INSERT,UPDATE,DELETE')
               OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_participants', 'SELECT,INSERT,UPDATE,DELETE')
