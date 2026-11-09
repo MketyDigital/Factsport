@@ -68,3 +68,31 @@ Documentation-only audit slice. Future SQL/API changes must be reverted independ
 - Source commits for this implementation slice: `e463f0abfcf7f47e3e7ca3b447ee24e02a1115b0`, `1db1b1e9d9a02e06b73bfccda7011557bd1f28e5`, `3d19370116045c7714a06d1d31835a0ea2cbb5b2`, `b13d477aba32edd7c12762d4be0fab7f75b59a0d`, `aaa683989f42a35ca891081858c32bb3520f3303`, `082d638ed1e3ee82edd626d8bcc8a036b03e74e1`.
 - **Not yet runtime-verified:** the migration and role behavior are awaiting disposable PostgreSQL CI. No API route, cookie, rate limiter, marketing-consent call, campaign logic, claim flow, settlement or UI is implemented. No staging/production database was touched.
 - Next: resolve any SQL/CI findings; add tests for kickoff equality, closed/unknown statuses, different visitor tokens sharing an email, and concurrency; then implement token cookie/API and privacy-safe rate limiting.
+
+
+## Public API, visitor continuity and optional consent — implementation added
+
+- Added `app/api/prediction/submit/route.ts` with a click-triggered GET session bootstrap and same-origin POST submission. Both are host-gated, no-store, and use only the dedicated Prediction Hyperdrive adapter.
+- The GET route issues an opaque 256-bit Secure/HttpOnly/SameSite=Lax cookie only when the visitor opens the submit form. Production uses `.factsport.com` scope for same-browser transition to `predict.factsport.com`; staging remains host-only. The cookie value is never returned to JavaScript.
+- Added `get_public_prediction_visitor_state(text)`, which exposes only a boolean for the current cookie hash. The form can therefore omit the email field for a returning browser. A new browser identity must supply email once; the database ignores an email supplied for an already-known visitor.
+- Added `lib/prediction/public-submission.ts` for cryptographic token generation, SHA-256 token hashing, HMAC rate keys and strict public-host checks.
+- Added a bounded JSON reader (8 KiB), exact Origin/Sec-Fetch-Site checks, UUID/outcome/score/email/display-name validation, no-store responses and sanitized database error mapping.
+- Added database-backed privacy-safe counters: 10 requests/minute per visitor and 60/minute per network key. Network and visitor keys are HMAC-SHA256 hashes; raw IPs and raw visitor tokens are not stored. Counters opportunistically prune expired buckets. Thresholds are technical abuse controls, not game eligibility/daily prediction rules, and need staging load/tuning.
+- Added versioned `prediction_rule_acceptances` records in the same transaction as a new prediction. The exact visible acceptance wording is stored.
+- Added optional `marketingOptIn` handling in the submission function. It creates/updates only a `pending_confirmation` subscription and appends an `opt_in` event; it is unticked by default, separate from prediction acceptance, and never sends email. The exact visible marketing wording/version is stored. A confirmation/unsubscribe delivery flow remains OPEN.
+- Added `app/components/PublicPredictionSubmit.tsx` and gated it on `FACTSPORT_PREDICTION_SUBMISSION_READY` plus a scheduled/pre-match page status. The email/rules/optional marketing form opens only after clicking Submit Prediction. Existing legacy `PredictionBoard` remains untouched and development-only; no old campaign/bonus/scoring behavior was replaced.
+- Added/expanded `tests/prediction-submission-api.test.cjs` and `tests/prediction-runtime-boundary.test.cjs`. Disposable PostgreSQL workflow now exercises function execution under the dedicated role, duplicate retry, visitor-state lookup, pending marketing consent, rate-limit threshold and no-direct-table-grant assertions.
+- Relevant implementation commits: `130093773f1d27c91c02a6eb6b345e3092dacb08`, `63873b0248bce87ed8b96ecd35a228273e9b6a20`, `d1c24e651eb5dfb7e6bfac1ff88cfc1706a99732`, `35351fcc505fab696b15a41837a10d7c2586a853`, `a393204f11d11a30684da48329ec6b38e402d704`, `81c48640cfd7520b32674af9a456d147ef12439f`, `a050f82cfe820f831a86a4680f2c465211167174`, `1e3019476cb7b377d931af4785b6a682f03b7356`, `74fc53e533496088a102f996af6aa43ec6c459ca`.
+- Verification remains in progress after multiple test-harness and SQL-expression corrections. The migration chain has not yet passed with the final visitor-state function/rate-limit/consent assertions; the newest native build/typecheck is also running. Do not treat this feature as runtime-verified until the current-head PostgreSQL, isolated, native build and protected staging runs pass.
+- No staging or production DB migration, Hyperdrive/login role, secret, cookie domain, feature flag, DNS or public release was activated.
+
+## Remaining acceptance gaps before any enablement
+
+1. Finish current-head disposable PostgreSQL migration and role tests; include a different visitor token using the same email to prove contact reuse does not transfer prediction history.
+2. Finish current-head TypeScript/native Worker build and protected Cloudflare staging. Run real browser tests for cookie set/reuse, same-origin rejection, payload limits, rate limits, duplicate retry and kickoff race.
+3. Provision the dedicated Prediction login/Hyperdrive and HMAC secret only in isolated staging; apply migration 0043 there after owner approval. Keep `FACTSPORT_PREDICTION_SUBMISSION_READY` unset until complete.
+4. Implement marketing confirmation, verified-email delivery, unsubscribe/withdrawal and append-only confirmation/withdrawal evidence before any promotional sends.
+5. Implement safe public own-prediction/leaderboard read projections; the new API currently submits but does not read a visitor's prior prediction or public standings.
+6. Map legacy campaign/rule versions, bonus markets and daily eligibility before public rollout; do not substitute generic submission behavior for legacy features.
+7. Reconcile legacy settlement 3/10-point rules, campaign bonus, VIP and monthly-winner conflicts before any settlement/prize feature is enabled.
+8. Add explicit race tests for same visitor/match, same email/different visitor, kickoff equality, live/terminal/unknown status, and rate-limit concurrent calls.
