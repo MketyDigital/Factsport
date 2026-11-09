@@ -53,8 +53,10 @@ export function isAllowedPredictionPublicHost(url: URL, environment: string, con
   if (environment === 'staging') {
     return /^factsport-v2-staging\.[a-z0-9-]+\.workers\.dev$/i.test(host);
   }
-  return environment === 'production' && Boolean(configuredHost) &&
-    host === configuredHost.trim().toLowerCase();
+  // Never serve the public submit API from the private Predict subdomain.
+  return environment === 'production' &&
+    configuredHost.trim().toLowerCase() === 'factsport.com' &&
+    host === 'factsport.com';
 }
 
 export function predictionVisitorCookieOptions(host: string, environment: string) {
