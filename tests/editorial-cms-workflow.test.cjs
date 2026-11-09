@@ -324,6 +324,11 @@ test('revision history compares metadata, media, videos and sources and previews
   assert.match(ui, /Source provenance/);
   assert.match(ui, /previewVideos/);
   assert.match(ui, /<MediaVideoPreview/);
+  assert.match(ui, /Desktop preview/);
+  assert.match(ui, /Mobile preview/);
+  assert.match(ui, /Search result preview/);
+  assert.match(ui, /Social share preview/);
+  assert.match(ui, /No ad or analytics scripts are loaded/);
   assert.match(videoPreview, /\/api\/admin\/media\/videos\//);
   assert.match(videoPreview, /iframeUrl/);
   assert.match(previewRoute, /authorizeMediaEditorialAction\('media'\)/);
