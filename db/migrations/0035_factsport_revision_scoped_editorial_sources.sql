@@ -17,6 +17,18 @@ SET revision_id = (
 )
 WHERE s.revision_id IS NULL;
 
+-- If an article has never been published, keep any existing source rows with its latest pending revision.
+UPDATE public.editorial_article_sources s
+SET revision_id = (
+  SELECT r.id
+  FROM public.editorial_article_revisions r
+  WHERE r.article_id=s.article_id
+    AND r.workflow_status IN ('draft','in_review','approved','rejected')
+  ORDER BY r.revision_number DESC
+  LIMIT 1
+)
+WHERE s.revision_id IS NULL;
+
 -- Existing pending revisions inherit the article's previously published source list.
 INSERT INTO public.editorial_article_sources
   (article_id, revision_id, source_title, publisher, canonical_url, attribution_text, rights_reference, accessed_at)
