@@ -20,10 +20,20 @@ export async function GET(request: Request) {
     const assets = await withFactsportEditorialPostgres(async sql => sql`
       SELECT m.id, m.object_key, m.content_type, m.width, m.height, m.alt_text, m.attribution_text
       FROM public.media_assets m
-      JOIN public.public_media_assets public_asset ON public_asset.object_key=m.object_key
       WHERE m.media_kind='image' AND m.is_public=true
         AND m.rights_status IN ('owned','licensed','editorial_exception')
         AND (m.usage_expires_at IS NULL OR m.usage_expires_at > now())
+            AND (EXISTS (
+              SELECT 1 FROM public.editorial_article_media am
+              JOIN public.editorial_articles a ON a.id=am.article_id
+              WHERE am.media_id=m.id AND a.status='published' AND a.review_status='approved'
+                AND a.reviewed_by IS NOT NULL AND a.reviewed_at IS NOT NULL AND a.published_at <= now()
+            ) OR EXISTS (
+              SELECT 1 FROM public.editorial_article_team_media tm
+              JOIN public.editorial_articles a ON a.id=tm.article_id
+              WHERE tm.media_id=m.id AND a.status='published' AND a.review_status='approved'
+                AND a.reviewed_by IS NOT NULL AND a.reviewed_at IS NOT NULL AND a.published_at <= now()
+            ))
         AND (
           ${query} = ''
           OR m.object_key ILIKE ${'%' + query + '%'}
