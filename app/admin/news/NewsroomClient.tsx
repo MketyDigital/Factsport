@@ -90,6 +90,8 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const [mediaPosition, setMediaPosition] = useState(0);
 
   const currentRevisionMedia = articles.find(article => article.id === form.id)?.revision_media || [];
+  const currentRevisionStatus = articles.find(article => article.id === form.id)?.revision_status || null;
+  const canEditRevisionMedia = currentRevisionStatus === 'draft';
   const currentSources = articles.find(article => article.id === form.id)?.sources || [];
   const activeRevisionMedia = currentRevisionMedia.filter(asset => !asset.remove_media && asset.media_id);
   const previewHero = activeRevisionMedia.find(asset => asset.placement === 'hero');
@@ -227,7 +229,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
             <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <h3 className="font-black text-slate-800">Rights-aware media library</h3>
               <p className="mt-1 text-xs text-slate-500">Upload JPEG, PNG or WebP files to private R2 storage. Every image stays private until its rights are reviewed and it is attached to a draft.</p>
-              {!form.id ? <p className="mt-3 text-sm font-semibold text-amber-800">Save the article draft first to attach media.</p> : <>
+              {!form.id || !canEditRevisionMedia ? <p className="mt-3 text-sm font-semibold text-amber-800">Save a new draft revision first to attach or remove media.</p> : <>
                 {currentRevisionMedia.filter(asset => !asset.remove_media && asset.media_id).length > 0 && <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
                   <h4 className="text-xs font-black uppercase tracking-wide text-slate-700">Attached to this draft revision</h4>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -237,7 +239,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                         <p className="text-xs font-bold text-slate-800">{asset.placement === 'hero' ? 'Hero image' : asset.placement === 'team_1' ? 'Team 1 logo' : asset.placement === 'team_2' ? 'Team 2 logo' : 'Inline gallery · position ' + asset.position}</p>
                         <p className="mt-1 truncate text-[10px] text-slate-500">{asset.object_key || 'Media asset'}</p>
                         <p className="mt-1 text-[10px] text-emerald-700">{(asset.rights_status || 'pending').replace('_', ' ')}</p>
-                        <button type="button" disabled={mediaPending} onClick={() => startMediaTransition(async () => {
+                        <button type="button" disabled={mediaPending || !canEditRevisionMedia} onClick={() => startMediaTransition(async () => {
                           const result = await removeRevisionMedia({ articleId: form.id!, placement: asset.placement, position: asset.position });
                           if (!result.success) { setMessage(result.error || 'Unable to remove attached media.'); return; }
                           setMessage('Media removal saved to this draft revision. Refreshing…');
@@ -255,7 +257,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                     <input value={assetAltText} onChange={e => setAssetAltText(e.target.value)} maxLength={500} className="mt-1 w-full rounded-xl border border-slate-200 p-2 text-sm" />
                   </label>
                 </div>
-                <button disabled={mediaPending || !selectedFile} onClick={() => startMediaTransition(async () => {
+                <button disabled={mediaPending || !selectedFile || !canEditRevisionMedia} onClick={() => startMediaTransition(async () => {
                   const data = new FormData();
                   data.append('file', selectedFile!);
                   data.append('altText', assetAltText);
@@ -319,7 +321,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                       <input type="datetime-local" value={usageExpiresAt} onChange={e => setUsageExpiresAt(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
                     </label>
                   </div>
-                  <button disabled={mediaPending} onClick={() => startMediaTransition(async () => {
+                  <button disabled={mediaPending || !canEditRevisionMedia} onClick={() => startMediaTransition(async () => {
                     const result = await reviewRightsAndAttachMedia({
                       articleId: form.id!, assetId: uploadedAsset.id, placement, position: mediaPosition, rightsStatus,
                       rightsReference, attributionText, altText: assetAltText,
@@ -346,7 +348,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                   {source.rights_reference && <p className="mt-1 text-[10px] text-amber-700">Private rights reference recorded</p>}
                 </li>)}
               </ul>}
-              {!form.id ? <p className="mt-3 text-xs text-amber-700">Save the article draft before adding sources.</p> : <div className="mt-3 grid gap-3 md:grid-cols-2">
+              {!form.id || !canEditRevisionMedia ? <p className="mt-3 text-xs text-amber-700">Save a new draft revision before adding source references.</p> : <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <label className="text-xs font-bold text-slate-600">Source title
                   <input value={sourceTitle} onChange={event => setSourceTitle(event.target.value)} maxLength={240} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
                 </label>
