@@ -138,7 +138,7 @@ export default function MediaLibraryClient({ canRevokeRights = false, derivative
           {derivativesReady && <MediaUsagePanel assetId={asset.id} />}
           {['owned', 'licensed', 'editorial_exception'].includes(asset.rights_status) &&
             (!asset.usage_expires_at || new Date(asset.usage_expires_at).valueOf() > Date.now()) &&
-            {derivativesReady && <MediaDerivativeEditor asset={asset} onCreated={() => void load(0, false)} />}}
+            derivativesReady && <MediaDerivativeEditor asset={asset} onCreated={() => void load(0, false)} />}
           {canRevokeRights && rightsRevocationReady && ['owned', 'licensed', 'editorial_exception'].includes(asset.rights_status) && <MediaRightsRevocationControl assetId={asset.id} onRevoked={() => void load(0, false)} />}
         </div>
       </article>)}
