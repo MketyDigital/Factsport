@@ -50,3 +50,12 @@ Status: source implementation committed; CI verification running; all activation
 ## Safety
 
 No production resources, secrets, DNS, database migrations, social accounts, public posts or live Logic Apps workflows were changed.
+
+
+## Required secret/binding names (names only; values never belong in Git)
+
+- Dispatcher: FACTSPORT_SOCIAL_DISPATCH_READY, FACTSPORT_SOCIAL_DISPATCH_TOKEN, FACTSPORT_SOCIAL_DISPATCHER_HYPERDRIVE.
+- Meta: FACTSPORT_SOCIAL_PROVIDER_META_READY, FACTSPORT_META_PAGE_ACCESS_TOKEN, optional FACTSPORT_META_GRAPH_API_VERSION.
+- Telegram: FACTSPORT_SOCIAL_PROVIDER_TELEGRAM_READY, FACTSPORT_TELEGRAM_BOT_TOKEN.
+- Buffer/Make: FACTSPORT_SOCIAL_PROVIDER_BUFFER_READY / FACTSPORT_SOCIAL_PROVIDER_MAKE_READY, FACTSPORT_LOGIC_APPS_SOCIAL_ADAPTER_URL (HTTPS, no query string), FACTSPORT_LOGIC_APPS_SOCIAL_ADAPTER_TOKEN.
+- Image capability: FACTSPORT_SOCIAL_MEDIA_META_READY, FACTSPORT_SOCIAL_MEDIA_TELEGRAM_READY, FACTSPORT_SOCIAL_MEDIA_BUFFER_READY and FACTSPORT_SOCIAL_MEDIA_MAKE_READY. Set only after provider-specific image E2E.
