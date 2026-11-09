@@ -66,3 +66,12 @@ test('social channel admin migration grants only bounded settings updates and re
   assert.ok(migration.includes('GRANT UPDATE (is_enabled, supports_media, settings, updated_at)'));
   assert.ok(!migration.includes('GRANT UPDATE ON public.media_social_channels'));
 });
+
+
+test('source provenance is scoped to the latest published editorial revision', () => {
+  const migration = readMigration('0035_factsport_revision_scoped_editorial_sources.sql');
+  assert.ok(migration.includes('ADD COLUMN IF NOT EXISTS revision_id uuid'));
+  assert.ok(migration.includes("latest.workflow_status='published'"));
+  assert.ok(migration.includes('latest.revision_number DESC'));
+  assert.ok(migration.includes('s.revision_id'));
+});
