@@ -57,7 +57,7 @@ jobs:
         run: npm run typecheck
       - name: Anonymous prediction and consent schema contract tests
         run: node --test tests/prediction-schema.test.cjs
-      - name: PostgreSQL migration syntax inventory
+      - name: PostgreSQL migration inventory and critical Media contract checks
         run: |
           test -s db/migrations/0001_factsport_core.sql
           grep -q "CREATE TABLE IF NOT EXISTS public.matches" db/migrations/0001_factsport_core.sql
@@ -76,7 +76,7 @@ jobs:
           grep -q "CREATE OR REPLACE VIEW public.public_competition_player_stats" db/migrations/0007_factsport_competition_player_stats.sql
           grep -q "ADD COLUMN IF NOT EXISTS legacy_match_id uuid" db/migrations/0008_factsport_match_identity_alias.sql
           grep -q "CREATE TABLE IF NOT EXISTS public.predictions" db/migrations/0003_factsport_public_predictions.sql
-          for migration_number in $(seq 9 26); do
+          for migration_number in $(seq 9 31); do
             migration_prefix="$(printf '%04d' "$migration_number")"
             migration_matches=(db/migrations/"$migration_prefix"_*.sql)
             if [ "${#migration_matches[@]}" -ne 1 ] || [ ! -s "${migration_matches[0]}" ]; then
@@ -88,4 +88,9 @@ jobs:
           grep -q "factsport_v2_editorial_writer" db/migrations/0025_factsport_media_homepage_settings_grants.sql
           grep -q "MEDIA_ATTESTATION_RECONCILIATION_REQUIRED" db/migrations/0026_factsport_public_media_attestation_enforcement.sql
           grep -q "EDITORIAL_ATTESTATION_RECONCILIATION_REQUIRED" db/migrations/0026_factsport_public_media_attestation_enforcement.sql
-          echo "Migrations 0001-0026 present; public Media announcement grants and fail-closed attestation guard inventoried; live migration NOT executed"
+          grep -q "public_editorial_article_inline_media" db/migrations/0027_factsport_revision_inline_media_gallery.sql
+          grep -q "media_broadcast_audit_events" db/migrations/0028_factsport_broadcast_admin_audit_and_role_history.sql
+          grep -q "media_broadcast_token_rate_limits" db/migrations/0029_factsport_broadcast_token_rate_limits.sql
+          grep -q "media_broadcast_webhook_receipts" db/migrations/0030_factsport_broadcast_token_identity_and_webhooks.sql
+          grep -q "supports_media boolean NOT NULL DEFAULT false" db/migrations/0031_factsport_social_channel_media_capability.sql
+          echo "Migrations 0001-0031 present; Media gallery, broadcast, social capability and attestation contracts inventoried; live migration NOT executed"
