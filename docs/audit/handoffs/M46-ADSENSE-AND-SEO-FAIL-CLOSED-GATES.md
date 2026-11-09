@@ -41,3 +41,10 @@ Status: fail-closed readiness hardening implemented; no ads are served and no Ad
 - No ad script or ad unit is enabled.
 - The static ads.txt line is syntax-checked only; it is not treated as account verification.
 - No production DNS, Worker route, database, AdSense account, publisher settings, public content or user data was changed.
+
+
+## Protected staging follow-up — 2026-11-09
+
+- Protected Cloudflare application staging passed on source commit `67c7d8b13138fa9da4242bb3aabf6b70a106f8cf`, run [42574631386](https://github.com/MketyDigital/Factsport/actions/runs/42574631386). This includes the host-aware robots metadata and ads.txt format guard in the source bundle.
+- The staging worker is intentionally protected and does not prove that the live public production host serves `/ads.txt`, that the publisher ID belongs to the active account, that AdSense has approved the site, or that a certified CMP is configured.
+- No AdSense script, ad unit or production indexing flag was enabled.
