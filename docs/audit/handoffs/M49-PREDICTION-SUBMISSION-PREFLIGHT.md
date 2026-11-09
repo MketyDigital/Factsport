@@ -96,3 +96,13 @@ Documentation-only audit slice. Future SQL/API changes must be reverted independ
 6. Map legacy campaign/rule versions, bonus markets and daily eligibility before public rollout; do not substitute generic submission behavior for legacy features.
 7. Reconcile legacy settlement 3/10-point rules, campaign bonus, VIP and monthly-winner conflicts before any settlement/prize feature is enabled.
 8. Add explicit race tests for same visitor/match, same email/different visitor, kickoff equality, live/terminal/unknown status, and rate-limit concurrent calls.
+
+
+## Additional parity/security refinements
+
+- Rechecked the actual legacy `PredictionBoard`: the no-campaign path defaults `require_score` to true. The new public API and SQL function now require both exact-score values; campaign-specific optional-score behavior remains disabled until campaign rules are mapped.
+- Aligned the exact displayed rules/privacy acceptance sentence and marketing opt-in sentence with the versioned text stored in the database.
+- Added SQL workflow coverage for a second browser using the same normalized email (one contact, two distinct participants; no prediction-history transfer), live and unknown match statuses, kickoff equality using one database transaction clock, and concurrent same-token submissions on separate PostgreSQL connections.
+- Disposable PostgreSQL migration verification passed on commit `b0c2b1c95b127696e92f5351ed2970e1310ea500` (migration chain through 0043 with exact-score requirement and the preceding role/consent/rate-limit checks). A newer run adds the concurrent race test and is still pending.
+- Isolated regression passed on `9e0450902d4d9ff4aca6d415827f5f4feb5ec679`; native Vinext build and protected Cloudflare staging passed on `74fc53e533496088a102f996af6aa43ec6c459ca`. Later source refinement requiring exact scores has fresh isolated/native/staging checks in progress.
+- The marketing flow intentionally stops at `pending_confirmation`: no marketing email is sent. Confirmation, unsubscribe/withdrawal endpoints, token expiry/replay handling and reliable delivery/outbox are required before any promotional send.
