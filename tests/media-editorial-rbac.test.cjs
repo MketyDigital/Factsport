@@ -99,3 +99,22 @@ test('Entra External ID Media login uses discovery, PKCE, nonce, encrypted state
   assert.doesNotMatch(authorization, /createClient\(|supabase\.auth/);
   assert.match(middleware, /hasEntraMediaSession/);
 });
+
+
+test('Media rights revocation is Media-admin-only, audited and retains the original object', () => {
+  const authorization = read('app/lib/admin/v2-editorial-authorization.ts');
+  const action = read('app/admin/news/media-actions.ts');
+  const control = read('app/admin/media/MediaRightsRevocationControl.tsx');
+  const page = read('app/admin/media/page.tsx');
+  const migration = read('db/migrations/0040_factsport_media_rights_revocation.sql');
+  assert.match(authorization, /rights_admin: \['media_admin'\]/);
+  assert.match(action, /authorizeMediaEditorialAction\('rights_admin'\)/);
+  assert.match(action, /rights_status='rejected', is_public=false/);
+  assert.match(action, /media_rights_revoked/);
+  assert.match(action, /reason/);
+  assert.doesNotMatch(action, /bucket\.delete|factsportMediaBucket/);
+  assert.match(control, /Confirm rights withdrawal/);
+  assert.match(control, /revokeMediaRights/);
+  assert.match(page, /roles\.includes\('media_admin'\)/);
+  assert.match(migration, /media_rights_revoked/);
+});
