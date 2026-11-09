@@ -126,7 +126,14 @@ export async function POST(request: Request) {
                     claimed.outbox_id, claimed.attempts
         )
         SELECT publishing.*,
-          c.provider, c.display_name, c.supports_media,
+          c.provider, c.channel_key, c.display_name, c.supports_media,
+          CASE c.provider
+            WHEN 'meta' THEN jsonb_build_object('pageId', c.settings->>'page_id')
+            WHEN 'buffer' THEN jsonb_build_object('profileId', c.settings->>'profile_id')
+            WHEN 'telegram' THEN jsonb_build_object('chatIds', c.settings->'chat_ids')
+            WHEN 'make' THEN jsonb_build_object('routeKey', c.settings->>'route_key')
+            ELSE '{}'::jsonb
+          END AS provider_config,
           media.items AS media_assets
         FROM publishing
         JOIN public.media_social_channels c ON c.id=publishing.channel_id
@@ -191,7 +198,9 @@ export async function POST(request: Request) {
           workerId,
           idempotencyKey: job.idempotency_key,
           provider: job.provider,
+          channelKey: job.channel_key,
           channelName: job.display_name,
+          providerConfig: job.provider_config,
           contentText: job.content_text,
           linkUrl: job.link_url,
           scheduledAt: job.scheduled_at,
