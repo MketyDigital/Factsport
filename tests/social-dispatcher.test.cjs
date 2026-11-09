@@ -73,3 +73,30 @@ test('social delivery adapter locks each attempt and uses direct Meta/Telegram p
   assert.match(lockMigration, /provider_started_at timestamptz/);
   assert.match(lockMigration, /GRANT UPDATE \(provider_started_at\)/);
 });
+
+
+test('Logic Apps social scheduler template is disabled by default and uses sequential secure claim-deliver-result calls', () => {
+  const template = JSON.parse(read('infra/azure/logic-app-social-dispatch-staging-disabled.json'));
+  const workflow = template.resources[0].properties;
+  const actions = workflow.definition.actions;
+  assert.equal(template.parameters.enabled.defaultValue, false);
+  assert.match(workflow.state, /Disabled/);
+  assert.equal(actions.Recurrence, undefined);
+  assert.equal(actions.Claim.type, 'Http');
+  assert.equal(actions.For_each_job.type, 'Foreach');
+  assert.equal(actions.For_each_job.operationOptions, 'Sequential');
+  assert.equal(actions.For_each_job.actions.Deliver.type, 'Http');
+  assert.equal(actions.For_each_job.actions.Record_result.type, 'Http');
+  assert.deepEqual(actions.Claim.runtimeConfiguration.secureData.properties, ['inputs', 'outputs']);
+  assert.deepEqual(actions.For_each_job.actions.Deliver.runtimeConfiguration.secureData.properties, ['inputs', 'outputs']);
+  assert.deepEqual(actions.For_each_job.actions.Record_result.runtimeConfiguration.secureData.properties, ['inputs', 'outputs']);
+  assert.match(actions.Claim.inputs.uri, /api\/internal\/social\/claim/);
+  assert.match(actions.For_each_job.actions.Deliver.inputs.uri, /api\/internal\/social\/deliver/);
+  assert.match(actions.For_each_job.actions.Record_result.inputs.uri, /api\/internal\/social\/result/);
+});
+
+test('provider readiness rejects query-string credentials on the Logic Apps adapter URL', () => {
+  const client = read('lib/adapters/postgres-client.ts');
+  assert.match(client, /!parsed\.search && !parsed\.hash/);
+  assert.match(client, /FACTSPORT_LOGIC_APPS_SOCIAL_ADAPTER_TOKEN/);
+});
