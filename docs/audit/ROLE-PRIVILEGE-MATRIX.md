@@ -83,3 +83,5 @@ The signed Stream webhook endpoint now verifies raw-body HMAC, handles gzip payl
 - Broadcast admin gains participant presence read access and only column-level updates to `left_at`, `last_seen_at`, `mic_enabled`; token issuer/webhook service identity owns token identity, invite redemption, webhook ledger and participant event writes. Stream API secrets remain outside browser and editorial DB roles.
 
 - Social dispatcher: migration 0032 adds SELECT only on the rights-filtered public_social_media_assets projection and column-scoped UPDATE on delivery-attempt receipt fields. It retains the separate social-dispatcher Hyperdrive and does not receive broad media_assets, editorial_articles, Prediction or settlement access.
+
+- Social channel administration uses the social_admin capability. The editorial writer's channel grant is column-scoped to is_enabled, supports_media, settings and updated_at; provider IDs are whitelisted non-secret metadata. Provider tokens, bot tokens and webhook URLs remain in secure bindings/Logic Apps connections.
