@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 
 const inter = Inter({ subsets: ["latin"] });
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   title: "FactSport | Live Football, Sports News & Analysis",
   description: "Football news, live scores, fixtures, match analysis and highlights from leagues around the world.",
   metadataBase: new URL('https://factsport.com'),
@@ -37,8 +37,28 @@ export const metadata: Metadata = {
     type: 'website',
     images: [{ url: '/logo.png', width: 1200, height: 630, alt: 'FactSport Logo' }],
   },
-  robots: "index, follow",
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  const requestHeaders = await headers();
+  const configuredPrivateHost = (process.env.FACTSPORT_PRIVATE_PRODUCT_HOST || '').trim().toLowerCase();
+  const requestHost = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '')
+    .split(',')[0].trim().toLowerCase().split(':')[0];
+  const isPrivateProductHost = !!configuredPrivateHost && requestHost === configuredPrivateHost;
+  const publicIndexingReady =
+    process.env.NODE_ENV === 'production' &&
+    process.env.FACTSPORT_INDEXING_ENABLED === 'true' &&
+    process.env.FACTSPORT_EDITORIAL_BACKEND === 'postgres' &&
+    process.env.FACTSPORT_MATCHES_BACKEND === 'postgres' &&
+    process.env.FACTSPORT_SITEMAP_BACKEND === 'postgres';
+
+  return {
+    ...baseMetadata,
+    robots: isPrivateProductHost || !publicIndexingReady
+      ? { index: false, follow: false, googleBot: { index: false, follow: false } }
+      : { index: true, follow: true, googleBot: { index: true, follow: true } },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: '#0a1428',
