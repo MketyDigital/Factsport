@@ -105,7 +105,7 @@ ALTER TABLE public.media_editorial_audit_events
     'draft_saved', 'submitted_for_review', 'review_approved', 'review_rejected',
     'published', 'archived', 'media_uploaded', 'media_rights_reviewed',
     'media_detached', 'media_derivative_created', 'media_rights_revoked',
-    'media_video_upload_started', 'media_video_uploaded', 'media_video_upload_failed', 'media_video_rights_reviewed', 'media_video_attached', 'media_video_detached',
+    'media_video_upload_started', 'media_video_uploaded', 'media_video_upload_failed', 'media_video_rights_reviewed', 'media_video_rights_revoked', 'media_video_attached', 'media_video_detached',
     'source_added', 'social_scheduled', 'social_cancelled',
     'social_channel_configured', 'membership_granted', 'membership_revoked'
   ));
