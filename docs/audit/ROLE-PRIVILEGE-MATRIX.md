@@ -85,3 +85,5 @@ The signed Stream webhook endpoint now verifies raw-body HMAC, handles gzip payl
 - Social dispatcher: migration 0032 adds SELECT only on the rights-filtered public_social_media_assets projection and column-scoped UPDATE on delivery-attempt receipt fields. It retains the separate social-dispatcher Hyperdrive and does not receive broad media_assets, editorial_articles, Prediction or settlement access.
 
 - Social channel administration uses the social_admin capability. The editorial writer's channel grant is column-scoped to is_enabled, supports_media, settings and updated_at; provider IDs are whitelisted non-secret metadata. Provider tokens, bot tokens and webhook URLs remain in secure bindings/Logic Apps connections.
+
+- Social provider credentials are read only by the server-side delivery adapter: Meta Page token and Telegram bot token as Cloudflare secrets; Buffer/Make calls use an HTTPS Logic Apps/APIM adapter URL plus bearer secret. No provider secret is stored in social channel settings or returned by the claim endpoint.
