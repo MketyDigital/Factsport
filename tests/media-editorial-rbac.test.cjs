@@ -112,6 +112,7 @@ test('Media rights revocation is Media-admin-only, audited and retains the origi
   assert.match(action, /rights_status='rejected', is_public=false/);
   assert.match(action, /media_rights_revoked/);
   assert.match(action, /reason/);
+  assert.ok(action.includes("revalidatePath('/news/' + slug)"));
   assert.doesNotMatch(action, /bucket\.delete|factsportMediaBucket/);
   assert.match(control, /Confirm rights withdrawal/);
   assert.match(control, /revokeMediaRights/);
