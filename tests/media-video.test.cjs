@@ -62,3 +62,57 @@ test('Video revisions preserve attachments and publication enforces current righ
   assert.match(usage, /editorial_article_revision_videos/);
   assert.match(usage, /editorial_article_videos/);
 });
+
+test('Large VOD files use protected Cloudflare TUS with durable resume and size integrity', () => {
+  const migration = read('db/migrations/0041_factsport_media_video_assets.sql');
+  const adapter = read('lib/media/cloudflare-stream.ts');
+  const basicRoute = read('app/api/admin/media/videos/direct-upload/route.ts');
+  const tusRoute = read('app/api/admin/media/videos/tus-upload/route.ts');
+  const refresh = read('app/api/admin/media/videos/[id]/refresh/route.ts');
+  const library = read('app/admin/media/MediaVideoLibrary.tsx');
+  const packageJson = JSON.parse(read('package.json'));
+
+  assert.match(migration, /upload_protocol text NOT NULL DEFAULT 'basic'/);
+  assert.match(migration, /upload_expected_size_bytes bigint/);
+  assert.match(migration, /BETWEEN 1 AND 30000000000/);
+
+  assert.match(adapter, /FACTSPORT_STREAM_BASIC_UPLOAD_MAX_BYTES = 200_000_000/);
+  assert.match(adapter, /FACTSPORT_STREAM_MAX_UPLOAD_BYTES = 30_000_000_000/);
+  assert.match(adapter, /createFactsportStreamTusUpload/);
+  assert.match(adapter, /direct_user=true/);
+  assert.match(adapter, /Tus-Resumable': '1\.0\.0'/);
+  assert.match(adapter, /Upload-Length/);
+  assert.match(adapter, /Upload-Metadata/);
+  assert.match(adapter, /maxdurationseconds/);
+  assert.match(adapter, /requiresignedurls/);
+  assert.match(adapter, /allowedorigins/);
+  assert.match(adapter, /stream-media-id/);
+  assert.match(adapter, /location\.pathname !== expectedPath/);
+
+  assert.match(basicRoute, /fileSizeBytes >= 200_000_000/);
+  assert.match(basicRoute, /upload_protocol, upload_expected_size_bytes/);
+  assert.match(tusRoute, /authorizeMediaEditorialAction\('media'\)/);
+  assert.match(tusRoute, /isSameOriginRequest/);
+  assert.match(tusRoute, /Tus-Resumable/);
+  assert.match(tusRoute, /Upload-Length/);
+  assert.match(tusRoute, /Location: directUpload\.uploadURL/);
+  assert.match(tusRoute, /X-Factsport-Video-Asset-Id/);
+  assert.doesNotMatch(tusRoute, /CLOUDFLARE_STREAM_API_TOKEN|apiToken/);
+
+  assert.match(library, /import \* as tus from 'tus-js-client'/);
+  assert.match(library, /chunkSize: 50 \* 1024 \* 1024/);
+  assert.match(library, /retryDelays: \[0, 3000, 5000, 10000, 20000\]/);
+  assert.match(library, /findPreviousUploads/);
+  assert.match(library, /resumeFromPreviousUpload/);
+  assert.match(library, /storeFingerprintForResuming: true/);
+  assert.match(library, /removeFingerprintOnSuccess: true/);
+  assert.match(library, /onProgress:/);
+  assert.match(library, /file\.size >= basicMaxBytes/);
+  assert.match(library, /tus\.canStoreURLs/);
+  assert.equal(packageJson.dependencies['tus-js-client'], '^4.3.1');
+
+  assert.match(refresh, /upload_expected_size_bytes/);
+  assert.match(refresh, /sizeMismatch/);
+  assert.match(refresh, /uploaded_size_mismatch/);
+  assert.match(refresh, /expiredUnuploaded \|\| sizeMismatch/);
+});
