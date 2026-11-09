@@ -570,3 +570,7 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - **Parity refinement:** the actual legacy PredictionBoard defaults `require_score=true` outside a campaign. The new public submission path now enforces both exact-score values; campaign-specific optional-score rules remain disabled until mapped.
 - **Additional DB coverage:** same email/different visitor identity separation, live/unknown/kickoff-equality rejection, and concurrent same-token race tests are included in the current disposable PostgreSQL workflow. The latest race-test run is pending.
 - **Marketing boundary:** opt-in only creates a pending-confirmation subscription and append-only event. No promotional or confirmation email is sent yet; confirmation/unsubscribe/withdrawal and reliable mail delivery remain required.
+
+
+- **Prediction concurrency/host follow-up:** disposable PostgreSQL run `42582368633` passed concurrent same-visitor/same-match requests (one participant/one prediction), same-email cross-browser separation, kickoff equality, live/unknown rejection, pending consent and rate-limit checks. Production API host is now pinned to `factsport.com`, never the private Predict host.
+- **Application checks:** isolated verification and native Vinext build passed on `4aa20c507bbdbf743b2f1e7c72f04e5cd5733e11`; protected staging for that commit was still running. A final CI-only assertion for zero direct public-schema table grants is pending.
