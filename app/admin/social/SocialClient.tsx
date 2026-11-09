@@ -25,6 +25,7 @@ export default function SocialClient({ channels, publications }: { channels: Cha
   const [mediaLoading, setMediaLoading] = useState(false);
 
   useEffect(() => {
+    if (!channels.some(channel => channel.supports_media)) return;
     let active = true;
     setMediaLoading(true);
     fetch('/api/admin/social/media?offset=0', { cache: 'no-store', credentials: 'same-origin' })
@@ -36,7 +37,9 @@ export default function SocialClient({ channels, publications }: { channels: Cha
       .catch(error => { if (active) setMessage(error instanceof Error ? error.message : 'Unable to load public media assets.'); })
       .finally(() => { if (active) setMediaLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [channels]);
+
+  const selectedChannel = channels.find(channel => channel.id === channelId);
 
   function invalidatePublicApproval() {
     setPublicContentConfirmed(false);
@@ -79,7 +82,7 @@ export default function SocialClient({ channels, publications }: { channels: Cha
             <label className="block text-xs font-bold text-slate-600">Published article ID (optional)
               <input value={articleId} onChange={e => { setArticleId(e.target.value); invalidatePublicApproval(); }} placeholder="UUID of an approved published article" className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
             </label>
-            <fieldset className="rounded-xl border border-slate-200 p-3">
+            {selectedChannel?.supports_media ? <fieldset className="rounded-xl border border-slate-200 p-3">
               <legend className="px-1 text-xs font-bold text-slate-700">Attach public media (up to four images)</legend>
               <p className="mb-2 text-[11px] text-slate-500">Only assets already rights-reviewed and attached to published public Media articles are available here.</p>
               {mediaLoading && <p className="text-xs text-slate-500">Loading approved media…</p>}
@@ -101,7 +104,7 @@ export default function SocialClient({ channels, publications }: { channels: Cha
                 })}
               </div>}
               <p className="mt-2 text-right text-[10px] text-slate-500">{selectedMediaAssetIds.length}/4 selected</p>
-            </fieldset>
+            </fieldset> : <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">Image attachments are disabled for this channel until its provider has passed image-delivery verification.</p>}
             <label className="block text-xs font-bold text-slate-600">Link URL (optional)
               <input value={linkUrl} onChange={e => { setLinkUrl(e.target.value); invalidatePublicApproval(); }} placeholder="https://factsport.com/…" className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
             </label>
