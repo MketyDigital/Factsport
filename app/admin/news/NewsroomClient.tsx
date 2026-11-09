@@ -42,6 +42,7 @@ type Article = {
   author_display_name: string;
   updated_at: string;
   sources?: Array<{ id: string; source_title: string; publisher: string | null; canonical_url: string; attribution_text: string | null; rights_reference: string | null; accessed_at: string }>;
+  revision_videos?: Array<{ position: number; video_id: string | null; remove_video: boolean; title: string | null; upload_status: string | null; rights_status: string | null; rights_reference: string | null; attribution_text: string | null; usage_expires_at: string | null; duration_seconds: number | null }>;
   revision_media?: Array<{ placement: 'hero' | 'team_1' | 'team_2' | 'inline'; position: number; remove_media: boolean; media_id: string | null; object_key: string | null; content_type: string | null; width: number | null; height: number | null; rights_status: string | null; alt_text: string | null; attribution_text: string | null }>;
 };
 
