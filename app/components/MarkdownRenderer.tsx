@@ -134,7 +134,7 @@ function EmbeddedMatchCard({ matchId }: { matchId: string }) {
     );
 }
 
-export default function MarkdownRenderer({ content }: { content: string }) {
+export default function MarkdownRenderer({ content, disableExternalMedia = false }: { content: string; disableExternalMedia?: boolean }) {
   const processedContent = content.replace(
       /\[MATCH_WIDGET:([a-zA-Z0-9-]+)\]?/gi,
       '[Match details](match-widget:$1)'
@@ -147,9 +147,10 @@ export default function MarkdownRenderer({ content }: { content: string }) {
         a: ({ href, children, ...props }) => {
           if (href?.startsWith('match-widget:')) {
             const matchId = href.slice('match-widget:'.length);
-            return /^[a-zA-Z0-9-]{1,80}$/.test(matchId)
-              ? <EmbeddedMatchCard matchId={matchId} />
-              : null;
+            if (!/^[a-zA-Z0-9-]{1,80}$/.test(matchId)) return null;
+            return disableExternalMedia
+              ? <div className="my-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-500">Embedded match card is represented by a placeholder in the private editor preview.</div>
+              : <EmbeddedMatchCard matchId={matchId} />;
           }
           const isInternal = href?.startsWith('/');
           const buttonClasses = "inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-lg font-black text-xs uppercase tracking-wider hover:bg-blue-600 hover:text-white transition shadow-sm border border-blue-100 my-1 no-underline group active:scale-95";
@@ -169,20 +170,27 @@ export default function MarkdownRenderer({ content }: { content: string }) {
             </a>
           );
         },
-        img: ({ src, alt, ...props }) => (
-          <span className="block my-6 rounded-2xl overflow-hidden shadow-lg border border-slate-100 bg-slate-50">
-            <img src={src} alt={alt || 'Article Image'} className="w-full h-auto object-cover m-0" loading="lazy" {...props} />
-            {alt && <span className="block text-center text-[10px] font-bold text-slate-400 p-2 bg-slate-50 uppercase tracking-widest">{alt}</span>}
-          </span>
-        ),
+        img: ({ src, alt, ...props }) => {
+          if (disableExternalMedia && typeof src === 'string' && !src.startsWith('/')) {
+            return <span className="my-6 block rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-500">External image omitted from private preview{alt ? ': ' + alt : ''}.</span>;
+          }
+          return (
+            <span className="block my-6 rounded-2xl overflow-hidden shadow-lg border border-slate-100 bg-slate-50">
+              <img src={src} alt={alt || 'Article Image'} className="w-full h-auto object-cover m-0" loading="lazy" {...props} />
+              {alt && <span className="block text-center text-[10px] font-bold text-slate-400 p-2 bg-slate-50 uppercase tracking-widest">{alt}</span>}
+            </span>
+          );
+        },
         p: ({ children, ...props }) => {
             return <p className="mb-4 text-slate-700 leading-relaxed" {...props}>{children}</p>;
         },
-        iframe: ({ node, ...props }) => (
+        iframe: ({ node, ...props }) => disableExternalMedia
+          ? <div className="my-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-500">Third-party video embed is not loaded in the private editor preview.</div>
+          : (
             <div className="w-full overflow-hidden rounded-xl my-6 flex justify-center bg-slate-50 border border-slate-100">
                 <iframe {...props} className="max-w-full" />
             </div>
-        )
+          )
       }}
     >
       {processedContent}
