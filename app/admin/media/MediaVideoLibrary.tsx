@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
+import * as tus from 'tus-js-client';
 import MediaVideoRightsRevocationControl from './MediaVideoRightsRevocationControl';
 import MediaVideoUsagePanel from './MediaVideoUsagePanel';
 import MediaVideoPreview from './MediaVideoPreview';
 
 type VideoAsset = {
   id: string; title: string; description: string | null; upload_status: string;
+  upload_protocol: 'basic' | 'tus'; upload_expected_size_bytes: number | null;
   upload_expires_at: string | null; duration_seconds: number | null;
   width: number | null; height: number | null; size_bytes: number | null;
   rights_status: string; rights_reviewed_at: string | null; is_public: boolean;
@@ -18,6 +20,8 @@ export default function MediaVideoLibrary({ ready, schemaReady, canRevokeRights 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [resumableUpload, setResumableUpload] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [message, setMessage] = useState('');
   const [pending, startTransition] = useTransition();
   const [loading, setLoading] = useState(false);
@@ -50,31 +54,104 @@ export default function MediaVideoLibrary({ ready, schemaReady, canRevokeRights 
     if (!file || !title.trim()) return;
     startTransition(async () => {
       setMessage('');
+      setUploadProgress(0);
       try {
-        if (!file.type.startsWith('video/') || file.size > 200 * 1024 * 1024) {
-          throw new Error('Choose a video file no larger than 200 MB. Larger uploads require the resumable TUS workflow.');
+        const allowedTypes = new Set([
+          'video/mp4', 'video/quicktime', 'video/webm',
+          'video/x-matroska', 'video/mpeg', 'video/ogg',
+        ]);
+        const maxBytes = 30_000_000_000;
+        const basicMaxBytes = 200_000_000;
+        if (!allowedTypes.has(file.type) || file.size < 1 || file.size >= maxBytes) {
+          throw new Error('Choose a supported video file smaller than 30 GB.');
         }
-        const created = await fetch('/api/admin/media/videos/direct-upload', {
-          method: 'POST', credentials: 'same-origin', cache: 'no-store',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, description, maxDurationSeconds: 900 }),
-        });
-        const uploadData = await created.json();
-        if (!created.ok || !uploadData.success) throw new Error(uploadData.error || 'Unable to start video upload.');
-        const form = new FormData();
-        form.append('file', file, file.name);
-        const uploaded = await fetch(uploadData.upload.url, { method: 'POST', body: form });
-        if (!uploaded.ok) throw new Error('Cloudflare Stream upload failed. The private upload record is retained for status reconciliation.');
-        const status = await refresh(uploadData.asset.id);
-        setMessage(status.upload_status === 'ready'
-          ? 'Video uploaded and processed. Rights review and article attachment are still required before public playback.'
-          : 'Video uploaded. Cloudflare Stream is still processing it; use Refresh status to check again.');
-        setTitle(''); setDescription(''); setFile(null);
+
+        const useTus = resumableUpload || file.size > basicMaxBytes;
+        let assetId = '';
+
+        if (useTus) {
+          if (!tus.isSupported) throw new Error('This browser does not support resumable uploads.');
+          const fingerprint = async (selected: File) =>
+            `factsport-stream:${selected.name}:${selected.size}:${selected.lastModified}:${title.trim()}`;
+          const fingerprintValue = await fingerprint(file);
+          const assetStorageKey = 'factsport-stream-asset:' + fingerprintValue;
+          assetId = localStorage.getItem(assetStorageKey) || '';
+
+          const uploader = new tus.Upload(file, {
+            endpoint: '/api/admin/media/videos/tus-upload',
+            chunkSize: 50 * 1024 * 1024,
+            retryDelays: [0, 3000, 5000, 10000, 20000],
+            uploadSize: file.size,
+            storeFingerprintForResuming: true,
+            removeFingerprintOnSuccess: true,
+            fingerprint,
+            metadata: { filename: file.name, filetype: file.type },
+            headers: {
+              'X-Factsport-Video-Title': title.trim(),
+              'X-Factsport-Video-Description': description.trim(),
+              'X-Factsport-Video-Content-Type': file.type,
+              'X-Factsport-Video-Max-Duration': '900',
+            },
+            onAfterResponse: async (_request, response) => {
+              const createdAssetId = response.getHeader('X-Factsport-Video-Asset-Id');
+              if (createdAssetId) {
+                assetId = createdAssetId;
+                localStorage.setItem(assetStorageKey, createdAssetId);
+              }
+            },
+            onProgress: (uploadedBytes, totalBytes) => {
+              setUploadProgress(Math.min(100, Math.round((uploadedBytes / totalBytes) * 100)));
+            },
+            onError: error => { throw error; },
+          });
+
+          const previousUploads = await uploader.findPreviousUploads();
+          if (previousUploads.length) {
+            uploader.resumeFromPreviousUpload(previousUploads[0]);
+          }
+
+          await new Promise<void>((resolve, reject) => {
+            uploader.options.onError = reject;
+            uploader.options.onSuccess = () => resolve();
+            uploader.start();
+          });
+          if (!assetId) assetId = localStorage.getItem(assetStorageKey) || '';
+          if (!assetId) {
+            throw new Error('Upload completed but its private asset reference is missing. Contact an administrator before retrying.');
+          }
+          const status = await refresh(assetId);
+          localStorage.removeItem(assetStorageKey);
+          setMessage(status.upload_status === 'ready'
+            ? 'Resumable upload complete and processed. Rights review and article attachment are still required before public playback.'
+            : 'Resumable upload complete. Cloudflare Stream is still processing it; use Refresh status to check again.');
+        } else {
+          const created = await fetch('/api/admin/media/videos/direct-upload', {
+            method: 'POST', credentials: 'same-origin', cache: 'no-store',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title, description, fileSizeBytes: file.size, maxDurationSeconds: 900,
+            }),
+          });
+          const uploadData = await created.json();
+          if (!created.ok || !uploadData.success) throw new Error(uploadData.error || 'Unable to start video upload.');
+          const form = new FormData();
+          form.append('file', file, file.name);
+          const uploaded = await fetch(uploadData.upload.url, { method: 'POST', body: form });
+          if (!uploaded.ok) throw new Error('Cloudflare Stream upload failed. The private upload record is retained for status reconciliation.');
+          const status = await refresh(uploadData.asset.id);
+          setMessage(status.upload_status === 'ready'
+            ? 'Video uploaded and processed. Rights review and article attachment are still required before public playback.'
+            : 'Video uploaded. Cloudflare Stream is still processing it; use Refresh status to check again.');
+        }
+
+        setTitle(''); setDescription(''); setFile(null); setResumableUpload(false);
         const input = document.getElementById('factsport-video-file') as HTMLInputElement | null;
         if (input) input.value = '';
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : 'Video upload failed.');
+        setMessage(error instanceof Error ? error.message : 'Video upload failed. A resumable upload can be retried by selecting the same file again.');
         await load();
+      } finally {
+        setUploadProgress(null);
       }
     });
   }
@@ -94,9 +171,17 @@ export default function MediaVideoLibrary({ ready, schemaReady, canRevokeRights 
       <label className="text-xs font-bold text-slate-600">Description
         <input value={description} onChange={event => setDescription(event.target.value)} maxLength={3000} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
       </label>
-      <label className="md:col-span-2 text-xs font-bold text-slate-600">Video file · up to 200 MB / 15 minutes
+      <label className="md:col-span-2 text-xs font-bold text-slate-600">Video file · under 30 GB / up to 15 minutes
         <input id="factsport-video-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska" onChange={event => setFile(event.target.files?.[0] || null)} className="mt-1 block w-full text-xs" />
       </label>
+      <label className="md:col-span-2 flex items-start gap-2 text-xs text-slate-600">
+        <input type="checkbox" checked={resumableUpload} onChange={event => setResumableUpload(event.target.checked)} className="mt-0.5" />
+        <span>Use resumable upload (recommended on unstable connections). Required automatically for files over 200 MB.</span>
+      </label>
+      {uploadProgress !== null && <div className="md:col-span-2">
+        <div className="mb-1 flex justify-between text-[11px] text-slate-500"><span>Upload progress</span><span>{uploadProgress}%</span></div>
+        <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: uploadProgress + '%' }} /></div>
+      </div>}
       <div className="md:col-span-2">
         <button type="button" onClick={upload} disabled={pending || !file || title.trim().length < 3} className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{pending ? 'Uploading video…' : 'Create secure upload & send video'}</button>
       </div>
