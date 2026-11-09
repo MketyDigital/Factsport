@@ -162,6 +162,12 @@ async function dispatchTelegram(job: any, token: string) {
 }
 
 async function dispatchLogicApps(job: any, adapterUrl: string, adapterToken: string) {
+  if (job.provider === 'buffer' && !textValue(job.settings?.profile_id, 200)) {
+    return providerError('permanent_failure', 'buffer_profile_id_missing', 'The Buffer profile/channel ID is not configured.');
+  }
+  if (job.provider === 'make' && !textValue(job.settings?.route_key, 80)) {
+    return providerError('permanent_failure', 'make_route_key_missing', 'The Make route key is not configured.');
+  }
   const url = new URL(adapterUrl);
   if (url.protocol !== 'https:' || url.search || url.hash) return providerError('permanent_failure', 'logic_apps_adapter_url_invalid', 'The Logic Apps adapter must use HTTPS without query-string credentials.');
   let response: Response;
