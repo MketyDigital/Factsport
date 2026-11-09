@@ -185,7 +185,9 @@ jobs:
             ('00000000-0000-4000-8000-000000000046',
              'CI', 'Home 4', 'Away 4', '2099-01-04T12:00:00Z', 'UNRECOGNIZED'),
             ('00000000-0000-4000-8000-000000000047',
-             'CI', 'Home 5', 'Away 5', transaction_timestamp(), 'SCHEDULED');
+             'CI', 'Home 5', 'Away 5', transaction_timestamp(), 'SCHEDULED'),
+            ('00000000-0000-4000-8000-000000000048',
+             'CI', 'Race Home', 'Race Away', '2099-01-08T12:00:00Z', 'SCHEDULED');
 
           BEGIN;
           UPDATE public.matches
@@ -313,12 +315,23 @@ jobs:
           RESET ROLE;
           COMMIT;
 
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SET ROLE factsport_v2_prediction_api; SELECT * FROM public.submit_public_prediction('gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg', 'race@example.test', 'Race Visitor', '00000000-0000-4000-8000-000000000048', 'home', 'free-prediction-v1', 'I have read and accept the Factsport free prediction rules and privacy notice.', false, NULL, NULL, 1, 0);" > /tmp/prediction-race-1.log &
+          race_pid_1=$!
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SET ROLE factsport_v2_prediction_api; SELECT * FROM public.submit_public_prediction('gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg', 'race@example.test', 'Race Visitor', '00000000-0000-4000-8000-000000000048', 'away', 'free-prediction-v1', 'I have read and accept the Factsport free prediction rules and privacy notice.', false, NULL, NULL, 0, 1);" > /tmp/prediction-race-2.log &
+          race_pid_2=$!
+          wait "$race_pid_1"
+          wait "$race_pid_2"
+
           DO $verify$
           BEGIN
-            IF (SELECT count(*) FROM public.predictions) <> 2
-              OR (SELECT count(*) FROM public.prediction_participants) <> 2
-              OR (SELECT count(*) FROM public.prediction_contacts) <> 1
-              OR (SELECT count(*) FROM public.prediction_rule_acceptances) <> 2 THEN
+            IF (SELECT count(*) FROM public.predictions) <> 3
+              OR (SELECT count(*) FROM public.prediction_participants) <> 3
+              OR (SELECT count(*) FROM public.prediction_contacts) <> 2
+              OR (SELECT count(*) FROM public.prediction_rule_acceptances) <> 3
+              OR (SELECT count(*) FROM public.predictions
+                  WHERE match_id='00000000-0000-4000-8000-000000000048') <> 1
+              OR (SELECT count(*) FROM public.prediction_participants
+                  WHERE visitor_token_hash='gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg') <> 1 THEN
               RAISE EXCEPTION 'Prediction and versioned rules acceptance were not persisted atomically';
             END IF;
             IF (SELECT count(*) FROM public.marketing_subscriptions
