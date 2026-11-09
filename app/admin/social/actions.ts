@@ -259,7 +259,7 @@ const SOCIAL_RECONCILIATION_MAX_ATTEMPTS = 6;
 function sanitizeReconciliationEvidence(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const text = value.trim()
-    .replace(/(access[_ -]?token|refresh[_ -]?token|api[_ -]?key|secret|password)[=: ]+[^\\s&]+/gi, '$1=[redacted]');
+    .replace(/(access[_ -]?token|refresh[_ -]?token|api[_ -]?key|secret|password)[=: ]+[^& ]+/gi, '$1=[redacted]');
   return text.length >= 10 && text.length <= 1000 ? text : null;
 }
 
