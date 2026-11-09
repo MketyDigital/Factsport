@@ -163,7 +163,7 @@ async function dispatchTelegram(job: any, token: string) {
 
 async function dispatchLogicApps(job: any, adapterUrl: string, adapterToken: string) {
   const url = new URL(adapterUrl);
-  if (url.protocol !== 'https:') return providerError('permanent_failure', 'logic_apps_adapter_url_invalid', 'The Logic Apps adapter must use HTTPS.');
+  if (url.protocol !== 'https:' || url.search || url.hash) return providerError('permanent_failure', 'logic_apps_adapter_url_invalid', 'The Logic Apps adapter must use HTTPS without query-string credentials.');
   let response: Response;
   try {
     response = await fetch(url.toString(), {
