@@ -3,6 +3,7 @@ import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-auth
 import { isSameOriginRequest } from '@/app/lib/admin/authorization';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 import { factsportMediaBucket } from '@/lib/adapters/factsport-cloudflare-bindings';
+import { isFactsportMediaDerivativesReady } from '@/lib/media/readiness';
 
 export const runtime = 'edge';
 
@@ -86,31 +87,53 @@ export async function GET(request: Request) {
   const limit = 50;
 
   try {
-    const assets = await withFactsportEditorialPostgres(async sql => sql`
-      SELECT id, object_key, media_kind, content_type, byte_size, sha256,
-             width, height, alt_text, rights_status, rights_reference,
-             attribution_text, usage_expires_at, is_public, uploaded_by,
-             created_at, updated_at,
-             derivative.source_asset_id AS derived_from,
-             derivative.variant_key
-      FROM public.media_assets
-      LEFT JOIN LATERAL (
-        SELECT source_asset_id, variant_key
-        FROM public.media_asset_derivatives
-        WHERE derivative_asset_id=media_assets.id
-        LIMIT 1
-      ) derivative ON true
-      WHERE media_kind = 'image'
-        AND (${status} = 'all' OR rights_status = ${status})
-        AND (
-          ${query} = ''
-          OR object_key ILIKE ${'%' + query + '%'}
-          OR COALESCE(alt_text, '') ILIKE ${'%' + query + '%'}
-          OR COALESCE(attribution_text, '') ILIKE ${'%' + query + '%'}
-        )
-      ORDER BY created_at DESC, id DESC
-      LIMIT ${limit + 1} OFFSET ${offset}
-    `);
+    const assets = await withFactsportEditorialPostgres(async sql => {
+      if (isFactsportMediaDerivativesReady()) {
+        return sql`
+          SELECT id, object_key, media_kind, content_type, byte_size, sha256,
+                 width, height, alt_text, rights_status, rights_reference,
+                 attribution_text, usage_expires_at, is_public, uploaded_by,
+                 created_at, updated_at,
+                 derivative.source_asset_id AS derived_from,
+                 derivative.variant_key
+          FROM public.media_assets
+          LEFT JOIN LATERAL (
+            SELECT source_asset_id, variant_key
+            FROM public.media_asset_derivatives
+            WHERE derivative_asset_id=media_assets.id
+            LIMIT 1
+          ) derivative ON true
+          WHERE media_kind = 'image'
+            AND (${status} = 'all' OR rights_status = ${status})
+            AND (
+              ${query} = ''
+              OR object_key ILIKE ${'%' + query + '%'}
+              OR COALESCE(alt_text, '') ILIKE ${'%' + query + '%'}
+              OR COALESCE(attribution_text, '') ILIKE ${'%' + query + '%'}
+            )
+          ORDER BY created_at DESC, id DESC
+          LIMIT ${limit + 1} OFFSET ${offset}
+        `;
+      }
+      return sql`
+        SELECT id, object_key, media_kind, content_type, byte_size, sha256,
+               width, height, alt_text, rights_status, rights_reference,
+               attribution_text, usage_expires_at, is_public, uploaded_by,
+               created_at, updated_at, NULL::uuid AS derived_from,
+               NULL::text AS variant_key
+        FROM public.media_assets
+        WHERE media_kind = 'image'
+          AND (${status} = 'all' OR rights_status = ${status})
+          AND (
+            ${query} = ''
+            OR object_key ILIKE ${'%' + query + '%'}
+            OR COALESCE(alt_text, '') ILIKE ${'%' + query + '%'}
+            OR COALESCE(attribution_text, '') ILIKE ${'%' + query + '%'}
+          )
+        ORDER BY created_at DESC, id DESC
+        LIMIT ${limit + 1} OFFSET ${offset}
+      `;
+    });
     const hasMore = assets.length > limit;
     return NextResponse.json({
       success: true,
