@@ -130,7 +130,7 @@ BEGIN
       v_email := pg_catalog.btrim(COALESCE(p_email_address, ''));
       v_email_normalized := pg_catalog.lower(v_email);
       IF pg_catalog.char_length(v_email) NOT BETWEEN 3 AND 254
-         OR v_email !~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$' THEN
+         OR v_email !~ '^[^[:space:]@]+@[^[:space:]@]+[.][^[:space:]@]+$' THEN
         RAISE EXCEPTION 'valid_email_required' USING ERRCODE = '22023';
       END IF;
 
