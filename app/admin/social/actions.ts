@@ -296,7 +296,7 @@ export async function reconcileSocialDelivery(input: {
     }
     try {
       const parsed = new URL(input.providerPostUrl.trim());
-      if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.href.length > 2048) {
+      if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.search || parsed.hash || parsed.href.length > 2048) {
         return { success: false, error: 'Provider post URL must be a valid HTTPS link without embedded credentials.' };
       }
       providerPostUrl = parsed.toString();
@@ -332,7 +332,7 @@ export async function reconcileSocialDelivery(input: {
         WHERE publication_id=${input.publicationId}::uuid
       `;
       const current = rows[0];
-      if (!current || current.outcome !== 'unknown_result' || current.outbox_status !== 'dead_letter') {
+      if (!current || current.publication_status !== 'failed' || current.outcome !== 'unknown_result' || current.outbox_status !== 'dead_letter') {
         throw new Error('Only an ambiguous provider result can be manually reconciled.');
       }
 
