@@ -52,3 +52,24 @@ test('dispatcher migration exposes only published rights-cleared media and permi
   assert.match(migration, /unknown_result/);
   assert.ok(migration.includes('GRANT UPDATE (') && migration.includes('finished_at\n) ON public.media_social_delivery_attempts'));
 });
+
+
+test('social delivery adapter locks each attempt and uses direct Meta/Telegram plus the secure Logic Apps adapter', () => {
+  const deliver = read('app/api/internal/social/deliver/route.ts');
+  const result = read('app/api/internal/social/result/route.ts');
+  const action = read('app/admin/social/actions.ts');
+  const lockMigration = read('db/migrations/0036_factsport_social_provider_dispatch_lock.sql');
+  assert.match(deliver, /provider_started_at/);
+  assert.match(deliver, /graph\.facebook\.com/);
+  assert.match(deliver, /Authorization: `Bearer \$\{token\}`/);
+  assert.match(deliver, /api\.telegram\.org/);
+  assert.match(deliver, /sendMediaGroup/);
+  assert.match(deliver, /5 \* 1024 \* 1024/);
+  assert.match(deliver, /FACTSPORT_LOGIC_APPS_SOCIAL_ADAPTER_URL/);
+  assert.match(deliver, /Idempotency-Key/);
+  assert.match(result, /!attempt\[0\]\.provider_started_at/);
+  assert.match(action, /meta_multiple_images_not_supported/);
+  assert.match(action, /Telegram image captions are limited to 1,024 characters/);
+  assert.match(lockMigration, /provider_started_at timestamptz/);
+  assert.match(lockMigration, /GRANT UPDATE \(provider_started_at\)/);
+});
