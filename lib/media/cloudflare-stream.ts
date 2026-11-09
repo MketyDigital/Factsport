@@ -6,7 +6,7 @@ function streamConfig() {
     apiToken: process.env.CLOUDFLARE_STREAM_API_TOKEN || '',
     signingKeyId: process.env.CLOUDFLARE_STREAM_SIGNING_KEY_ID || '',
     signingKeyJwk: process.env.CLOUDFLARE_STREAM_SIGNING_KEY_JWK || '',
-    allowedOrigins: (process.env.FACTSPORT_STREAM_ALLOWED_ORIGINS || 'factsport.com,www.factsport.com')
+    allowedOrigins: (process.env.FACTSPORT_STREAM_ALLOWED_ORIGINS || '')
       .split(',').map(value => value.trim().toLowerCase()).filter(Boolean),
   };
 }
