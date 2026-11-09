@@ -3,7 +3,7 @@ import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-auth
 import { isSameOriginRequest } from '@/app/lib/admin/authorization';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
 import {
-  getFactsportStreamPlaybackHost, getFactsportStreamVideo,
+  deleteFactsportStreamVideo, getFactsportStreamPlaybackHost, getFactsportStreamVideo,
   isFactsportStreamVideoReady,
 } from '@/lib/media/cloudflare-stream';
 
@@ -74,7 +74,6 @@ export async function POST(request: Request, context: { params: { id: string } }
     }));
     if (expiredUnuploaded) {
       try {
-        const { deleteFactsportStreamVideo } = await import('@/lib/media/cloudflare-stream');
         await deleteFactsportStreamVideo(existing.provider_video_id);
       } catch (cleanupError) {
         console.error('Expired unuploaded Stream video cleanup failed', cleanupError);
