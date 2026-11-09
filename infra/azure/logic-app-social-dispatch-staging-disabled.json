@@ -1,0 +1,158 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workflowName": {
+      "type": "string",
+      "defaultValue": "factsport-social-dispatch-staging"
+    },
+    "factsportBaseUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "Protected Factsport staging origin, e.g. https://staging.factsport.com"
+      }
+    },
+    "dispatchToken": {
+      "type": "secureString",
+      "metadata": {
+        "description": "High-entropy FACTSPORT_SOCIAL_DISPATCH_TOKEN. Never store it in source control."
+      }
+    },
+    "enabled": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Keep false until dispatcher Hyperdrive, provider secrets, APIM/Logic Apps adapter and private provider E2E are verified."
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2019-05-01",
+      "name": "[parameters('workflowName')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "state": "[if(parameters('enabled'), 'Enabled', 'Disabled')]",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "contentVersion": "1.0.0.0",
+          "triggers": {
+            "Recurrence": {
+              "type": "Recurrence",
+              "recurrence": {
+                "frequency": "Minute",
+                "interval": 1
+              }
+            }
+          },
+          "actions": {
+            "Claim": {
+              "type": "Http",
+              "inputs": {
+                "method": "POST",
+                "uri": "@{concat(parameters('factsportBaseUrl'), '/api/internal/social/claim')}",
+                "headers": {
+                  "Authorization": "@{concat('Bearer ', parameters('dispatchToken'))}",
+                  "Content-Type": "application/json"
+                }
+              },
+              "runtimeConfiguration": {
+                "secureData": {
+                  "properties": [
+                    "inputs",
+                    "outputs"
+                  ]
+                }
+              }
+            },
+            "For_each_job": {
+              "type": "Foreach",
+              "foreach": "@body('Claim')?['jobs']",
+              "operationOptions": "Sequential",
+              "actions": {
+                "Deliver": {
+                  "type": "Http",
+                  "inputs": {
+                    "method": "POST",
+                    "uri": "@{concat(parameters('factsportBaseUrl'), '/api/internal/social/deliver')}",
+                    "headers": {
+                      "Authorization": "@{concat('Bearer ', parameters('dispatchToken'))}",
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "outboxId": "@items('For_each_job')?['outboxId']",
+                      "publicationId": "@items('For_each_job')?['publicationId']",
+                      "workerId": "@items('For_each_job')?['workerId']",
+                      "attemptNumber": "@items('For_each_job')?['attemptNumber']"
+                    }
+                  },
+                  "runtimeConfiguration": {
+                    "secureData": {
+                      "properties": [
+                        "inputs",
+                        "outputs"
+                      ]
+                    }
+                  }
+                },
+                "Record_result": {
+                  "type": "Http",
+                  "inputs": {
+                    "method": "POST",
+                    "uri": "@{concat(parameters('factsportBaseUrl'), '/api/internal/social/result')}",
+                    "headers": {
+                      "Authorization": "@{concat('Bearer ', parameters('dispatchToken'))}",
+                      "Content-Type": "application/json"
+                    },
+                    "body": {
+                      "outboxId": "@items('For_each_job')?['outboxId']",
+                      "publicationId": "@items('For_each_job')?['publicationId']",
+                      "workerId": "@items('For_each_job')?['workerId']",
+                      "attemptNumber": "@items('For_each_job')?['attemptNumber']",
+                      "outcome": "@body('Deliver')?['outcome']",
+                      "providerRequestId": "@body('Deliver')?['providerRequestId']",
+                      "providerPostId": "@body('Deliver')?['providerPostId']",
+                      "providerPostUrl": "@body('Deliver')?['providerPostUrl']",
+                      "errorCode": "@body('Deliver')?['errorCode']",
+                      "errorMessage": "@body('Deliver')?['errorMessage']",
+                      "responseSummary": "@body('Deliver')?['responseSummary']"
+                    }
+                  },
+                  "runAfter": {
+                    "Deliver": [
+                      "Succeeded"
+                    ]
+                  },
+                  "runtimeConfiguration": {
+                    "secureData": {
+                      "properties": [
+                        "inputs",
+                        "outputs"
+                      ]
+                    }
+                  }
+                }
+              },
+              "runAfter": {
+                "Claim": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "outputs": {}
+        },
+        "parameters": {
+          "factsportBaseUrl": {
+            "value": "[parameters('factsportBaseUrl')]"
+          },
+          "dispatchToken": {
+            "value": "[parameters('dispatchToken')]"
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {}
+}
