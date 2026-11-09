@@ -510,3 +510,14 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - Protected Cloudflare application staging passed on source commit `67c7d8b13138fa9da4242bb3aabf6b70a106f8cf` (run `42574631386`), including regression, TypeScript, native Worker build, isolated deployment, deny-by-default and protected `/matches` checks.
 - The pass includes the newsroom preview/Markdown external-media isolation and the host-aware robots metadata/ads.txt format guard. It does not verify real Entra sign-in, Azure VOD migration, full CMS browser E2E, production ads.txt/account approval or certified CMP integration.
 - M45/M46 remain source/build/protected-staging verified; the owner/account and isolated database/browser gates remain open.
+
+
+## 2026-11-09 Media Entra host isolation — M47
+
+- Media login is now fail-closed on Entra configuration, dedicated editorial Hyperdrive and exact registered Media host. Entra start/callback reject any other origin; sign-out is a same-origin POST.
+- Public Media middleware no longer refreshes Supabase sessions. Unauthenticated `/admin` redirects to `/media-login`; cookie presence is only a routing hint and admin layout/actions still verify the signed session and DB role.
+- The private Prediction host alone retains legacy Supabase session refresh during its separate migration. Media admin/login/Entra routes are not served on that host.
+- Private host normalization is consistent in middleware, metadata and server guards. CI path filters now include all auth and host-guard files.
+- Isolated verification passed on `5e87b07c098c19e7cc037ea7acefa56c49f9b473` (run `42575473484`). Native build and protected staging were running at handoff time.
+- Actual Entra tenant/app registration, Cloudflare secret provisioning, editorial Hyperdrive role/grants and live OIDC E2E remain owner-provisioning gates. No Cloudflare API token or 2FA configuration was changed.
+- Details: `docs/audit/handoffs/M47-MEDIA-ENTRA-HOST-ISOLATION.md`.
