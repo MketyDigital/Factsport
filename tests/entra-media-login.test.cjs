@@ -16,6 +16,7 @@ test('Media sign-in stays hidden until Entra and dedicated editorial PostgreSQL 
   const callbackRoute = read('app/api/auth/entra/callback/route.ts');
   const adminLayout = read('app/admin/layout.tsx');
   const mediaLogin = read('app/media-login/page.tsx');
+  const privateHostGuard = read('app/lib/private-product-host.ts');
   assert.match(entra, /export function isEntraExternalConfigured/);
   assert.match(entra, /ENTRA_EXTERNAL_DISCOVERY_URL/);
   assert.match(entra, /ENTRA_EXTERNAL_ISSUER/);
@@ -50,4 +51,6 @@ test('Media sign-in stays hidden until Entra and dedicated editorial PostgreSQL 
   assert.match(middleware, /Only the private Prediction host retains the legacy Supabase session refresh/);
   assert.match(adminLayout, /rejectPrivateProductHost/);
   assert.match(mediaLogin, /rejectPrivateProductHost/);
+  assert.match(privateHostGuard, /new URL\(rawConfiguredHost\.includes/);
+  assert.match(middleware, /new URL\(rawPrivateProductHost\.includes/);
 });
