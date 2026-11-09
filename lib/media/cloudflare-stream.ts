@@ -83,7 +83,13 @@ export async function getFactsportStreamVideo(uid: string) {
 
 export async function deleteFactsportStreamVideo(uid: string) {
   if (!/^[a-f0-9]{32}$/i.test(uid)) return;
-  await streamRequest('/' + uid, { method: 'DELETE' });
+  const config = requireConfig();
+  const response = await fetch(API + '/accounts/' + config.accountId + '/stream/' + uid, {
+    method: 'DELETE', headers: { Authorization: 'Bearer ' + config.apiToken, Accept: 'application/json' },
+    signal: AbortSignal.timeout(20000), cache: 'no-store',
+  });
+  const payload = await response.json().catch(() => null) as any;
+  if (!response.ok || payload?.success !== true) throw new Error('Cloudflare Stream cleanup failed.');
 }
 
 export function getFactsportStreamPlaybackHost(playbackUrl: unknown): string {
