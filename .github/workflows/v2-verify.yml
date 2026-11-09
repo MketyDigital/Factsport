@@ -76,7 +76,7 @@ jobs:
           grep -q "CREATE OR REPLACE VIEW public.public_competition_player_stats" db/migrations/0007_factsport_competition_player_stats.sql
           grep -q "ADD COLUMN IF NOT EXISTS legacy_match_id uuid" db/migrations/0008_factsport_match_identity_alias.sql
           grep -q "CREATE TABLE IF NOT EXISTS public.predictions" db/migrations/0003_factsport_public_predictions.sql
-          for migration_number in $(seq 9 35); do
+          for migration_number in $(seq 9 36); do
             migration_prefix="$(printf '%04d' "$migration_number")"
             migration_matches=(db/migrations/"$migration_prefix"_*.sql)
             if [ "${#migration_matches[@]}" -ne 1 ] || [ ! -s "${migration_matches[0]}" ]; then
@@ -98,4 +98,5 @@ jobs:
           grep -q "public_editorial_article_sources" db/migrations/0033_factsport_public_editorial_sources.sql
           grep -q "social_channel_configured" db/migrations/0034_factsport_editorial_audit_and_social_channel_admin.sql
           grep -q "latest.workflow_status='published'" db/migrations/0035_factsport_revision_scoped_editorial_sources.sql
-          echo "Migrations 0001-0035 present; revision-scoped provenance, Media gallery, broadcast, social channel admin, dispatcher and attestation contracts inventoried; live migration NOT executed"
+          grep -q "provider_started_at timestamptz" db/migrations/0036_factsport_social_provider_dispatch_lock.sql
+          echo "Migrations 0001-0036 present; revision-scoped provenance, Media gallery, broadcast, social channel admin, provider delivery lock and dispatcher contracts inventoried; live migration NOT executed"
