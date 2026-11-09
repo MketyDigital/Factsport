@@ -494,3 +494,12 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - Added desktop/mobile preview controls, search result preview with title/description counts and canonical status, and Open Graph/social card preview. No ad or analytics scripts load in the editor.
 - Private preview now suppresses external Markdown images (including protocol-relative URLs), match widgets and third-party iframe embeds; approved Stream videos continue through the signed admin preview endpoint. Public Markdown rendering remains unchanged by default.
 - Isolated verification passed on `67c7d8b13138fa9da4242bb3aabf6b70a106f8cf` (run `42574631125`). Native build and protected staging were still running at handoff time.
+
+
+## 2026-11-09 AdSense and SEO fail-closed gates — M46
+
+- Root metadata now emits host-aware `noindex,nofollow` for the private Predict host and until production indexing plus PostgreSQL editorial/matches/sitemap readiness are all explicitly enabled. This now agrees with the existing robots.txt and sitemap gates.
+- AdSense readiness tests enforce the fail-closed publisher/consent/domain policy, the single syntactically valid ads.txt seller record, the privacy/advertising policy disclosures and absence of live AdSense scripts.
+- No ad units/scripts or CMP are configured. The publisher ID in the repository is not verified against the owner's active AdSense account or live production ads.txt response. Account approval, certified CMP setup, consent tests, legal review and approved ad-unit IDs remain owner gates.
+- Isolated verification passed on `3b915b0b...` (run `42574256321`); native Vinext build passed (run `42574256073`). No production changes.
+- Details: `docs/audit/handoffs/M46-ADSENSE-AND-SEO-FAIL-CLOSED-GATES.md`.
