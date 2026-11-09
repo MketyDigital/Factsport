@@ -590,3 +590,6 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 
 
 - **M50 verification update:** isolated verification passed with 226 regression tests and TypeScript on `e3dac371fa40293ae73e0a1c75c1cd78419b6fff` (run `42584448535`); native Vinext build passed (run `42584448487`). Protected Cloudflare staging deployment/deny-by-default checks were still in progress. Disposable PostgreSQL migration chain including the revised 0041 VOD size/protocol columns passed on `55464ea4a8d3000a836d109d1ad4c20397922d50` (run `42584159460`). No Stream upload or Azure staging DB migration was performed.
+
+
+- **M50 protected staging closeout:** Cloudflare staging deployment and deny-by-default checks passed on `e3dac371fa40293ae73e0a1c75c1cd78419b6fff` (run `42584448515`). M50 source/build is verified, but actual Stream TUS/browser/provider E2E and isolated Azure migration remain OPEN. Keep `FACTSPORT_MEDIA_VIDEO_SCHEMA_READY` and `FACTSPORT_STREAM_VIDEO_READY` unset until owner-provisioned staging acceptance. See `docs/audit/handoffs/M50-RESUMABLE-CLOUDFLARE-STREAM-UPLOADS.md`.
