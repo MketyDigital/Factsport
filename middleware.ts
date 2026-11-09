@@ -101,7 +101,15 @@ export async function middleware(request: NextRequest) {
   // -----------------------------------------------------------------
   // PART 2: host-isolated identity middleware
   // -----------------------------------------------------------------
-  const privateProductHost = (process.env.FACTSPORT_PRIVATE_PRODUCT_HOST || '').trim().toLowerCase();
+  const rawPrivateProductHost = (process.env.FACTSPORT_PRIVATE_PRODUCT_HOST || '').trim();
+  let privateProductHost = '';
+  try {
+    privateProductHost = rawPrivateProductHost
+      ? new URL(rawPrivateProductHost.includes('://') ? rawPrivateProductHost : 'https://' + rawPrivateProductHost).hostname.toLowerCase()
+      : '';
+  } catch {
+    privateProductHost = '';
+  }
   const requestHost = request.nextUrl.hostname.toLowerCase();
   const isPrivateProductHost = !!privateProductHost && requestHost === privateProductHost;
   const isMediaAdminPath = pathname === '/admin' || pathname.startsWith('/admin/');
