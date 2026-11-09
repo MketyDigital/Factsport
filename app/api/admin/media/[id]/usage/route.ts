@@ -42,6 +42,9 @@ export async function GET(_request: Request, context: { params: { id: string } }
         WITH affected_assets AS (
           SELECT ${assetId}::uuid AS id
           UNION
+          SELECT source_asset_id FROM public.media_asset_derivatives
+          WHERE derivative_asset_id=${assetId}::uuid
+          UNION
           SELECT derivative_asset_id FROM public.media_asset_derivatives
           WHERE source_asset_id=${assetId}::uuid
         )
@@ -62,6 +65,9 @@ export async function GET(_request: Request, context: { params: { id: string } }
       const socialPosts = await sql`
         WITH affected_assets AS (
           SELECT ${assetId}::uuid AS id
+          UNION
+          SELECT source_asset_id FROM public.media_asset_derivatives
+          WHERE derivative_asset_id=${assetId}::uuid
           UNION
           SELECT derivative_asset_id FROM public.media_asset_derivatives
           WHERE source_asset_id=${assetId}::uuid
