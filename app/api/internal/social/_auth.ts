@@ -9,7 +9,7 @@ export async function isSocialDispatcherRequestAuthorized(request: Request): Pro
     ? bindings.FACTSPORT_SOCIAL_DISPATCH_TOKEN : '';
   const authorization = request.headers.get('authorization') || '';
   const supplied = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-  if (!expected || !supplied || expected.length > 4096 || supplied.length > 4096) return false;
+  if (expected.length < 32 || !supplied || expected.length > 4096 || supplied.length > 4096) return false;
   const encoder = new TextEncoder();
   const [expectedHash, suppliedHash] = await Promise.all([
     crypto.subtle.digest('SHA-256', encoder.encode(expected)),
