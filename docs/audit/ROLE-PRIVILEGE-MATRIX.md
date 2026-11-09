@@ -87,3 +87,5 @@ The signed Stream webhook endpoint now verifies raw-body HMAC, handles gzip payl
 - Social channel administration uses the social_admin capability. The editorial writer's channel grant is column-scoped to is_enabled, supports_media, settings and updated_at; provider IDs are whitelisted non-secret metadata. Provider tokens, bot tokens and webhook URLs remain in secure bindings/Logic Apps connections.
 
 - Social provider credentials are read only by the server-side delivery adapter: Meta Page token and Telegram bot token as Cloudflare secrets; Buffer/Make calls use an HTTPS Logic Apps/APIM adapter URL plus bearer secret. No provider secret is stored in social channel settings or returned by the claim endpoint.
+
+- Migration 0038 revokes table-wide UPDATE on `media_assets` from `factsport_v2_editorial_writer` and grants only rights metadata, rights-review identity/time, public-promotion and `updated_at` columns. Asset identity, object key, content type, byte size, hash, dimensions and uploader cannot be rewritten through the CMS role.
