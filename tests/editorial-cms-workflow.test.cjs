@@ -219,6 +219,9 @@ test('Media library is role-protected, paginated and exposes only private asset 
   assert.match(page, /authorizeMediaEditorialAction\('media'\)/);
   assert.match(client, /\/api\/admin\/media\?/);
   assert.match(client, /Load more assets/);
+  assert.match(client, /Upload privately/);
+  assert.match(client, /FormData/);
+  assert.match(client, /It remains unavailable publicly until rights are reviewed/);
   assert.match(client, /rights_reference/);
   assert.match(layout, /href="\/admin\/media"/);
   assert.doesNotMatch(route, /public_media_assets|SUPABASE_SERVICE_ROLE_KEY/);
