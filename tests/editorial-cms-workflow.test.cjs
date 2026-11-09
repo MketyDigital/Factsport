@@ -388,3 +388,26 @@ test('social publishing can attach only rights-cleared assets already exposed by
   assert.match(socialClient, /selectedMediaAssetIds\.length >= 4/);
   assert.match(socialPage, /p\.media_asset_ids/);
 });
+
+
+test('editorial source provenance is append-only in the CMS and public only with an approved article', () => {
+  const sourceAction = read('app/admin/news/actions.ts');
+  const newsroomPage = read('app/admin/news/page.tsx');
+  const newsroomClient = read('app/admin/news/NewsroomClient.tsx');
+  const sourceMigration = read('db/migrations/0033_factsport_public_editorial_sources.sql');
+  const publicAdapter = read('lib/adapters/postgres-editorial.ts');
+  const publicArticle = read('app/news/[slug]/page.tsx');
+  assert.match(sourceAction, /export async function addEditorialSource/);
+  assert.match(sourceAction, /INSERT INTO public\.editorial_article_sources/);
+  assert.match(sourceAction, /source_added/);
+  assert.match(sourceAction, /embedded credentials/);
+  assert.match(newsroomPage, /public\.editorial_article_sources/);
+  assert.match(newsroomClient, /Sources and editorial provenance/);
+  assert.match(newsroomClient, /Add source reference/);
+  assert.match(sourceMigration, /CREATE OR REPLACE VIEW public\.public_editorial_article_sources/);
+  assert.match(sourceMigration, /a\.status='published'/);
+  assert.match(sourceMigration, /a\.review_status='approved'/);
+  assert.doesNotMatch(sourceMigration, /rights_reference/);
+  assert.match(publicAdapter, /public\.public_editorial_article_sources/);
+  assert.match(publicArticle, /Sources &amp; References/);
+});
