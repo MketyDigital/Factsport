@@ -20,7 +20,7 @@ test('Prediction visitor cookie is opaque, cryptographically random and HttpOnly
   assert.match(helper, /secure: true/);
   assert.match(helper, /sameSite: 'lax'/);
   assert.match(helper, /maxAge: 60 \* 60 \* 24 \* 180/);
-  assert.match(helper, /domain = '\.factsport\.com'/);
+  assert.match(helper, /options\\.domain = '\\.factsport\\.com'/);
   assert.match(helper, /SHA-256/);
 });
 
