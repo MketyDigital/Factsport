@@ -28,6 +28,8 @@ test('Prediction readiness requires only the scoped function capability, not dir
   assert.match(readiness, /to_regprocedure\(/);
   assert.match(readiness, /public\.submit_public_prediction\(text,text,text,uuid,text,integer,integer\)/);
   assert.match(readiness, /has_function_privilege\([\s\S]*?'EXECUTE'/);
+  assert.match(readiness, /consume_public_prediction_rate_limit/);
+  assert.match(readiness, /rate_limit_function_executable === true/);
   assert.doesNotMatch(readiness, /has_table_privilege/);
   assert.match(readiness, /catch \{\s*return false;\s*\}/);
 });
@@ -42,7 +44,10 @@ test('Prediction submission SQL is atomic, closed to PUBLIC and denies direct AP
   assert.match(migration, /ON CONFLICT \(participant_id, match_id\) DO NOTHING/);
   assert.match(migration, /REVOKE ALL ON FUNCTION[\s\S]*?FROM PUBLIC/);
   assert.match(migration, /GRANT EXECUTE ON FUNCTION[\s\S]*?TO factsport_v2_prediction_api/);
-  assert.doesNotMatch(migration, /GRANT (SELECT|INSERT|UPDATE|DELETE|ALL).*prediction_(contacts|participants)|GRANT (SELECT|INSERT|UPDATE|DELETE|ALL).*public\.predictions/i);
+  assert.match(migration, /prediction_submission_rate_limits/);
+  assert.match(migration, /consume_public_prediction_rate_limit/);
+  assert.match(migration, /p_scope NOT IN \('visitor', 'network'\)/);
+  assert.doesNotMatch(migration, /GRANT (SELECT|INSERT|UPDATE|DELETE|ALL).*prediction_(contacts|participants|submission_rate_limits)|GRANT (SELECT|INSERT|UPDATE|DELETE|ALL).*public\.predictions/i);
   assert.match(migration, /is_eligible_for_prize,[\s\S]*?false/);
 });
 
