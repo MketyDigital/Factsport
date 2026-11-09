@@ -184,3 +184,51 @@ export function isFactsportSocialMediaProviderReady(provider: FactsportSocialPro
   };
   return isFactsportSocialProviderReady(provider) && bindings[readiness[provider]] === 'true';
 }
+
+
+/**
+ * Dedicated anonymous/registered Prediction API identity.
+ * It must be backed by factsport_v2_prediction_api and a separate Hyperdrive
+ * binding. Never fall back to the public reader, editorial writer, Supabase,
+ * or DATABASE_URL: Prediction owns participant/contact/prediction writes.
+ */
+export function withFactsportPredictionPostgres<T>(operation: (sql: FactsportSql) => Promise<T> | T): Promise<T> {
+  const bindings = env as unknown as Record<string, HyperdriveBinding | undefined>;
+  return withConnection(
+    bindings.FACTSPORT_PREDICTION_HYPERDRIVE?.connectionString,
+    operation,
+    'Factsport Prediction API',
+  );
+}
+
+/**
+ * Runtime readiness probe for the minimum anonymous submission contract.
+ * The readiness flag alone is insufficient: require the dedicated DB role,
+ * required schema objects and explicit effective grants before serving writes.
+ */
+export async function isFactsportPredictionPostgresReady(): Promise<boolean> {
+  const bindings = env as unknown as Record<string, HyperdriveBinding | undefined>;
+  if (!bindings.FACTSPORT_PREDICTION_HYPERDRIVE?.connectionString) return false;
+  try {
+    const rows = await withFactsportPredictionPostgres(sql => sql`
+      SELECT
+        current_user = 'factsport_v2_prediction_api' AS role_ready,
+        to_regclass('public.matches') IS NOT NULL AS matches_ready,
+        to_regclass('public.prediction_contacts') IS NOT NULL AS contacts_ready,
+        to_regclass('public.prediction_participants') IS NOT NULL AS participants_ready,
+        to_regclass('public.predictions') IS NOT NULL AS predictions_ready,
+        has_table_privilege(current_user, 'public.matches', 'SELECT') AS matches_readable,
+        has_table_privilege(current_user, 'public.prediction_contacts', 'SELECT,INSERT,UPDATE') AS contacts_writable,
+        has_table_privilege(current_user, 'public.prediction_participants', 'SELECT,INSERT,UPDATE') AS participants_writable,
+        has_table_privilege(current_user, 'public.predictions', 'SELECT,INSERT') AS predictions_writable
+    `);
+    const ready = rows[0];
+    return !!ready && ready.role_ready === true &&
+      ready.matches_ready === true && ready.contacts_ready === true &&
+      ready.participants_ready === true && ready.predictions_ready === true &&
+      ready.matches_readable === true && ready.contacts_writable === true &&
+      ready.participants_writable === true && ready.predictions_writable === true;
+  } catch {
+    return false;
+  }
+}
