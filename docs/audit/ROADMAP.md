@@ -565,3 +565,8 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - No role login, Hyperdrive binding, HMAC secret, staging database migration, feature flag, production deployment or DNS change was activated.
 - Outstanding before enablement: current-head CI, isolated staging DB provisioning/application, browser E2E, marketing confirmation/unsubscribe, public own-prediction/leaderboard reads, legacy campaign/bonus mapping and scoring/VIP/monthly parity.
 - Detailed evidence and acceptance gaps: `docs/audit/handoffs/M49-PREDICTION-SUBMISSION-PREFLIGHT.md`.
+
+
+- **Parity refinement:** the actual legacy PredictionBoard defaults `require_score=true` outside a campaign. The new public submission path now enforces both exact-score values; campaign-specific optional-score rules remain disabled until mapped.
+- **Additional DB coverage:** same email/different visitor identity separation, live/unknown/kickoff-equality rejection, and concurrent same-token race tests are included in the current disposable PostgreSQL workflow. The latest race-test run is pending.
+- **Marketing boundary:** opt-in only creates a pending-confirmation subscription and append-only event. No promotional or confirmation email is sent yet; confirmation/unsubscribe/withdrawal and reliable mail delivery remain required.
