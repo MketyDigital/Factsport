@@ -93,3 +93,14 @@ export function isFactsportBroadcastTokenIssuerReady(): boolean {
   return getFactsportBroadcastRuntimeConfig() !== null &&
     Boolean((bindings.FACTSPORT_BROADCAST_TOKEN_HYPERDRIVE as HyperdriveBinding | undefined)?.connectionString);
 }
+
+
+/** Dedicated social dispatcher identity; it cannot read private Prediction or edit editorial content. */
+export function withFactsportSocialDispatcherPostgres<T>(operation: (sql: FactsportSql) => Promise<T> | T): Promise<T> {
+  const bindings = env as unknown as Record<string, HyperdriveBinding | undefined>;
+  return withConnection(
+    bindings.FACTSPORT_SOCIAL_DISPATCHER_HYPERDRIVE?.connectionString,
+    operation,
+    'Factsport social dispatcher',
+  );
+}
