@@ -330,7 +330,7 @@ test('editorial uploads persist intrinsic dimensions and reject oversized image 
   assert.match(mediaUpload, /VP8X/);
   assert.match(mediaUpload, /VP8L/);
   assert.match(mediaUpload, /width > 16000 \|\| height > 16000 \|\| width \* height > 40000000/);
-  assert.match(mediaUpload, /dimensions\.width, dimensions\.height/);
+  assert.match(mediaUpload, /\$\{dimensions\.width\}, \$\{dimensions\.height\}/);
   assert.match(mediaUpload, /width, height, alt_text/);
 });
 
