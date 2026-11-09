@@ -12,6 +12,7 @@ import NewsArtwork from '@/app/components/NewsArtwork';
 type ReusableMediaAsset = {
   id: string; object_key: string; rights_status: string; rights_reference: string | null;
   attribution_text: string | null; alt_text: string | null; usage_expires_at: string | null;
+  derived_from?: string | null; variant_key?: string | null;
 };
 
 type RevisionRecord = {
@@ -288,6 +289,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                     }} className="rounded-lg border border-slate-200 p-3 text-left hover:border-blue-400">
                       <span className="block truncate text-xs font-bold text-slate-800">{asset.object_key}</span>
                       <span className="mt-1 block text-[10px] font-semibold uppercase text-emerald-700">{asset.rights_status.replace('_', ' ')}</span>
+                      {asset.derived_from && <span className="mt-1 block text-[10px] text-indigo-700">Derivative · {asset.variant_key?.replaceAll('_', ' ')} · original {asset.derived_from.slice(0, 8)}</span>}
                       {asset.attribution_text && <span className="mt-1 block truncate text-[10px] text-slate-500">{asset.attribution_text}</span>}
                     </button>)}
                   </div>}
