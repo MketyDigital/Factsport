@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   const maxDurationSeconds = Number(request.headers.get('x-factsport-video-max-duration') || 900);
 
   if (!Number.isSafeInteger(fileSizeBytes) || fileSizeBytes < 1 ||
-      fileSizeBytes > FACTSPORT_STREAM_MAX_UPLOAD_BYTES) {
+      fileSizeBytes >= FACTSPORT_STREAM_MAX_UPLOAD_BYTES) {
     return NextResponse.json({ error: 'Resumable video uploads must be between 1 byte and 30 GB.' }, { status: 413 });
   }
   if (title.length < 3 || !VIDEO_CONTENT_TYPES.has(contentType) ||
