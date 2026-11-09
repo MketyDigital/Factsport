@@ -90,13 +90,17 @@ test('Large VOD files use protected Cloudflare TUS with durable resume and size 
   assert.match(adapter, /location\.pathname !== expectedPath/);
 
   assert.match(basicRoute, /fileSizeBytes >= 200_000_000/);
+  assert.match(basicRoute, /fileType/);
   assert.match(basicRoute, /upload_protocol, upload_expected_size_bytes/);
   assert.match(tusRoute, /authorizeMediaEditorialAction\('media'\)/);
   assert.match(tusRoute, /isSameOriginRequest/);
   assert.match(tusRoute, /Tus-Resumable/);
-  assert.match(tusRoute, /Upload-Length/);
+  assert.match(tusRoute, /upload-length/);
   assert.match(tusRoute, /Location: directUpload\.uploadURL/);
   assert.match(tusRoute, /X-Factsport-Video-Asset-Id/);
+  const tusAssetInsert = tusRoute.match(/INSERT INTO public\.media_video_assets\s*\(([\s\S]*?)\)\s*VALUES/);
+  assert.ok(tusAssetInsert, 'TUS upload metadata insert must be explicit');
+  assert.doesNotMatch(tusAssetInsert[1], /uploadURL/i);
   assert.doesNotMatch(tusRoute, /CLOUDFLARE_STREAM_API_TOKEN|apiToken/);
 
   assert.match(library, /import \* as tus from 'tus-js-client'/);
