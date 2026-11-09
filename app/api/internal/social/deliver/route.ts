@@ -263,9 +263,8 @@ export async function POST(request: Request) {
       if (row.provider_started_at) throw new Error('This delivery attempt has already started a provider request.');
       const media = Array.isArray(row.media_assets) ? row.media_assets : [];
       const expected = Array.isArray(row.media_asset_ids) ? row.media_asset_ids.length : 0;
-      if (media.length !== expected || (expected > 0 && !row.supports_media)) {
-        throw new Error('Attached media is no longer public or this channel is not verified for image delivery.');
-      }
+      const mediaInvalid = media.length !== expected || (expected > 0 && !row.supports_media);
+      const supportedProvider = ['meta', 'telegram', 'buffer', 'make'].includes(String(row.provider));
       await tx`
         UPDATE public.media_social_delivery_attempts
         SET provider_started_at=now()
@@ -277,10 +276,16 @@ export async function POST(request: Request) {
         provider: row.provider as FactsportSocialProvider,
         channelKey: row.channel_key, settings: row.settings || {},
         contentText: row.content_text, linkUrl: row.link_url,
-        media,
+        media, mediaInvalid, supportedProvider,
       };
     }));
 
+    if (!job.supportedProvider) {
+      return NextResponse.json(providerError('permanent_failure', 'social_provider_unsupported', 'This social provider is not supported by the V2 dispatcher.'), { headers: { 'Cache-Control': 'no-store' } });
+    }
+    if (job.mediaInvalid) {
+      return NextResponse.json(providerError('permanent_failure', 'media_no_longer_public', 'One or more attached images are no longer eligible for public delivery.'), { headers: { 'Cache-Control': 'no-store' } });
+    }
     if (!isFactsportSocialProviderReady(job.provider)) {
       return NextResponse.json(providerError('retryable_failure', 'provider_not_ready', 'Provider credentials or adapter readiness are not available.'), { headers: { 'Cache-Control': 'no-store' } });
     }
