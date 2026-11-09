@@ -29,7 +29,7 @@ Status: source implementation committed; current CI verification is running; mig
 - Migration 0033/0034 are inventoried by CI, but not applied to any database.
 - No source was imported from legacy Supabase, no rights reference is exposed publicly, no provider credentials are stored in Git/PostgreSQL, and no channel is enabled by these source changes.
 - Current native build and isolated regression runs are pending for the latest social channel UI and source-provenance changes.
-- Provider adapters, Logic Apps workflow, dedicated dispatcher Hyperdrive/role provisioning and delivery reconciliation UI remain outstanding.
+- Provider adapter source code and a disabled Logic Apps workflow template now exist; dedicated dispatcher Hyperdrive/role provisioning, provider secrets, private E2E and delivery reconciliation UI remain outstanding.
 
 ## Remaining work
 
