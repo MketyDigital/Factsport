@@ -12,7 +12,7 @@ export default function MediaRightsRevocationControl({ assetId, onRevoked }: {
 
   return <details className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-3">
     <summary className="cursor-pointer text-xs font-bold text-rose-800">Withdraw rights / revoke public use</summary>
-    <p className="mt-2 text-[11px] leading-5 text-rose-800">Use when permission is withdrawn, incorrect or no longer valid. The asset and audit history are retained; public article and social projections will stop returning it.</p>
+    <p className="mt-2 text-[11px] leading-5 text-rose-800">Use when permission is withdrawn, incorrect or no longer valid. The asset and audit history are retained; public article and social projections will stop returning it. Any post already published on an external social network must be removed separately at that provider.</p>
     <label className="mt-2 block text-[11px] font-semibold text-slate-700">Reason
       <textarea value={reason} onChange={event => setReason(event.target.value)} maxLength={500} rows={3} className="mt-1 w-full rounded-lg border border-rose-200 bg-white p-2 text-xs" placeholder="Record the rights issue and any source reference…" />
     </label>
