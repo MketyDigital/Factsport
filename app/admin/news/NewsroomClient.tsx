@@ -573,13 +573,13 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
               return typeof value === 'object' ? JSON.stringify(value) : String(value);
             };
             const changedFields = fields.filter(field => JSON.stringify(field.currentValue ?? null) !== JSON.stringify(field.selectedValue ?? null));
-            const mediaSummary = (items: Array<Record<string, any>> = []) => items.map(item =>
+            const mediaSummary = (items: Array<any> = []) => items.map(item =>
               [item.placement, '#', item.position, ': ', item.remove_media ? 'removed' : (item.object_key || item.media_id || 'missing asset')].join('')
             ).join(' · ') || 'No media attachments';
-            const videoSummary = (items: Array<Record<string, any>> = []) => items.map(item =>
+            const videoSummary = (items: Array<any> = []) => items.map(item =>
               ['#', item.position, ': ', item.remove_video ? 'removed' : (item.title || item.video_id || 'untitled video'), ' (', item.upload_status || 'unknown', ', rights ', item.rights_status || 'pending', ')'].join('')
             ).join(' · ') || 'No video attachments';
-            const sourceSummary = (items: Array<Record<string, any>> = []) => items.map(item =>
+            const sourceSummary = (items: Array<any> = []) => items.map(item =>
               [item.source_title || 'Untitled source', item.publisher ? ' — ' + item.publisher : '', item.canonical_url ? ' · ' + item.canonical_url : ''].join('')
             ).join(' · ') || 'No source references';
             const currentMedia = current?.revision_media || [];
