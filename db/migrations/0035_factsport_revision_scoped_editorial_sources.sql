@@ -17,6 +17,31 @@ SET revision_id = (
 )
 WHERE s.revision_id IS NULL;
 
+-- Existing pending revisions inherit the article's previously published source list.
+INSERT INTO public.editorial_article_sources
+  (article_id, revision_id, source_title, publisher, canonical_url, attribution_text, rights_reference, accessed_at)
+SELECT source.article_id, pending.id, source.source_title, source.publisher,
+       source.canonical_url, source.attribution_text, source.rights_reference, source.accessed_at
+FROM public.editorial_article_sources source
+JOIN public.editorial_article_revisions published
+  ON published.id=source.revision_id AND published.workflow_status='published'
+JOIN LATERAL (
+  SELECT id FROM public.editorial_article_revisions
+  WHERE article_id=source.article_id AND workflow_status IN ('draft','in_review','approved','rejected')
+  ORDER BY revision_number DESC LIMIT 1
+) pending ON true
+WHERE published.id = (
+  SELECT latest.id FROM public.editorial_article_revisions latest
+  WHERE latest.article_id=source.article_id AND latest.workflow_status='published'
+  ORDER BY latest.revision_number DESC LIMIT 1
+)
+AND NOT EXISTS (
+  SELECT 1 FROM public.editorial_article_sources existing
+  WHERE existing.revision_id=pending.id
+    AND existing.source_title=source.source_title
+    AND existing.canonical_url=source.canonical_url
+);
+
 CREATE INDEX IF NOT EXISTS editorial_article_sources_revision_idx
   ON public.editorial_article_sources (revision_id, created_at DESC);
 
