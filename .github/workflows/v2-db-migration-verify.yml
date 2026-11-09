@@ -175,10 +175,11 @@ jobs:
 
           INSERT INTO public.matches (
             id, league, home_team, away_team, match_date, status
-          ) VALUES (
-            '00000000-0000-4000-8000-000000000043',
-            'CI', 'Home', 'Away', '2099-01-01T12:00:00Z', 'SCHEDULED'
-          );
+          ) VALUES
+            ('00000000-0000-4000-8000-000000000043',
+             'CI', 'Home', 'Away', '2099-01-01T12:00:00Z', 'SCHEDULED'),
+            ('00000000-0000-4000-8000-000000000044',
+             'CI', 'Home 2', 'Away 2', '2099-01-02T12:00:00Z', 'SCHEDULED');
 
           SET ROLE factsport_v2_prediction_api;
           DO $verify$
@@ -186,6 +187,7 @@ jobs:
             first_result record;
             retry_result record;
             consent_result record;
+            second_browser_result record;
             rate_first boolean;
             rate_second boolean;
             visitor_known boolean;
@@ -248,15 +250,28 @@ jobs:
             IF rate_first IS NOT TRUE OR rate_second IS NOT FALSE THEN
               RAISE EXCEPTION 'Prediction rate-limit counter did not enforce the configured threshold';
             END IF;
+            SELECT * INTO second_browser_result FROM public.submit_public_prediction(
+              'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+              'ci-prediction@example.test',
+              'Other Browser',
+              '00000000-0000-4000-8000-000000000044',
+              'draw', 'free-prediction-v1', 'I have read and accept the Factsport free prediction rules and privacy notice.',
+              false, NULL, NULL, 1, 1
+            );
+            IF second_browser_result.prediction_id IS NULL
+              OR second_browser_result.duplicate IS NOT FALSE THEN
+              RAISE EXCEPTION 'A second browser sharing the email did not get an independent participant/prediction';
+            END IF;
           END
           $verify$;
           RESET ROLE;
 
           DO $verify$
           BEGIN
-            IF (SELECT count(*) FROM public.predictions
-                WHERE match_id='00000000-0000-4000-8000-000000000043') <> 1
-              OR (SELECT count(*) FROM public.prediction_rule_acceptances) <> 1 THEN
+            IF (SELECT count(*) FROM public.predictions) <> 2
+              OR (SELECT count(*) FROM public.prediction_participants) <> 2
+              OR (SELECT count(*) FROM public.prediction_contacts) <> 1
+              OR (SELECT count(*) FROM public.prediction_rule_acceptances) <> 2 THEN
               RAISE EXCEPTION 'Prediction and versioned rules acceptance were not persisted atomically';
             END IF;
             IF (SELECT count(*) FROM public.marketing_subscriptions
