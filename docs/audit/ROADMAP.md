@@ -418,3 +418,14 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - Recorded the finding and exact remaining acceptance gates in `docs/audit/handoffs/M41-CI-SCOPE-AND-MEDIA-COVERAGE.md`.
 - Commit `c3ac3a693fcad8e5c70eb4dd19146198d5280b2a` contains the workflow change; the M41 handoff documentation was added in `599cc073422955e41b5756988b473d0ec216c2f7`.
 - Verification for the workflow commit was running when recorded. No pass is claimed until CI completes.
+
+
+## 2026-11-09 VOD and derivative migration integrity — M42
+
+- Investigated the failed VOD regression using the actual workflow logs: 209/210 tests passed; the failure was test 157's signed-playback contract, not the prediction engine. Follow-up runs exposed an overbroad direct-upload assertion and a whitespace-sensitive public-view assertion.
+- Rebuilt migration 0041 after finding overlapping edits had left duplicated SQL and multiple transaction endings. The clean migration has one BEGIN/COMMIT pair, a database-enforced `signed_playback_required=true` invariant, restored rights/provider/duration/host constraints and least-privilege grants.
+- Repaired migration 0039's invalid PL/pgSQL dollar quoting and added regression checks for paired function delimiters and transaction integrity.
+- Corrected the upload test to inspect only INSERT columns, made the public view test whitespace-tolerant, and extended migration inventory coverage through 0041.
+- Detailed evidence and commits: `docs/audit/handoffs/M42-VOD-DERIVATIVE-MIGRATION-INTEGRITY.md`. Latest head at handoff: `b6d3d8810ad46cda7e8754438ddfcc5e0a67eff8`.
+- Current-head isolated verification, native build and protected staging are not yet confirmed green. Migrations 0039–0041 remain unapplied; no production resources changed.
+- Next: complete current CI, parse/apply the complete chain in disposable PostgreSQL, provision a dedicated least-privilege Stream token lookup identity, then test VOD upload/preview/rights/public playback end-to-end in isolated staging.
