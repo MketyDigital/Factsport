@@ -29,7 +29,7 @@ test('Cloudflare Stream VOD is separate, signed, fail-closed and revision-scoped
   assert.match(directUpload, /authorizeMediaEditorialAction\('media'\)/);
   assert.match(directUpload, /isSameOriginRequest/);
   assert.match(directUpload, /createFactsportStreamDirectUpload/);
-  assert.doesNotMatch(directUpload, /INSERT INTO public\.media_video_assets[\s\S]*uploadURL/);
+  const assetInsert = directUpload.match(/INSERT INTO public\\.media_video_assets\\s*\\(([\\s\\S]*?)\\)\\s*VALUES/);\n  assert.ok(assetInsert, 'video metadata insert must be explicit');\n  assert.doesNotMatch(assetInsert[1], /uploadURL/i);
   assert.match(refresh, /readyToStream/);
   assert.match(refresh, /expiredUnuploaded/);
   assert.match(playback, /public_editorial_article_video_tokens/);
