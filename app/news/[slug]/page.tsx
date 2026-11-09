@@ -169,6 +169,22 @@ export default async function ArticlePage({ params }: { params: { slug: string }
                     </section>
                 )}
 
+                {article.sources && article.sources.length > 0 && (
+                    <section className="mt-12 border-t border-slate-200 pt-8" aria-label="Editorial sources and references">
+                        <h2 className="mb-4 text-lg font-black tracking-tight text-slate-900">Sources &amp; References</h2>
+                        <ol className="space-y-3">
+                            {article.sources.map((source: any) => (
+                                <li key={source.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                    <a href={source.canonical_url} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-700 underline underline-offset-2">{source.source_title}</a>
+                                    {source.publisher && <span className="ml-2 text-xs text-slate-500">— {source.publisher}</span>}
+                                    {source.attribution_text && <p className="mt-1 text-xs leading-5 text-slate-600">{source.attribution_text}</p>}
+                                    <p className="mt-2 text-[10px] text-slate-400">Source checked {new Date(source.accessed_at).toLocaleDateString('en-GB')}</p>
+                                </li>
+                            ))}
+                        </ol>
+                    </section>
+                )}
+
                 <div className="mt-12 pt-6 border-t border-slate-200 flex items-center justify-between">
                     <span className="text-xs font-black uppercase tracking-widest text-slate-400">Share Story</span>
                     <ShareButton title={article.title} slug={article.slug} />
