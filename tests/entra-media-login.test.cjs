@@ -26,6 +26,7 @@ test('Media sign-in stays hidden until Entra and dedicated editorial PostgreSQL 
   assert.match(postgres, /FACTSPORT_EDITORIAL_HYPERDRIVE/);
   assert.match(login, /isEntraExternalConfigured\(\)/);
   assert.match(login, /isFactsportEditorialPostgresReady\(\)/);
+  assert.match(login, /isEntraMediaRequestHost/);
   assert.match(login, /signInReady/);
   assert.match(login, /No legacy email allowlist fallback is available/);
   assert.doesNotMatch(login, /createClient|supabase/i);
@@ -41,6 +42,8 @@ test('Media sign-in stays hidden until Entra and dedicated editorial PostgreSQL 
   assert.match(adminLayout, /method="post"/);
   assert.match(middleware, /redirect\(new URL\('\/media-login'/);
   assert.match(middleware, /Only the private Prediction host retains the legacy Supabase session refresh/);
+  assert.match(middleware, /if \(!isPrivateProductHost\)/);
+  assert.match(middleware, /if \(isMediaAdminPath \|\| isMediaAuthPath\)/);
   assert.doesNotMatch(middleware, /ADMIN_EMAILS|adminEmails/);
   assert.match(adminLayout, /rejectPrivateProductHost/);
   assert.match(mediaLogin, /rejectPrivateProductHost/);
