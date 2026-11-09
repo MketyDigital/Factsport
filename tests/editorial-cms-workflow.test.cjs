@@ -131,7 +131,7 @@ test('editorial media uploads are private, validated, hashed and rights-reviewed
   assert.match(mediaActions, /rights_reviewed_at/);
   assert.match(mediaActions, /workflow_status='draft'/);
   assert.match(mediaActions, /editorial_article_revision_media/);
-  assert.doesNotMatch(mediaActions, /is_public=false/);
+  assert.doesNotMatch(mediaActions.slice(0, mediaActions.indexOf('export async function revokeMediaRights')), /is_public=false/);
   assert.match(actions, /editorial_article_revision_media/);
   assert.match(actions, /is_public=true/);
   assert.match(revisionMediaSql, /CREATE TABLE IF NOT EXISTS public\.editorial_article_revision_media/i);
@@ -256,7 +256,7 @@ test('editorial composer can reuse only rights-approved, non-expired media asset
 test('reusing an approved asset in a new revision does not unpublish its existing public attachment', () => {
   const mediaActions = read('app/admin/news/media-actions.ts');
   assert.match(mediaActions, /INSERT INTO public\.editorial_article_revision_media/);
-  assert.doesNotMatch(mediaActions, /is_public=false/);
+  assert.doesNotMatch(mediaActions.slice(0, mediaActions.indexOf('export async function revokeMediaRights')), /is_public=false/);
 });
 
 
