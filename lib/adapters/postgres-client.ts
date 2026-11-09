@@ -108,6 +108,11 @@ export function withFactsportSocialDispatcherPostgres<T>(operation: (sql: Factsp
 
 export type FactsportSocialProvider = 'meta' | 'telegram' | 'buffer' | 'make';
 
+export function isFactsportSocialReconciliationReady(): boolean {
+  const bindings = env as unknown as Record<string, unknown>;
+  return bindings.FACTSPORT_SOCIAL_RECONCILIATION_READY === 'true';
+}
+
 export function isFactsportSocialDispatchReady(): boolean {
   const bindings = env as unknown as Record<string, unknown>;
   const hyperdrive = bindings.FACTSPORT_SOCIAL_DISPATCHER_HYPERDRIVE as HyperdriveBinding | undefined;
