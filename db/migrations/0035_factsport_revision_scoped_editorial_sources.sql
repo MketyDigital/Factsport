@@ -7,6 +7,15 @@ ALTER TABLE public.editorial_article_sources
   ADD COLUMN IF NOT EXISTS revision_id uuid
     REFERENCES public.editorial_article_revisions(id) ON DELETE RESTRICT;
 
+ALTER TABLE public.editorial_article_revisions
+  ADD CONSTRAINT editorial_article_revisions_article_id_id_key UNIQUE (article_id, id);
+
+ALTER TABLE public.editorial_article_sources
+  ADD CONSTRAINT editorial_article_sources_revision_article_fk
+  FOREIGN KEY (article_id, revision_id)
+  REFERENCES public.editorial_article_revisions(article_id, id)
+  ON DELETE RESTRICT;
+
 UPDATE public.editorial_article_sources s
 SET revision_id = (
   SELECT r.id
