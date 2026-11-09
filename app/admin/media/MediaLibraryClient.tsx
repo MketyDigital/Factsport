@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import MediaDerivativeEditor from './MediaDerivativeEditor';
 
 type Asset = {
   id: string; object_key: string; content_type: string; byte_size: number;
   width: number | null; height: number | null; alt_text: string | null;
   rights_status: string; rights_reference: string | null; attribution_text: string | null;
+  derived_from: string | null; variant_key: string | null;
   usage_expires_at: string | null; is_public: boolean; created_at: string;
 };
 type LibraryResponse = {
@@ -127,6 +129,10 @@ export default function MediaLibraryClient() {
           {asset.rights_reference && <p className="break-words text-xs text-slate-500">Rights reference: {asset.rights_reference}</p>}
           {asset.usage_expires_at && <p className="text-xs text-amber-700">Usage expires: {new Date(asset.usage_expires_at).toLocaleString()}</p>}
           <p className="text-[11px] text-slate-400">{asset.is_public ? 'Eligible for public projection when attached to a published article' : 'Private / not publicly served'}</p>
+          {asset.derived_from && <p className="text-[10px] text-indigo-700">Immutable derivative · {asset.variant_key?.replaceAll('_', ' ')} · source {asset.derived_from}</p>}
+          {['owned', 'licensed', 'editorial_exception'].includes(asset.rights_status) &&
+            (!asset.usage_expires_at || new Date(asset.usage_expires_at).valueOf() > Date.now()) &&
+            <MediaDerivativeEditor asset={asset} onCreated={() => void load(0, false)} />}
         </div>
       </article>)}
     </div>
