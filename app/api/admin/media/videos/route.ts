@@ -14,7 +14,8 @@ export async function GET() {
   if (!isFactsportMediaVideoSchemaReady()) return NextResponse.json({ success: true, videos: [], schemaReady: false }, { headers: { 'Cache-Control': 'private, no-store' } });
   try {
     const videos = await withFactsportEditorialPostgres(sql => sql`
-      SELECT id, title, description, upload_status, upload_expires_at,
+      SELECT id, title, description, upload_status, upload_protocol,
+             upload_expected_size_bytes, upload_expires_at,
              duration_seconds, width, height, size_bytes, rights_status,
              rights_reference, attribution_text, usage_expires_at,
              rights_reviewed_by, rights_reviewed_at, is_public,
