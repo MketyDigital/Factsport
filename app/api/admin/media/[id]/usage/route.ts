@@ -21,6 +21,9 @@ export async function GET(_request: Request, context: { params: { id: string } }
         WITH affected_assets AS (
           SELECT ${assetId}::uuid AS id
           UNION
+          SELECT source_asset_id FROM public.media_asset_derivatives
+          WHERE derivative_asset_id=${assetId}::uuid
+          UNION
           SELECT derivative_asset_id FROM public.media_asset_derivatives
           WHERE source_asset_id=${assetId}::uuid
         )
@@ -33,7 +36,7 @@ export async function GET(_request: Request, context: { params: { id: string } }
           ) ORDER BY d.created_at DESC), '[]'::jsonb)
            FROM public.media_asset_derivatives d
            JOIN public.media_assets m ON m.id=d.derivative_asset_id
-           WHERE d.source_asset_id=${assetId}::uuid) AS derivatives
+           WHERE d.source_asset_id=${assetId}::uuid OR d.derivative_asset_id=${assetId}::uuid) AS derivatives
       `;
       const articles = await sql`
         WITH affected_assets AS (
@@ -62,13 +65,13 @@ export async function GET(_request: Request, context: { params: { id: string } }
           UNION
           SELECT derivative_asset_id FROM public.media_asset_derivatives
           WHERE source_asset_id=${assetId}::uuid
-        ), ids AS (SELECT array_agg(id) AS values FROM affected_assets)
+        ), ids AS (SELECT array_agg(id) AS asset_ids FROM affected_assets)
         SELECT p.id, p.status, p.scheduled_at, p.published_at,
                p.provider_post_url, c.display_name, c.provider
         FROM public.media_social_publications p
         JOIN public.media_social_channels c ON c.id=p.channel_id
         CROSS JOIN ids
-        WHERE p.media_asset_ids && ids.values
+        WHERE p.media_asset_ids && ids.asset_ids
         ORDER BY p.created_at DESC
         LIMIT 100
       `;
