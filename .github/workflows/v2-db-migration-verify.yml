@@ -90,7 +90,7 @@ jobs:
         run: |
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
-          DO $
+          DO $verify$
           DECLARE
             function_oid regprocedure;
           BEGIN
@@ -135,7 +135,7 @@ jobs:
               RAISE EXCEPTION 'Prediction API role has direct table access; only function execution is allowed';
             END IF;
           END
-          $;
+          $verify$;
 
           INSERT INTO public.matches (
             id, league, home_team, away_team, match_date, status
@@ -145,7 +145,7 @@ jobs:
           );
 
           SET ROLE factsport_v2_prediction_api;
-          DO $
+          DO $verify$
           DECLARE
             first_result record;
             retry_result record;
@@ -171,7 +171,7 @@ jobs:
               RAISE EXCEPTION 'Prediction retry was not idempotently recognized';
             END IF;
           END
-          $;
+          $verify$;
           RESET ROLE;
           SQL
           echo "Prediction API function is executable only by its dedicated role; direct table access is denied and duplicate retry is idempotent."
