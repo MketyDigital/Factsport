@@ -100,6 +100,15 @@ jobs:
             IF function_oid IS NULL THEN
               RAISE EXCEPTION 'Prediction submission function is missing';
             END IF;
+            IF to_regclass('public.prediction_submission_rate_limits') IS NULL
+              OR to_regprocedure('public.consume_public_prediction_rate_limit(text,text,integer,integer)') IS NULL
+              OR NOT has_function_privilege(
+                'factsport_v2_prediction_api',
+                'public.consume_public_prediction_rate_limit(text,text,integer,integer)',
+                'EXECUTE'
+              ) THEN
+              RAISE EXCEPTION 'Prediction rate-limit table/function/EXECUTE grant is missing';
+            END IF;
             IF NOT has_function_privilege(
               'factsport_v2_prediction_api', function_oid, 'EXECUTE'
             ) THEN
@@ -131,7 +140,8 @@ jobs:
               OR has_table_privilege('factsport_v2_prediction_api', 'public.predictions', 'SELECT,INSERT,UPDATE,DELETE')
               OR has_table_privilege('factsport_v2_prediction_api', 'public.marketing_subscriptions', 'SELECT,INSERT,UPDATE,DELETE')
               OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_participant_claims', 'SELECT,INSERT,UPDATE,DELETE')
-              OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_claim_conflicts', 'SELECT,INSERT,UPDATE,DELETE') THEN
+              OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_claim_conflicts', 'SELECT,INSERT,UPDATE,DELETE')
+              OR has_table_privilege('factsport_v2_prediction_api', 'public.prediction_submission_rate_limits', 'SELECT,INSERT,UPDATE,DELETE') THEN
               RAISE EXCEPTION 'Prediction API role has direct table access; only function execution is allowed';
             END IF;
           END
@@ -149,6 +159,8 @@ jobs:
           DECLARE
             first_result record;
             retry_result record;
+            rate_first boolean;
+            rate_second boolean;
           BEGIN
             SELECT * INTO first_result FROM public.submit_public_prediction(
               'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -169,6 +181,19 @@ jobs:
             IF retry_result.prediction_id IS DISTINCT FROM first_result.prediction_id
               OR retry_result.duplicate IS NOT TRUE THEN
               RAISE EXCEPTION 'Prediction retry was not idempotently recognized';
+            END IF;
+            rate_first := public.consume_public_prediction_rate_limit(
+              'visitor',
+              'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+              60, 1
+            );
+            rate_second := public.consume_public_prediction_rate_limit(
+              'visitor',
+              'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+              60, 1
+            );
+            IF rate_first IS NOT TRUE OR rate_second IS NOT FALSE THEN
+              RAISE EXCEPTION 'Prediction rate-limit counter did not enforce the configured threshold';
             END IF;
           END
           $verify$;
