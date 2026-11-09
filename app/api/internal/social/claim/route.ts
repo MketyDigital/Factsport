@@ -42,6 +42,50 @@ export async function POST(request: Request) {
         `;
       }
 
+      const rejected = await tx`
+        SELECT o.id AS outbox_id, p.id AS publication_id,
+          CASE
+            WHEN o.attempts >= ${MAX_ATTEMPTS} THEN 'max_attempts_reached'
+            WHEN c.is_enabled=false THEN 'channel_disabled'
+            WHEN c.surface_scope <> 'public_media' OR p.distribution_scope <> 'public_media' THEN 'invalid_distribution_scope'
+            WHEN p.public_content_confirmed_by IS NULL OR p.public_content_confirmed_at IS NULL THEN 'missing_public_content_attestation'
+            ELSE 'dispatch_not_eligible'
+          END AS reason
+        FROM public.media_social_outbox o
+        JOIN public.media_social_publications p ON p.id=o.publication_id
+        JOIN public.media_social_channels c ON c.id=p.channel_id
+        WHERE o.status IN ('pending','retry')
+          AND o.available_at <= now()
+          AND p.status IN ('scheduled','queued')
+          AND p.scheduled_at <= now()
+          AND (
+            o.attempts >= ${MAX_ATTEMPTS}
+            OR c.is_enabled=false
+            OR c.surface_scope <> 'public_media'
+            OR p.distribution_scope <> 'public_media'
+            OR p.public_content_confirmed_by IS NULL
+            OR p.public_content_confirmed_at IS NULL
+          )
+        ORDER BY o.available_at, o.created_at
+        FOR UPDATE OF o, p SKIP LOCKED
+        LIMIT 50
+      `;
+      for (const row of rejected) {
+        await tx`
+          UPDATE public.media_social_outbox
+          SET status='dead_letter', lease_owner=NULL, lease_expires_at=NULL,
+              last_error_code=${row.reason}, updated_at=now()
+          WHERE id=${row.outbox_id}::uuid
+        `;
+        await tx`
+          UPDATE public.media_social_publications
+          SET status='failed', last_error_code=${row.reason},
+              last_error_message='This scheduled post no longer meets the public Media dispatch requirements.',
+              locked_at=NULL, locked_by=NULL, updated_at=now()
+          WHERE id=${row.publication_id}::uuid
+        `;
+      }
+
       const jobs = await tx`
         WITH due AS (
           SELECT o.id AS outbox_id, p.id AS publication_id
