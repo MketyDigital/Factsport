@@ -2,6 +2,7 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
+import { isFactsportMediaVideoSchemaReady } from '@/lib/media/readiness';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 import NewsroomClient from './NewsroomClient';
 
@@ -17,7 +18,8 @@ export default async function AdminNewsPage() {
   }
 
   try {
-    const articles = await withFactsportEditorialPostgres(async sql => sql`
+    const articles = await withFactsportEditorialPostgres(async sql => {
+      const rows = await sql`
       SELECT a.id,
         COALESCE(r.snapshot->>'title', a.title) AS title,
         COALESCE(r.snapshot->>'slug', a.slug) AS slug,
@@ -30,9 +32,9 @@ export default async function AdminNewsPage() {
         a.status,
         COALESCE(r.workflow_status, a.review_status) AS review_status,
         r.workflow_status AS revision_status,
+        COALESCE(r.id, published_revision.id) AS current_revision_id,
         COALESCE(revision_media.items, '[]'::jsonb) AS revision_media,
         COALESCE(article_sources.items, '[]'::jsonb) AS sources,
-        COALESCE(revision_videos.items, '[]'::jsonb) AS revision_videos,
         r.review_comment,
         COALESCE((r.snapshot->>'is_headline')::boolean, a.is_headline) AS is_headline,
         COALESCE((r.snapshot->>'is_breaking')::boolean, a.is_breaking) AS is_breaking,
@@ -84,26 +86,38 @@ export default async function AdminNewsPage() {
         FROM public.editorial_article_sources s
         WHERE s.article_id=a.id AND s.revision_id=COALESCE(r.id, published_revision.id)
       ) article_sources ON true
-      LEFT JOIN LATERAL (
-        SELECT jsonb_agg(jsonb_build_object(
-          'position', rv.position,
-          'video_id', rv.video_id,
-          'remove_video', rv.remove_video,
-          'title', v.title,
-          'upload_status', v.upload_status,
-          'rights_status', v.rights_status,
-          'rights_reference', v.rights_reference,
-          'attribution_text', v.attribution_text,
-          'usage_expires_at', v.usage_expires_at,
-          'duration_seconds', v.duration_seconds
-        ) ORDER BY rv.position) AS items
-        FROM public.editorial_article_revision_videos rv
-        LEFT JOIN public.media_video_assets v ON v.id=rv.video_id
-        WHERE rv.revision_id=COALESCE(r.id, published_revision.id)
-      ) revision_videos ON true
       ORDER BY GREATEST(a.updated_at, COALESCE(r.created_at, a.updated_at)) DESC
       LIMIT 200
-    `);
+      `;
+      if (!isFactsportMediaVideoSchemaReady() || rows.length === 0) {
+        return rows.map(({ current_revision_id, ...article }) => ({ ...article, revision_videos: [] }));
+      }
+      const revisionIds = rows.map(row => row.current_revision_id).filter(Boolean);
+      const videoRows = revisionIds.length ? await sql`
+        SELECT rv.revision_id,
+          jsonb_agg(jsonb_build_object(
+            'position', rv.position,
+            'video_id', rv.video_id,
+            'remove_video', rv.remove_video,
+            'title', v.title,
+            'upload_status', v.upload_status,
+            'rights_status', v.rights_status,
+            'rights_reference', v.rights_reference,
+            'attribution_text', v.attribution_text,
+            'usage_expires_at', v.usage_expires_at,
+            'duration_seconds', v.duration_seconds
+          ) ORDER BY rv.position) AS items
+        FROM public.editorial_article_revision_videos rv
+        LEFT JOIN public.media_video_assets v ON v.id=rv.video_id
+        WHERE rv.revision_id = ANY(${revisionIds}::uuid[])
+        GROUP BY rv.revision_id
+      ` : [];
+      const videosByRevision = new Map(videoRows.map(row => [String(row.revision_id), row.items || []]));
+      return rows.map(({ current_revision_id, ...article }) => ({
+        ...article,
+        revision_videos: current_revision_id ? videosByRevision.get(String(current_revision_id)) || [] : [],
+      }));
+    });
     return <NewsroomClient initialArticles={articles as any[]} />;
   } catch (error) {
     console.error('V2 newsroom unavailable', error);
