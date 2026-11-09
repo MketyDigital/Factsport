@@ -103,3 +103,8 @@ These checks validate the V2 app deployment and existing reader path, **not** th
 - Public article pages now render the rights-filtered inline gallery with alt text and attribution. Reusing an existing asset no longer resets its global `is_public` flag, so one article revision cannot accidentally unpublish an asset already used by another published story.
 - The public article sidebar no longer contains the prize/prediction acquisition message; it now links to neutral fixtures and live-score coverage, keeping private Prediction promotion out of the public newsroom surface.
 - These changes are source committed; latest verification for commit `34494850b31ce530f960cfe30f46a95fe97e0927` is running. Do not mark migration 0027 or public gallery runtime complete until it is applied and exercised in isolated staging.
+
+
+## Media asset permission hardening — M39
+
+Migration `0038_factsport_media_asset_column_grants.sql` removes the editorial writer's table-wide UPDATE permission on `media_assets`. The CMS may update only rights metadata, rights-review identity/time, `is_public` during approved publication and `updated_at`. Object key, content type, byte size, hash, dimensions and uploader remain immutable through this application identity. Migration is committed but not applied to staging or production.
