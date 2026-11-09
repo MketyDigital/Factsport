@@ -554,3 +554,14 @@ This section supersedes the 2026-11-08 OPEN media-operations bullets where the s
 - Disposable PostgreSQL CI now targets 43 migrations and includes ACL/role/function/duplicate-retry assertions. The new run must complete before this is marked DB/runtime verified.
 - API route, visitor cookie, rate limiting, marketing confirmation, public UI, campaign engine, account claim and settlement are still not implemented. No staging/production DB was changed.
 - See `docs/audit/handoffs/M49-PREDICTION-SUBMISSION-PREFLIGHT.md`.
+
+
+### M49 implementation continuation — anonymous Prediction API and visitor flow
+
+- Added migration 0043's scoped SECURITY DEFINER submission, visitor-state and rate-limit functions. The dedicated API role receives EXECUTE only; no direct table access is intended.
+- Added host-gated same-origin GET/POST API, opaque Secure/HttpOnly visitor cookie, HMAC-keyed visitor/network rate limits, exact versioned rules acceptance and optional pending marketing consent.
+- Added a submit-triggered free-prediction form to match pages behind `FACTSPORT_PREDICTION_SUBMISSION_READY`. Email is hidden until Submit Prediction and omitted for a known browser participant. Legacy PredictionBoard and campaign/bonus/settlement logic remain untouched.
+- Final SQL/CI, typecheck and Worker build fixes are still being verified at current branch head. Earlier failures were traced to a malformed test dollar-quote/visitor-state block, a SQL email-regex escape and static-test/type errors; do not mark current implementation green until the latest runs complete.
+- No role login, Hyperdrive binding, HMAC secret, staging database migration, feature flag, production deployment or DNS change was activated.
+- Outstanding before enablement: current-head CI, isolated staging DB provisioning/application, browser E2E, marketing confirmation/unsubscribe, public own-prediction/leaderboard reads, legacy campaign/bonus mapping and scoring/VIP/monthly parity.
+- Detailed evidence and acceptance gaps: `docs/audit/handoffs/M49-PREDICTION-SUBMISSION-PREFLIGHT.md`.
