@@ -419,6 +419,16 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                         ? <MarkdownRenderer content={form.bodyMarkdown} />
                         : <p className="italic text-slate-500">Article body preview will appear here.</p>}
                     </div>
+                    {currentSources.length > 0 && <section className="mt-10 border-t border-slate-200 pt-7" aria-label="Preview source references">
+                      <h3 className="mb-3 text-lg font-black text-slate-900">Sources &amp; References</h3>
+                      <ul className="space-y-2">
+                        {currentSources.map(source => <li key={source.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                          <a href={source.canonical_url} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-blue-700 underline">{source.source_title}</a>
+                          {source.publisher && <span className="ml-2 text-[10px] text-slate-500">— {source.publisher}</span>}
+                          {source.attribution_text && <p className="mt-1 text-[10px] text-slate-600">{source.attribution_text}</p>}
+                        </li>)}
+                      </ul>
+                    </section>}
                     {previewInline.length > 0 && <section className="mt-10 border-t border-slate-200 pt-7" aria-label="Preview media gallery">
                       <h3 className="mb-4 text-lg font-black text-slate-900">More from this story</h3>
                       <div className="grid gap-4 sm:grid-cols-2">
