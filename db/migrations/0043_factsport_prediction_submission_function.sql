@@ -162,6 +162,8 @@ CREATE TABLE public.prediction_submission_rate_limits (
 );
 
 REVOKE ALL ON TABLE public.prediction_submission_rate_limits FROM PUBLIC;
+CREATE INDEX prediction_submission_rate_limits_expiry_idx
+  ON public.prediction_submission_rate_limits (window_started_at);
 
 CREATE OR REPLACE FUNCTION public.consume_public_prediction_rate_limit(
   p_scope text,
@@ -183,6 +185,12 @@ BEGIN
      OR p_window_seconds NOT BETWEEN 1 AND 3600
      OR p_limit NOT BETWEEN 1 AND 1000 THEN
     RAISE EXCEPTION 'invalid_rate_limit_parameters' USING ERRCODE = '22023';
+  END IF;
+
+  -- Opportunistically prune expired buckets without storing source identifiers.
+  IF pg_catalog.mod(pg_catalog.hashtextextended(p_key_hash, 0), 100) = 0 THEN
+    DELETE FROM public.prediction_submission_rate_limits
+     WHERE window_started_at < pg_catalog.transaction_timestamp() - INTERVAL '24 hours';
   END IF;
 
   v_window_start := pg_catalog.to_timestamp(
