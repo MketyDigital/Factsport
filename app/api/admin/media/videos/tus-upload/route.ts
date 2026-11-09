@@ -20,6 +20,12 @@ const VIDEO_CONTENT_TYPES = new Set([
   'video/x-matroska',
   'video/mpeg',
   'video/ogg',
+  'video/x-msvideo',
+  'video/x-flv',
+  'video/mp2t',
+  'video/3gpp',
+  'video/mxf',
+  'application/mxf',
 ]);
 
 export async function POST(request: Request) {
