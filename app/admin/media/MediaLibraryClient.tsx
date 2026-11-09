@@ -27,7 +27,7 @@ function formatBytes(bytes: number) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-export default function MediaLibraryClient({ canRevokeRights = false, streamVideoReady = false }: { canRevokeRights?: boolean; streamVideoReady?: boolean }) {
+export default function MediaLibraryClient({ canRevokeRights = false, derivativesReady = false, rightsRevocationReady = false, videoSchemaReady = false, streamVideoReady = false }: { canRevokeRights?: boolean; derivativesReady?: boolean; rightsRevocationReady?: boolean; videoSchemaReady?: boolean; streamVideoReady?: boolean }) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
@@ -69,7 +69,7 @@ export default function MediaLibraryClient({ canRevokeRights = false, streamVide
       <p className="mt-2 text-sm text-slate-500">Private R2 assets, rights status, attribution and expiry. Public delivery remains restricted to assets approved and attached to published editorial content.</p>
     </header>
 
-    <MediaVideoLibrary ready={streamVideoReady} canRevokeRights={canRevokeRights} />
+    <MediaVideoLibrary ready={streamVideoReady && videoSchemaReady} schemaReady={videoSchemaReady} canRevokeRights={canRevokeRights && rightsRevocationReady} />
 
     <form className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_220px_auto]" onSubmit={event => { event.preventDefault(); void load(0, false); }}>
       <label className="text-xs font-bold text-slate-600">Search assets
@@ -135,11 +135,11 @@ export default function MediaLibraryClient({ canRevokeRights = false, streamVide
           {asset.usage_expires_at && <p className="text-xs text-amber-700">Usage expires: {new Date(asset.usage_expires_at).toLocaleString()}</p>}
           <p className="text-[11px] text-slate-400">{asset.is_public ? 'Eligible for public projection when attached to a published article' : 'Private / not publicly served'}</p>
           {asset.derived_from && <p className="text-[10px] text-indigo-700">Immutable derivative · {asset.variant_key?.replaceAll('_', ' ')} · source {asset.derived_from}</p>}
-          <MediaUsagePanel assetId={asset.id} />
+          {derivativesReady && <MediaUsagePanel assetId={asset.id} />}
           {['owned', 'licensed', 'editorial_exception'].includes(asset.rights_status) &&
             (!asset.usage_expires_at || new Date(asset.usage_expires_at).valueOf() > Date.now()) &&
-            <MediaDerivativeEditor asset={asset} onCreated={() => void load(0, false)} />}
-          {canRevokeRights && ['owned', 'licensed', 'editorial_exception'].includes(asset.rights_status) && <MediaRightsRevocationControl assetId={asset.id} onRevoked={() => void load(0, false)} />}
+            {derivativesReady && <MediaDerivativeEditor asset={asset} onCreated={() => void load(0, false)} />}}
+          {canRevokeRights && rightsRevocationReady && ['owned', 'licensed', 'editorial_exception'].includes(asset.rights_status) && <MediaRightsRevocationControl assetId={asset.id} onRevoked={() => void load(0, false)} />}
         </div>
       </article>)}
     </div>
