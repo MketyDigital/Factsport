@@ -224,14 +224,26 @@ export async function isFactsportPredictionPostgresReady(): Promise<boolean> {
           current_user,
           'public.submit_public_prediction(text,text,text,uuid,text,integer,integer)',
           'EXECUTE'
-        ) AS submission_function_executable
+        ) AS submission_function_executable,
+        to_regclass('public.prediction_submission_rate_limits') IS NOT NULL AS rate_limits_ready,
+        to_regprocedure(
+          'public.consume_public_prediction_rate_limit(text,text,integer,integer)'
+        ) IS NOT NULL AS rate_limit_function_ready,
+        has_function_privilege(
+          current_user,
+          'public.consume_public_prediction_rate_limit(text,text,integer,integer)',
+          'EXECUTE'
+        ) AS rate_limit_function_executable
     `);
     const ready = rows[0];
     return !!ready && ready.role_ready === true &&
       ready.matches_ready === true && ready.contacts_ready === true &&
       ready.participants_ready === true && ready.predictions_ready === true &&
       ready.submission_function_ready === true &&
-      ready.submission_function_executable === true;
+      ready.submission_function_executable === true &&
+      ready.rate_limits_ready === true &&
+      ready.rate_limit_function_ready === true &&
+      ready.rate_limit_function_executable === true;
   } catch {
     return false;
   }
