@@ -328,6 +328,7 @@ test('revision history compares metadata, media, videos and sources and previews
   const markdownRenderer = read('app/components/MarkdownRenderer.tsx');
   assert.match(markdownRenderer, /disableExternalMedia = false/);
   assert.match(markdownRenderer, /External image omitted from private preview/);
+  assert.match(markdownRenderer, /src\.startsWith\('\/'\)/);
   assert.match(markdownRenderer, /Third-party video embed is not loaded in the private editor preview/);
   assert.match(ui, /Desktop preview/);
   assert.match(ui, /Mobile preview/);
