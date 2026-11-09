@@ -36,8 +36,9 @@ export async function scheduleSocialPublication(input: {
 
     const id = await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
       const actorId = authorization.user.domainUserId;
-      const channels = await tx`SELECT id FROM public.media_social_channels WHERE id=${input.channelId}::uuid AND is_enabled=true AND surface_scope='public_media' FOR SHARE`;
+      const channels = await tx`SELECT id, supports_media FROM public.media_social_channels WHERE id=${input.channelId}::uuid AND is_enabled=true AND surface_scope='public_media' FOR SHARE`;
       if (!channels.length) throw new Error('This social channel is not enabled for publishing.');
+      if (mediaAssetIds.length && !channels[0].supports_media) throw new Error('This channel has not passed image-delivery verification; schedule a text-only post or use a verified image-capable channel.');
       if (input.articleId) {
         const articles = await tx`
           SELECT id FROM public.editorial_articles
