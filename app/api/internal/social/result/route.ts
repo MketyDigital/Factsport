@@ -58,16 +58,21 @@ export async function POST(request: Request) {
   const providerRequestId = boundedText(input.providerRequestId, 200);
   const providerPostId = boundedText(input.providerPostId, 300);
   const providerPostUrl = safeProviderUrl(input.providerPostUrl);
-  const errorCode = boundedText(input.errorCode, 100);
-  const errorMessage = boundedText(input.errorMessage, 1000);
-  const responseSummary = input.responseSummary && typeof input.responseSummary === 'object'
-    ? Object.fromEntries(Object.entries(input.responseSummary).slice(0, 10).map(([key, value]) => [
-        key.slice(0, 64),
-        typeof value === 'string' ? value.slice(0, 200) :
-          typeof value === 'number' || typeof value === 'boolean' || value === null ? value : null,
-      ]))
+  const errorCodeInput = boundedText(input.errorCode, 100);
+  const errorCode = errorCodeInput && /^[a-zA-Z0-9_.-]+$/.test(errorCodeInput) ? errorCodeInput : null;
+  const errorMessage = boundedText(input.errorMessage, 1000)?.replace(/(access[_ -]?token|refresh[_ -]?token|api[_ -]?key|secret|password)[=: ]+[^\\s&]+/gi, '$1=[redacted]') || null;
+  const allowedSummaryKeys = new Set(['requestId', 'statusCode', 'provider', 'messageId', 'postId']);
+  const responseSummary = input.responseSummary && typeof input.responseSummary === 'object' && !Array.isArray(input.responseSummary)
+    ? Object.fromEntries(Object.entries(input.responseSummary)
+        .filter(([key]) => allowedSummaryKeys.has(key))
+        .slice(0, 5)
+        .map(([key, value]) => [key, typeof value === 'string' ? value.slice(0, 200) :
+          typeof value === 'number' || typeof value === 'boolean' || value === null ? value : null]))
     : {};
 
+  if (input.providerPostUrl && !providerPostUrl) {
+    return NextResponse.json({ error: 'Provider post URL must use HTTP or HTTPS.' }, { status: 400 });
+  }
   if (input.outcome === 'succeeded' && !providerPostId) {
     return NextResponse.json({ error: 'A successful delivery must include a provider post ID.' }, { status: 400 });
   }
