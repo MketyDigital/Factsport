@@ -15,6 +15,27 @@ CREATE TABLE IF NOT EXISTS public.media_asset_derivatives (
 CREATE INDEX IF NOT EXISTS media_asset_derivatives_source_idx
   ON public.media_asset_derivatives (source_asset_id, variant_key, created_at DESC);
 
+CREATE OR REPLACE FUNCTION public.reject_nested_media_derivative()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public
+AS $
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.media_asset_derivatives
+    WHERE derivative_asset_id=NEW.source_asset_id
+  ) THEN
+    RAISE EXCEPTION 'A derivative cannot be used as the source of another derivative';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS media_asset_derivative_no_nesting ON public.media_asset_derivatives;
+CREATE TRIGGER media_asset_derivative_no_nesting
+  BEFORE INSERT ON public.media_asset_derivatives
+  FOR EACH ROW EXECUTE FUNCTION public.reject_nested_media_derivative();
+
 REVOKE ALL ON public.media_asset_derivatives
   FROM PUBLIC, factsport_v2_reader, factsport_v2_schedule_writer,
        factsport_v2_espn_writer, factsport_v2_social_dispatcher;
