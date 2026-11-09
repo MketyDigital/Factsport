@@ -74,7 +74,7 @@ test('Large VOD files use protected Cloudflare TUS with durable resume and size 
 
   assert.match(migration, /upload_protocol text NOT NULL DEFAULT 'basic'/);
   assert.match(migration, /upload_expected_size_bytes bigint/);
-  assert.match(migration, /BETWEEN 1 AND 30000000000/);
+  assert.match(migration, /upload_expected_size_bytes > 0 AND upload_expected_size_bytes < 30000000000/);
 
   assert.match(adapter, /FACTSPORT_STREAM_BASIC_UPLOAD_MAX_BYTES = 200_000_000/);
   assert.match(adapter, /FACTSPORT_STREAM_MAX_UPLOAD_BYTES = 30_000_000_000/);
