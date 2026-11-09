@@ -361,7 +361,7 @@ export async function publishApprovedEditorial(articleId: string, publicContentC
         const videoId = videoAttachment.video_id as string | null;
         if (videoId && !videoAttachment.remove_video) {
           const approvedVideo = await tx`
-            SELECT id FROM public.media_video_assets
+            SELECT id, title, description FROM public.media_video_assets
             WHERE id=${videoId}::uuid AND upload_status='ready'
               AND rights_status IN ('owned','licensed','editorial_exception')
               AND rights_reviewed_by IS NOT NULL AND rights_reviewed_at IS NOT NULL
@@ -370,6 +370,11 @@ export async function publishApprovedEditorial(articleId: string, publicContentC
             FOR SHARE
           `;
           if (!approvedVideo.length) throw new Error('A revision video is not processed or no longer has valid rights approval. Publishing is blocked.');
+          const videoPolicy = inspectPublicMediaArticle({
+            ...snapshot,
+            body_markdown: [snapshot.body_markdown, approvedVideo[0].title, approvedVideo[0].description || ''].join('\\n'),
+          });
+          if (!videoPolicy.eligible) throw new Error('Video title or description contains content that is not eligible for public Media publication.');
         }
       }
       for (const attachment of revisionMedia) {
