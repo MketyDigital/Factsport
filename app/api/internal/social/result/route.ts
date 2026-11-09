@@ -60,7 +60,7 @@ export async function POST(request: Request) {
   const providerPostUrl = safeProviderUrl(input.providerPostUrl);
   const errorCodeInput = boundedText(input.errorCode, 100);
   const errorCode = errorCodeInput && /^[a-zA-Z0-9_.-]+$/.test(errorCodeInput) ? errorCodeInput : null;
-  const errorMessage = boundedText(input.errorMessage, 1000)?.replace(/(access[_ -]?token|refresh[_ -]?token|api[_ -]?key|secret|password)[=: ]+[^\\s&]+/gi, '$1=[redacted]') || null;
+  const errorMessage = boundedText(input.errorMessage, 1000)?.replace(/(access[_ -]?token|refresh[_ -]?token|api[_ -]?key|secret|password)[=: ]+[^\s&]+/gi, '$1=[redacted]') || null;
   const allowedSummaryKeys = new Set(['requestId', 'statusCode', 'provider', 'messageId', 'postId']);
   const responseSummary = input.responseSummary && typeof input.responseSummary === 'object' && !Array.isArray(input.responseSummary)
     ? Object.fromEntries(Object.entries(input.responseSummary)
