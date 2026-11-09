@@ -166,7 +166,7 @@ GRANT SELECT ON public.public_editorial_article_videos,
 COMMIT;
 ),
   CONSTRAINT media_video_duration_limit CHECK (duration_seconds IS NULL OR duration_seconds BETWEEN 0.001 AND 900),
-  CONSTRAINT media_video_playback_host_valid CHECK (playback_host IS NULL OR playback_host ~ '^[a-z0-9-]+\\.cloudflarestream\\.com
+  CONSTRAINT media_video_playback_host_valid CHECK (playback_host IS NULL OR playback_host ~ '^[a-z0-9-]+\.cloudflarestream\.com
     (rights_reviewed_by IS NULL AND rights_reviewed_at IS NULL) OR
     (rights_reviewed_by IS NOT NULL AND rights_reviewed_at IS NOT NULL)
   ),
