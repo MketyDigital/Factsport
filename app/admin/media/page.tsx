@@ -12,5 +12,5 @@ export default async function MediaLibraryPage() {
       <p className="mt-2 text-sm text-amber-900">{authorization.error}</p>
     </main>;
   }
-  return <MediaLibraryClient />;
+  return <MediaLibraryClient canRevokeRights={authorization.user.roles.includes('media_admin')} />;
 }
