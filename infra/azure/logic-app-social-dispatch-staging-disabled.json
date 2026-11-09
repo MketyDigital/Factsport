@@ -141,7 +141,15 @@
               }
             }
           },
-          "outputs": {}
+          "outputs": {},
+          "parameters": {
+            "factsportBaseUrl": {
+              "type": "String"
+            },
+            "dispatchToken": {
+              "type": "SecureString"
+            }
+          }
         },
         "parameters": {
           "factsportBaseUrl": {
