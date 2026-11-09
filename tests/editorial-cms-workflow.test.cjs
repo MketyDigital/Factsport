@@ -411,3 +411,28 @@ test('editorial source provenance is append-only in the CMS and public only with
   assert.match(publicAdapter, /public\.public_editorial_article_sources/);
   assert.match(publicArticle, /Sources &amp; References/);
 });
+
+
+test('social channel administration is role-gated, secret-free and readiness-gated', () => {
+  const socialAction = read('app/admin/social/actions.ts');
+  const socialPage = read('app/admin/social/page.tsx');
+  const socialClient = read('app/admin/social/SocialClient.tsx');
+  const migration = read('db/migrations/0034_factsport_editorial_audit_and_social_channel_admin.sql');
+  assert.match(socialAction, /authorizeMediaEditorialAction\('social_admin'\)/);
+  assert.match(socialAction, /isFactsportSocialDispatchReady/);
+  assert.match(socialAction, /isFactsportSocialProviderReady/);
+  assert.match(socialAction, /isFactsportSocialMediaProviderReady/);
+  assert.match(socialAction, /page_id/);
+  assert.match(socialAction, /profile_id/);
+  assert.match(socialAction, /chat_ids/);
+  assert.match(socialAction, /route_key/);
+  assert.match(socialAction, /never enter a page access token here/);
+  assert.match(socialPage, /settings FROM public\.media_social_channels/);
+  assert.match(socialClient, /Social channel connections/);
+  assert.match(socialClient, /Access tokens, bot tokens and webhook URLs belong in secure/);
+  assert.match(socialClient, /Save channel settings/);
+  assert.match(migration, /media_detached/);
+  assert.match(migration, /source_added/);
+  assert.match(migration, /social_channel_configured/);
+  assert.match(migration, /GRANT UPDATE \(is_enabled, supports_media, settings, updated_at\)/);
+});
