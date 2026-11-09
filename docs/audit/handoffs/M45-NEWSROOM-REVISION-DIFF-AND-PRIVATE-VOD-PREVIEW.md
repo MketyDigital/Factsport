@@ -68,3 +68,10 @@ No migration, Azure database, production route, DNS, Cloudflare Stream asset, R2
 - Approved Stream clips remain available through the short-lived, editor-authorized preview endpoint.
 - Isolated verification passed on source commit `67c7d8b13138fa9da4242bb3aabf6b70a106f8cf`, run [42574631125](https://github.com/MketyDigital/Factsport/actions/runs/42574631125): engine regression, TypeScript, anonymous prediction/consent schema contract and migration inventory passed.
 - Native build run [42574631124](https://github.com/MketyDigital/Factsport/actions/runs/42574631124) and protected staging run [42574631386](https://github.com/MketyDigital/Factsport/actions/runs/42574631386) were still in progress when this follow-up was written.
+
+
+## Final protected staging follow-up — 2026-11-09
+
+- Protected Cloudflare application staging passed on source commit `67c7d8b13138fa9da4242bb3aabf6b70a106f8cf`, run [42574631386](https://github.com/MketyDigital/Factsport/actions/runs/42574631386).
+- The final source slice passed the regression suite, TypeScript, native Worker build, isolated protected Worker deployment, deny-by-default probes and protected PostgreSQL-backed `/matches` checks.
+- This does not prove the full Newsroom browser journey, revision restore, private Stream preview or Azure VOD migration. Those remain separate acceptance tests.
