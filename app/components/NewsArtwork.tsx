@@ -7,6 +7,9 @@ interface NewsArtworkProps {
   image?: string | null;
   team1Logo?: string | null;
   team2Logo?: string | null;
+  imageAlt?: string;
+  team1Alt?: string;
+  team2Alt?: string;
   title?: string;
   className?: string;
   loading?: 'lazy' | 'eager'; // Added this prop
@@ -14,7 +17,7 @@ interface NewsArtworkProps {
   decoding?: 'sync' | 'async' | 'auto'; // Added this prop as it's also relevant for images
 }
 
-export default function NewsArtwork({ image, team1Logo, team2Logo, title, className = "", loading, fetchPriority, decoding }: NewsArtworkProps) {
+export default function NewsArtwork({ image, team1Logo, team2Logo, imageAlt, team1Alt, team2Alt, title, className = "", loading, fetchPriority, decoding }: NewsArtworkProps) {
 
   // **Important:** The actual <img> tags within this component
   // need to be updated to accept and use these new props.
@@ -27,7 +30,7 @@ export default function NewsArtwork({ image, team1Logo, team2Logo, title, classN
         {/* The img tag below needs to accept loading, fetchPriority, and decoding */}
         <img
           src={image}
-          alt={title || "News"}
+          alt={imageAlt || title || "News"}
           className="w-full h-full object-cover"
           loading={loading} // Pass the prop down
           fetchPriority={fetchPriority} // Pass the prop down
@@ -48,12 +51,12 @@ export default function NewsArtwork({ image, team1Logo, team2Logo, title, classN
 
         {/* Logos */}
         <div className="relative z-10 flex items-center gap-4 md:gap-8 px-4 w-full justify-center">
-           <img src={team1Logo} className="w-14 h-14 md:w-24 md:h-24 object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]" alt="Team 1" loading={loading} fetchPriority={fetchPriority} decoding={decoding} />
+           <img src={team1Logo} className="w-14 h-14 md:w-24 md:h-24 object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]" alt={team1Alt || 'Team 1'} loading={loading} fetchPriority={fetchPriority} decoding={decoding} />
            <div className="flex flex-col items-center">
              <Zap size={24} className="text-yellow-400 fill-yellow-400 animate-pulse drop-shadow-md" />
              <span className="text-[10px] md:text-xs font-black text-white/50 uppercase tracking-widest mt-1">VS</span>
            </div>
-           <img src={team2Logo} className="w-14 h-14 md:w-24 md:h-24 object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]" alt="Team 2" loading={loading} fetchPriority={fetchPriority} decoding={decoding} />
+           <img src={team2Logo} className="w-14 h-14 md:w-24 md:h-24 object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]" alt={team2Alt || 'Team 2'} loading={loading} fetchPriority={fetchPriority} decoding={decoding} />
         </div>
 
         {/* Overlay Gradient */}
@@ -72,7 +75,7 @@ export default function NewsArtwork({ image, team1Logo, team2Logo, title, classN
 
          {/* Sharp Logo in Center */}
          <div className="relative z-10 w-full flex justify-center p-6">
-            <img src={team1Logo} className="w-20 h-20 md:w-32 md:h-32 object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.9)]" alt="Club" loading={loading} fetchPriority={fetchPriority} decoding={decoding} />
+            <img src={team1Logo} className="w-20 h-20 md:w-32 md:h-32 object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.9)]" alt={team1Alt || 'Club'} loading={loading} fetchPriority={fetchPriority} decoding={decoding} />
          </div>
          <div className="absolute inset-0 bg-gradient-to-t from-[#0a1428] via-transparent to-transparent"></div>
       </div>
