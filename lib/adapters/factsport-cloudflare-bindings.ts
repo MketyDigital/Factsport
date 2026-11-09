@@ -23,7 +23,7 @@ export function factsportPostgres() {
 export function factsportMediaBucket() {
   const bucket = env.FACTSPORT_MEDIA_BUCKET as {
     head: (key: string) => Promise<unknown | null>;
-    get: (key: string) => Promise<unknown | null>;
+    get: (key: string) => Promise<{ size: number; arrayBuffer: () => Promise<ArrayBuffer> } | null>;
     put: (key: string, data: ArrayBuffer | string, options?: object) => Promise<unknown>;
     delete: (key: string) => Promise<void>;
   };
