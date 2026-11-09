@@ -139,7 +139,8 @@ export function isFactsportSocialProviderReady(provider: FactsportSocialProvider
   const adapterToken = typeof bindings.FACTSPORT_LOGIC_APPS_SOCIAL_ADAPTER_TOKEN === 'string'
     ? String(bindings.FACTSPORT_LOGIC_APPS_SOCIAL_ADAPTER_TOKEN) : '';
   try {
-    return new URL(adapterUrl).protocol === 'https:' && adapterToken.length >= 32;
+    const parsed = new URL(adapterUrl);
+    return parsed.protocol === 'https:' && !parsed.search && !parsed.hash && adapterToken.length >= 32;
   } catch { return false; }
 }
 
