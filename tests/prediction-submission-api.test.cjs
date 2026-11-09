@@ -68,7 +68,7 @@ test('Public prediction form reveals email only after explicit submit and reuses
   assert.match(publicUi, /method: 'GET'/);
   assert.match(publicUi, /emailRequired\) &&/);
   assert.match(publicUi, /emailRequired: data\.emailRequired/);
-  assert.match(publicUi, /name="email"/);
+  assert.match(publicUi, /type="email" required/);
   assert.match(publicUi, /Submit Prediction/);
   assert.match(publicUi, /Confirm Prediction/);
   assert.match(publicUi, /checked=\{marketingOptIn\}/);
