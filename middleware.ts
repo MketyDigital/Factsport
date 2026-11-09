@@ -99,13 +99,49 @@ export async function middleware(request: NextRequest) {
   }
 
   // -----------------------------------------------------------------
-  // 🟢 PART 2: SUPABASE AUTH & ADMIN PROTECTION
+  // PART 2: host-isolated identity middleware
   // -----------------------------------------------------------------
+  const privateProductHost = (process.env.FACTSPORT_PRIVATE_PRODUCT_HOST || '').trim().toLowerCase();
+  const requestHost = request.nextUrl.hostname.toLowerCase();
+  const isPrivateProductHost = !!privateProductHost && requestHost === privateProductHost;
+  const isMediaAdminPath = pathname === '/admin' || pathname.startsWith('/admin/');
+  const isMediaAuthPath = pathname === '/media-login' || pathname.startsWith('/api/auth/entra/');
+
+  // Media editorial authentication is Entra-only. Never send Media editors
+  // through the legacy Supabase email allowlist or profile-role check.
+  if (!isPrivateProductHost) {
+    if (isMediaAuthPath) return NextResponse.next();
+
+    if (isMediaAdminPath) {
+      const hasEntraMediaSession = Boolean(request.cookies.get('__Host-factsport_media_session')?.value);
+      if (!hasEntraMediaSession) {
+        return NextResponse.redirect(new URL('/media-login', request.url), 302);
+      }
+      // Cookie presence is only a routing hint. The admin layout and every
+      // protected action decrypt the session and re-check the DB membership.
+      return NextResponse.next();
+    }
+
+    // Public Media pages do not require a Supabase session refresh on every
+    // request. This also keeps Entra callback/login independent of Supabase.
+    return NextResponse.next();
+  }
+
+  // Only the private Prediction host retains the legacy Supabase session
+  // refresh while its separate Entra/account migration remains outstanding.
+  // Media admin and Entra endpoints are never served on the Prediction host.
+  if (isMediaAdminPath || isMediaAuthPath) {
+    return new NextResponse('Not found', {
+      status: 404,
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  }
+
   let response = NextResponse.next({
     request: {
       headers: request.headers,
     },
-  })
+  });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -113,90 +149,31 @@ export async function middleware(request: NextRequest) {
     {
       cookies: {
         get(name: string) {
-          return request.cookies.get(name)?.value
+          return request.cookies.get(name)?.value;
         },
         set(name: string, value: string, options: CookieOptions) {
-          // 1. Update request (name & value only)
-          request.cookies.set({
-            name,
-            value,
-          })
-          
-          // 2. Re-initialize response
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          
-          // 3. Update response (apply security options here)
+          request.cookies.set({ name, value });
+          response = NextResponse.next({ request: { headers: request.headers } });
           response.cookies.set({
             name,
             value,
             ...options,
-            secure: process.env.NODE_ENV === 'production', // 🛡️ Forces secure cookies in prod
-            sameSite: 'lax', // 🛡️ Protects against CSRF
-          })
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+          });
         },
         remove(name: string, options: CookieOptions) {
-          // 1. Update request (name & empty value only)
-          request.cookies.set({
-            name,
-            value: '',
-          })
-          
-          // 2. Re-initialize response
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          
-          // 3. Update response (apply removal options here)
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
+          request.cookies.set({ name, value: '' });
+          response = NextResponse.next({ request: { headers: request.headers } });
+          response.cookies.set({ name, value: '', ...options });
         },
       },
-    }
-  )
+    },
+  );
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // 🛡️ SECURITY CHECK FOR ADMIN ROUTES
-  // Entra cookie presence bypasses only this legacy Supabase/email gate.
-  // Media layouts, pages and every mutation decrypt and verify the session.
-  const hasEntraMediaSession = Boolean(request.cookies.get('__Host-factsport_media_session')?.value);
-  if (pathname.startsWith('/admin') && !hasEntraMediaSession) {
-    
-    // 1. If not logged in -> Send to Login
-    if (!user) {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-
-    // 2. If logged in but WRONG EMAIL -> Kick them out
-    const userEmail = user.email;
-    const adminEmails = ['mkposcosunday@gmail.com', 'factsportlive@gmail.com', 'fact@factsport.com'];
-
-    if (!userEmail || !adminEmails.includes(userEmail.toLowerCase())) {
-      // Redirect unauthorized users to the dashboard
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
-  }
-
-  return response
+  // This call refreshes only the private Prediction browser session. It does
+  // not authorize Media admin or any Prediction business-data operation.
+  await supabase.auth.getUser();
+  return response;
 }
-
-export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
-  ],
 }
