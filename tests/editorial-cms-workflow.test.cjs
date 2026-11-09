@@ -308,6 +308,29 @@ test('editorial revision history is role-protected and restore creates a new dra
 });
 
 
+test('revision history compares metadata, media, videos and sources and previews private clips', () => {
+  const revisionRoute = read('app/api/admin/news/[id]/revisions/route.ts');
+  const newsroomPage = read('app/admin/news/page.tsx');
+  const videoPreview = read('app/admin/media/MediaVideoPreview.tsx');
+  const previewRoute = read('app/api/admin/media/videos/[id]/preview/route.ts');
+  assert.match(revisionRoute, /revision_media/);
+  assert.match(revisionRoute, /revision_videos/);
+  assert.match(revisionRoute, /revision_sources/);
+  assert.match(revisionRoute, /editorial_article_sources/);
+  assert.match(newsroomPage, /WHERE rm\.revision_id = COALESCE\(r\.id, published_revision\.id\)/);
+  assert.match(ui, /Field-by-field changes/);
+  assert.match(ui, /Image placements/);
+  assert.match(ui, /Video clips/);
+  assert.match(ui, /Source provenance/);
+  assert.match(ui, /previewVideos/);
+  assert.match(ui, /<MediaVideoPreview/);
+  assert.match(videoPreview, /\/api\/admin\/media\/videos\//);
+  assert.match(videoPreview, /iframeUrl/);
+  assert.match(previewRoute, /authorizeMediaEditorialAction\('media'\)/);
+  assert.match(previewRoute, /createFactsportStreamSignedToken/);
+  assert.match(previewRoute, /private, no-store/);
+});
+
 test('draft saves carry forward the previous draft revision media attachments', () => {
   assert.match(actions, /let previousRevisionId: string \| null = null/);
   assert.match(actions, /workflow_status IN \('draft','in_review','approved'\)[\s\S]*ORDER BY revision_number DESC LIMIT 1 FOR UPDATE/);
