@@ -18,7 +18,7 @@ export default async function AdminSocialPage() {
       `;
       const publications = await sql`
         SELECT p.id, p.content_text, p.status, p.scheduled_at, p.published_at,
-               p.provider_post_url, c.display_name, c.provider
+               p.provider_post_url, p.media_asset_ids, c.display_name, c.provider
         FROM public.media_social_publications p
         JOIN public.media_social_channels c ON c.id=p.channel_id
         ORDER BY p.created_at DESC LIMIT 100
