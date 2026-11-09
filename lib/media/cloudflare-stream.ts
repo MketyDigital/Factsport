@@ -16,7 +16,7 @@ export function isFactsportStreamVideoReady(): boolean {
   return process.env.FACTSPORT_STREAM_VIDEO_READY === 'true' &&
     /^[a-f0-9]{32}$/i.test(config.accountId) &&
     config.apiToken.length >= 32 &&
-    /^[a-f0-9]{32}$/i.test(config.signingKeyId) &&
+    /^[a-f0-9]{31,32}$/i.test(config.signingKeyId) &&
     config.signingKeyJwk.length >= 100 &&
     config.allowedOrigins.length > 0 &&
     config.allowedOrigins.every(origin => /^(?:[a-z0-9-]+\.)*[a-z0-9-]+\.[a-z]{2,}$/.test(origin));
