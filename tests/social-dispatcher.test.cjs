@@ -20,7 +20,9 @@ test('social claim endpoint is fail-closed and uses the dedicated dispatcher dat
   assert.match(claim, /lease_expires_at/);
   assert.match(claim, /public\.public_social_media_assets/);
   assert.match(claim, /unknown_result/);
-  assert.doesNotMatch(claim, /c\.settings|channelSettings/);
+  assert.match(claim, /c\.settings->>'page_id'/);
+  assert.match(claim, /c\.settings->'chat_ids'/);
+  assert.doesNotMatch(claim, /c\.settings AS|channelSettings/);
 });
 
 test('social result callback records provider receipts, bounded retries and unknown outcomes without blind retry', () => {
