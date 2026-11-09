@@ -118,6 +118,24 @@ export async function saveEditorialDraft(input: EditorialInput): Promise<ActionR
           ON CONFLICT (revision_id, placement, position) DO NOTHING
         `;
       }
+      else if (currentStatus === 'published') {
+        await tx`
+          INSERT INTO public.editorial_article_revision_media
+            (revision_id, placement, position, media_id, remove_media, updated_at)
+          SELECT ${newRevision[0].id}::uuid, 'hero', 0, media_id, false, now()
+          FROM public.editorial_article_media
+          WHERE article_id=${articleId}::uuid AND placement='hero'
+          UNION ALL
+          SELECT ${newRevision[0].id}::uuid, 'inline', position, media_id, false, now()
+          FROM public.editorial_article_media
+          WHERE article_id=${articleId}::uuid AND placement='inline'
+          UNION ALL
+          SELECT ${newRevision[0].id}::uuid, team_side, 0, media_id, false, now()
+          FROM public.editorial_article_team_media
+          WHERE article_id=${articleId}::uuid
+          ON CONFLICT (revision_id, placement, position) DO NOTHING
+        `;
+      }
       await tx`
         INSERT INTO public.media_editorial_audit_events (actor_user_id, action, article_id, revision_id, details)
         VALUES (${actorId}::uuid, 'draft_saved', ${articleId}::uuid, ${newRevision[0].id}::uuid,
