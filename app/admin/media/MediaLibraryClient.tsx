@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import MediaDerivativeEditor from './MediaDerivativeEditor';
 import MediaRightsRevocationControl from './MediaRightsRevocationControl';
+import MediaUsagePanel from './MediaUsagePanel';
 
 type Asset = {
   id: string; object_key: string; content_type: string; byte_size: number;
@@ -131,6 +132,7 @@ export default function MediaLibraryClient({ canRevokeRights = false }: { canRev
           {asset.usage_expires_at && <p className="text-xs text-amber-700">Usage expires: {new Date(asset.usage_expires_at).toLocaleString()}</p>}
           <p className="text-[11px] text-slate-400">{asset.is_public ? 'Eligible for public projection when attached to a published article' : 'Private / not publicly served'}</p>
           {asset.derived_from && <p className="text-[10px] text-indigo-700">Immutable derivative · {asset.variant_key?.replaceAll('_', ' ')} · source {asset.derived_from}</p>}
+          <MediaUsagePanel assetId={asset.id} />
           {['owned', 'licensed', 'editorial_exception'].includes(asset.rights_status) &&
             (!asset.usage_expires_at || new Date(asset.usage_expires_at).valueOf() > Date.now()) &&
             <MediaDerivativeEditor asset={asset} onCreated={() => void load(0, false)} />}
