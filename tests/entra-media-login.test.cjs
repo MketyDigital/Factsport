@@ -30,6 +30,7 @@ test('Media sign-in stays hidden until Entra and dedicated editorial PostgreSQL 
   assert.match(postgres, /FACTSPORT_EDITORIAL_HYPERDRIVE/);
   assert.match(login, /isEntraExternalConfigured\(\)/);
   assert.match(login, /isFactsportEditorialPostgresReady\(\)/);
+  assert.match(login, /await isFactsportEditorialPostgresReady\(\)/);
   assert.match(login, /isEntraMediaRequestHost/);
   assert.match(login, /signInReady/);
   assert.match(login, /No legacy email allowlist fallback is available/);
