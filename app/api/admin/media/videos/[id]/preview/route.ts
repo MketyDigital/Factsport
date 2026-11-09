@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 import { withFactsportEditorialPostgres } from '@/lib/adapters/postgres-client';
+import { isFactsportMediaVideoSchemaReady } from '@/lib/media/readiness';
 import {
   createFactsportStreamSignedToken, isFactsportStreamPlaybackReady,
 } from '@/lib/media/cloudflare-stream';
@@ -17,6 +18,7 @@ export async function GET(_request: Request, context: { params: { id: string } }
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(videoId)) {
     return NextResponse.json({ error: 'Not found' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
   }
+  if (!isFactsportMediaVideoSchemaReady()) return NextResponse.json({ error: 'Video schema migration is not enabled.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   if (!isFactsportStreamPlaybackReady()) {
     return NextResponse.json({ error: 'Secure video preview is not configured.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
