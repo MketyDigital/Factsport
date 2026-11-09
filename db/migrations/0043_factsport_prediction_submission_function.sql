@@ -238,7 +238,21 @@ SET search_path = pg_catalog, public
 AS $visitor_state$
   SELECT CASE
     WHEN p_visitor_token_hash IS NULL
-      OR p_visitor_token_hash !~ '^[0-9a-f]{64} Only keyed hashes are stored; raw
+      OR pg_catalog.char_length(p_visitor_token_hash) <> 64
+      OR p_visitor_token_hash ~ '[^0-9a-f]' THEN false
+    ELSE EXISTS (
+      SELECT 1
+      FROM public.prediction_participants AS participant
+      WHERE participant.visitor_token_hash = p_visitor_token_hash
+    )
+  END;
+$visitor_state$;
+
+REVOKE ALL ON FUNCTION public.get_public_prediction_visitor_state(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_public_prediction_visitor_state(text)
+  TO factsport_v2_prediction_api;
+
+-- Privacy-preserving rate-limit counters. Only keyed hashes are stored; raw
 -- visitor tokens and client IP addresses never enter this table.
 CREATE TABLE public.prediction_submission_rate_limits (
   scope text NOT NULL CHECK (scope IN ('visitor', 'network')),
