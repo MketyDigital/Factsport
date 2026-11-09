@@ -65,7 +65,7 @@ export async function POST(request: Request) {
         claimed AS (
           UPDATE public.media_social_outbox o
           SET status='processing', attempts=o.attempts+1,
-              lease_owner=${workerId}, lease_expires_at=now() + (${LEASE_MINUTES} || ' minutes')::interval,
+              lease_owner=${workerId}, lease_expires_at=now() + make_interval(mins => ${LEASE_MINUTES}),
               updated_at=now()
           FROM due
           WHERE o.id=due.outbox_id
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
                     claimed.outbox_id, claimed.attempts
         )
         SELECT publishing.*,
-          c.provider, c.display_name, c.settings, c.supports_media,
+          c.provider, c.display_name, c.supports_media,
           media.items AS media_assets
         FROM publishing
         JOIN public.media_social_channels c ON c.id=publishing.channel_id
@@ -106,6 +106,19 @@ export async function POST(request: Request) {
         const assets = Array.isArray(job.media_assets) ? job.media_assets : [];
         const expectedAssets = Array.isArray(job.media_asset_ids) ? job.media_asset_ids.length : 0;
         if ((expectedAssets > 0 && !job.supports_media) || assets.length !== expectedAssets) {
+          await tx`
+            INSERT INTO public.media_social_delivery_attempts
+              (publication_id, attempt_number, outcome, error_code, error_message, finished_at)
+            VALUES (
+              ${job.id}::uuid, ${job.attempts}, 'permanent_failure',
+              'media_not_public_or_channel_unsupported',
+              'One or more attached images are no longer eligible for this public channel.',
+              now()
+            )
+            ON CONFLICT (publication_id, attempt_number) DO UPDATE SET
+              outcome='permanent_failure', error_code=EXCLUDED.error_code,
+              error_message=EXCLUDED.error_message, finished_at=now()
+          `;
           await tx`
             UPDATE public.media_social_outbox
             SET status='dead_letter', lease_owner=NULL, lease_expires_at=NULL,
@@ -135,7 +148,6 @@ export async function POST(request: Request) {
           idempotencyKey: job.idempotency_key,
           provider: job.provider,
           channelName: job.display_name,
-          channelSettings: job.settings,
           contentText: job.content_text,
           linkUrl: job.link_url,
           scheduledAt: job.scheduled_at,
