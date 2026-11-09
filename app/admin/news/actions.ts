@@ -461,6 +461,14 @@ export async function restoreEditorialRevision(articleId: string, revisionId: st
         ON CONFLICT (revision_id, placement, position) DO NOTHING
       `;
       await tx`
+        INSERT INTO public.editorial_article_sources
+          (article_id, revision_id, source_title, publisher, canonical_url, attribution_text, rights_reference, accessed_at)
+        SELECT article_id, ${created[0].id}::uuid, source_title, publisher,
+               canonical_url, attribution_text, rights_reference, accessed_at
+        FROM public.editorial_article_sources
+        WHERE revision_id=${revisionId}::uuid
+      `;
+      await tx`
         UPDATE public.editorial_article_revisions
         SET workflow_status='superseded'
         WHERE article_id=${articleId}::uuid
