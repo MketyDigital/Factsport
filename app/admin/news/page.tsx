@@ -54,6 +54,8 @@ export default async function AdminNewsPage() {
           'media_id', m.id,
           'object_key', m.object_key,
           'content_type', m.content_type,
+          'width', m.width,
+          'height', m.height,
           'rights_status', m.rights_status,
           'alt_text', m.alt_text,
           'attribution_text', m.attribution_text
