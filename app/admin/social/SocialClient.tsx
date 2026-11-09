@@ -21,7 +21,7 @@ type Reconciliation = {
   attempt_error_message: string | null; started_at: string; finished_at: string | null;
 };
 
-export default function SocialClient({ channels, publications, reconciliations }: { channels: Channel[]; publications: Publication[]; reconciliations: Reconciliation[] }) {
+export default function SocialClient({ channels, publications, reconciliations, reconciliationReady }: { channels: Channel[]; publications: Publication[]; reconciliations: Reconciliation[]; reconciliationReady: boolean }) {
   const [channelId, setChannelId] = useState(channels.find(channel => channel.is_enabled)?.id || '');
   const [channelDrafts, setChannelDrafts] = useState<Record<string, { isEnabled: boolean; supportsMedia: boolean; providerSetting: string }>>(() => Object.fromEntries(channels.map(channel => [channel.id, {
     isEnabled: channel.is_enabled,
@@ -228,6 +228,10 @@ export default function SocialClient({ channels, publications, reconciliations }
             <h3 className="font-black text-amber-950">Dispatcher status</h3>
             <p className="mt-2 text-sm text-amber-900">Posts enter a durable outbox and are delivered only by the dedicated dispatcher. Live delivery remains disabled until its isolated database identity, provider credentials, secure Logic Apps/APIM adapter and private-destination end-to-end tests are verified. Ambiguous provider results are dead-lettered for manual reconciliation; they are never blindly replayed.</p>
           </div>
+          {!reconciliationReady && <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <h3 className="font-black text-slate-800">Operator reconciliation is not activated</h3>
+            <p className="mt-2 text-sm text-slate-600">The manual unknown-result queue stays hidden until migration 0042, the editorial-reader view grant and the environment readiness flag are verified together.</p>
+          </div>}
         </aside>
       </section>
 
