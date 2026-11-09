@@ -42,13 +42,15 @@ test('Media sign-in stays hidden until Entra and dedicated editorial PostgreSQL 
   assert.doesNotMatch(logoutRoute, /export async function GET/);
   assert.match(adminLayout, /method="post"/);
   assert.match(middleware, /redirect\(new URL\('\/media-login'/);
-  assert.match(middleware, /Only the private Prediction host retains the legacy Supabase session refresh/);
+  assert.ok(middleware.includes('Only the private Prediction host retains the legacy Supabase session'));
+  assert.ok(middleware.includes('refresh while its separate Entra/account migration remains outstanding'));
   assert.match(middleware, /if \(!isPrivateProductHost\)/);
   assert.match(middleware, /if \(isMediaAdminPath \|\| isMediaAuthPath\)/);
   assert.doesNotMatch(middleware, /ADMIN_EMAILS|adminEmails/);
   const publicHostBranch = middleware.slice(middleware.indexOf('if (!isPrivateProductHost)'), middleware.indexOf('// Only the private Prediction host retains'));
   assert.doesNotMatch(publicHostBranch, /createServerClient|supabase\.auth\.getUser/);
-  assert.match(middleware, /Only the private Prediction host retains the legacy Supabase session refresh/);
+  assert.ok(middleware.includes('Only the private Prediction host retains the legacy Supabase session'));
+  assert.ok(middleware.includes('refresh while its separate Entra/account migration remains outstanding'));
   assert.match(adminLayout, /rejectPrivateProductHost/);
   assert.match(mediaLogin, /rejectPrivateProductHost/);
   assert.match(privateHostGuard, /new URL\(rawConfiguredHost\.includes/);
