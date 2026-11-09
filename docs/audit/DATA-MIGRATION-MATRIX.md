@@ -113,3 +113,5 @@ The signed Stream webhook endpoint now verifies raw-body HMAC, handles gzip payl
 - `0030_factsport_broadcast_token_identity_and_webhooks.sql`: room-scoped Stream token identity mapping, retryable webhook receipt ledger, audit action extensions, token-issuer grants and narrowly scoped broadcast-admin participant update columns. Not applied to staging/production.
 
 - Migration 0031 adds per-channel supports_media (default false) so image posting is opt-in only after provider E2E. Migration 0032 adds a dispatcher-only published-media projection and unknown_result receipt outcome; neither migration is applied to staging/production.
+
+- Migration 0033 exposes published editorial source references without private rights_reference; migration 0034 adds source/media/social-channel audit actions and scoped social-channel configuration updates. Both remain unapplied.
