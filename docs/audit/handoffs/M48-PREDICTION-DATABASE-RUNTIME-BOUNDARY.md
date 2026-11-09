@@ -61,3 +61,11 @@ Revert commits `184519eea565d5b84e75ff771170970c86475b67` and `6f083d51a8738fb8c
 - The disposable PostgreSQL migration workflow was prepared to seed `factsport_v2_prediction_api` as a NOLOGIN role for future grants testing. This changes only the ephemeral CI database role fixture; it does not create a staging/Azure login or grant table access.
 - The updated disposable migration run [42576290658](https://github.com/MketyDigital/Factsport/actions/runs/42576290658) was in progress. Native build [42576199686](https://github.com/MketyDigital/Factsport/actions/runs/42576199686) and protected application staging [42576199616](https://github.com/MketyDigital/Factsport/actions/runs/42576199616) were also still in progress at this follow-up.
 - No Prediction Hyperdrive, database login, grants, API or visitor cookie has been provisioned.
+
+
+## Disposable migration and native build results
+
+- Native Vinext build passed for the Prediction adapter/test source commit `6f083d51a8738fb8c69953e92b51c528951ed551`, run [42576199686](https://github.com/MketyDigital/Factsport/actions/runs/42576199686).
+- Disposable PostgreSQL migration verification passed on commit `84b9ee27f58439582cb534441ecc1149b1ba51aa`, run [42576290658](https://github.com/MketyDigital/Factsport/actions/runs/42576290658). It seeded `factsport_v2_prediction_api` as a NOLOGIN CI role, applied migrations 0001–0042 in order, and passed the existing Media/VOD/social privilege assertions.
+- The migration result proves the role fixture does not break the existing 42-migration chain. It does not prove Prediction grants or a Prediction API because no Prediction grant migration exists yet.
+- Protected application staging run [42576199616](https://github.com/MketyDigital/Factsport/actions/runs/42576199616) was still in progress at the time of this update.
