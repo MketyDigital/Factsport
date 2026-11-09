@@ -64,12 +64,12 @@ The existing match-event social automation route is archived and disabled in V2;
 
 ## Remaining CMS capabilities
 
-- Media preview and crop/resize tooling, inline article media ordering, asset replacement/versioning, and public-page preview parity. Revision-aware hero/team attachment and publish-only public visibility are implemented; full media-library search and visual asset replacement preview remain.
-- Preview rendering that matches the public article renderer, scheduled article publication, revision diff/restore, approval comments and review rejection/change requests.
+- Crop/resize and immutable derivative generation, asset version lineage and a full public-page preview including live sidebar/modules remain. The Media library now supports private uploads, search, pagination and previews; newsroom drafts display attached hero/team/gallery assets and support revision-scoped replacement/removal. Saving a new revision carries pending media choices forward, and editing a published article seeds the new draft from its current media.
+- The draft preview now reuses the public `NewsArtwork` and sanitized `MarkdownRenderer` components and shows revision-scoped hero/team/gallery media. Exact full-page layout parity and scheduled article publication remain. Revision history/restore, review comments and rejection/change requests are implemented.
 - Editorial role matrix (writer, editor, publisher, media admin), audit events and stronger review separation than a single admin flag.
-- Social calendar, per-channel copy variants, media attachments, approval, edit/reschedule, retry/dead-letter UI, delivery receipts and analytics.
+- Social calendar, per-channel copy variants, social media attachments, edit/reschedule, retry/dead-letter UI, delivery receipts and analytics remain.
 - Dedicated dispatcher Worker with durable queue claiming, expired-lease recovery, bounded retries/backoff, provider-specific rate limits and delivery-attempt persistence.
-- Safe migration/mapping of legacy news rows and social settings only after field-level transformation/parity inventory. No bulk import or deletion is performed by these commits.
+- Video/clip asset ingestion and transformation, captions/transcripts, provider/source rights, safe embeds and poster frames remain. Safe migration/mapping of legacy news rows and social settings still requires field-level transformation/parity inventory; no bulk import or deletion is performed by these commits.
 
 ## Validation status
 
