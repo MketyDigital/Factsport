@@ -551,9 +551,62 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
             const selected = historyRecords.find(item => item.id === historySelectedId);
             const current = articles.find(item => item.id === historyArticleId);
             if (!selected) return <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Choose a revision to compare its saved snapshot.</p>;
-            return <div className="grid gap-3 xl:grid-cols-2">
-              <div className="min-w-0 rounded-xl border border-slate-200 p-3"><h3 className="mb-2 text-xs font-black uppercase text-slate-600">Current newsroom version</h3><p className="font-bold text-slate-900">{current?.title || 'Current article'}</p><pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs text-slate-600">{current?.body_markdown || ''}</pre></div>
-              <div className="min-w-0 rounded-xl border border-blue-200 bg-blue-50/40 p-3"><h3 className="mb-2 text-xs font-black uppercase text-blue-800">Selected revision {selected.revision_number}</h3><p className="font-bold text-slate-900">{String(selected.snapshot.title || '')}</p><pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs text-slate-600">{String(selected.snapshot.body_markdown || '')}</pre></div>
+            const fields: Array<{ label: string; currentValue: unknown; selectedValue: unknown }> = [
+              { label: 'Headline', currentValue: current?.title, selectedValue: selected.snapshot.title },
+              { label: 'Slug', currentValue: current?.slug, selectedValue: selected.snapshot.slug },
+              { label: 'Excerpt', currentValue: current?.excerpt, selectedValue: selected.snapshot.excerpt },
+              { label: 'Category', currentValue: current?.category, selectedValue: selected.snapshot.category },
+              { label: 'Home team', currentValue: current?.team_1_name, selectedValue: selected.snapshot.team_1_name },
+              { label: 'Away team', currentValue: current?.team_2_name, selectedValue: selected.snapshot.team_2_name },
+              { label: 'Tags', currentValue: current?.tags, selectedValue: selected.snapshot.tags },
+              { label: 'SEO title', currentValue: current?.seo_title, selectedValue: selected.snapshot.seo_title },
+              { label: 'SEO description', currentValue: current?.seo_description, selectedValue: selected.snapshot.seo_description },
+              { label: 'Canonical URL', currentValue: current?.canonical_url, selectedValue: selected.snapshot.canonical_url },
+              { label: 'Author display name', currentValue: current?.author_display_name, selectedValue: selected.snapshot.author_display_name },
+              { label: 'Homepage headline', currentValue: current?.is_headline, selectedValue: selected.snapshot.is_headline },
+              { label: 'Breaking news', currentValue: current?.is_breaking, selectedValue: selected.snapshot.is_breaking },
+            ];
+            const formatValue = (value: unknown) => {
+              if (value === null || value === undefined || value === '') return '—';
+              if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+              if (Array.isArray(value)) return value.length ? value.map(item => String(item)).join(', ') : '—';
+              return typeof value === 'object' ? JSON.stringify(value) : String(value);
+            };
+            const changedFields = fields.filter(field => JSON.stringify(field.currentValue ?? null) !== JSON.stringify(field.selectedValue ?? null));
+            const mediaSummary = (items: Array<Record<string, any>> = []) => items.map(item =>
+              [item.placement, '#', item.position, ': ', item.remove_media ? 'removed' : (item.object_key || item.media_id || 'missing asset')].join('')
+            ).join(' · ') || 'No media attachments';
+            const videoSummary = (items: Array<Record<string, any>> = []) => items.map(item =>
+              ['#', item.position, ': ', item.remove_video ? 'removed' : (item.title || item.video_id || 'untitled video'), ' (', item.upload_status || 'unknown', ', rights ', item.rights_status || 'pending', ')'].join('')
+            ).join(' · ') || 'No video attachments';
+            const sourceSummary = (items: Array<Record<string, any>> = []) => items.map(item =>
+              [item.source_title || 'Untitled source', item.publisher ? ' — ' + item.publisher : '', item.canonical_url ? ' · ' + item.canonical_url : ''].join('')
+            ).join(' · ') || 'No source references';
+            const currentMedia = current?.revision_media || [];
+            const currentVideos = current?.revision_videos || [];
+            const currentSources = current?.sources || [];
+            return <div className="space-y-3">
+              <section className="rounded-xl border border-slate-200 p-3">
+                <h3 className="text-xs font-black uppercase text-slate-700">Field-by-field changes</h3>
+                {changedFields.length === 0
+                  ? <p className="mt-2 text-xs text-slate-500">No metadata differences from the latest newsroom version.</p>
+                  : <div className="mt-2 divide-y divide-slate-100">
+                    {changedFields.map(field => <div key={field.label} className="grid gap-1 py-2 md:grid-cols-[150px_1fr_1fr]">
+                      <strong className="text-xs text-slate-700">{field.label}</strong>
+                      <p className="break-words text-xs text-slate-600"><span className="font-bold text-slate-400">Current: </span>{formatValue(field.currentValue)}</p>
+                      <p className="break-words text-xs text-blue-900"><span className="font-bold text-blue-500">Selected: </span>{formatValue(field.selectedValue)}</p>
+                    </div>)}
+                  </div>}
+              </section>
+              <section className="grid gap-2 md:grid-cols-3">
+                <div className="rounded-xl border border-slate-200 p-3"><h3 className="text-[10px] font-black uppercase text-slate-600">Image placements</h3><p className="mt-2 break-words text-xs text-slate-700">Current: {mediaSummary(currentMedia)}</p><p className="mt-2 break-words text-xs text-blue-900">Selected: {mediaSummary(selected.revision_media)}</p></div>
+                <div className="rounded-xl border border-slate-200 p-3"><h3 className="text-[10px] font-black uppercase text-slate-600">Video clips</h3><p className="mt-2 break-words text-xs text-slate-700">Current: {videoSummary(currentVideos)}</p><p className="mt-2 break-words text-xs text-blue-900">Selected: {videoSummary(selected.revision_videos)}</p></div>
+                <div className="rounded-xl border border-slate-200 p-3"><h3 className="text-[10px] font-black uppercase text-slate-600">Source provenance</h3><p className="mt-2 break-words text-xs text-slate-700">Current: {sourceSummary(currentSources)}</p><p className="mt-2 break-words text-xs text-blue-900">Selected: {sourceSummary(selected.revision_sources)}</p></div>
+              </section>
+              <div className="grid gap-3 xl:grid-cols-2">
+                <div className="min-w-0 rounded-xl border border-slate-200 p-3"><h3 className="mb-2 text-xs font-black uppercase text-slate-600">Current newsroom version</h3><p className="font-bold text-slate-900">{current?.title || 'Current article'}</p><pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs text-slate-600">{current?.body_markdown || ''}</pre></div>
+                <div className="min-w-0 rounded-xl border border-blue-200 bg-blue-50/40 p-3"><h3 className="mb-2 text-xs font-black uppercase text-blue-800">Selected revision {selected.revision_number}</h3><p className="font-bold text-slate-900">{String(selected.snapshot.title || '')}</p><pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs text-slate-600">{String(selected.snapshot.body_markdown || '')}</pre></div>
+              </div>
             </div>;
           })()}
         </div>
