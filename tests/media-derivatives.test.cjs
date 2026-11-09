@@ -20,6 +20,7 @@ test('Media derivatives are immutable, linked to an original asset and inherit s
   assert.match(endpoint, /image\/webp/);
   assert.match(endpoint, /webpDimensions/);
   assert.match(endpoint, /FOR SHARE/);
+  assert.match(endpoint, /NOT EXISTS \\(SELECT 1 FROM public\\.media_asset_derivatives/);
   assert.match(endpoint, /rights_reviewed_by/);
   assert.match(endpoint, /usage_expires_at/);
   assert.match(endpoint, /media_asset_derivatives/);
