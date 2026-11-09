@@ -510,11 +510,17 @@ export async function addEditorialSource(input: {
         FOR UPDATE
       `;
       if (!articles.length) throw new Error('Article was not found or has been archived.');
+      const draftRevision = await tx`
+        SELECT id FROM public.editorial_article_revisions
+        WHERE article_id=${input.articleId}::uuid AND workflow_status='draft'
+        ORDER BY revision_number DESC LIMIT 1 FOR UPDATE
+      `;
+      if (!draftRevision.length) throw new Error('Save a draft revision before adding source provenance.');
       const inserted = await tx`
         INSERT INTO public.editorial_article_sources
-          (article_id, source_title, publisher, canonical_url, attribution_text, rights_reference)
+          (article_id, revision_id, source_title, publisher, canonical_url, attribution_text, rights_reference)
         VALUES (
-          ${input.articleId}::uuid, ${sourceTitle}, ${publisher},
+          ${input.articleId}::uuid, ${draftRevision[0].id}::uuid, ${sourceTitle}, ${publisher},
           ${canonicalUrl}, ${attributionText}, ${rightsReference}
         )
         RETURNING id
@@ -524,7 +530,7 @@ export async function addEditorialSource(input: {
           (actor_user_id, action, article_id, details)
         VALUES (
           ${authorization.user.domainUserId}::uuid, 'source_added', ${input.articleId}::uuid,
-          ${JSON.stringify({ sourceTitle, publisher, canonicalUrl })}::jsonb
+          ${JSON.stringify({ revisionId: draftRevision[0].id, sourceTitle, publisher, canonicalUrl })}::jsonb
         )
       `;
       return { id: inserted[0].id as string, slug: articles[0].slug as string, status: articles[0].status as string };
