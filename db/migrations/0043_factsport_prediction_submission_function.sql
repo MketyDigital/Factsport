@@ -3,14 +3,30 @@
 -- The API role receives EXECUTE on one function, never direct table access.
 BEGIN;
 
+
+-- Explicit rules/privacy acceptance is tied to the actual prediction, not to
+-- marketing consent. Preserve the exact versioned text the visitor accepted.
+CREATE TABLE public.prediction_rule_acceptances (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  participant_id uuid NOT NULL REFERENCES public.prediction_participants(id) ON DELETE RESTRICT,
+  prediction_id uuid NOT NULL UNIQUE REFERENCES public.predictions(id) ON DELETE RESTRICT,
+  rules_version text NOT NULL CHECK (char_length(rules_version) BETWEEN 1 AND 32),
+  rules_text text NOT NULL CHECK (char_length(rules_text) BETWEEN 10 AND 4000),
+  accepted_at timestamptz NOT NULL DEFAULT now(),
+  source text NOT NULL DEFAULT 'public_prediction_submission'
+);
+REVOKE ALL ON TABLE public.prediction_rule_acceptances FROM PUBLIC;
+
 CREATE OR REPLACE FUNCTION public.submit_public_prediction(
   p_visitor_token_hash text,
   p_email_address text,
   p_display_name text,
   p_match_id uuid,
   p_predicted_outcome text,
-  p_predicted_home_score integer DEFAULT NULL,
-  p_predicted_away_score integer DEFAULT NULL
+  p_rules_version text,
+  p_rules_text text,
+  p_predicted_home_score integer,
+  p_predicted_away_score integer
 )
 RETURNS TABLE (prediction_id uuid, duplicate boolean)
 LANGUAGE plpgsql
@@ -37,6 +53,10 @@ BEGIN
   IF p_predicted_outcome IS NULL
      OR p_predicted_outcome NOT IN ('home', 'draw', 'away') THEN
     RAISE EXCEPTION 'invalid_outcome' USING ERRCODE = '22023';
+  END IF;
+  IF p_rules_version IS NULL OR pg_catalog.char_length(p_rules_version) NOT BETWEEN 1 AND 32
+     OR p_rules_text IS NULL OR pg_catalog.char_length(p_rules_text) NOT BETWEEN 10 AND 4000 THEN
+    RAISE EXCEPTION 'rules_acceptance_required' USING ERRCODE = '22023';
   END IF;
   IF (p_predicted_home_score IS NULL) <> (p_predicted_away_score IS NULL)
      OR p_predicted_home_score < 0 OR p_predicted_away_score < 0
@@ -139,16 +159,22 @@ BEGIN
     RETURN;
   END IF;
 
+  INSERT INTO public.prediction_rule_acceptances (
+    participant_id, prediction_id, rules_version, rules_text
+  ) VALUES (
+    v_participant_id, v_prediction_id, p_rules_version, p_rules_text
+  );
+
   RETURN QUERY SELECT v_prediction_id, false;
 END;
 $function$;
 
 REVOKE ALL ON FUNCTION public.submit_public_prediction(
-  text, text, text, uuid, text, integer, integer
+  text, text, text, uuid, text, text, text, integer, integer
 ) FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION public.submit_public_prediction(
-  text, text, text, uuid, text, integer, integer
+  text, text, text, uuid, text, text, text, integer, integer
 ) TO factsport_v2_prediction_api;
 
 -- Privacy-preserving rate-limit counters. Only keyed hashes are stored; raw
