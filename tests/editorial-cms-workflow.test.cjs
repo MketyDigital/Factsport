@@ -436,3 +436,18 @@ test('social channel administration is role-gated, secret-free and readiness-gat
   assert.match(migration, /social_channel_configured/);
   assert.match(migration, /GRANT UPDATE \(is_enabled, supports_media, settings, updated_at\)/);
 });
+
+
+test('editorial source provenance follows immutable revision lifecycle and publishes only with the latest published revision', () => {
+  const sourceAction = read('app/admin/news/actions.ts');
+  const newsroomPage = read('app/admin/news/page.tsx');
+  const sourceMigration = read('db/migrations/0035_factsport_revision_scoped_editorial_sources.sql');
+  assert.match(sourceAction, /workflow_status='draft'[\s\S]*INSERT INTO public\.editorial_article_sources[\s\S]*revision_id/);
+  assert.match(sourceAction, /WHERE revision_id=\$\{previousRevisionId\}::uuid/);
+  assert.match(sourceAction, /WHERE revision_id=\([\s\S]*workflow_status='published'/);
+  assert.match(sourceAction, /WHERE revision_id=\$\{revisionId\}::uuid/);
+  assert.match(newsroomPage, /s\.revision_id=COALESCE\(r\.id, published_revision\.id\)/);
+  assert.match(sourceMigration, /ADD COLUMN IF NOT EXISTS revision_id uuid/);
+  assert.match(sourceMigration, /latest\.workflow_status='published'/);
+  assert.match(sourceMigration, /latest\.revision_number DESC/);
+});
