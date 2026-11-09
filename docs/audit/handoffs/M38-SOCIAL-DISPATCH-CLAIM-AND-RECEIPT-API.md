@@ -42,3 +42,5 @@ Status: source implementation committed; CI verification running; scheduler, pro
 ## Safety
 
 No Logic Apps workflow, provider account, Facebook page, Telegram bot, Buffer profile, Make webhook, credential, production database, public route or live social post was changed.
+
+- The claim path also rechecks provider readiness and, for image-bearing posts, provider image-delivery readiness at dispatch time. A channel that loses readiness is left queued rather than claimed; image-bearing posts are never sent through a channel whose image capability is unverified.
