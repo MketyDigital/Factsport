@@ -19,6 +19,9 @@ test('social claim endpoint is fail-closed and uses the dedicated dispatcher dat
   assert.match(claim, /status='publishing'/);
   assert.match(claim, /lease_expires_at/);
   assert.match(claim, /public\.public_social_media_assets/);
+  assert.match(claim, /readyProviders/);
+  assert.match(claim, /mediaReadyProviders/);
+  assert.match(claim, /c\.provider = ANY/);
   assert.match(claim, /unknown_result/);
   assert.match(claim, /c\.settings->>'page_id'/);
   assert.match(claim, /c\.settings->'chat_ids'/);
