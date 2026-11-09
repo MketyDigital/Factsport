@@ -344,6 +344,30 @@ export async function publishApprovedEditorial(articleId: string, publicContentC
         FROM public.editorial_article_revision_media
         WHERE revision_id=${revision.id}::uuid FOR UPDATE
       `;
+      const revisionVideos = await tx`
+        SELECT position, video_id, remove_video
+        FROM public.editorial_article_revision_videos
+        WHERE revision_id=${revision.id}::uuid FOR UPDATE
+      `;
+      const existingVideoIds = await tx`
+        SELECT video_id FROM public.editorial_article_videos
+        WHERE article_id=${articleId}::uuid
+      `;
+      for (const videoAttachment of revisionVideos) {
+        const videoId = videoAttachment.video_id as string | null;
+        if (videoId && !videoAttachment.remove_video) {
+          const approvedVideo = await tx`
+            SELECT id FROM public.media_video_assets
+            WHERE id=${videoId}::uuid AND upload_status='ready'
+              AND rights_status IN ('owned','licensed','editorial_exception')
+              AND rights_reviewed_by IS NOT NULL AND rights_reviewed_at IS NOT NULL
+              AND (usage_expires_at IS NULL OR usage_expires_at > now())
+              AND playback_host IS NOT NULL
+            FOR SHARE
+          `;
+          if (!approvedVideo.length) throw new Error('A revision video is not processed or no longer has valid rights approval. Publishing is blocked.');
+        }
+      }
       for (const attachment of revisionMedia) {
         const mediaId = attachment.media_id as string | null;
         if (mediaId && !attachment.remove_media) {
@@ -407,6 +431,36 @@ export async function publishApprovedEditorial(articleId: string, publicContentC
         if (mediaId && !attachment.remove_media) {
           await tx`UPDATE public.media_assets SET is_public=true, updated_at=now() WHERE id=${mediaId}::uuid`;
         }
+      }
+      for (const videoAttachment of revisionVideos) {
+        const videoId = videoAttachment.video_id as string | null;
+        await tx`
+          DELETE FROM public.editorial_article_videos
+          WHERE article_id=${articleId}::uuid AND position=${videoAttachment.position}
+        `;
+        if (videoId && !videoAttachment.remove_video) {
+          await tx`
+            INSERT INTO public.editorial_article_videos (article_id, position, video_id)
+            VALUES (${articleId}::uuid, ${videoAttachment.position}, ${videoId}::uuid)
+          `;
+          await tx`
+            UPDATE public.media_video_assets
+            SET is_public=true, updated_at=now()
+            WHERE id=${videoId}::uuid
+          `;
+        }
+      }
+      if (existingVideoIds.length) {
+        const oldIds = existingVideoIds.map((row: any) => row.video_id as string);
+        await tx`
+          UPDATE public.media_video_assets v
+          SET is_public=false, updated_at=now()
+          WHERE v.id = ANY(${oldIds}::uuid[])
+            AND NOT EXISTS (
+              SELECT 1 FROM public.editorial_article_videos live
+              WHERE live.video_id=v.id
+            )
+        `;
       }
       await tx`
         UPDATE public.editorial_article_revisions SET
