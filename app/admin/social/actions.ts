@@ -193,7 +193,7 @@ export async function updateSocialChannel(input: {
   try {
     await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
       const rows = await tx`
-        SELECT id, provider FROM public.media_social_channels
+        SELECT id, provider, supports_media FROM public.media_social_channels
         WHERE id=${input.channelId}::uuid
         FOR UPDATE
       `;
@@ -205,7 +205,7 @@ export async function updateSocialChannel(input: {
       if (input.isEnabled && (!isFactsportSocialDispatchReady() || !isFactsportSocialProviderReady(provider))) {
         throw new Error('Channel activation is blocked until the Logic Apps dispatcher and this provider adapter pass staging readiness checks.');
       }
-      if (input.supportsMedia && !isFactsportSocialMediaProviderReady(provider)) {
+      if (input.supportsMedia && !rows[0].supports_media && !isFactsportSocialMediaProviderReady(provider)) {
         throw new Error('Image delivery is disabled until this provider has passed private image-delivery E2E.');
       }
 
