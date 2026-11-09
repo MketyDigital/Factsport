@@ -66,7 +66,7 @@ export default function MediaVideoLibrary({ ready, schemaReady, canRevokeRights 
           throw new Error('Choose a supported video file smaller than 30 GB.');
         }
 
-        const useTus = resumableUpload || file.size > basicMaxBytes;
+        const useTus = resumableUpload || file.size >= basicMaxBytes;
         let assetId = '';
 
         if (useTus) {
@@ -168,7 +168,7 @@ export default function MediaVideoLibrary({ ready, schemaReady, canRevokeRights 
         <input value={description} onChange={event => setDescription(event.target.value)} maxLength={3000} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
       </label>
       <label className="md:col-span-2 text-xs font-bold text-slate-600">Video file · under 30 GB / up to 15 minutes
-        <input id="factsport-video-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska" onChange={event => setFile(event.target.files?.[0] || null)} className="mt-1 block w-full text-xs" />
+        <input id="factsport-video-file" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/mpeg,video/ogg" onChange={event => setFile(event.target.files?.[0] || null)} className="mt-1 block w-full text-xs" />
       </label>
       <label className="md:col-span-2 flex items-start gap-2 text-xs text-slate-600">
         <input type="checkbox" checked={resumableUpload} onChange={event => setResumableUpload(event.target.checked)} className="mt-0.5" />
