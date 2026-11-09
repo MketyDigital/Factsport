@@ -49,3 +49,11 @@ Status: source implementation, isolated regression, TypeScript and native build 
 ## Safety
 
 No migration, Azure database, production route, DNS, Cloudflare Stream asset, R2 object, provider credential or public article was changed by M45. No AdSense approval or production VOD readiness is claimed.
+
+
+## Protected staging follow-up — 2026-11-09
+
+- Protected Cloudflare application staging passed on source commit `7be8065d8ad75f6796ca572ef71853daf3eee61a`, run [42573678448](https://github.com/MketyDigital/Factsport/actions/runs/42573678448).
+- Regression suite, TypeScript, native Worker build, protected Worker deployment, deny-by-default probes and the protected PostgreSQL-backed `/matches` checks passed.
+- This run does not apply optional VOD migration 0041 to Azure PostgreSQL or enable `FACTSPORT_MEDIA_VIDEO_SCHEMA_READY`. It does not exercise the full Newsroom browser journey, revision restore, or actual Stream private preview.
+- No production route, database, R2 object, Stream asset or AdSense configuration changed.
