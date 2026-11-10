@@ -111,6 +111,16 @@ function safeMediaUrl(value: unknown): string | null {
   if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) {
     throw new Error('Broadcast media URLs must be HTTP(S) and cannot contain credentials.');
   }
+  // Do not accept loopback, link-local or private-network playback destinations.
+  const host = url.hostname.toLowerCase().replace(/^\\[|\\]$/g, '');
+  if (host === 'localhost' || host === '0.0.0.0' || host.endsWith('.localhost') ||
+      host.endsWith('.local') || host.endsWith('.internal') ||
+      host === '::1' || host.startsWith('fc') || host.startsWith('fd') ||
+      host.startsWith('fe80:') || /^127\\./.test(host) ||
+      /^10\\./.test(host) || /^192\\.168\\./.test(host) ||
+      /^172\\.(1[6-9]|2\\d|3[01])\\./.test(host) || /^169\\.254\\./.test(host)) {
+    throw new Error('Broadcast media URLs cannot target local or private networks.');
+  }
   return url.toString();
 }
 
