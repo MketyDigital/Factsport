@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const read = name => fs.readFileSync(path.join(__dirname, '..', name), 'utf8');
 
@@ -110,4 +111,35 @@ test('unapproved paid Cloudflare Stream VOD cannot activate via env flags or edi
   assert.match(newsroom, /previewInline.length > 0/);
   assert.match(library, /MediaDerivativeEditor/);
   assert.match(library, /MediaUsagePanel/);
+});
+
+test('newsroom approved external video helper validates provider URLs and records rights', () => {
+  const newsroom = read('app/admin/news/NewsroomClient.tsx');
+  const renderer = read('app/components/MarkdownRenderer.tsx');
+  const start = newsroom.indexOf('function approvedExternalVideo(');
+  const end = newsroom.indexOf('export default function NewsroomClient', start);
+  assert.ok(start >= 0 && end > start, 'approved provider helper must exist');
+  const helper = newsroom.slice(start, end).replace(
+    'function approvedExternalVideo(value: string): { embedUrl: string; sourceUrl: string; publisher: string } | null {',
+    'function approvedExternalVideo(value) {',
+  );
+  const parse = vm.runInNewContext(helper + '\n;approvedExternalVideo', { URL }, { timeout: 1000 });
+  const youtube = parse('https://youtu.be/abcdefghijk?t=30');
+  assert.equal(youtube.embedUrl, 'https://www.youtube-nocookie.com/embed/abcdefghijk');
+  assert.equal(youtube.sourceUrl, 'https://www.youtube.com/watch?v=abcdefghijk');
+  const vimeo = parse('https://vimeo.com/12345678');
+  assert.equal(vimeo.embedUrl, 'https://player.vimeo.com/video/12345678');
+  for (const bad of [
+    'http://youtu.be/abcdefghijk', 'https://youtube.com.evil.test/watch?v=abcdefghijk',
+    'javascript:alert(1)', 'https://vimeo.com.evil.test/12345678',
+    'https://user:pass@www.youtube.com/watch?v=abcdefghijk',
+    'https://www.youtube.com/watch?v=not-a-valid-video-id',
+  ]) assert.equal(parse(bad), null, bad);
+
+  assert.match(renderer, /www.youtube-nocookie.com/);
+  assert.match(renderer, /player.vimeo.com/);
+  assert.match(newsroom, /rightsReference: externalVideoRights/);
+  assert.match(newsroom, /await addEditorialSource/);
+  assert.match(newsroom, /Record source &amp; insert draft embed/);
+  assert.match(newsroom, /Save the draft, then submit for editorial review/);
 });
