@@ -49,7 +49,24 @@ export default function FactSportPlayer({
   const playerWrapperRef = useRef<HTMLDivElement>(null);
   const { activeMatchId, tuneInVideo, setIsPageActive } = useGlobalMedia();
 
-  const isYouTube = mediaUrl && (mediaUrl.includes('youtube.com') || mediaUrl.includes('youtu.be') || mediaUrl.includes('embed/'));
+  // Only actual YouTube hosts may be embedded as YouTube.
+  const youtubeVideoId = (() => {
+    try {
+      const url = new URL(mediaUrl);
+      if (url.protocol !== 'https:' || url.username || url.password) return null;
+      const host = url.hostname.toLowerCase();
+      let id = '';
+      if (host === 'youtu.be') id = url.pathname.split('/')[1] || '';
+      else if (['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtube-nocookie.com', 'www.youtube-nocookie.com'].includes(host)) {
+        if (url.pathname === '/watch') id = url.searchParams.get('v') || '';
+        else if (url.pathname.startsWith('/embed/') || url.pathname.startsWith('/shorts/') || url.pathname.startsWith('/live/')) id = url.pathname.split('/')[2] || '';
+      }
+      return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+    } catch {
+      return null;
+    }
+  })();
+  const isYouTube = youtubeVideoId !== null;
   const isRawMedia = mediaUrl && !!mediaUrl.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
   const isRawAudio = mediaUrl && !!mediaUrl.match(/\.(mp3|wav)$/i);
 
@@ -96,12 +113,8 @@ export default function FactSportPlayer({
 
       if (shouldAutoRegister) {
           let finalUrl = mediaUrl;
-          if (isYouTube) {
-              let videoId = '';
-              if (mediaUrl.includes('v=')) videoId = mediaUrl.split('v=')[1]?.split('&')[0];
-              else if (mediaUrl.includes('.be/')) videoId = mediaUrl.split('.be/')[1];
-              else if (mediaUrl.includes('embed/')) videoId = mediaUrl.split('embed/')[1];
-              finalUrl = `https://www.youtube.com/embed/${videoId}`;
+          if (youtubeVideoId) {
+              finalUrl = `https://www.youtube.com/embed/${youtubeVideoId}`;
           }
           
           if (mode === 'audio') {
@@ -110,7 +123,7 @@ export default function FactSportPlayer({
 
           tuneInVideo(matchId, finalUrl);
       }
-  }, [isTimeLocked, mediaUrl, matchId, activeMatchId, mode, isFinished, isYouTube, isRawMedia, tuneInVideo]);
+  }, [isTimeLocked, mediaUrl, matchId, activeMatchId, mode, isFinished, isYouTube, youtubeVideoId, isRawMedia, tuneInVideo]);
 
   const startPlayback = () => {
       setHasStarted(true);
@@ -305,12 +318,7 @@ export default function FactSportPlayer({
   );
 
   const renderYouTube = () => {
-    let videoId = '';
-    if (mediaUrl.includes('v=')) videoId = mediaUrl.split('v=')[1]?.split('&')[0];
-    else if (mediaUrl.includes('.be/')) videoId = mediaUrl.split('.be/')[1];
-    else if (mediaUrl.includes('embed/')) videoId = mediaUrl.split('embed/')[1];
-
-    const embedUrl = `https://www.youtube.com/embed/${videoId}?controls=0&disablekb=1&fs=0&modestbranding=1&playsinline=1&rel=0&showinfo=0&enablejsapi=1&iv_load_policy=3`;
+    const embedUrl = `https://www.youtube.com/embed/${youtubeVideoId}?controls=0&disablekb=1&fs=0&modestbranding=1&playsinline=1&rel=0&showinfo=0&enablejsapi=1&iv_load_policy=3`;
 
     if (mode === 'audio') {
       return (
