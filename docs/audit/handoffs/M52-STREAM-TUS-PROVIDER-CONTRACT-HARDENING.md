@@ -34,3 +34,9 @@ Status: targeted source fix committed; isolated CI and real provider/browser sta
 ## Rollback
 
 Revert the targeted source/test commits on V2 if isolated provider-contract testing contradicts the documented encoding. Do not enable the provider feature as a workaround.
+
+## Newly observed repository integration discrepancy
+
+The GitHub combined-status endpoint for M52 HEAD `93a686692bfeb952c6e25cfee76fd2adcdfe1dd8` returned a `Vercel` context in `pending` state, despite the project's Cloudflare-only target architecture and prior source cleanup. This does **not** prove any Vercel deployment happened. It is evidence that a legacy Vercel GitHub integration/status reporter may still be connected or a status context is being posted.
+
+Owner/maintainer should inspect repository GitHub Apps/webhooks/check-required contexts and any Vercel project Git connection. Remove or disable obsolete integration only after verifying it is not needed for a live protected branch/release gate. Check Cloudflare CI independently; the combined-status result did not establish any green checks for this new HEAD.
