@@ -3,8 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { authorizeMediaEditorialAction } from '@/app/lib/admin/v2-editorial-authorization';
 import MediaLibraryClient from './MediaLibraryClient';
-import { isFactsportStreamVideoReady } from '@/lib/media/cloudflare-stream';
-import { isFactsportMediaDerivativesReady, isFactsportMediaRightsRevocationReady, isFactsportMediaVideoSchemaReady } from '@/lib/media/readiness';
+import { isFactsportMediaDerivativesReady, isFactsportMediaRightsRevocationReady } from '@/lib/media/readiness';
 
 export default async function MediaLibraryPage() {
   const authorization = await authorizeMediaEditorialAction('media');
@@ -14,5 +13,5 @@ export default async function MediaLibraryPage() {
       <p className="mt-2 text-sm text-amber-900">{authorization.error}</p>
     </main>;
   }
-  return <MediaLibraryClient canRevokeRights={authorization.user.roles.includes('media_admin')} derivativesReady={isFactsportMediaDerivativesReady()} rightsRevocationReady={isFactsportMediaRightsRevocationReady()} videoSchemaReady={isFactsportMediaVideoSchemaReady()} streamVideoReady={isFactsportStreamVideoReady()} />;
+  return <MediaLibraryClient canRevokeRights={authorization.user.roles.includes('media_admin')} derivativesReady={isFactsportMediaDerivativesReady()} rightsRevocationReady={isFactsportMediaRightsRevocationReady()} />;
 }
