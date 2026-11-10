@@ -65,3 +65,15 @@ test('broadcast settings reject unsafe local/private media destinations', () => 
   assert.match(actions, /Broadcast media URLs cannot target local or private networks/);
   assert.match(actions, /authorizeMediaEditorialAction\('broadcast'\)/);
 });
+
+test('unapproved paid Cloudflare Stream VOD cannot activate via env flags or editor UI', () => {
+  const stream = read('lib/media/cloudflare-stream.ts');
+  const library = read('app/admin/media/MediaLibraryClient.tsx');
+  const adminPage = read('app/admin/media/page.tsx');
+  assert.ok(stream.includes('const FACTSPORT_PAID_STREAM_OWNER_APPROVED = false;'));
+  assert.ok(stream.includes('return FACTSPORT_PAID_STREAM_OWNER_APPROVED &&'));
+  assert.doesNotMatch(library, /<MediaVideoLibrary/);
+  assert.doesNotMatch(adminPage, /isFactsportStreamVideoReady/);
+  assert.match(library, /MediaDerivativeEditor/);
+  assert.match(library, /MediaUsagePanel/);
+});
