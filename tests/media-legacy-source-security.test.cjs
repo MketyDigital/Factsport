@@ -24,6 +24,12 @@ test('legacy-compatible player only identifies verified YouTube hosts and IDs', 
   assert.match(player, /test\(rawMediaPath\)/);
   assert.match(player, /referrerPolicy="no-referrer"/);
   assert.match(player, /title="Factsport external match media"/);
+  assert.match(player, /const isSafeMediaUrl/);
+  assert.match(player, /value\.startsWith\('\/\/'\)/);
+  assert.match(player, /host\.endsWith\('\.internal'\)/);
+  assert.match(player, /private172/);
+  assert.ok(player.includes("if (!mediaUrl || !isSafeMediaUrl) return <DefaultPreview />;"));
+  assert.ok(player.includes("if (isTimeLocked || !isSafeMediaUrl || !mediaUrl"));
   assert.equal(player.split("postMessage(JSON.stringify(").length - 1, 3);
   assert.ok(player.includes("postMessage(JSON.stringify({ event: 'command', func: 'playVideo' }), 'https://www.youtube.com')"));
   assert.ok(!player.includes("}), '*')"), 'YouTube commands must not use wildcard target origins');
