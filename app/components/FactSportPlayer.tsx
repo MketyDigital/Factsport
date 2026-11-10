@@ -67,8 +67,20 @@ export default function FactSportPlayer({
     }
   })();
   const isYouTube = youtubeVideoId !== null;
-  const isRawMedia = mediaUrl && !!mediaUrl.match(/\.(mp4|webm|ogg|mp3|m3u8|wav)$/i);
-  const isRawAudio = mediaUrl && !!mediaUrl.match(/\.(mp3|wav)$/i);
+  // Classify the URL pathname so signed media URLs with query parameters keep
+  // their legacy audio/video rendering path instead of becoming generic iframes.
+  const rawMediaPath = (() => {
+    try {
+      if (!mediaUrl || mediaUrl === 'streamio') return '';
+      const url = new URL(mediaUrl, 'https://factsport.invalid');
+      if (!['https:', 'http:'].includes(url.protocol)) return '';
+      return url.pathname;
+    } catch {
+      return '';
+    }
+  })();
+  const isRawMedia = /\.(mp4|webm|ogg|mp3|m3u8|wav)$/i.test(rawMediaPath);
+  const isRawAudio = /\.(mp3|wav)$/i.test(rawMediaPath);
 
   useEffect(() => {
       setIsTimeLocked(isLocked);
@@ -447,7 +459,7 @@ export default function FactSportPlayer({
              <div className="absolute inset-0 bg-[url('/tournaments/default-bg.jpg')] bg-cover opacity-20 blur-sm pointer-events-none"></div>
          )}
          
-         <iframe src={mediaUrl} className="relative z-10 w-full h-full" frameBorder="0" scrolling="no" sandbox="allow-scripts allow-same-origin" allowFullScreen></iframe>
+         <iframe src={mediaUrl} title="Factsport external match media" referrerPolicy="no-referrer" loading="lazy" className="relative z-10 w-full h-full" frameBorder="0" scrolling="no" sandbox="allow-scripts allow-same-origin" allowFullScreen></iframe>
          
          <AnnouncementMarquee />
          <div className="absolute bottom-0 left-0 w-full h-[30px] bg-[#0a1428] border-t border-slate-800 z-40 flex items-center justify-between px-3 pointer-events-none">
