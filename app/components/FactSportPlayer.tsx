@@ -212,6 +212,7 @@ export default function FactSportPlayer({
       setHasStarted(true);
       setIsPlaying(true);
     }).catch(() => {
+      setHasStarted(false);
       setIsPlaying(false);
       setPlaybackError('Playback could not start. Check the stream and tap play to retry.');
     });
