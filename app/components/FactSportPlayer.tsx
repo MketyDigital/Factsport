@@ -112,6 +112,39 @@ export default function FactSportPlayer({
   })();
   const isRawMedia = /\.(mp4|webm|ogg|mp3|m3u8|wav)$/i.test(rawMediaPath);
   const isRawAudio = /\.(mp3|wav)$/i.test(rawMediaPath);
+  const isHls = /\\.m3u8$/i.test(rawMediaPath);
+
+  // Safari can play HLS natively; other supported browsers use hls.js.
+  // The URL remains unchanged so signed query parameters reach the provider.
+  useEffect(() => {
+    if (!isHls || !isSafeMediaUrl || isTimeLocked || mode === 'audio') return;
+    const video = mediaRef.current;
+    if (!(video instanceof HTMLVideoElement)) return;
+    let cancelled = false;
+    let cleanup: (() => void) | undefined;
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = mediaUrl;
+      return () => {
+        video.removeAttribute('src');
+        video.load();
+      };
+    }
+    void import('hls.js').then(({ default: Hls }) => {
+      if (cancelled || !Hls.isSupported()) return;
+      const hls = new Hls({ enableWorker: true });
+      cleanup = () => hls.destroy();
+      hls.loadSource(mediaUrl);
+      hls.attachMedia(video);
+    }).catch(() => {
+      // Keep an unavailable stream in the existing no-play state; never
+      // replace the stream with an untrusted iframe fallback.
+    });
+    return () => {
+      cancelled = true;
+      cleanup?.();
+    };
+  }, [isHls, isSafeMediaUrl, isTimeLocked, mediaUrl, mode]);
+
 
   useEffect(() => {
       setIsTimeLocked(isLocked);
@@ -451,7 +484,7 @@ export default function FactSportPlayer({
         {mode === 'audio' || isRawAudio ? (
              <audio ref={mediaRef as React.RefObject<HTMLAudioElement>} src={mediaUrl} onTimeUpdate={handleTimeUpdate} onWaiting={() => setIsBuffering(true)} onPlaying={() => setIsBuffering(false)} />
         ) : (
-             <video ref={mediaRef as React.RefObject<HTMLVideoElement>} src={mediaUrl} className="w-full h-full object-contain pointer-events-none z-10" onTimeUpdate={handleTimeUpdate} onWaiting={() => setIsBuffering(true)} onPlaying={() => setIsBuffering(false)} />
+             <video ref={mediaRef as React.RefObject<HTMLVideoElement>} src={isHls ? undefined : mediaUrl} className="w-full h-full object-contain pointer-events-none z-10" onTimeUpdate={handleTimeUpdate} onWaiting={() => setIsBuffering(true)} onPlaying={() => setIsBuffering(false)} />
         )}
 
         {isBuffering && <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30"><Loader2 className="text-white animate-spin w-10 h-10 drop-shadow-lg" /></div>}
