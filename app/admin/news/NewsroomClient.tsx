@@ -60,6 +60,31 @@ function slugify(value: string) {
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+// Only embed providers already accepted by the public Markdown sanitizer.
+function approvedExternalVideo(value: string): { embedUrl: string; sourceUrl: string; publisher: string } | null {
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'https:' || url.username || url.password) return null;
+    const host = url.hostname.toLowerCase();
+    let id = '';
+    if (host === 'youtu.be') id = url.pathname.split('/')[1] || '';
+    else if (['youtube.com', 'www.youtube.com', 'm.youtube.com', 'www.youtube-nocookie.com', 'youtube-nocookie.com'].includes(host)) {
+      if (url.pathname === '/watch') id = url.searchParams.get('v') || '';
+      else if (/^\/(embed|shorts|live)\//.test(url.pathname)) id = url.pathname.split('/')[2] || '';
+    }
+    if (/^[A-Za-z0-9_-]{11}$/.test(id)) {
+      return { embedUrl: 'https://www.youtube-nocookie.com/embed/' + id,
+        sourceUrl: 'https://www.youtube.com/watch?v=' + id, publisher: 'YouTube' };
+    }
+    if (['vimeo.com', 'www.vimeo.com', 'player.vimeo.com'].includes(host)) {
+      const path = url.pathname.match(/^\/(?:video\/)?([0-9]+)\/?$/);
+      if (path) return { embedUrl: 'https://player.vimeo.com/video/' + path[1],
+        sourceUrl: 'https://vimeo.com/' + path[1], publisher: 'Vimeo' };
+    }
+    return null;
+  } catch { return null; }
+}
+
 export default function NewsroomClient({ initialArticles }: { initialArticles: Article[] }) {
   const [articles, setArticles] = useState(initialArticles);
   const [form, setForm] = useState(blank);
@@ -78,6 +103,10 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const [sourceUrl, setSourceUrl] = useState('');
   const [sourceAttribution, setSourceAttribution] = useState('');
   const [sourceRightsReference, setSourceRightsReference] = useState('');
+  const [externalVideoUrl, setExternalVideoUrl] = useState('');
+  const [externalVideoTitle, setExternalVideoTitle] = useState('');
+  const [externalVideoAttribution, setExternalVideoAttribution] = useState('');
+  const [externalVideoRights, setExternalVideoRights] = useState('');
   const [publicPolicyConfirmed, setPublicPolicyConfirmed] = useState<Record<string, boolean>>({});
   const [isPending, startTransition] = useTransition();
   const [mediaPending, startMediaTransition] = useTransition();
@@ -387,6 +416,48 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                   })} className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{isPending ? 'Saving source…' : 'Add source reference'}</button>
                 </div>
               </div>}
+            </section>
+            <section className="md:col-span-2 rounded-2xl border border-slate-200 bg-white p-4">
+              <h3 className="font-black text-slate-800">External editorial video</h3>
+              <p className="mt-1 text-xs text-slate-500">Use an authorized YouTube or Vimeo source. Factsport does not upload or transcode this video. A source record and private rights reference are required before inserting an embed into the draft.</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="text-xs font-bold text-slate-600">Video URL
+                  <input type="url" value={externalVideoUrl} onChange={event => setExternalVideoUrl(event.target.value)} maxLength={2048} placeholder="https://www.youtube.com/watch?v=…" className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
+                </label>
+                <label className="text-xs font-bold text-slate-600">Video title
+                  <input value={externalVideoTitle} onChange={event => setExternalVideoTitle(event.target.value)} maxLength={180} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
+                </label>
+                <label className="text-xs font-bold text-slate-600">Public attribution
+                  <input value={externalVideoAttribution} onChange={event => setExternalVideoAttribution(event.target.value)} maxLength={500} placeholder="Credit the original rights holder" className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
+                </label>
+                <label className="text-xs font-bold text-slate-600">Private rights / permission reference
+                  <input value={externalVideoRights} onChange={event => setExternalVideoRights(event.target.value)} maxLength={2048} placeholder="Licence, permission or documented editorial basis" className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
+                </label>
+              </div>
+              <button type="button" className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+                disabled={isPending || !form.id || !canEditRevisionMedia || !approvedExternalVideo(externalVideoUrl) || externalVideoTitle.trim().length < 3 || !externalVideoAttribution.trim() || !externalVideoRights.trim()}
+                onClick={() => startTransition(async () => {
+                  const video = approvedExternalVideo(externalVideoUrl);
+                  if (!video || !form.id || !canEditRevisionMedia) return;
+                  const title = externalVideoTitle.trim().replace(/[<>"'&]/g, '').slice(0, 180);
+                  if (title.length < 3) { setMessage('Enter a video title without HTML characters.'); return; }
+                  const result = await addEditorialSource({
+                    articleId: form.id, sourceTitle: title, publisher: video.publisher,
+                    canonicalUrl: video.sourceUrl, attributionText: externalVideoAttribution,
+                    rightsReference: externalVideoRights,
+                  });
+                  if (!result.success) { setMessage(result.error); return; }
+                  const embed = '<iframe src="' + video.embedUrl + '" title="' + title +
+                    '" loading="lazy" referrerpolicy="no-referrer" allowfullscreen></iframe>';
+                  setForm(current => ({
+                    ...current, bodyMarkdown: current.bodyMarkdown.trimEnd() + '\n\n' +
+                      embed + '\n\n' + externalVideoAttribution.trim(),
+                  }));
+                  setExternalVideoUrl(''); setExternalVideoTitle('');
+                  setExternalVideoAttribution(''); setExternalVideoRights('');
+                  setMessage('Source and private rights reference recorded. Embed added to the unsaved draft body. Save the draft, then submit for editorial review.');
+                })}>Record source &amp; insert draft embed</button>
+              {!canEditRevisionMedia && <p className="mt-2 text-xs text-amber-700">Save a draft revision first. Reviewed and published revisions cannot be edited directly.</p>}
             </section>
             <label className="md:col-span-2 text-xs font-bold text-slate-600">Excerpt / social preview
               <textarea value={form.excerpt} onChange={e => setForm({ ...form, excerpt: e.target.value })} maxLength={500} rows={2} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
