@@ -129,7 +129,7 @@ export default function FactSportPlayer({
       setHasStarted(true);
       setIsPlaying(true);
       if (isYouTube && iframeRef.current) {
-          iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo' }), '*');
+          iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo' }), 'https://www.youtube.com');
           setUiBlocker(true);
           // HOW TO EDIT UI BLOCKER TIMEOUT:
           // Change the '4000' below (in milliseconds) to adjust how long the top/bottom bars hide the YouTube UI
@@ -145,7 +145,7 @@ export default function FactSportPlayer({
         return;
     }
     if (isYouTube && iframeRef.current) {
-        iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: isPlaying ? 'pauseVideo' : 'playVideo' }), '*');
+        iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: isPlaying ? 'pauseVideo' : 'playVideo' }), 'https://www.youtube.com');
         if (!isPlaying) {
             setUiBlocker(true);
             // HOW TO EDIT UI BLOCKER TIMEOUT:
@@ -162,7 +162,7 @@ export default function FactSportPlayer({
 
   const toggleMute = () => {
     if (isYouTube && iframeRef.current) {
-        iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: isMuted ? 'unMute' : 'mute' }), '*');
+        iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: isMuted ? 'unMute' : 'mute' }), 'https://www.youtube.com');
         setIsMuted(!isMuted);
     } else if (mediaRef.current) {
       mediaRef.current.muted = !isMuted;
