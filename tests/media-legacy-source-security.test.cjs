@@ -1,0 +1,33 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const read = name => fs.readFileSync(path.join(__dirname, '..', name), 'utf8');
+
+test('legacy-compatible player only identifies verified YouTube hosts and IDs', () => {
+  const player = read('app/components/FactSportPlayer.tsx');
+  assert.match(player, /const youtubeVideoId = \(\(\) =>/);
+  assert.match(player, /url\.hostname\.toLowerCase\(\)/);
+  assert.match(player, /host === 'youtu\.be'/);
+  assert.match(player, /\['youtube\.com', 'www\.youtube\.com'/);
+  assert.match(player, /\^\[A-Za-z0-9_-\]\{11\}\$/);
+  assert.match(player, /const isYouTube = youtubeVideoId !== null/);
+  assert.doesNotMatch(player, /mediaUrl\.includes\('youtube\.com'\)/);
+  assert.doesNotMatch(player, /mediaUrl\.includes\('embed\/'\)/);
+  assert.match(player, /https:\/\/www\.youtube\.com\/embed\/\$\{youtubeVideoId\}/);
+  assert.match(player, /mediaUrl === 'streamio'/);
+  assert.match(player, /\.\(mp4\|webm\|ogg\|mp3\|m3u8\|wav\)/);
+});
+
+test('broadcast settings reject unsafe local/private media destinations', () => {
+  const actions = read('app/admin/studio/actions.ts');
+  assert.match(actions, /function safeMediaUrl/);
+  assert.match(actions, /trimmed === 'streamio'/);
+  assert.match(actions, /host === 'localhost'/);
+  assert.match(actions, /host\.endsWith\('\.internal'\)/);
+  assert.match(actions, /host\.startsWith\('fe80:'\)/);
+  assert.match(actions, /192/);
+  assert.match(actions, /Broadcast media URLs cannot target local or private networks/);
+  assert.match(actions, /authorizeMediaEditorialAction\('broadcast'\)/);
+});
