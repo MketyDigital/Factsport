@@ -26,6 +26,9 @@ test('legacy-compatible player only identifies verified YouTube hosts and IDs', 
   assert.match(player, /title="Factsport external match media"/);
   assert.match(player, /const isSafeMediaUrl/);
   assert.match(player, /value\.startsWith\('\/\/'\)/);
+  assert.ok(player.includes('value.includes(String.fromCharCode(92))'));
+  assert.ok(player.includes("url.username || url.password"));
+  assert.ok(player.includes("host.startsWith('169.254.')"));
   assert.match(player, /host\.endsWith\('\.internal'\)/);
   assert.match(player, /private172/);
   assert.ok(player.includes("if (!mediaUrl || !isSafeMediaUrl) return <DefaultPreview />;"));
