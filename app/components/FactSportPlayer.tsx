@@ -117,24 +117,24 @@ export default function FactSportPlayer({
   // Safari can play HLS natively; other supported browsers use hls.js.
   // The URL remains unchanged so signed query parameters reach the provider.
   useEffect(() => {
-    if (!isHls || !isSafeMediaUrl || isTimeLocked || mode === 'audio') return;
-    const video = mediaRef.current;
-    if (!(video instanceof HTMLVideoElement)) return;
+    if (!isHls || !isSafeMediaUrl || isTimeLocked) return;
+    const media = mediaRef.current;
+    if (!media) return;
     let cancelled = false;
     let cleanup: (() => void) | undefined;
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = mediaUrl;
+    if (media.canPlayType('application/vnd.apple.mpegurl')) {
+      media.src = mediaUrl;
       return () => {
-        video.removeAttribute('src');
-        video.load();
+        media.removeAttribute('src');
+        media.load();
       };
     }
     void import('hls.js').then(({ default: Hls }) => {
       if (cancelled || !Hls.isSupported()) return;
       const hls = new Hls({ enableWorker: true });
       cleanup = () => hls.destroy();
+      hls.attachMedia(media);
       hls.loadSource(mediaUrl);
-      hls.attachMedia(video);
     }).catch(() => {
       // Keep an unavailable stream in the existing no-play state; never
       // replace the stream with an untrusted iframe fallback.
@@ -482,7 +482,7 @@ export default function FactSportPlayer({
         <div className="absolute inset-0 z-20 cursor-pointer" onClick={togglePlay}></div>
 
         {mode === 'audio' || isRawAudio ? (
-             <audio ref={mediaRef as React.RefObject<HTMLAudioElement>} src={mediaUrl} onTimeUpdate={handleTimeUpdate} onWaiting={() => setIsBuffering(true)} onPlaying={() => setIsBuffering(false)} />
+             <audio ref={mediaRef as React.RefObject<HTMLAudioElement>} src={isHls ? undefined : mediaUrl} onTimeUpdate={handleTimeUpdate} onWaiting={() => setIsBuffering(true)} onPlaying={() => setIsBuffering(false)} />
         ) : (
              <video ref={mediaRef as React.RefObject<HTMLVideoElement>} src={isHls ? undefined : mediaUrl} className="w-full h-full object-contain pointer-events-none z-10" onTimeUpdate={handleTimeUpdate} onWaiting={() => setIsBuffering(true)} onPlaying={() => setIsBuffering(false)} />
         )}
