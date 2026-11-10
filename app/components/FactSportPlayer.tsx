@@ -112,7 +112,7 @@ export default function FactSportPlayer({
   })();
   const isRawMedia = /\.(mp4|webm|ogg|mp3|m3u8|wav)$/i.test(rawMediaPath);
   const isRawAudio = /\.(mp3|wav)$/i.test(rawMediaPath);
-  const isHls = /\\.m3u8$/i.test(rawMediaPath);
+  const isHls = /\.m3u8$/i.test(rawMediaPath);
 
   // Safari can play HLS natively; other supported browsers use hls.js.
   // The URL remains unchanged so signed query parameters reach the provider.
