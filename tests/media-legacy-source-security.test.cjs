@@ -38,6 +38,22 @@ test('legacy-compatible player only identifies verified YouTube hosts and IDs', 
   assert.ok(!player.includes("}), '*')"), 'YouTube commands must not use wildcard target origins');
 });
 
+
+test('signed external HLS uses native video or already-installed hls.js, not an iframe', () => {
+  const player = read('app/components/FactSportPlayer.tsx');
+  const dependencies = JSON.parse(read('package.json')).dependencies;
+  assert.equal(dependencies['hls.js'], '^1.5.8');
+  assert.match(player, /const isHls =/);
+  assert.ok(player.includes("video.canPlayType('application/vnd.apple.mpegurl')"));
+  assert.ok(player.includes("void import('hls.js')"));
+  assert.ok(player.includes('Hls.isSupported()'));
+  assert.ok(player.includes('hls.loadSource(mediaUrl)'));
+  assert.ok(player.includes('hls.attachMedia(video)'));
+  assert.ok(player.includes('cleanup = () => hls.destroy()'));
+  assert.ok(player.includes('src={isHls ? undefined : mediaUrl}'));
+});
+
+
 test('broadcast settings reject unsafe local/private media destinations', () => {
   const actions = read('app/admin/studio/actions.ts');
   assert.match(actions, /function safeMediaUrl/);
