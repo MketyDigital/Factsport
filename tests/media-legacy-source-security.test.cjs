@@ -44,6 +44,17 @@ test('signed external HLS uses native video or already-installed hls.js, not an 
   const dependencies = JSON.parse(read('package.json')).dependencies;
   assert.equal(dependencies['hls.js'], '^1.5.8');
   assert.match(player, /const isHls =/);
+  // Execute the exact regex from the player: static keyword checks would have
+  // missed the escaped-backslash regression that stopped every .m3u8 match.
+  const hlsExpression = player.match(/const isHls = (\/[^\n]+\/[a-z]*)\.test\(rawMediaPath\);/);
+  assert.ok(hlsExpression, 'HLS detection expression must remain readable');
+  const expression = hlsExpression[1];
+  const splitAt = expression.lastIndexOf('/');
+  const hlsRegex = new RegExp(expression.slice(1, splitAt), expression.slice(splitAt + 1));
+  assert.equal(hlsRegex.test('/live/playlist.m3u8'), true);
+  assert.equal(hlsRegex.test(new URL('https://cdn.example.org/live/playlist.m3u8?signature=a').pathname), true);
+  assert.equal(hlsRegex.test('/live/playlist.M3U8'), true);
+  assert.equal(hlsRegex.test('/live/playlist.mp4'), false);
   assert.ok(player.includes("video.canPlayType('application/vnd.apple.mpegurl')"));
   assert.ok(player.includes("void import('hls.js')"));
   assert.ok(player.includes('Hls.isSupported()'));
