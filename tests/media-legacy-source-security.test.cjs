@@ -19,6 +19,9 @@ test('legacy-compatible player only identifies verified YouTube hosts and IDs', 
   assert.match(player, /mediaUrl === 'streamio'/);
   assert.match(player, /const isRawMedia/);
   assert.match(player, /const isRawAudio/);
+  assert.equal((player.match(/postMessage\\(JSON\\.stringify\\(/g) || []).length, 3);
+  assert.match(player, /postMessage\\(JSON\\.stringify\\(\\{ event: 'command', func: 'playVideo' \\}\\), 'https:\\/\\/www\\.youtube\\.com'\\)/);
+  assert.doesNotMatch(player, /postMessage\\(JSON\\.stringify\\([^\\n]+, '\\*'\\)/);
 });
 
 test('broadcast settings reject unsafe local/private media destinations', () => {
