@@ -54,7 +54,7 @@ export default function FactSportPlayer({
   const isSafeMediaUrl = (() => {
     if (!mediaUrl || mediaUrl === 'streamio') return true;
     const value = mediaUrl.trim();
-    if (!value || value.includes('\\\\') || value.startsWith('//')) return false;
+    if (!value || value.includes(String.fromCharCode(92)) || value.startsWith('//')) return false;
     try {
       const relative = value.startsWith('/');
       if (relative && value.split(/[?#]/, 1)[0].split('/').includes('..')) return false;
