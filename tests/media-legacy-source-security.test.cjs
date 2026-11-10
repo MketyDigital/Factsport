@@ -70,6 +70,20 @@ test('signed external HLS uses native video or already-installed hls.js, not an 
 });
 
 
+
+test('legacy audio and video report playback failure and expose retry controls', () => {
+  const player = read('app/components/FactSportPlayer.tsx');
+  assert.match(player, /const \[playbackError, setPlaybackError\] = useState/);
+  assert.match(player, /const playNativeMedia = \(\) =>/);
+  assert.ok(player.includes('void media.play().then(() => {'));
+  assert.ok(player.includes('setHasStarted(false);'));
+  assert.ok(player.includes('setPlaybackError(\'Playback could not start.'));
+  assert.ok(player.includes('playNativeMedia();'));
+  assert.ok(player.includes('playbackError && <span role="alert"'));
+  assert.equal(player.split('onPause={() => setIsPlaying(false)}').length - 1, 2);
+  assert.equal(player.split('onEnded={() => setIsPlaying(false)}').length - 1, 2);
+});
+
 test('broadcast settings reject unsafe local/private media destinations', () => {
   const actions = read('app/admin/studio/actions.ts');
   assert.match(actions, /function safeMediaUrl/);
