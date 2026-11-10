@@ -89,6 +89,8 @@ test('Large VOD files use protected Cloudflare TUS with durable resume and size 
   assert.match(adapter, /maxDurationSeconds/);
   assert.match(adapter, /requiresignedurls/);
   assert.match(adapter, /allowedorigins/);
+  assert.match(adapter, /encodeTusMetadata\(config\.allowedOrigins\.join\(','\)\)/);
+  assert.doesNotMatch(adapter, /encodeTusMetadata\(JSON\.stringify\(config\.allowedOrigins\)\)/);
   assert.match(adapter, /stream-media-id/);
   assert.match(adapter, /location\.pathname\.startsWith\(expectedPathPrefix\)/);
   assert.match(adapter, /\^\[a-z0-9\]\{32,64\}\$/);
