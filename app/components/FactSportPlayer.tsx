@@ -49,6 +49,32 @@ export default function FactSportPlayer({
   const playerWrapperRef = useRef<HTMLDivElement>(null);
   const { activeMatchId, tuneInVideo, setIsPageActive } = useGlobalMedia();
 
+  // This player also receives URLs from Media UI callers, not just the
+  // server-gated match endpoint. Never load non-web schemes in raw/iframe src.
+  const isSafeMediaUrl = (() => {
+    if (!mediaUrl || mediaUrl === 'streamio') return true;
+    const value = mediaUrl.trim();
+    if (!value || value.includes('\\\\') || value.startsWith('//')) return false;
+    try {
+      const relative = value.startsWith('/');
+      if (relative && value.split(/[?#]/, 1)[0].split('/').includes('..')) return false;
+      const url = new URL(value, 'https://factsport.invalid');
+      if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return false;
+      if (relative) return url.origin === 'https://factsport.invalid';
+      const host = url.hostname.toLowerCase().replace(/^\\[|\\]$/g, '');
+      if (!host || host === 'localhost' || host.endsWith('.localhost') ||
+          host.endsWith('.local') || host.endsWith('.internal') ||
+          host === '::1' || host.startsWith('fc') || host.startsWith('fd') ||
+          host.startsWith('fe80:') || /^127\\./.test(host) ||
+          /^10\\./.test(host) || /^192\\.168\\./.test(host) ||
+          /^172\\.(1[6-9]|2\\d|3[01])\\./.test(host) ||
+          /^169\\.254\\./.test(host) || host === '0.0.0.0') return false;
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+
   // Only actual YouTube hosts may be embedded as YouTube.
   const youtubeVideoId = (() => {
     try {
@@ -119,7 +145,7 @@ export default function FactSportPlayer({
   // 🟢 GLOBAL REGISTRATION SHIELD
   useEffect(() => {
       if (!tuneInVideo) return;
-      if (isTimeLocked || !mediaUrl || mediaUrl === 'streamio' || activeMatchId === matchId) return;
+      if (isTimeLocked || !isSafeMediaUrl || !mediaUrl || mediaUrl === 'streamio' || activeMatchId === matchId) return;
 
       const shouldAutoRegister = mode === 'audio' || isFinished || isRawMedia;
 
@@ -135,7 +161,7 @@ export default function FactSportPlayer({
 
           tuneInVideo(matchId, finalUrl);
       }
-  }, [isTimeLocked, mediaUrl, matchId, activeMatchId, mode, isFinished, isYouTube, youtubeVideoId, isRawMedia, tuneInVideo]);
+  }, [isTimeLocked, mediaUrl, matchId, activeMatchId, mode, isFinished, isYouTube, youtubeVideoId, isRawMedia, isSafeMediaUrl, tuneInVideo]);
 
   const startPlayback = () => {
       setHasStarted(true);
@@ -290,7 +316,7 @@ export default function FactSportPlayer({
       );
   }
 
-  if (!mediaUrl) return <DefaultPreview />;
+  if (!mediaUrl || !isSafeMediaUrl) return <DefaultPreview />;
   if (mediaUrl === 'streamio') return <FactSportMediaRoom matchId={matchId} mediaUrl="streamio" />;
 
   const CustomControls = () => (
