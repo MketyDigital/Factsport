@@ -55,13 +55,18 @@ test('signed external HLS uses native video or already-installed hls.js, not an 
   assert.equal(hlsRegex.test(new URL('https://cdn.example.org/live/playlist.m3u8?signature=a').pathname), true);
   assert.equal(hlsRegex.test('/live/playlist.M3U8'), true);
   assert.equal(hlsRegex.test('/live/playlist.mp4'), false);
-  assert.ok(player.includes("video.canPlayType('application/vnd.apple.mpegurl')"));
+  assert.ok(player.includes("media.canPlayType('application/vnd.apple.mpegurl')"));
   assert.ok(player.includes("void import('hls.js')"));
   assert.ok(player.includes('Hls.isSupported()'));
   assert.ok(player.includes('hls.loadSource(mediaUrl)'));
-  assert.ok(player.includes('hls.attachMedia(video)'));
+  assert.ok(player.includes('hls.attachMedia(media)'));
   assert.ok(player.includes('cleanup = () => hls.destroy()'));
   assert.ok(player.includes('src={isHls ? undefined : mediaUrl}'));
+  assert.ok(player.includes("if (!isHls || !isSafeMediaUrl || isTimeLocked) return;"));
+  assert.ok(player.includes("const media = mediaRef.current;"));
+  assert.ok(!player.includes("mode === 'audio') return;"), 'HLS audio must use the fallback');
+  assert.equal(player.split('src={isHls ? undefined : mediaUrl}').length - 1, 2,
+    'HLS audio and video both defer source assignment to native HLS or hls.js');
 });
 
 
