@@ -17,7 +17,8 @@ test('legacy-compatible player only identifies verified YouTube hosts and IDs', 
   assert.doesNotMatch(player, /mediaUrl\.includes\('embed\/'\)/);
   assert.match(player, /https:\/\/www\.youtube\.com\/embed\/\$\{youtubeVideoId\}/);
   assert.match(player, /mediaUrl === 'streamio'/);
-  assert.match(player, /\.\(mp4\|webm\|ogg\|mp3\|m3u8\|wav\)/);
+  assert.match(player, /const isRawMedia/);
+  assert.match(player, /const isRawAudio/);
 });
 
 test('broadcast settings reject unsafe local/private media destinations', () => {
