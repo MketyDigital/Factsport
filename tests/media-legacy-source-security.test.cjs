@@ -70,10 +70,14 @@ test('unapproved paid Cloudflare Stream VOD cannot activate via env flags or edi
   const stream = read('lib/media/cloudflare-stream.ts');
   const library = read('app/admin/media/MediaLibraryClient.tsx');
   const adminPage = read('app/admin/media/page.tsx');
+  const newsroom = read('app/admin/news/NewsroomClient.tsx');
   assert.ok(stream.includes('const FACTSPORT_PAID_STREAM_OWNER_APPROVED = false;'));
   assert.ok(stream.includes('return FACTSPORT_PAID_STREAM_OWNER_APPROVED &&'));
   assert.doesNotMatch(library, /<MediaVideoLibrary/);
   assert.doesNotMatch(adminPage, /isFactsportStreamVideoReady/);
+  assert.doesNotMatch(newsroom, /<EditorialVideoAttachments/);
+  assert.doesNotMatch(newsroom, /<MediaVideoPreview/);
+  assert.match(newsroom, /previewInline.length > 0/);
   assert.match(library, /MediaDerivativeEditor/);
   assert.match(library, /MediaUsagePanel/);
 });
