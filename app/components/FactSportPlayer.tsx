@@ -38,6 +38,7 @@ export default function FactSportPlayer({
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [uiBlocker, setUiBlocker] = useState(false);
   
@@ -201,17 +202,31 @@ export default function FactSportPlayer({
       }
   }, [isTimeLocked, mediaUrl, matchId, activeMatchId, mode, isFinished, isYouTube, youtubeVideoId, isRawMedia, isSafeMediaUrl, tuneInVideo]);
 
-  const startPlayback = () => {
+  const playNativeMedia = () => {
+    const media = mediaRef.current;
+    if (!media) return;
+    setPlaybackError(null);
+    // HLS.js may not yet have attached a playlist. Do not report success
+    // until the browser resolves play(), and never leave an unhandled rejection.
+    void media.play().then(() => {
       setHasStarted(true);
       setIsPlaying(true);
+    }).catch(() => {
+      setIsPlaying(false);
+      setPlaybackError('Playback could not start. Check the stream and tap play to retry.');
+    });
+  };
+
+  const startPlayback = () => {
+      setPlaybackError(null);
       if (isYouTube && iframeRef.current) {
+          setHasStarted(true);
+          setIsPlaying(true);
           iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo' }), 'https://www.youtube.com');
           setUiBlocker(true);
-          // HOW TO EDIT UI BLOCKER TIMEOUT:
-          // Change the '4000' below (in milliseconds) to adjust how long the top/bottom bars hide the YouTube UI
           setTimeout(() => setUiBlocker(false), 4000);
-      } else if (mediaRef.current) {
-          mediaRef.current.play();
+      } else {
+          playNativeMedia();
       }
   };
 
@@ -224,15 +239,16 @@ export default function FactSportPlayer({
         iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: isPlaying ? 'pauseVideo' : 'playVideo' }), 'https://www.youtube.com');
         if (!isPlaying) {
             setUiBlocker(true);
-            // HOW TO EDIT UI BLOCKER TIMEOUT:
-            // Change the '4000' below (in milliseconds) to adjust how long the top/bottom bars hide the YouTube UI
             setTimeout(() => setUiBlocker(false), 4000);
         }
         setIsPlaying(!isPlaying);
     } else if (mediaRef.current) {
-      if (isPlaying) mediaRef.current.pause();
-      else mediaRef.current.play();
-      setIsPlaying(!isPlaying);
+      if (isPlaying) {
+        mediaRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        playNativeMedia();
+      }
     }
   };
 
@@ -390,6 +406,7 @@ export default function FactSportPlayer({
          <span className="relative z-10 text-white mt-4 text-[10px] font-black tracking-widest uppercase drop-shadow-md">
              {mode === 'audio' ? 'Listen Live' : 'Watch Live Stream'}
          </span>
+         {playbackError && <span role="alert" className="relative z-10 mt-3 max-w-xs px-3 text-center text-xs text-amber-200">{playbackError}</span>}
      </div>
   );
 
@@ -482,9 +499,9 @@ export default function FactSportPlayer({
         <div className="absolute inset-0 z-20 cursor-pointer" onClick={togglePlay}></div>
 
         {mode === 'audio' || isRawAudio ? (
-             <audio ref={mediaRef as React.RefObject<HTMLAudioElement>} src={isHls ? undefined : mediaUrl} onTimeUpdate={handleTimeUpdate} onWaiting={() => setIsBuffering(true)} onPlaying={() => setIsBuffering(false)} />
+             <audio ref={mediaRef as React.RefObject<HTMLAudioElement>} src={isHls ? undefined : mediaUrl} onTimeUpdate={handleTimeUpdate} onWaiting={() => setIsBuffering(true)} onPlaying={() => { setIsBuffering(false); setIsPlaying(true); setHasStarted(true); }} onPause={() => setIsPlaying(false)} onEnded={() => setIsPlaying(false)} />
         ) : (
-             <video ref={mediaRef as React.RefObject<HTMLVideoElement>} src={isHls ? undefined : mediaUrl} className="w-full h-full object-contain pointer-events-none z-10" onTimeUpdate={handleTimeUpdate} onWaiting={() => setIsBuffering(true)} onPlaying={() => setIsBuffering(false)} />
+             <video ref={mediaRef as React.RefObject<HTMLVideoElement>} src={isHls ? undefined : mediaUrl} className="w-full h-full object-contain pointer-events-none z-10" onTimeUpdate={handleTimeUpdate} onWaiting={() => setIsBuffering(true)} onPlaying={() => { setIsBuffering(false); setIsPlaying(true); setHasStarted(true); }} onPause={() => setIsPlaying(false)} onEnded={() => setIsPlaying(false)} />
         )}
 
         {isBuffering && <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30"><Loader2 className="text-white animate-spin w-10 h-10 drop-shadow-lg" /></div>}
