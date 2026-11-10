@@ -1,5 +1,10 @@
 const API = 'https://api.cloudflare.com/client/v4';
 
+// Owner decision M53: Cloudflare Stream is a separately billed, unapproved VOD
+// service. Environment variables or credentials alone MUST NOT activate it.
+// Changing this requires explicit owner approval and a reviewed source change.
+const FACTSPORT_PAID_STREAM_OWNER_APPROVED = false;
+
 function streamConfig() {
   return {
     accountId: process.env.CLOUDFLARE_ACCOUNT_ID || '',
@@ -24,7 +29,8 @@ function hasValidSigningJwk(value: string) {
 
 export function isFactsportStreamPlaybackReady(): boolean {
   const config = streamConfig();
-  return process.env.FACTSPORT_STREAM_VIDEO_READY === 'true' &&
+  return FACTSPORT_PAID_STREAM_OWNER_APPROVED &&
+    process.env.FACTSPORT_STREAM_VIDEO_READY === 'true' &&
     /^[a-f0-9]{31,32}$/i.test(config.signingKeyId) &&
     hasValidSigningJwk(config.signingKeyJwk) &&
     config.allowedOrigins.length > 0 &&
