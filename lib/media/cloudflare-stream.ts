@@ -134,7 +134,7 @@ export async function createFactsportStreamTusUpload(input: {
     'factsportMediaVideoId ' + encodeTusMetadata(input.assetId),
     'maxDurationSeconds ' + encodeTusMetadata(String(maxDurationSeconds)),
     'expiry ' + encodeTusMetadata(expiresAt),
-    'allowedorigins ' + encodeTusMetadata(JSON.stringify(config.allowedOrigins)),
+    'allowedorigins ' + encodeTusMetadata(config.allowedOrigins.join(',')),
     'thumbnailtimestamppct ' + encodeTusMetadata('0.1'),
     'requiresignedurls',
   ].join(',');
