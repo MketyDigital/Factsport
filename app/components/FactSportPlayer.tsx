@@ -61,14 +61,19 @@ export default function FactSportPlayer({
       const url = new URL(value, 'https://factsport.invalid');
       if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return false;
       if (relative) return url.origin === 'https://factsport.invalid';
-      const host = url.hostname.toLowerCase().replace(/^\\[|\\]$/g, '');
+      const hostname = url.hostname.toLowerCase();
+      const host = hostname.startsWith('[') && hostname.endsWith(']')
+        ? hostname.slice(1, -1) : hostname;
+      const ipv4Parts = host.split('.');
+      const private172 = ipv4Parts.length === 4 &&
+        ipv4Parts[0] === '172' && Number(ipv4Parts[1]) >= 16 && Number(ipv4Parts[1]) <= 31;
       if (!host || host === 'localhost' || host.endsWith('.localhost') ||
           host.endsWith('.local') || host.endsWith('.internal') ||
           host === '::1' || host.startsWith('fc') || host.startsWith('fd') ||
-          host.startsWith('fe80:') || /^127\\./.test(host) ||
-          /^10\\./.test(host) || /^192\\.168\\./.test(host) ||
-          /^172\\.(1[6-9]|2\\d|3[01])\\./.test(host) ||
-          /^169\\.254\\./.test(host) || host === '0.0.0.0') return false;
+          host.startsWith('fe80:') || host.startsWith('127.') ||
+          host.startsWith('10.') || host.startsWith('192.168.') ||
+          host.startsWith('169.254.') || private172 ||
+          host === '0.0.0.0') return false;
       return true;
     } catch {
       return false;
