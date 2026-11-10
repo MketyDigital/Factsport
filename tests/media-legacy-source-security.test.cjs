@@ -19,6 +19,11 @@ test('legacy-compatible player only identifies verified YouTube hosts and IDs', 
   assert.match(player, /mediaUrl === 'streamio'/);
   assert.match(player, /const isRawMedia/);
   assert.match(player, /const isRawAudio/);
+  assert.match(player, /const rawMediaPath/);
+  assert.match(player, /return url\.pathname/);
+  assert.match(player, /test\(rawMediaPath\)/);
+  assert.match(player, /referrerPolicy="no-referrer"/);
+  assert.match(player, /title="Factsport external match media"/);
   assert.equal(player.split("postMessage(JSON.stringify(").length - 1, 3);
   assert.ok(player.includes("postMessage(JSON.stringify({ event: 'command', func: 'playVideo' }), 'https://www.youtube.com')"));
   assert.ok(!player.includes("}), '*')"), 'YouTube commands must not use wildcard target origins');
