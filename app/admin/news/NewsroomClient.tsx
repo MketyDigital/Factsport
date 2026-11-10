@@ -7,9 +7,7 @@ import {
 } from './actions';
 import { removeRevisionMedia, reviewRightsAndAttachMedia } from './media-actions';
 import MarkdownRenderer from '@/app/components/MarkdownRenderer';
-import MediaVideoPreview from '@/app/admin/media/MediaVideoPreview';
 import NewsArtwork from '@/app/components/NewsArtwork';
-import EditorialVideoAttachments from './EditorialVideoAttachments';
 
 type ReusableMediaAsset = {
   id: string; object_key: string; rights_status: string; rights_reference: string | null;
@@ -106,7 +104,6 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const previewTeam1 = activeRevisionMedia.find(asset => asset.placement === 'team_1');
   const previewTeam2 = activeRevisionMedia.find(asset => asset.placement === 'team_2');
   const previewInline = activeRevisionMedia.filter(asset => asset.placement === 'inline').sort((a, b) => a.position - b.position);
-  const previewVideos = currentRevisionVideos.filter(video => !video.remove_video && video.video_id).sort((a, b) => a.position - b.position);
   const previewSeoTitle = form.seoTitle.trim() || form.title || 'Untitled article';
   const previewSeoDescription = form.seoDescription.trim() || form.excerpt.trim() ||
     form.bodyMarkdown.replace(/[#*_>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 160);
@@ -392,7 +389,6 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                 </div>
               </div>}
             </section>
-            <EditorialVideoAttachments articleId={form.id} revisionStatus={currentRevisionStatus} attachments={currentRevisionVideos} />
             <label className="md:col-span-2 text-xs font-bold text-slate-600">Excerpt / social preview
               <textarea value={form.excerpt} onChange={e => setForm({ ...form, excerpt: e.target.value })} maxLength={500} rows={2} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm" />
             </label>
@@ -452,19 +448,6 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                           {source.attribution_text && <p className="mt-1 text-[10px] text-slate-600">{source.attribution_text}</p>}
                         </li>)}
                       </ul>
-                    </section>}
-                    {previewVideos.length > 0 && <section className="mt-10 border-t border-slate-200 pt-7" aria-label="Preview video clips">
-                      <h3 className="mb-4 text-lg font-black text-slate-900">Watch the clips</h3>
-                      <div className="space-y-5">
-                        {previewVideos.map(video => <article key={video.video_id} className="rounded-xl border border-slate-200 p-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-sm font-bold text-slate-900">{video.title || 'Untitled video'}</p>
-                            <span className="text-[10px] font-bold uppercase text-slate-500">{video.upload_status || 'unknown'} · rights {video.rights_status || 'pending'}</span>
-                          </div>
-                          {video.video_id && video.upload_status === 'ready' && <MediaVideoPreview videoId={video.video_id} title={video.title || 'Editorial video preview'} />}
-                          {video.upload_status !== 'ready' && <p className="mt-2 text-xs text-slate-500">Private preview becomes available when Stream processing is complete.</p>}
-                        </article>)}
-                      </div>
                     </section>}
                     {previewInline.length > 0 && <section className="mt-10 border-t border-slate-200 pt-7" aria-label="Preview media gallery">
                       <h3 className="mb-4 text-lg font-black text-slate-900">More from this story</h3>
@@ -528,7 +511,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                     </div>
                   </section>
                 </div>
-                <p className="border-t border-slate-200 px-4 py-2 text-[10px] text-slate-500">Private editor preview only. Ad and analytics scripts are not loaded; third-party Markdown images, match widgets and video embeds are shown as placeholders. Approved Stream clips use the signed, editor-only preview endpoint.</p>
+                <p className="border-t border-slate-200 px-4 py-2 text-[10px] text-slate-500">Private editor preview only. Ad and analytics scripts are not loaded; third-party Markdown images, match widgets and video embeds are shown as placeholders. Unapproved hosted VOD uploads are excluded from this editorial workflow.</p>
               </section>}
             </label>
             <label className="text-xs font-bold text-slate-600">Tags (comma separated)
