@@ -46,3 +46,14 @@ Fetched the committed V2 player, Stream adapter, R2 media editor/page and regres
 5. Keep AdSense-sensitive Media and paid Prediction separation; enabling public ads, SEO indexing and production migration requires release approval.
 
 No production change, DNS cutover, paid video provisioning, live Stream.io operation, data migration or AdSense activation occurred.
+
+## Newsroom paid-VOD exclusion follow-up (same milestone)
+
+After the initial M58 document, a deeper audit confirmed `app/admin/news/NewsroomClient.tsx` still mounted the dormant paid Cloudflare Stream VOD attachment and preview components. These controls have now been removed from the approved newsroom UI; the R2 image gallery, editorial source references and historical revision comparisons remain intact. `tests/media-legacy-source-security.test.cjs` now protects that decision.
+
+Additional commits:
+- `438abb0e1bb28c22a69216016a65356ed40a2fd4` — remove unapproved VOD editor and video preview surfaces
+- `60f6f385d9c24b92822aa81e3137faca9e65eb6d` — remove unused current-video preview state
+- `1fbc4a126fc5956256f6ed7c4c901b5598b64179` — strengthen newsroom regression assertions
+
+All changes were made to the V2 source branch only. The migration, legacy published content and existing provider assets were not deleted; these remain subject to separate owner-approved data-retention decisions. Current-head tests/build/staging remain pending, and dormant code is not equivalent to a deployed billable resource.
