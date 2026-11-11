@@ -72,7 +72,7 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const tuneInVideo = (matchId: string, url: string) => {
-        stopMedia();
+        void stopMedia();
         setActiveMatchId(matchId);
         setMediaType('video');
         setVideoUrl(url);
@@ -80,7 +80,12 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
 
     const tuneInAudio = async (matchId: string) => {
         if (activeMatchId === matchId && mediaType === 'audio') return; 
-        await stopMedia();
+        // stopMedia invalidates previous joins synchronously, but its provider
+        // disconnect is async. A newer user choice may arrive while it awaits.
+        const stopping = stopMedia();
+        const stoppedSession = sessionRef.current;
+        await stopping;
+        if (stoppedSession !== sessionRef.current) return;
         const session = ++sessionRef.current;
         setIsConnecting(true);
         setErrorMsg(null);
@@ -132,7 +137,12 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
             };
 
             const joined = await tryJoin();
-            if (session !== sessionRef.current) return;
+            if (session !== sessionRef.current) {
+                // stopMedia may have raced with join(); close the late join too.
+                await myCall.leave().catch(() => {});
+                await myClient.disconnectUser().catch(() => {});
+                return;
+            }
 
             if (joined) {
                 setClient(myClient); setCall(myCall); setActiveMatchId(matchId); setIsConnecting(false);
@@ -144,7 +154,11 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
                     retryInProgress = true;
                     try {
                         await myCall.join();
-                        if (session !== sessionRef.current) return;
+                        if (session !== sessionRef.current) {
+                            await myCall.leave().catch(() => {});
+                            await myClient.disconnectUser().catch(() => {});
+                            return;
+                        }
                         if (pollRef.current) clearInterval(pollRef.current);
                         pollRef.current = null;
                         setClient(myClient); setCall(myCall); setActiveMatchId(matchId);
