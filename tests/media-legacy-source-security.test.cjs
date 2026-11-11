@@ -189,6 +189,10 @@ test('atomic external video authoring locks draft, rejects stale bodies and comm
   assert.match(atomic, /ORDER BY revision_number DESC LIMIT 1 FOR UPDATE/);
   assert.match(atomic, /input\.expectedBody !== currentBody/);
   assert.match(atomic, /expectedRevisionId: string/);
+  assert.match(atomic, /expectedSnapshotEtag: string/);
+  assert.match(atomic, /md5\(snapshot::text\) AS snapshot_etag/);
+  assert.match(atomic, /revisions\[0\]\.snapshot_etag !== input\.expectedSnapshotEtag/);
+  assert.match(atomic, /This draft was changed in another editor/);
   assert.match(atomic, /String\(revisions\[0\]\.id\) !== input\.expectedRevisionId/);
   assert.match(atomic, /A newer draft revision exists/);
   assert.match(atomic, /SELECT id, status FROM public\.editorial_articles/);
@@ -200,10 +204,14 @@ test('atomic external video authoring locks draft, rejects stale bodies and comm
   assert.match(atomic, /url\.protocol !== 'https:'/);
   assert.match(newsroom, /attachExternalVideoToDraft\(\{/);
   assert.match(newsroom, /expectedRevisionId: currentRevisionId!/);
+  assert.match(newsroom, /expectedSnapshotEtag: currentRevisionSnapshotEtag!/);
+  assert.match(newsroom, /!currentRevisionSnapshotEtag/);
   assert.match(newsroom, /hasUnsavedEditorialChanges/);
   assert.match(newsroom, /Save your article changes before attaching an external video/);
   const page = read('app/admin/news/page.tsx');
   assert.match(page, /current_revision_id/);
+  assert.match(page, /md5\(r\.snapshot::text\)/);
+  assert.match(page, /current_revision_snapshot_etag/);
   assert.match(page, /return rows\.map\(article =>/);
   assert.doesNotMatch(newsroom.slice(newsroom.indexOf('External editorial video')), /await addEditorialSource\(\{/);
 });
