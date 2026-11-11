@@ -33,6 +33,7 @@ export default async function AdminNewsPage() {
         COALESCE(r.workflow_status, a.review_status) AS review_status,
         r.workflow_status AS revision_status,
         COALESCE(r.id, published_revision.id) AS current_revision_id,
+        CASE WHEN r.workflow_status='draft' THEN md5(r.snapshot::text) ELSE NULL END AS current_revision_snapshot_etag,
         COALESCE(revision_media.items, '[]'::jsonb) AS revision_media,
         COALESCE(article_sources.items, '[]'::jsonb) AS sources,
         r.review_comment,
