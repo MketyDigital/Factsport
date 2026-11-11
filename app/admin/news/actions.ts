@@ -23,6 +23,39 @@ function safeHttpUrl(value: string | undefined): string | null {
   return parsed.toString();
 }
 
+// Validate the source records behind sanctioned public article video embeds.
+// Rights references are private records, never serialized into the article.
+function externalVideoCanonicalUrls(body: string): string[] {
+  const urls = new Set<string>();
+  const iframes = body.match(/<iframe\\b[^>]*>/gi) || [];
+  for (const iframe of iframes) {
+    const src = iframe.match(/\\bsrc\\s*=\\s*(["'])(.*?)\\1/i);
+    if (!src) continue; // The public Markdown sanitizer drops malformed embeds.
+    let url: URL;
+    try { url = new URL(src[2]); } catch { continue; }
+    if (url.protocol !== 'https:' || url.username || url.password) continue;
+    if (['www.youtube.com', 'www.youtube-nocookie.com'].includes(url.hostname)) {
+      const id = url.pathname.match(/^\\/embed\\/([A-Za-z0-9_-]{11})$/);
+      if (id) urls.add('https://www.youtube.com/watch?v=' + id[1]);
+    } else if (url.hostname === 'player.vimeo.com') {
+      const id = url.pathname.match(/^\\/video\\/([0-9]+)$/);
+      if (id) urls.add('https://vimeo.com/' + id[1]);
+    }
+  }
+  return [...urls];
+}
+
+function assertExternalVideoSourceRights(
+  body: string, sources: Array<{ canonical_url: string; attribution_text: string | null; rights_reference: string | null }>
+) {
+  for (const canonicalUrl of externalVideoCanonicalUrls(body)) {
+    if (!sources.some(source => source.canonical_url === canonicalUrl &&
+        Boolean(source.attribution_text?.trim()) && Boolean(source.rights_reference?.trim()))) {
+      throw new Error('An external video requires a matching source, public attribution and private rights reference on this editorial revision.');
+    }
+  }
+}
+
 function revalidateEditorial() {
   revalidatePath('/admin/news'); revalidatePath('/'); revalidatePath('/news'); revalidatePath('/sitemap.xml');
 }
@@ -206,11 +239,18 @@ export async function submitEditorialForReview(articleId: string): Promise<Actio
       const articles = await tx`SELECT id, status FROM public.editorial_articles WHERE id=${articleId}::uuid FOR UPDATE`;
       if (!articles.length || articles[0].status === 'archived') throw new Error('Article is unavailable.');
       const revisions = await tx`
-        SELECT id FROM public.editorial_article_revisions
+        SELECT id, snapshot::text AS snapshot_text FROM public.editorial_article_revisions
         WHERE article_id=${articleId}::uuid AND workflow_status='draft'
         ORDER BY revision_number DESC LIMIT 1 FOR UPDATE
       `;
       if (!revisions.length) throw new Error('Save a new draft revision before submitting for review.');
+      const reviewSnapshot = JSON.parse(revisions[0].snapshot_text);
+      const reviewSources = await tx`
+        SELECT canonical_url, attribution_text, rights_reference
+        FROM public.editorial_article_sources WHERE revision_id=${revisions[0].id}::uuid
+      `;
+      assertExternalVideoSourceRights(String(reviewSnapshot.body_markdown || ''), reviewSources);
+
       await tx`
         UPDATE public.editorial_article_revisions SET
           workflow_status='in_review', submitted_by=${actorId}::uuid, submitted_at=now()
@@ -338,6 +378,12 @@ export async function publishApprovedEditorial(articleId: string, publicContentC
         throw new Error('Publishing requires a publisher distinct from the author, submitter and reviewer.');
       }
       const snapshot = JSON.parse(revision.snapshot_text);
+      const publishSources = await tx`
+        SELECT canonical_url, attribution_text, rights_reference
+        FROM public.editorial_article_sources WHERE revision_id=${revision.id}::uuid
+      `;
+      assertExternalVideoSourceRights(String(snapshot.body_markdown || ''), publishSources);
+
       const contentPolicy = inspectPublicMediaArticle(snapshot);
       if (!contentPolicy.eligible) throw new Error('This revision contains betting promotion, affiliate links or private Prediction content and cannot be published on public Media.');
       const revisionMedia = await tx`
