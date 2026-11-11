@@ -90,7 +90,7 @@ export default async function AdminNewsPage() {
       LIMIT 200
       `;
       if (!isFactsportMediaVideoSchemaReady() || rows.length === 0) {
-        return rows.map(({ current_revision_id, ...article }) => ({ ...article, revision_videos: [] }));
+        return rows.map(article => ({ ...article, revision_videos: [] }));
       }
       const revisionIds = rows.map(row => row.current_revision_id).filter(Boolean);
       const videoRows = revisionIds.length ? await sql`
@@ -113,9 +113,9 @@ export default async function AdminNewsPage() {
         GROUP BY rv.revision_id
       ` : [];
       const videosByRevision = new Map(videoRows.map(row => [String(row.revision_id), row.items || []]));
-      return rows.map(({ current_revision_id, ...article }) => ({
+      return rows.map(article => ({
         ...article,
-        revision_videos: current_revision_id ? videosByRevision.get(String(current_revision_id)) || [] : [],
+        revision_videos: article.current_revision_id ? videosByRevision.get(String(article.current_revision_id)) || [] : [],
       }));
     });
     return <NewsroomClient initialArticles={articles as any[]} />;
