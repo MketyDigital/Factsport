@@ -727,7 +727,7 @@ export async function addEditorialSource(input: {
  * its source. Reject stale editors instead of overwriting newer draft changes.
  */
 export async function attachExternalVideoToDraft(input: {
-  articleId: string; expectedRevisionId: string; expectedBody: string; videoUrl: string;
+  articleId: string; expectedRevisionId: string; expectedSnapshotEtag: string; expectedBody: string; videoUrl: string;
   title: string; attributionText: string; rightsReference: string;
 }): Promise<ActionResult> {
   const authorization = await authorizeMediaEditorialAction('draft');
@@ -737,6 +737,9 @@ export async function attachExternalVideoToDraft(input: {
   }
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input?.expectedRevisionId || '')) {
     return { success: false, error: 'A valid draft revision identity is required.' };
+  }
+  if (!/^[a-f0-9]{32}$/i.test(input?.expectedSnapshotEtag || '')) {
+    return { success: false, error: 'A valid saved draft version is required.' };
   }
   const title = cleanText(input.title, 180).replace(/[<>"'&]/g, '');
   const attributionText = cleanText(input.attributionText, 500);
@@ -780,7 +783,7 @@ export async function attachExternalVideoToDraft(input: {
       `;
       if (!articles.length) throw new Error('Article was not found or is archived.');
       const revisions = await tx`
-        SELECT id, snapshot::text AS snapshot_text
+        SELECT id, snapshot::text AS snapshot_text, md5(snapshot::text) AS snapshot_etag
         FROM public.editorial_article_revisions
         WHERE article_id=${input.articleId}::uuid AND workflow_status='draft'
         ORDER BY revision_number DESC LIMIT 1 FOR UPDATE
@@ -788,6 +791,9 @@ export async function attachExternalVideoToDraft(input: {
       if (!revisions.length) throw new Error('Save a draft revision before attaching a video.');
       if (String(revisions[0].id) !== input.expectedRevisionId) {
         throw new Error('A newer draft revision exists. Reload the newsroom before attaching video.');
+      }
+      if (revisions[0].snapshot_etag !== input.expectedSnapshotEtag) {
+        throw new Error('This draft was changed in another editor. Reload before attaching video.');
       }
       const snapshot = JSON.parse(revisions[0].snapshot_text);
       const currentBody = String(snapshot.body_markdown || '');
