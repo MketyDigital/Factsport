@@ -720,3 +720,109 @@ export async function addEditorialSource(input: {
     return { success: false, error: error instanceof Error ? error.message : 'Unable to add the editorial source.' };
   }
 }
+
+
+/**
+ * Atomically attach an authorized external video to the active draft and record
+ * its source. Reject stale editors instead of overwriting newer draft changes.
+ */
+export async function attachExternalVideoToDraft(input: {
+  articleId: string; expectedBody: string; videoUrl: string;
+  title: string; attributionText: string; rightsReference: string;
+}): Promise<ActionResult> {
+  const authorization = await authorizeMediaEditorialAction('draft');
+  if (!authorization.ok) return { success: false, error: authorization.error };
+  if (!/^[0-9a-f-]{36}$/i.test(input?.articleId || '')) {
+    return { success: false, error: 'Invalid article identifier.' };
+  }
+  const title = cleanText(input.title, 180).replace(/[<>"'&]/g, '');
+  const attributionText = cleanText(input.attributionText, 500);
+  const rightsReference = cleanText(input.rightsReference, 2048);
+  if (title.length < 3 || !attributionText || !rightsReference) {
+    return { success: false, error: 'Video title, public attribution and private rights reference are required.' };
+  }
+  let canonicalUrl: string;
+  let embedUrl: string;
+  let publisher: string;
+  try {
+    const url = new URL(input.videoUrl.trim());
+    if (url.protocol !== 'https:' || url.username || url.password) throw new Error();
+    const host = url.hostname.toLowerCase();
+    let videoId = '';
+    if (host === 'youtu.be') videoId = url.pathname.split('/')[1] || '';
+    else if (['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtube-nocookie.com', 'www.youtube-nocookie.com'].includes(host)) {
+      if (url.pathname === '/watch') videoId = url.searchParams.get('v') || '';
+      else if (/^\/(embed|shorts|live)\//.test(url.pathname)) videoId = url.pathname.split('/')[2] || '';
+    }
+    if (/^[A-Za-z0-9_-]{11}$/.test(videoId)) {
+      canonicalUrl = 'https://www.youtube.com/watch?v=' + videoId;
+      embedUrl = 'https://www.youtube-nocookie.com/embed/' + videoId;
+      publisher = 'YouTube';
+    } else if (['vimeo.com', 'www.vimeo.com', 'player.vimeo.com'].includes(host)) {
+      const match = url.pathname.match(/^\/(?:video\/)?([0-9]+)\/?$/);
+      if (!match) throw new Error();
+      canonicalUrl = 'https://vimeo.com/' + match[1];
+      embedUrl = 'https://player.vimeo.com/video/' + match[1];
+      publisher = 'Vimeo';
+    } else throw new Error();
+  } catch {
+    return { success: false, error: 'Only approved HTTPS YouTube or Vimeo video URLs are supported.' };
+  }
+
+  try {
+    await withFactsportEditorialPostgres(async sql => sql.begin(async tx => {
+      const articles = await tx`
+        SELECT id, status FROM public.editorial_articles
+        WHERE id=${input.articleId}::uuid AND status <> 'archived' FOR UPDATE
+      `;
+      if (!articles.length) throw new Error('Article was not found or is archived.');
+      const revisions = await tx`
+        SELECT id, snapshot::text AS snapshot_text
+        FROM public.editorial_article_revisions
+        WHERE article_id=${input.articleId}::uuid AND workflow_status='draft'
+        ORDER BY revision_number DESC LIMIT 1 FOR UPDATE
+      `;
+      if (!revisions.length) throw new Error('Save a draft revision before attaching a video.');
+      const snapshot = JSON.parse(revisions[0].snapshot_text);
+      const currentBody = String(snapshot.body_markdown || '');
+      if (typeof input.expectedBody !== 'string' || input.expectedBody !== currentBody) {
+        throw new Error('This draft has changed. Save or reload the latest draft before inserting video.');
+      }
+      const embed = '<iframe src="' + embedUrl + '" title="' + title +
+        '" loading="lazy" referrerpolicy="no-referrer" allowfullscreen></iframe>';
+      const updatedBody = currentBody.trimEnd() + '\n\n' + embed + '\n\n' + attributionText;
+      if (updatedBody.length > 100000) throw new Error('Article body is too large.');
+      const updatedSnapshot = { ...snapshot, body_markdown: updatedBody };
+
+      await tx`
+        INSERT INTO public.editorial_article_sources
+          (article_id, revision_id, source_title, publisher, canonical_url, attribution_text, rights_reference)
+        VALUES (${input.articleId}::uuid, ${revisions[0].id}::uuid,
+          ${title}, ${publisher}, ${canonicalUrl}, ${attributionText}, ${rightsReference})
+      `;
+      await tx`
+        UPDATE public.editorial_article_revisions SET snapshot=${JSON.stringify(updatedSnapshot)}::jsonb
+        WHERE id=${revisions[0].id}::uuid AND workflow_status='draft'
+      `;
+      if (articles[0].status !== 'published') {
+        await tx`
+          UPDATE public.editorial_articles
+          SET body_markdown=${updatedBody}, updated_by=${authorization.user.domainUserId}::uuid, updated_at=now()
+          WHERE id=${input.articleId}::uuid AND status <> 'archived'
+        `;
+      }
+      await tx`
+        INSERT INTO public.media_editorial_audit_events
+          (actor_user_id, action, article_id, revision_id, details)
+        VALUES (${authorization.user.domainUserId}::uuid, 'external_video_attached',
+          ${input.articleId}::uuid, ${revisions[0].id}::uuid,
+          ${JSON.stringify({ canonicalUrl, publisher, title })}::jsonb)
+      `;
+    }));
+    revalidateEditorial();
+    return { success: true };
+  } catch (error) {
+    console.error('External video draft attachment failed', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unable to attach external video.' };
+  }
+}
