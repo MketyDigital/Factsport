@@ -814,9 +814,9 @@ export async function attachExternalVideoToDraft(input: {
       await tx`
         INSERT INTO public.media_editorial_audit_events
           (actor_user_id, action, article_id, revision_id, details)
-        VALUES (${authorization.user.domainUserId}::uuid, 'external_video_attached',
+        VALUES (${authorization.user.domainUserId}::uuid, 'source_added',
           ${input.articleId}::uuid, ${revisions[0].id}::uuid,
-          ${JSON.stringify({ canonicalUrl, publisher, title })}::jsonb)
+          ${JSON.stringify({ canonicalUrl, publisher, title, mediaKind: 'external_video' })}::jsonb)
       `;
     }));
     revalidateEditorial();
