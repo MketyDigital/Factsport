@@ -43,12 +43,21 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
     const [canRequestCallIn, setCanRequestCallIn] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     
-    const pollRef = useRef<NodeJS.Timeout | null>(null);
+    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    // Track connections independently of React render state: an in-flight join
+    // must be cancellable on navigation, media switch and provider unmount.
+    const activeClientRef = useRef<StreamVideoClient | null>(null);
+    const activeCallRef = useRef<Call | null>(null);
+    const sessionRef = useRef(0);
 
     const stopMedia = async () => {
+        ++sessionRef.current;
         if (pollRef.current) clearInterval(pollRef.current);
-        if (call) await call.leave().catch(()=>{});
-        if (client) await client.disconnectUser().catch(()=>{});
+        pollRef.current = null;
+        const previousCall = activeCallRef.current;
+        const previousClient = activeClientRef.current;
+        activeCallRef.current = null;
+        activeClientRef.current = null;
         setCall(null);
         setClient(null);
         setActiveMatchId(null);
@@ -57,6 +66,9 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
         setIsConnecting(false);
         setIsWaitingForHost(false);
         setCanRequestCallIn(false);
+        setErrorMsg(null);
+        await previousCall?.leave().catch(() => {});
+        await previousClient?.disconnectUser().catch(() => {});
     };
 
     const tuneInVideo = (matchId: string, url: string) => {
@@ -68,9 +80,10 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
 
     const tuneInAudio = async (matchId: string) => {
         if (activeMatchId === matchId && mediaType === 'audio') return; 
+        await stopMedia();
+        const session = ++sessionRef.current;
         setIsConnecting(true);
         setErrorMsg(null);
-        await stopMedia(); 
 
         try {
             const url = new URL(window.location.href);
@@ -93,6 +106,7 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
             try { data = JSON.parse(text); } catch(e) { throw new Error("Server temporarily unavailable. Reconnecting..."); }
             
             if (!res.ok) throw new Error(data.error || "Connection refused.");
+            if (session !== sessionRef.current) return;
             
             setRole(data.role);
             setCanRequestCallIn(data.canRequestCallIn === true);
@@ -102,6 +116,8 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
                 apiKey: data.apiKey, user: { id: data.userId, name: data.username, image: data.image }, token: data.token,
             });
             const myCall = myClient.call('audio_room', data.roomName || matchId);
+            activeClientRef.current = myClient;
+            activeCallRef.current = myCall;
 
             const tryJoin = async () => {
                 try {
@@ -116,24 +132,40 @@ export const GlobalMediaProvider = ({ children }: { children: ReactNode }) => {
             };
 
             const joined = await tryJoin();
+            if (session !== sessionRef.current) return;
 
             if (joined) {
                 setClient(myClient); setCall(myCall); setActiveMatchId(matchId); setIsConnecting(false);
             } else {
                 setIsWaitingForHost(true);
+                let retryInProgress = false;
                 pollRef.current = setInterval(async () => {
-                    if (document.hidden) return; // 🛑 THE CPU SHIELD: Don't poll Stream if phone is locked
+                    if (document.hidden || retryInProgress || session !== sessionRef.current) return;
+                    retryInProgress = true;
                     try {
                         await myCall.join();
+                        if (session !== sessionRef.current) return;
                         if (pollRef.current) clearInterval(pollRef.current);
+                        pollRef.current = null;
                         setClient(myClient); setCall(myCall); setActiveMatchId(matchId);
                         setIsWaitingForHost(false); setIsConnecting(false);
-                    } catch (e) {}
+                    } catch (e) {
+                        // The room may not be available until the host starts it.
+                    } finally {
+                        retryInProgress = false;
+                    }
                 }, 4000);
             }
         } catch (err: any) {
-            setErrorMsg(err.message);
+            if (session !== sessionRef.current) return;
+            setErrorMsg(err instanceof Error ? err.message : 'Unable to join broadcast.');
             setIsConnecting(false);
+            const failedCall = activeCallRef.current;
+            const failedClient = activeClientRef.current;
+            activeCallRef.current = null;
+            activeClientRef.current = null;
+            void failedCall?.leave().catch(() => {});
+            void failedClient?.disconnectUser().catch(() => {});
         }
     };
 
