@@ -143,3 +143,36 @@ test('newsroom approved external video helper validates provider URLs and record
   assert.match(newsroom, /Record source &amp; insert draft embed/);
   assert.match(newsroom, /Save the draft, then submit for editorial review/);
 });
+
+test('review and publish require revision-scoped external video attribution and rights evidence', () => {
+  const actions = read('app/admin/news/actions.ts');
+  const start = actions.indexOf('function externalVideoCanonicalUrls(');
+  const end = actions.indexOf('function revalidateEditorial()', start);
+  assert.ok(start >= 0 && end > start);
+  const helper = actions.slice(start, end)
+    .replace('function externalVideoCanonicalUrls(body: string): string[] {', 'function externalVideoCanonicalUrls(body) {')
+    .replace('new Set<string>()', 'new Set()')
+    .replace('let url: URL;', 'let url;')
+    .replace(
+      'function assertExternalVideoSourceRights(\n  body: string, sources: Array<{ canonical_url: string; attribution_text: string | null; rights_reference: string | null }>\n) {',
+      'function assertExternalVideoSourceRights(body, sources) {',
+    );
+  const { externalVideoCanonicalUrls, assertExternalVideoSourceRights } = vm.runInNewContext(
+    helper + '\n;({ externalVideoCanonicalUrls, assertExternalVideoSourceRights })', { URL }, { timeout: 1000 },
+  );
+  const yt = '<iframe src="https://www.youtube-nocookie.com/embed/abcdefghijk" title="Report"></iframe>';
+  const vi = "<iframe src='https://player.vimeo.com/video/12345678'></iframe>";
+  const sources = [
+    { canonical_url: 'https://www.youtube.com/watch?v=abcdefghijk', attribution_text: 'Video credit', rights_reference: 'Permission recorded' },
+    { canonical_url: 'https://vimeo.com/12345678', attribution_text: 'Vimeo credit', rights_reference: 'Editorial basis recorded' },
+  ];
+  assert.equal(Array.from(externalVideoCanonicalUrls(yt + '\n' + vi)).length, 2);
+  assert.doesNotThrow(() => assertExternalVideoSourceRights(yt + '\n' + vi, sources));
+  assert.throws(() => assertExternalVideoSourceRights(yt, []), /matching source/);
+  assert.throws(() => assertExternalVideoSourceRights(vi, [{ ...sources[1], rights_reference: '' }]), /matching source/);
+  assert.throws(() => assertExternalVideoSourceRights(yt, [{ ...sources[0], attribution_text: '' }]), /matching source/);
+  assert.doesNotThrow(() => assertExternalVideoSourceRights('An article without embedded video', []));
+  assert.ok(actions.includes("assertExternalVideoSourceRights(String(reviewSnapshot.body_markdown || ''), reviewSources)"));
+  assert.ok(actions.includes("assertExternalVideoSourceRights(String(snapshot.body_markdown || ''), publishSources)"));
+  assert.ok(actions.includes('FROM public.editorial_article_sources WHERE revision_id='));
+});
