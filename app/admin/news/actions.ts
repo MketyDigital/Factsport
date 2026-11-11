@@ -727,13 +727,16 @@ export async function addEditorialSource(input: {
  * its source. Reject stale editors instead of overwriting newer draft changes.
  */
 export async function attachExternalVideoToDraft(input: {
-  articleId: string; expectedBody: string; videoUrl: string;
+  articleId: string; expectedRevisionId: string; expectedBody: string; videoUrl: string;
   title: string; attributionText: string; rightsReference: string;
 }): Promise<ActionResult> {
   const authorization = await authorizeMediaEditorialAction('draft');
   if (!authorization.ok) return { success: false, error: authorization.error };
   if (!/^[0-9a-f-]{36}$/i.test(input?.articleId || '')) {
     return { success: false, error: 'Invalid article identifier.' };
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input?.expectedRevisionId || '')) {
+    return { success: false, error: 'A valid draft revision identity is required.' };
   }
   const title = cleanText(input.title, 180).replace(/[<>"'&]/g, '');
   const attributionText = cleanText(input.attributionText, 500);
@@ -783,6 +786,9 @@ export async function attachExternalVideoToDraft(input: {
         ORDER BY revision_number DESC LIMIT 1 FOR UPDATE
       `;
       if (!revisions.length) throw new Error('Save a draft revision before attaching a video.');
+      if (String(revisions[0].id) !== input.expectedRevisionId) {
+        throw new Error('A newer draft revision exists. Reload the newsroom before attaching video.');
+      }
       const snapshot = JSON.parse(revisions[0].snapshot_text);
       const currentBody = String(snapshot.body_markdown || '');
       if (typeof input.expectedBody !== 'string' || input.expectedBody !== currentBody) {
