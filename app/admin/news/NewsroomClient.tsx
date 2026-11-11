@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import {
-  addEditorialSource, archiveEditorialArticle, approveEditorialRevision, rejectEditorialRevision, publishApprovedEditorial, restoreEditorialRevision, saveEditorialDraft,
+  addEditorialSource, attachExternalVideoToDraft, archiveEditorialArticle, approveEditorialRevision, rejectEditorialRevision, publishApprovedEditorial, restoreEditorialRevision, saveEditorialDraft,
   submitEditorialForReview,
 } from './actions';
 import { removeRevisionMedia, reviewRightsAndAttachMedia } from './media-actions';
@@ -419,7 +419,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
             </section>
             <section className="md:col-span-2 rounded-2xl border border-slate-200 bg-white p-4">
               <h3 className="font-black text-slate-800">External editorial video</h3>
-              <p className="mt-1 text-xs text-slate-500">Use an authorized YouTube or Vimeo source. Factsport does not upload or transcode this video. A source record and private rights reference are required before inserting an embed into the draft.</p>
+              <p className="mt-1 text-xs text-slate-500">Use an authorized YouTube or Vimeo source. Factsport does not upload or transcode this video. The saved draft body must be current. The video embed, source and private rights reference are recorded together; reload if the draft changed.</p>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <label className="text-xs font-bold text-slate-600">Video URL
                   <input type="url" value={externalVideoUrl} onChange={event => setExternalVideoUrl(event.target.value)} maxLength={2048} placeholder="https://www.youtube.com/watch?v=…" className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" />
@@ -441,22 +441,16 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                   if (!video || !form.id || !canEditRevisionMedia) return;
                   const title = externalVideoTitle.trim().replace(/[<>"'&]/g, '').slice(0, 180);
                   if (title.length < 3) { setMessage('Enter a video title without HTML characters.'); return; }
-                  const result = await addEditorialSource({
-                    articleId: form.id, sourceTitle: title, publisher: video.publisher,
-                    canonicalUrl: video.sourceUrl, attributionText: externalVideoAttribution,
-                    rightsReference: externalVideoRights,
+                  const result = await attachExternalVideoToDraft({
+                    articleId: form.id, expectedBody: form.bodyMarkdown,
+                    videoUrl: externalVideoUrl, title,
+                    attributionText: externalVideoAttribution, rightsReference: externalVideoRights,
                   });
                   if (!result.success) { setMessage(result.error); return; }
-                  const embed = '<iframe src="' + video.embedUrl + '" title="' + title +
-                    '" loading="lazy" referrerpolicy="no-referrer" allowfullscreen></iframe>';
-                  setForm(current => ({
-                    ...current, bodyMarkdown: current.bodyMarkdown.trimEnd() + '\n\n' +
-                      embed + '\n\n' + externalVideoAttribution.trim(),
-                  }));
                   setExternalVideoUrl(''); setExternalVideoTitle('');
                   setExternalVideoAttribution(''); setExternalVideoRights('');
-                  setMessage('Source and private rights reference recorded. Embed added to the unsaved draft body. Save the draft, then submit for editorial review.');
-                })}>Record source &amp; insert draft embed</button>
+                  window.location.reload();
+                })}>Attach video &amp; record rights atomically</button>
               {!canEditRevisionMedia && <p className="mt-2 text-xs text-amber-700">Save a draft revision first. Reviewed and published revisions cannot be edited directly.</p>}
             </section>
             <label className="md:col-span-2 text-xs font-bold text-slate-600">Excerpt / social preview
