@@ -139,9 +139,9 @@ test('newsroom approved external video helper validates provider URLs and record
   assert.match(renderer, /www.youtube-nocookie.com/);
   assert.match(renderer, /player.vimeo.com/);
   assert.match(newsroom, /rightsReference: externalVideoRights/);
-  assert.match(newsroom, /await addEditorialSource/);
-  assert.match(newsroom, /Record source &amp; insert draft embed/);
-  assert.match(newsroom, /Save the draft, then submit for editorial review/);
+  assert.match(newsroom, /await attachExternalVideoToDraft/);
+  assert.match(newsroom, /Attach video &amp; record rights atomically/);
+  assert.match(newsroom, /expectedBody: form.bodyMarkdown/);
 });
 
 test('review and publish require revision-scoped external video attribution and rights evidence', () => {
@@ -175,4 +175,26 @@ test('review and publish require revision-scoped external video attribution and 
   assert.ok(actions.includes("assertExternalVideoSourceRights(String(reviewSnapshot.body_markdown || ''), reviewSources)"));
   assert.ok(actions.includes("assertExternalVideoSourceRights(String(snapshot.body_markdown || ''), publishSources)"));
   assert.ok(actions.includes('FROM public.editorial_article_sources WHERE revision_id='));
+});
+
+test('atomic external video authoring locks draft, rejects stale bodies and commits provenance together', () => {
+  const actions = read('app/admin/news/actions.ts');
+  const newsroom = read('app/admin/news/NewsroomClient.tsx');
+  const start = actions.indexOf('export async function attachExternalVideoToDraft(');
+  assert.ok(start >= 0, 'atomic editorial action must exist');
+  const atomic = actions.slice(start);
+  assert.match(atomic, /authorizeMediaEditorialAction\('draft'\)/);
+  assert.match(atomic, /sql\.begin\(async tx =>/);
+  assert.match(atomic, /workflow_status='draft'/);
+  assert.match(atomic, /ORDER BY revision_number DESC LIMIT 1 FOR UPDATE/);
+  assert.match(atomic, /input\.expectedBody !== currentBody/);
+  assert.match(atomic, /SELECT id, status FROM public\.editorial_articles/);
+  assert.match(atomic, /INSERT INTO public\.editorial_article_sources/);
+  assert.match(atomic, /UPDATE public\.editorial_article_revisions SET snapshot=/);
+  assert.match(atomic, /body_markdown=\$\{updatedBody\}/);
+  assert.match(atomic, /media_editorial_audit_events/);
+  assert.match(atomic, /rightsReference/);
+  assert.match(atomic, /url\.protocol !== 'https:'/);
+  assert.match(newsroom, /attachExternalVideoToDraft\(\{/);
+  assert.doesNotMatch(newsroom.slice(newsroom.indexOf('External editorial video')), /await addEditorialSource\(\{/);
 });
