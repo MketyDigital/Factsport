@@ -129,6 +129,23 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const canEditRevisionMedia = currentRevisionStatus === 'draft';
   const currentRevisionId = articles.find(article => article.id === form.id)?.current_revision_id || null;
   const currentSources = articles.find(article => article.id === form.id)?.sources || [];
+  const currentSavedArticle = articles.find(article => article.id === form.id);
+  const hasUnsavedEditorialChanges = Boolean(currentSavedArticle && (
+    form.title !== currentSavedArticle.title ||
+    form.slug !== currentSavedArticle.slug ||
+    form.excerpt !== (currentSavedArticle.excerpt || '') ||
+    form.bodyMarkdown !== currentSavedArticle.body_markdown ||
+    form.category !== currentSavedArticle.category ||
+    form.team1Name !== (currentSavedArticle.team_1_name || '') ||
+    form.team2Name !== (currentSavedArticle.team_2_name || '') ||
+    form.tagsText !== (currentSavedArticle.tags || []).join(', ') ||
+    form.seoTitle !== (currentSavedArticle.seo_title || '') ||
+    form.seoDescription !== (currentSavedArticle.seo_description || '') ||
+    form.canonicalUrl !== (currentSavedArticle.canonical_url || '') ||
+    form.authorDisplayName !== (currentSavedArticle.author_display_name || 'FactSport Desk') ||
+    form.isHeadline !== currentSavedArticle.is_headline ||
+    form.isBreaking !== currentSavedArticle.is_breaking
+  ));
   const activeRevisionMedia = currentRevisionMedia.filter(asset => !asset.remove_media && asset.media_id);
   const previewHero = activeRevisionMedia.find(asset => asset.placement === 'hero');
   const previewTeam1 = activeRevisionMedia.find(asset => asset.placement === 'team_1');
@@ -437,10 +454,10 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                 </label>
               </div>
               <button type="button" className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
-                disabled={isPending || !form.id || !currentRevisionId || !canEditRevisionMedia || !approvedExternalVideo(externalVideoUrl) || externalVideoTitle.trim().length < 3 || !externalVideoAttribution.trim() || !externalVideoRights.trim()}
+                disabled={isPending || !form.id || !currentRevisionId || !canEditRevisionMedia || hasUnsavedEditorialChanges || !approvedExternalVideo(externalVideoUrl) || externalVideoTitle.trim().length < 3 || !externalVideoAttribution.trim() || !externalVideoRights.trim()}
                 onClick={() => startTransition(async () => {
                   const video = approvedExternalVideo(externalVideoUrl);
-                  if (!video || !form.id || !currentRevisionId || !canEditRevisionMedia) return;
+                  if (!video || !form.id || !currentRevisionId || !canEditRevisionMedia || hasUnsavedEditorialChanges) return;
                   const title = externalVideoTitle.trim().replace(/[<>"'&]/g, '').slice(0, 180);
                   if (title.length < 3) { setMessage('Enter a video title without HTML characters.'); return; }
                   const result = await attachExternalVideoToDraft({
@@ -453,6 +470,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                   setExternalVideoAttribution(''); setExternalVideoRights('');
                   window.location.reload();
                 })}>Attach video &amp; record rights atomically</button>
+              {hasUnsavedEditorialChanges && <p className="mt-2 text-xs text-amber-700">Save your article changes before attaching an external video, so no unsaved headline, SEO or body edits are lost.</p>}
               {!canEditRevisionMedia && <p className="mt-2 text-xs text-amber-700">Save a draft revision first. Reviewed and published revisions cannot be edited directly.</p>}
             </section>
             <label className="md:col-span-2 text-xs font-bold text-slate-600">Excerpt / social preview
