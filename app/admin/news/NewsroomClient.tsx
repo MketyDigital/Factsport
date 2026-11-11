@@ -36,6 +36,7 @@ type Article = {
   review_status: string;
   revision_status: string | null;
   current_revision_id: string | null;
+  current_revision_snapshot_etag: string | null;
   review_comment?: string | null;
   is_headline: boolean;
   is_breaking: boolean;
@@ -128,6 +129,7 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
   const currentRevisionStatus = articles.find(article => article.id === form.id)?.revision_status || null;
   const canEditRevisionMedia = currentRevisionStatus === 'draft';
   const currentRevisionId = articles.find(article => article.id === form.id)?.current_revision_id || null;
+  const currentRevisionSnapshotEtag = articles.find(article => article.id === form.id)?.current_revision_snapshot_etag || null;
   const currentSources = articles.find(article => article.id === form.id)?.sources || [];
   const currentSavedArticle = articles.find(article => article.id === form.id);
   const hasUnsavedEditorialChanges = Boolean(currentSavedArticle && (
@@ -454,14 +456,15 @@ export default function NewsroomClient({ initialArticles }: { initialArticles: A
                 </label>
               </div>
               <button type="button" className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
-                disabled={isPending || !form.id || !currentRevisionId || !canEditRevisionMedia || hasUnsavedEditorialChanges || !approvedExternalVideo(externalVideoUrl) || externalVideoTitle.trim().length < 3 || !externalVideoAttribution.trim() || !externalVideoRights.trim()}
+                disabled={isPending || !form.id || !currentRevisionId || !currentRevisionSnapshotEtag || !canEditRevisionMedia || hasUnsavedEditorialChanges || !approvedExternalVideo(externalVideoUrl) || externalVideoTitle.trim().length < 3 || !externalVideoAttribution.trim() || !externalVideoRights.trim()}
                 onClick={() => startTransition(async () => {
                   const video = approvedExternalVideo(externalVideoUrl);
-                  if (!video || !form.id || !currentRevisionId || !canEditRevisionMedia || hasUnsavedEditorialChanges) return;
+                  if (!video || !form.id || !currentRevisionId || !currentRevisionSnapshotEtag || !canEditRevisionMedia || hasUnsavedEditorialChanges) return;
                   const title = externalVideoTitle.trim().replace(/[<>"'&]/g, '').slice(0, 180);
                   if (title.length < 3) { setMessage('Enter a video title without HTML characters.'); return; }
                   const result = await attachExternalVideoToDraft({
-                    articleId: form.id, expectedRevisionId: currentRevisionId!, expectedBody: form.bodyMarkdown,
+                    articleId: form.id, expectedRevisionId: currentRevisionId!,
+                    expectedSnapshotEtag: currentRevisionSnapshotEtag!, expectedBody: form.bodyMarkdown,
                     videoUrl: externalVideoUrl, title,
                     attributionText: externalVideoAttribution, rightsReference: externalVideoRights,
                   });
