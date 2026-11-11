@@ -27,18 +27,18 @@ function safeHttpUrl(value: string | undefined): string | null {
 // Rights references are private records, never serialized into the article.
 function externalVideoCanonicalUrls(body: string): string[] {
   const urls = new Set<string>();
-  const iframes = body.match(/<iframe\\b[^>]*>/gi) || [];
+  const iframes = body.match(/<iframe\b[^>]*>/gi) || [];
   for (const iframe of iframes) {
-    const src = iframe.match(/\\bsrc\\s*=\\s*(["'])(.*?)\\1/i);
+    const src = iframe.match(/\bsrc\s*=\s*(["'])(.*?)\1/i);
     if (!src) continue; // The public Markdown sanitizer drops malformed embeds.
     let url: URL;
     try { url = new URL(src[2]); } catch { continue; }
     if (url.protocol !== 'https:' || url.username || url.password) continue;
     if (['www.youtube.com', 'www.youtube-nocookie.com'].includes(url.hostname)) {
-      const id = url.pathname.match(/^\\/embed\\/([A-Za-z0-9_-]{11})$/);
+      const id = url.pathname.match(/^\/embed\/([A-Za-z0-9_-]{11})$/);
       if (id) urls.add('https://www.youtube.com/watch?v=' + id[1]);
     } else if (url.hostname === 'player.vimeo.com') {
-      const id = url.pathname.match(/^\\/video\\/([0-9]+)$/);
+      const id = url.pathname.match(/^\/video\/([0-9]+)$/);
       if (id) urls.add('https://vimeo.com/' + id[1]);
     }
   }
