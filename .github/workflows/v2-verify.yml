@@ -35,6 +35,7 @@ on:
       - 'app/tournaments/**'
       - 'app/highlights/**'
       - 'app/components/**'
+      - 'app/providers/**'
       - 'app/news/**'
       - 'app/page.tsx'
       - 'lib/**'
