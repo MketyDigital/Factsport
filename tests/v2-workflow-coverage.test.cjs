@@ -8,7 +8,7 @@ const test = require('node:test');
 const workflow = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'v2-verify.yml'), 'utf8');
 
 test('isolated V2 verification covers public pages, media, PWA and worker changes', () => {
-  assert.match(workflow, /push:\\s*\\n\\s*branches:\\s*\\n\\s*- refactor\\/factsport-v2/);
+  assert.ok(workflow.includes('push:\n    branches:\n      - refactor/factsport-v2'), 'V2 branch push trigger missing');
   for (const glob of ['app/**', 'workers/**', 'public/**', 'scripts/**', 'db/**', '.github/workflows/**', 'tests/**']) {
     assert.ok(workflow.includes(`- '${glob}'`), `missing push path ${glob}`);
   }
