@@ -6,6 +6,13 @@ on:
     branches:
       - refactor/factsport-v2
     paths:
+      # Catch all public/media route, layout, PWA and shared UI changes, not just selected slices.
+      - 'app/**'
+      - 'workers/**'
+      - 'public/**'
+      - 'scripts/**'
+      - 'db/**'
+      - '.github/workflows/**'
       - 'app/api/matches/**'
       - 'app/api/match/**'
       - 'app/api/media/**'
