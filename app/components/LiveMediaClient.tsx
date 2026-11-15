@@ -8,6 +8,58 @@ import MatchTime from '@/app/components/MatchTime'; // 🟢 INJECTED LOCAL TIME 
 
 export default function LiveMediaClient({ matches }: { matches: any[] }) {
     const [localData, setLocalData] = useState<any>(null);
+    const [liveMatches, setLiveMatches] = useState<any[]>(matches);
+
+    useEffect(() => { setLiveMatches(matches); }, [matches]);
+
+    // The external fast worker writes canonical match rows. Read the V2 public
+    // projection on a bounded interval, without querying providers or replacing
+    // approved match-specific video/audio URLs returned by the initial page.
+    useEffect(() => {
+        const controller = new AbortController();
+        let inFlight = false;
+        const refresh = async () => {
+            if (document.hidden || inFlight || controller.signal.aborted) return;
+            inFlight = true;
+            try {
+                const response = await fetch('/api/media/live-scores', {
+                    signal: controller.signal, credentials: 'same-origin', cache: 'no-store',
+                });
+                if (!response.ok) return;
+                const payload = await response.json();
+                if (!Array.isArray(payload.matches)) return;
+                setLiveMatches(current => {
+                    const existing = new Map(current.map(match => [String(match.id), match]));
+                    const updates = payload.matches.filter((match: any) => match && match.id);
+                    for (const update of updates) {
+                        const id = String(update.id);
+                        // Preserve the existing media/broadcast fields: score updates
+                        // must never change stream sources or permissions.
+                        const previous = existing.get(id);
+                        existing.set(id, previous
+                            ? { ...previous, status: update.status, home_score: update.home_score,
+                                away_score: update.away_score, source_updated_at: update.source_updated_at,
+                                version: update.version, updated_at: update.updated_at }
+                            : update);
+                    }
+                    return Array.from(existing.values()).sort((a, b) =>
+                        new Date(a.match_date).getTime() - new Date(b.match_date).getTime());
+                });
+            } catch {
+                // Retain the last good scores when a refresh is unavailable.
+            } finally {
+                inFlight = false;
+            }
+        };
+        void refresh();
+        const interval = setInterval(() => { void refresh(); }, 15000);
+        document.addEventListener('visibilitychange', refresh);
+        return () => {
+            controller.abort();
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', refresh);
+        };
+    }, []);
 
     useEffect(() => {
         // 1. GET EXACT LOCAL TIMEZONE BOUNDARIES
@@ -19,7 +71,7 @@ export default function LiveMediaClient({ matches }: { matches: any[] }) {
         const liveUncoveredMatches: any[] = [];
         let nextUpcomingMatch: any = null;
 
-        matches.forEach(m => {
+        liveMatches.forEach(m => {
             const matchTime = new Date(m.match_date).getTime();
             const status = (m.status || '').toUpperCase();
             const isLiveNow = ['LIVE','IN_PLAY','IN','1H','2H','HT','HALFTIME','ET','EXTRA TIME','P','PENALTIES'].includes(status);
@@ -41,7 +93,7 @@ export default function LiveMediaClient({ matches }: { matches: any[] }) {
             : "a later date";
 
         setLocalData({ coveredMatches, liveUncoveredMatches, nextDateText });
-    }, [matches]);
+    }, [liveMatches]);
 
     // Hydration Skeleton
     if (!localData) return <div className="w-full h-64 animate-pulse bg-white/5 rounded-3xl max-w-5xl mx-auto mt-8 border border-white/10"></div>;
