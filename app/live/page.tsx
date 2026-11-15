@@ -4,7 +4,7 @@ export const fetchCache = 'force-no-store';
 
 import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
-import { listPostgresMatchesWindow } from '@/lib/adapters/postgres-matches';
+import { listPostgresLiveCoverageWindow } from '@/lib/adapters/postgres-matches';
 import { getPublicMediaStudioSettings } from '@/lib/adapters/postgres-homepage';
 import Link from 'next/link';
 import { Metadata } from 'next';
@@ -40,7 +40,7 @@ export default async function LiveMediaPage() {
 
   if (matchesBackend && studioBackend) {
     const [rows, studio] = await Promise.all([
-      listPostgresMatchesWindow({ from: lookBack, to: lookForward }),
+      listPostgresLiveCoverageWindow({ from: lookBack, to: lookForward }),
       getPublicMediaStudioSettings(),
     ]);
     matches = rows
