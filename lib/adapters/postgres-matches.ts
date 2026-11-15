@@ -217,3 +217,24 @@ export async function getPostgresMatchPlaybackById(matchId: string) {
     return rows[0] ?? null;
   });
 }
+
+
+/**
+ * Lightweight public live-score snapshot. This reads already-ingested match
+ * rows; the independent fast live worker remains the sole update authority.
+ * Do not include Prediction, provider secrets, or media playback URLs here.
+ */
+export async function listPostgresLiveScoreSnapshot(now = new Date()) {
+  const from = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const to = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
+  return withFactsportPostgres(sql => sql`
+    SELECT id, league, home_team, away_team, home_score, away_score,
+           match_date, status, home_logo, away_logo, source_updated_at,
+           version, updated_at
+    FROM public.matches
+    WHERE match_date >= ${from}::timestamptz
+      AND match_date <= ${to}::timestamptz
+    ORDER BY match_date ASC, id ASC
+    LIMIT 1500
+  `);
+}
