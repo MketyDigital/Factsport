@@ -75,10 +75,11 @@ export default function LiveMediaClient({ matches }: { matches: any[] }) {
             const matchTime = new Date(m.match_date).getTime();
             const status = (m.status || '').toUpperCase();
             const isLiveNow = ['LIVE','IN_PLAY','IN','1H','2H','HT','HALFTIME','ET','EXTRA TIME','P','PENALTIES'].includes(status);
+            const isFinished = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(status);
             const isToday = matchTime >= startOfLocalDay && matchTime <= endOfLocalDay;
 
-            // Only show if it's currently live OR it is scheduled for LOCAL TODAY
-            if (isLiveNow || isToday) {
+            // Keep the legacy live-page filter as matches transition to final.
+            if (!isFinished && (isLiveNow || isToday)) {
                 if (m.livestream_url || m.audio_url) coveredMatches.push(m);
                 else liveUncoveredMatches.push(m);
             }
