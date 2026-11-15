@@ -238,3 +238,30 @@ export async function listPostgresLiveScoreSnapshot(now = new Date()) {
     LIMIT 1500
   `);
 }
+
+
+/**
+ * Live Center needs Media's approved playback metadata, not raw match_media.
+ * The public_match_media view enforces ownership/licence, review and expiry.
+ */
+export async function listPostgresLiveCoverageWindow(input: { from: string; to: string }) {
+  const from = new Date(input.from), to = new Date(input.to);
+  if (!Number.isFinite(from.valueOf()) || !Number.isFinite(to.valueOf()) || from >= to ||
+      to.getTime() - from.getTime() > 72 * 60 * 60 * 1000) {
+    throw new Error('Invalid live coverage window');
+  }
+  return withFactsportPostgres(sql => sql`
+    SELECT m.id, m.api_id, m.espn_id, m.league, m.home_team, m.away_team,
+           m.home_score, m.away_score, m.match_date, m.status,
+           m.home_logo, m.away_logo, m.venue, m.stage, m.match_group,
+           m.display_clock, m.source_updated_at, m.version,
+           mm.video_url, mm.livestream_url, mm.audio_url, mm.media_url,
+           mm.stream_url, mm.media_mode
+    FROM public.matches m
+    LEFT JOIN public.public_match_media mm ON mm.match_id = m.id
+    WHERE m.match_date >= ${from.toISOString()}::timestamptz
+      AND m.match_date <= ${to.toISOString()}::timestamptz
+    ORDER BY m.match_date ASC, m.id ASC
+    LIMIT 1500
+  `);
+}
