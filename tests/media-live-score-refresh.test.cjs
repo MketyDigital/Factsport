@@ -49,3 +49,38 @@ test('live client refresh preserves coverage URLs, respects tab visibility and r
   const merge = client.slice(mergeStart, mergeEnd);
   assert.doesNotMatch(merge, /livestream_url:|audio_url:|video_url:|rights_reference:/);
 });
+
+
+test('Live Center loads rights-cleared video and audio separately from score refresh', () => {
+  const adapter = read('lib/adapters/postgres-matches.ts');
+  const page = read('app/live/page.tsx');
+  const migration = read('db/migrations/0017_factsport_media_match_metadata.sql');
+  const index = adapter.indexOf('export async function listPostgresLiveCoverageWindow');
+  assert.ok(index > 0, 'separate coverage read model is required');
+  const coverage = adapter.slice(index);
+  assert.match(coverage, /LEFT JOIN public\.public_match_media mm ON mm\.match_id = m\.id/);
+  assert.match(coverage, /mm\.video_url, mm\.livestream_url, mm\.audio_url/);
+  assert.match(coverage, /mm\.stream_url, mm\.media_mode/);
+  assert.match(coverage, /Invalid live coverage window/);
+  assert.doesNotMatch(coverage, /JOIN public\.match_media /);
+  assert.match(page, /listPostgresLiveCoverageWindow\(\{ from: lookBack, to: lookForward \}\)/);
+  assert.match(migration, /WHERE is_public = true/);
+  assert.match(migration, /rights_reviewed_at IS NOT NULL/);
+  assert.match(migration, /usage_expires_at IS NULL OR usage_expires_at > now\(\)/);
+  const scoreProjection = adapter.slice(
+    adapter.indexOf('export async function listPostgresLiveScoreSnapshot'),
+    index,
+  );
+  assert.doesNotMatch(scoreProjection, /public_match_media|match_media|livestream_url|audio_url/);
+});
+
+test('database score snapshots are not the 3-second ESPN frontend or background live writer', () => {
+  const handoff = read('docs/audit/handoffs/M20-FAST-EXTERNAL-LIVE-WORKER-AND-FRONTEND-DATA-PATH.md');
+  const fetcher = read('app/utils/liveFetcher.ts');
+  const provider = read('app/providers/MatchLiveProvider.tsx');
+  const legacyLiveRoute = read('app/api/live/route.ts');
+  assert.match(handoff, /NOT the fast frontend live-score API/);
+  assert.match(fetcher, /live-api\.factsport\.com/);
+  assert.match(provider, /pollInterval = isLive \? 3000 : 60000/);
+  assert.match(legacyLiveRoute, /legacyRouteDisabled/);
+});
