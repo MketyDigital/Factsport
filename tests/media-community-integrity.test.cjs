@@ -56,13 +56,13 @@ test('legacy chat and MOTM clients do not silently acknowledge failed posts or a
   assert.match(chat, /if \(!response\.ok\) throw new Error\('Message was not accepted\.'/);
   assert.match(chat, /prev\.filter\(message => message\.id !== tempMsg\.id\)/);
   assert.match(chat, /setSubmissionError\('Your message was not posted/);
-  assert.match(chat, /body: JSON\.stringify\(\{ match_id: matchId, message: tempMsg\.message \}\)/);
+  assert.match(chat, /body: JSON\.stringify\(\{ match_id: matchId, message: tempMsg\.message, reply_to_id: replyTo\?\.id \|\| null \}\)/);
   const start = chat.indexOf('const response = await fetch(');
   const end = chat.indexOf('if (!response.ok)', start);
   const send = chat.slice(start, end);
   assert.doesNotMatch(send, /user_id:|username:|avatar_url:/);
-  assert.match(chat, /COMMUNITY_WRITES_ENABLED = false/);
+  assert.match(chat, /NEXT_PUBLIC_FACTSPORT_MEDIA_COMMUNITY_WRITES === 'enabled'/);
   assert.match(motm, /if \(!response\.ok\) throw new Error\('MOTM vote was not accepted\.'/);
   assert.match(motm, /setVoteError\('Your vote was not recorded/);
-  assert.match(motm, /COMMUNITY_VOTING_ENABLED = false/);
+  assert.match(motm, /NEXT_PUBLIC_FACTSPORT_MEDIA_COMMUNITY_WRITES === 'enabled'/);
 });
