@@ -94,6 +94,14 @@ Gate: full route-to-component acceptance on homepage, matches, standings, match-
 - [ ] Expose transparent rule progress; qualify rewards correctly; protect admin operations.
 Gate: score reconciliation and eligibility tests passing.
 
+### M75 — guest fan-rating completion and CI source-repair milestone
+- [x] Recover successful GitHub isolated verification and Vinext build on `eb228e89` after identifying actual failures in prior M74 source/test contracts, restoring TypeScript-safe editorial rights and visitor-cookie logic. See `docs/audit/handoffs/M75-V2-ROUNDUP-CI-AND-ANONYMOUS-RATINGS.md`.
+- [x] Replace active match-detail Player Ratings external Worker URL with a **disabled-by-default, PostgreSQL-only and account-free** Media feature (migration 0048, visitor cookie, Turnstile, reader totals, duplicate-per-player vote constraint, private vote-state reader).
+- [ ] Latest-head verification: run test:engine/typecheck/Vinext and protected Cloudflare staging after M75, including SQL acceptance and role denial. Source commit alone does not mean ready.
+- [ ] Audit all remaining runtime external Worker calls; no active D1 in V2. Keep existing legacy files for reference and preserve legitimate media data rewriting.
+- [ ] Complete full M74 visual all-tabs/Media pages and branded social templates before release.
+Gate: verified match/prediction/rights parity and owner-approved staging cutover; no production activation by a documentation or source commit.
+
 ### M10 — AdSense/compliance/security/performance
 - [ ] Audit publisher restrictions against actual VIP/prize mechanics (not text-only concealment).
 - [ ] Audit rate limiting, bot protection, authz, secrets, provenance, accessibility, Core Web Vitals, CDN cache and DB loads.
