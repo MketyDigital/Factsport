@@ -8,7 +8,7 @@ const B64URL = /^[a-zA-Z0-9_-]+$/;
 
 function base64url(bytes: Uint8Array) {
   let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 function fromBase64url(value: string) {
@@ -17,7 +17,7 @@ function fromBase64url(value: string) {
   return Uint8Array.from(text, c => c.charCodeAt(0));
 }
 function hex(bytes: Uint8Array) {
-  return [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 async function sha256(value: string) {
   return hex(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value))));
