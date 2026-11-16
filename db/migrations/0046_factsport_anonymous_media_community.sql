@@ -125,13 +125,20 @@ CREATE FUNCTION public.submit_anonymous_media_chat(
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $function$
-DECLARE v_id uuid; v_message_id uuid;
+DECLARE v_id uuid; v_message_id uuid; v_match_id uuid;
 BEGIN
   IF p_token_hash IS NULL OR p_token_hash !~ '^[a-f0-9]{64}$' THEN
     RAISE EXCEPTION 'invalid_visitor' USING ERRCODE = '22023';
   END IF;
   IF p_message IS NULL OR char_length(btrim(p_message)) NOT BETWEEN 1 AND 200 THEN
     RAISE EXCEPTION 'invalid_message' USING ERRCODE = '22023';
+  END IF;
+  SELECT id INTO v_match_id FROM public.matches
+    WHERE id = p_match_id OR legacy_match_id = p_match_id
+    ORDER BY CASE WHEN id = p_match_id THEN 0 ELSE 1 END
+    LIMIT 1;
+  IF v_match_id IS NULL THEN
+    RAISE EXCEPTION 'unknown_match' USING ERRCODE = '22023';
   END IF;
   IF NOT public.consume_media_community_network_limit(p_network_hash, 12) THEN
     RAISE EXCEPTION 'community_network_rate_limited' USING ERRCODE = '23514';
@@ -146,7 +153,7 @@ BEGIN
   END IF;
   INSERT INTO public.media_match_chat_messages
     (match_id, visitor_id, display_name, message, reply_to_id)
-  VALUES (p_match_id, v_id, 'Fan ' || upper(left(v_id::text, 6)), btrim(p_message), p_reply_to)
+  VALUES (v_match_id, v_id, 'Fan ' || upper(left(v_id::text, 6)), btrim(p_message), p_reply_to)
   RETURNING id INTO v_message_id;
   RETURN v_message_id;
 END;
@@ -158,13 +165,20 @@ CREATE FUNCTION public.submit_anonymous_media_motm(
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $function$
-DECLARE v_id uuid;
+DECLARE v_id uuid; v_match_id uuid;
 BEGIN
   IF p_token_hash IS NULL OR p_token_hash !~ '^[a-f0-9]{64}$' THEN
     RAISE EXCEPTION 'invalid_visitor' USING ERRCODE = '22023';
   END IF;
   IF p_player_name IS NULL OR char_length(btrim(p_player_name)) NOT BETWEEN 1 AND 120 THEN
     RAISE EXCEPTION 'invalid_candidate' USING ERRCODE = '22023';
+  END IF;
+  SELECT id INTO v_match_id FROM public.matches
+    WHERE id = p_match_id OR legacy_match_id = p_match_id
+    ORDER BY CASE WHEN id = p_match_id THEN 0 ELSE 1 END
+    LIMIT 1;
+  IF v_match_id IS NULL THEN
+    RAISE EXCEPTION 'unknown_match' USING ERRCODE = '22023';
   END IF;
   IF NOT public.consume_media_community_network_limit(p_network_hash, 8) THEN
     RAISE EXCEPTION 'community_network_rate_limited' USING ERRCODE = '23514';
@@ -178,7 +192,7 @@ BEGIN
     RAISE EXCEPTION 'community_visitor_suspended' USING ERRCODE = '42501';
   END IF;
   INSERT INTO public.media_match_motm_votes (match_id, visitor_id, player_name)
-    VALUES (p_match_id, v_id, btrim(p_player_name));
+    VALUES (v_match_id, v_id, btrim(p_player_name));
   RETURN true;
 END;
 $function$;
