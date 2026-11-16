@@ -261,3 +261,19 @@ export async function isFactsportPredictionPostgresReady(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Anonymous Media community writes use a distinct, narrowly privileged
+ * PostgreSQL login bound through Hyperdrive. Never reuse Prediction,
+ * editorial, ESPN writer, general reader, Supabase or D1 identities.
+ */
+export function withFactsportCommunityPostgres<T>(
+  operation: (sql: FactsportSql) => Promise<T> | T,
+): Promise<T> {
+  const bindings = env as unknown as Record<string, HyperdriveBinding | undefined>;
+  return withConnection(
+    bindings.FACTSPORT_COMMUNITY_HYPERDRIVE?.connectionString,
+    operation,
+    'Factsport anonymous Media community',
+  );
+}
