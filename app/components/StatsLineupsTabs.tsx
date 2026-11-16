@@ -66,7 +66,7 @@ export default function StatsLineupsTabs({ matchId, dbData }: { matchId: string,
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 -m-4">
                 <PitchLineup data={{ lineups: lineups }} dbData={dbData} />
                 <div className="p-4 bg-white border-t border-slate-100">
-                    <PlayerRatingsWidget matchId={matchId} lineups={lineups} status={liveData?.status} />
+                    <PlayerRatingsWidget matchId={matchId} lineups={lineups} status={liveData?.status} matchDate={dbData?.match_date} />
                 </div>
             </div>
         )}
