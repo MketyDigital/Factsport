@@ -80,7 +80,10 @@ test('database score snapshots are not the 3-second ESPN frontend or background 
   const provider = read('app/providers/MatchLiveProvider.tsx');
   const legacyLiveRoute = read('app/api/live/route.ts');
   assert.match(handoff, /NOT the fast frontend live-score API/);
-  assert.match(fetcher, /live-api\.factsport\.com/);
+  const originalFrontend = read('docs/audit/handoffs/M20-FAST-EXTERNAL-LIVE-WORKER-AND-FRONTEND-DATA-PATH.md');
+  assert.match(originalFrontend, /live-api\.factsport\.com/);
+  assert.doesNotMatch(fetcher, /live-api\.factsport\.com/);
+  assert.match(fetcher, /NEXT_PUBLIC_FACTSPORT_FAST_LIVE_BACKEND/);
   assert.match(provider, /pollInterval = isLive \? 3000 : 60000/);
   assert.match(legacyLiveRoute, /legacyRouteDisabled/);
 });
