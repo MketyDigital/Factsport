@@ -1,5 +1,8 @@
 # M71 — Original ESPN Worker mapping restored to a gated, same-origin V2 fast reader (without D1)
 
+> **2026-11-16 supersession:** [M72](M72-POSTGRES-COMMUNITY-WRITE-INTEGRITY-NO-LEGACY-WORKER.md) removes the implicit old external-Worker fallback from V2 browser fetching and SEO metadata. References below to retaining the old frontend read fallback describe the original M71 implementation and are no longer current.
+
+
 Date: 2026-11-16
 Branch: `refactor/factsport-v2`
 Status: source implementation and regression tests committed, small local normalizer sample executed; full Next/Vinext builds, protected staging, Cloudflare cache/load behavior and provider parity NOT verified.
