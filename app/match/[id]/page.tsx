@@ -121,8 +121,8 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
         description = `Follow the live score, minute-by-minute text commentary, and live match stats for ${match.home_team} vs ${match.away_team}.`;
         label = 'LIVE MATCH UPDATE';
     } else if (isFinished) {
-        title = `${match.home_team} ${hScore}-${aScore} ${match.away_team} Result, Highlights & Match Stats`;
-        description = `Full time result: ${match.home_team} ${hScore}-${aScore} ${match.away_team}. Watch the highlights, review the match report, and check the final match stats.`;
+        title = `${match.home_team} ${scoreText} ${match.away_team} Result, Highlights & Match Stats`;
+        description = `Full time result: ${match.home_team} ${scoreText} ${match.away_team}. Watch the highlights, review the match report, and check the final match stats.`;
         label = 'FULL TIME RESULT';
     }
 
