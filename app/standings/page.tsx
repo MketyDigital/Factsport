@@ -25,9 +25,19 @@ const LEAGUE_MAP: Record<string, string> = {
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<any> }): Promise<Metadata> {
     const resolvedParams = await searchParams;
-    const league = resolvedParams?.league || 'Premier League';
+    const requestedLeague = typeof resolvedParams?.league === 'string' ? resolvedParams.league : '';
+    const league = Object.prototype.hasOwnProperty.call(LEAGUE_MAP, requestedLeague)
+      ? requestedLeague : 'Premier League';
     const title = `${league} Table & Standings | FactSport`;
     const description = `Check the latest ${league} table, points, and current team form. Live updates on the title race and relegation battles.`;
+    // Reuse the existing branded Media Open Graph renderer, with approved
+    // league metadata only. Never fabricate ranks or standings results.
+    const payload = JSON.stringify({ type: 'standings', league, label: 'League standings' });
+    const bytes = new TextEncoder().encode(payload);
+    const raw = Array.from(bytes, byte => String.fromCodePoint(byte)).join('');
+    const data = btoa(raw).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://factsport.com';
+    const ogImage = `${appUrl}/api/og?data=${data}`;
     
     return {
         title,
@@ -37,11 +47,13 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
             description,
             type: 'website',
             siteName: 'FactSport',
+            images: [{ url: ogImage, width: 1200, height: 630, alt: `${league} standings – FactSport` }],
         },
         twitter: {
             card: 'summary_large_image',
             title,
             description,
+            images: [ogImage],
         }
     }
 }
