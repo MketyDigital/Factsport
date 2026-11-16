@@ -27,10 +27,10 @@ test('chat and MOTM clients do not call the legacy D1-backed hostnames', () => {
   assert.doesNotMatch(motm, /live-api\.factsport\.com\/api\/motm|env\.DB/);
   assert.match(chat, /const CHAT_WORKER_URL = '\/api\/media\/chat'/);
   assert.match(motm, /const WORKER_URL = '\/api\/media\/motm'/);
-  assert.match(chat, /const COMMUNITY_WRITES_ENABLED = false/);
-  assert.match(motm, /const COMMUNITY_VOTING_ENABLED = false/);
+  assert.match(chat, /NEXT_PUBLIC_FACTSPORT_MEDIA_COMMUNITY_WRITES === 'enabled'/);
+  assert.match(motm, /NEXT_PUBLIC_FACTSPORT_MEDIA_COMMUNITY_WRITES === 'enabled'/);
   assert.match(chat, /Chat posting is paused/);
-  assert.match(motm, /MOTM voting is paused/);
+  assert.match(motm, /MOTM voting is being prepared for account-free visitors/);
 });
 
 test('public community readers use PostgreSQL and writes fail closed', () => {
@@ -49,8 +49,8 @@ test('public community readers use PostgreSQL and writes fail closed', () => {
     assert.match(route, /!== 'postgres'/);
     assert.match(route, /validCommunityMatchId/);
     assert.match(route, /export async function POST/);
-    assert.match(route, /Media community submission is not yet enabled/);
-    assert.match(route, /status: 503/);
+    assert.match(route, /Media participation is not yet enabled/);
+    assert.match(route, /env.FACTSPORT_MEDIA_COMMUNITY_WRITES !== 'enabled'/);
     assert.doesNotMatch(route, /env\.DB|D1Database|supabase|service_role/);
   }
 });
