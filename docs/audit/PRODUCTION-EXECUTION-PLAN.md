@@ -23,7 +23,7 @@ This plan operationalizes `docs/audit/ROADMAP.md`, the handoffs under `docs/audi
 | Automation | Application-owned JobRunner + durable run keys/idempotency; Azure Logic Apps Consumption is the selected third-party automation orchestrator; Cloudflare scheduler alternative remains disabled unless deliberately selected for a job |
 | Social | Facebook Graph API and Telegram Bot API remain direct first-party integrations; Buffer/Make-type third-party distribution may use Logic Apps |
 | AI and transactional email | Mkety AI and Mkety Mail behind server-only replaceable adapters; every AI article remains review-gated |
-| Identity | Factsport-owned immutable user IDs, roles and entitlements; Microsoft Entra External ID in a dedicated customer external tenant for customer sign-in, with OIDC behind an adapter. Media editor identity remains isolated. Tenant, app registrations, secrets and runtime acceptance are not provisioned; do not use workforce Entra for customers or assume Entra is live |
+| Identity | Factsport-owned immutable user IDs, roles and entitlements; Microsoft Entra External ID in a dedicated customer external tenant for customer sign-in, with OIDC behind an adapter. Media editor identity remains isolated. Customer external tenant `factsports.onmicrosoft.com` is now confirmed in subscription inventory; app registrations, secrets and runtime acceptance remain unverified. Do not use workforce Entra for customers or assume sign-in is live |
 | Legacy operational data | Clean start for matches, scores, events, predictions, points, rankings and transient logs; preserve accounts/paid obligations and authored editorial assets only after explicit review |
 
 Do not silently replace PostgreSQL with D1. Do not make a provider change that breaks stable internal match IDs, prediction references, authored article slugs, or paid entitlement obligations.
@@ -125,7 +125,7 @@ The staging app's `/api/matches` response previously used `Cache-Control: public
 
 ### P4 — Identity, accounts, privacy and admin
 
-- [ ] Select the production identity provider after staging proof: Entra External ID external tenant, shared Mkety Auth/OIDC, or app-owned Better Auth are documented candidates; do not use the workforce tenant as customer directory.
+- [x] Select Entra External ID in a dedicated customer external tenant for customer sign-in; the tenant resource now exists. [ ] Provision/verify the customer app registration, login flow, callback/session configuration and run the full staging sign-in/recovery proof. Never use the workforce tenant as the customer directory.
 - [ ] Implement OIDC Authorization Code + PKCE, state/nonce, issuer/audience/signature/JWKS validation, callback allowlist, replay protection, secure session cookies, refresh/revocation and CSRF protections.
 - [ ] Preserve immutable Factsport UUIDs and map `(issuer, subject)`; never auto-link old accounts by email alone.
 - [ ] Decide which user accounts and profiles are retained, reset or reauthenticated; preserve paid VIP/financial/legal obligations explicitly.
@@ -226,7 +226,7 @@ Governing spec: [`docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md`](../product/FA
 
 ## 4. Current blockers and owner decisions
 
-1. **Customer identity:** Entra External ID in a dedicated external tenant is selected for customer sign-in. The tenant/apps/secrets, exact redirect/session configuration and real staging sign-in/recovery tests remain unprovisioned. Keep editor OIDC separate; do not use a workforce tenant for customers or silently link accounts by email.
+1. **Customer identity:** Entra External ID in a dedicated external tenant is selected for customer sign-in. The tenant resource exists; app registrations/secrets, exact redirect/session configuration and real staging sign-in/recovery tests remain unverified. Keep editor OIDC separate; do not use a workforce tenant for customers or silently link accounts by email.
 2. **Editorial retention:** preserve manually authored and rights-cleared content; 79 articles require provenance review; don't infer human authorship from the default author field.
 3. **Accounts and money:** define treatment of old user identities, paid VIP entitlements, pending subscriptions, prize obligations and compliance records before any reset/migration.
 4. **ESPN links:** approve the 18 candidate links before writing mappings.
@@ -416,9 +416,14 @@ The current branch's latest protected staging run (`43871889138`, HEAD `64b5d75a
 
 ### M77 status reconciliation — 2026-11-16
 
-The current V2 completion and non-use inventory is recorded in [M77](./handoffs/M77-CURRENT-STATE-AND-CUTOVER-READINESS.md). Exact Cloudflare tool pins passed isolated verification (43888295007), native Worker build (43888295073), and protected app staging (43888294900), including DB/R2, `/matches`, pagination, cache and access-isolation probes. Customer Entra External ID is selected but not provisioned; Logic Apps remains a disabled template/adapter, not a live integration. No P0–P9 exit gate or production cutover is complete.
+The current V2 completion and non-use inventory is recorded in [M77](./handoffs/M77-CURRENT-STATE-AND-CUTOVER-READINESS.md). Exact Cloudflare tool pins passed isolated verification (43888295007), native Worker build (43888295073), and protected app staging (43888294900), including DB/R2, `/matches`, pagination, cache and access-isolation probes. Customer Entra External ID is selected and the external tenant resource exists; customer app/sign-in configuration is unverified. A Logic Apps staging resource exists, but its workflow state, connections and delivery have not been validated. No P0–P9 exit gate or production cutover is complete.
 
 
 ### M78 TV integration and phased release update — 2026-11-16
 
 Factsport TV design spec `docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md` is integrated into P10 and implementation plan TV-001. Implementation is intentionally ordered after the public Media and Prediction releases, per owner direction. P9 is split into Media-only, Prediction, and final legacy-retirement gates; the first production DNS/route switch is prohibited until a route inventory proves the un-migrated Prediction/VIP/payment routes can stay isolated and unchanged. Each phase requires separate explicit owner go/no-go. See ROADMAP M78.
+
+
+### M79 Azure inventory update — 2026-11-16
+
+The owner-provided read-only Azure CLI output confirms the customer External ID tenant resource and a Logic Apps workflow resource exist (`factsports.onmicrosoft.com`, `external_group`, `unitedstates`; `la-factsport-v2-staging`, `rg-factsport-v2-staging`, `westus`). No PostgreSQL appeared in the name/RG-filtered resource list, which is inconclusive until all Flexible Servers are listed. See ROADMAP M79. Do not claim tenant sign-in or Logic Apps operation from resource presence alone.
