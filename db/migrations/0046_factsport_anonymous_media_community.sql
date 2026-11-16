@@ -112,7 +112,8 @@ $function$;
 -- No browser identity, display name, user ID, or role is accepted as authority.
 -- The caller must use a separate, locked-down Hyperdrive PostgreSQL login.
 CREATE FUNCTION public.submit_anonymous_media_chat(
-  p_token_hash text, p_network_hash text, p_match_id uuid, p_message text
+  p_token_hash text, p_network_hash text, p_match_id uuid, p_message text,
+  p_reply_to uuid DEFAULT NULL
 ) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, public
@@ -137,8 +138,8 @@ BEGIN
     RAISE EXCEPTION 'community_visitor_suspended' USING ERRCODE = '42501';
   END IF;
   INSERT INTO public.media_match_chat_messages
-    (match_id, visitor_id, display_name, message)
-  VALUES (p_match_id, v_id, 'Fan ' || upper(left(v_id::text, 6)), btrim(p_message))
+    (match_id, visitor_id, display_name, message, reply_to_id)
+  VALUES (p_match_id, v_id, 'Fan ' || upper(left(v_id::text, 6)), btrim(p_message), p_reply_to)
   RETURNING id INTO v_message_id;
   RETURN v_message_id;
 END;
@@ -182,7 +183,7 @@ REVOKE ALL ON public.media_visitor_participants,
   public.media_community_network_limits FROM PUBLIC, factsport_v2_reader;
 REVOKE ALL ON FUNCTION public.consume_media_community_network_limit(text, integer)
   FROM PUBLIC, factsport_v2_reader;
-REVOKE ALL ON FUNCTION public.submit_anonymous_media_chat(text, text, uuid, text)
+REVOKE ALL ON FUNCTION public.submit_anonymous_media_chat(text, text, uuid, text, uuid)
   FROM PUBLIC, factsport_v2_reader;
 REVOKE ALL ON FUNCTION public.submit_anonymous_media_motm(text, text, uuid, text)
   FROM PUBLIC, factsport_v2_reader;
