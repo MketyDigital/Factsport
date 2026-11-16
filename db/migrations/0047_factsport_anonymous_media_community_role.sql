@@ -27,7 +27,11 @@ BEGIN
   RETURN EXISTS (
     SELECT 1 FROM public.media_match_motm_votes v
     JOIN public.media_visitor_participants p ON p.id = v.visitor_id
-    WHERE p.token_hash = p_token_hash AND v.match_id = p_match_id
+    WHERE p.token_hash = p_token_hash AND v.match_id = (
+      SELECT id FROM public.matches
+      WHERE id = p_match_id OR legacy_match_id = p_match_id
+      ORDER BY CASE WHEN id = p_match_id THEN 0 ELSE 1 END LIMIT 1
+    )
   );
 END;
 $function$;
