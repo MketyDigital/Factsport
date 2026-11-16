@@ -128,3 +128,22 @@ test('all guest writes verify single-use Turnstile tokens on the server', () => 
   assert.match(types, /FACTSPORT_MEDIA_TURNSTILE_SECRET/);
   assert.doesNotMatch(verify, /D1Database|env\.DB|SUPABASE_SERVICE_ROLE_KEY/);
 });
+
+test('guest cookies are bootstrapped before chat/vote and match page enables Media tab independent of Prediction', () => {
+  const chatApi = read('app/api/media/chat/messages/route.ts');
+  const voteState = read('app/api/media/motm/state/route.ts');
+  const page = read('app/match/[id]/page.tsx');
+  const sqlAcceptance = read('tests/sql/media-anonymous-community-acceptance.sql');
+  assert.match(chatApi, /ensureAnonymousMediaSession\(request\)/);
+  assert.match(chatApi, /response\.headers\.append\('Set-Cookie'/);
+  assert.match(voteState, /ensureAnonymousMediaSession\(request\)/);
+  assert.match(voteState, /response\.headers\.append\('Set-Cookie'/);
+  assert.match(page, /chatEnabled=\{\(env\.FACTSPORT_MEDIA_COMMUNITY_BACKEND/);
+  assert.doesNotMatch(page, /chatEnabled=\{process\.env\.NODE_ENV === 'development'\}/);
+  assert.match(sqlAcceptance, /submit_anonymous_media_chat/);
+  assert.match(sqlAcceptance, /submit_anonymous_media_motm/);
+  assert.match(sqlAcceptance, /author_user_id IS NULL AND visitor_id IS NOT NULL/);
+  assert.match(sqlAcceptance, /voter_user_id IS NULL AND visitor_id IS NOT NULL/);
+  assert.match(sqlAcceptance, /unique_violation/);
+  assert.match(sqlAcceptance, /ROLLBACK;/);
+});
