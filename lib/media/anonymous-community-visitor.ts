@@ -98,3 +98,23 @@ export async function anonymousCommunityVisitor(request: Request): Promise<Commu
   }
   return { tokenHash: await sha256('factsport-media-v1:' + nonce), networkHash };
 }
+
+/** Verify a returning anonymous visitor without issuing a new identity on GET. */
+export async function existingAnonymousMediaTokenHash(request: Request): Promise<string | null> {
+  const url = new URL(request.url);
+  const name = url.protocol === 'https:' ? COOKIE_NAME : DEV_COOKIE_NAME;
+  const raw = (request.headers.get('cookie') || '').split(';')
+    .map(part => part.trim()).find(part => part.startsWith(name + '='))
+    ?.slice(name.length + 1) || '';
+  const [nonce, mac, ...extra] = raw.split('.');
+  if (extra.length || !nonce || !mac || nonce.length !== 43 || mac.length !== 43 ||
+      !B64URL.test(nonce) || !B64URL.test(mac)) return null;
+  try {
+    const signatureValid = await crypto.subtle.verify(
+      'HMAC', await signingKey(), fromBase64url(mac), encoder.encode('media-v1:' + nonce),
+    );
+    return signatureValid ? sha256('factsport-media-v1:' + nonce) : null;
+  } catch {
+    return null;
+  }
+}
