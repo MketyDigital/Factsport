@@ -154,7 +154,7 @@ test('review and publish require revision-scoped external video attribution and 
     .replace('new Set<string>()', 'new Set()')
     .replace('let url: URL;', 'let url;')
     .replace(
-      'function assertExternalVideoSourceRights(\n  body: string, sources: Array<{ canonical_url: string; attribution_text: string | null; rights_reference: string | null }>\n) {',
+      'function assertExternalVideoSourceRights(\n  body: string, sources: ReadonlyArray<{ canonical_url?: unknown; attribution_text?: unknown; rights_reference?: unknown }>\n) {',
       'function assertExternalVideoSourceRights(body, sources) {',
     );
   const { externalVideoCanonicalUrls, assertExternalVideoSourceRights } = vm.runInNewContext(
