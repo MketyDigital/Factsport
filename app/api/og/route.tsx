@@ -308,6 +308,53 @@ export async function GET(req: NextRequest) {
 
     const parsedData = decodeBase64Safe(dataParam);
 
+    // M74: standings league share card, layered 2.5D-style typography.
+    // This is intentionally a league preview, not a fabricated ranking.
+    if (parsedData.type === 'standings') {
+      const league = shortTeamName(parsedData.league, 'FOOTBALL');
+      const header = cleanText(parsedData.label || 'LEAGUE STANDINGS').slice(0, 46);
+      return new ImageResponse(
+        (
+          <div style={{
+            width: 1200, height: 630, display: 'flex', flexDirection: 'column',
+            background: 'linear-gradient(145deg, #0a1428 0%, #14346b 75%, #116b83 100%)',
+            fontFamily: 'Arial, sans-serif', color: '#fff',
+            padding: '62px 75px', justifyContent: 'space-between',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ display: 'flex', fontSize: 27, fontWeight: 900, letterSpacing: 5, color: '#facc15' }}>FACTSPORT</span>
+              <span style={{
+                display: 'flex', padding: '13px 24px', borderRadius: 30,
+                border: '1px solid #5d789d', background: '#172e56',
+                fontSize: 20, letterSpacing: 2, fontWeight: 700,
+              }}>{header}</span>
+            </div>
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: 22,
+              padding: '35px 42px', borderRadius: 35, background: '#0a1e3d',
+              border: '1px solid #31537d', boxShadow: '0 20px 45px rgba(0,0,0,0.35)',
+            }}>
+              <span style={{ display: 'flex', fontSize: 24, color: '#9fc9ec', letterSpacing: 3, fontWeight: 700 }}>THE RACE FOR THE TOP</span>
+              <span style={{ display: 'flex', fontSize: 76, lineHeight: 1.08, fontWeight: 900, maxWidth: 980 }}>{league}</span>
+              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', height: 68 }}>
+                {[32, 52, 43, 65, 49, 57, 39].map((height, i) => (
+                  <div key={i} style={{
+                    display: 'flex', flex: 1, height, borderRadius: '11px 11px 4px 4px',
+                    background: i === 3 ? '#facc15' : '#299ad0', opacity: i === 3 ? 1 : 0.7,
+                  }} />
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 24, color: '#cbd5e1' }}>
+              <span>TABLE · POINTS · RECENT FORM</span>
+              <span>factsport.com</span>
+            </div>
+          </div>
+        ),
+        { width: 1200, height: 630 },
+      );
+    }
+
     // 📋 TEMPLATE 1: PITCH LINEUP INTERFACE
     if (parsedData.type === 'pitch') {
       const home = shortTeamName(parsedData.home, 'HOME');
