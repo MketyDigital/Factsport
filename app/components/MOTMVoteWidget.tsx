@@ -143,7 +143,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
                                 <CheckCircle size={10} className="text-green-400" />
                             )}
                             <span className={`text-[8px] md:text-[9px] font-black uppercase tracking-widest ${isVotingClosed ? 'text-slate-400' : 'text-green-400'}`}>
-                                {isVotingClosed ? 'Voting Closed (Final Results)' : 'MOTM Vote Cast'}
+                                {isVotingClosed ? (!matchDateMs ? 'Voting unavailable' : hoursSinceKickoff < 0 ? 'Voting opens at kickoff' : 'Voting closed (final results)') : 'MOTM Vote Cast'}
                             </span>
                         </div>
                     </div>
