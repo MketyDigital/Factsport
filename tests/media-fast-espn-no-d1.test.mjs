@@ -88,16 +88,16 @@ test('fast ESPN route is canonically keyed, gated, cached and D1-free', () => {
 });
 
 
-test('frontend fast ESPN switch uses verified canonical match ID without enabling it by default', () => {
+test('frontend fast ESPN reader uses verified canonical match ID and never calls the archived external Worker', () => {
   const fetcher = read('app/utils/liveFetcher.ts');
   const provider = read('app/providers/MatchLiveProvider.tsx');
   const page = read('app/match/[id]/page.tsx');
   const label = read('app/components/LiveScoreLabel.tsx');
-  assert.match(fetcher, /NEXT_PUBLIC_FACTSPORT_FAST_LIVE_BACKEND === 'postgres'/);
+  assert.match(fetcher, /NEXT_PUBLIC_FACTSPORT_FAST_LIVE_BACKEND !== 'postgres'/);
   assert.match(fetcher, /MATCH_UUID\.test\(matchId\)/);
   assert.match(fetcher, /'\/api\/media\/live\/matches\/'/);
-  assert.match(fetcher, /live-api\.factsport\.com/);
-  assert.match(fetcher, /const key = useV2FastReader \? 'match:'/);
+  assert.doesNotMatch(fetcher, /live-api\.factsport\.com|env\.DB|D1Database/);
+  assert.match(fetcher, /const key = 'match:' \+ matchId/);
   assert.match(provider, /fetchLiveMatchDeduplicated\(espnId, matchId\)/);
   assert.match(page, /<MatchLiveProvider matchId=\{dbData\.id\}/);
   assert.match(label, /fetchLiveMatchDeduplicated\(espnId, matchId\)/);
