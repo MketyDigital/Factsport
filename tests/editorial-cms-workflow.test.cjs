@@ -311,7 +311,7 @@ test('editorial revision history is role-protected and restore creates a new dra
 });
 
 
-test('revision history compares metadata, media, videos and sources and previews private clips', () => {
+test('revision history compares metadata, media, videos and sources without activating paid private VOD', () => {
   const revisionRoute = read('app/api/admin/news/[id]/revisions/route.ts');
   const newsroomPage = read('app/admin/news/page.tsx');
   const videoPreview = read('app/admin/media/MediaVideoPreview.tsx');
@@ -325,8 +325,10 @@ test('revision history compares metadata, media, videos and sources and previews
   assert.match(ui, /Image placements/);
   assert.match(ui, /Video clips/);
   assert.match(ui, /Source provenance/);
-  assert.match(ui, /previewVideos/);
-  assert.match(ui, /<MediaVideoPreview/);
+  // The owner prohibited paid Cloudflare Stream VOD in M53. Revision video
+  // summaries remain visible, but do not reenable its old private player.
+  assert.match(ui, /videoSummary\(selected\.revision_videos\)/);
+  assert.doesNotMatch(ui, /<MediaVideoPreview/);
   assert.match(ui, /disableExternalMedia/);
   const markdownRenderer = read('app/components/MarkdownRenderer.tsx');
   assert.match(markdownRenderer, /disableExternalMedia = false/);
