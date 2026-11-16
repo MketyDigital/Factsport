@@ -12,6 +12,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
     const [voteData, setVoteData] = useState<any[]>([]);
     const [selectedPlayer, setSelectedPlayer] = useState('');
     const [isVoting, setIsVoting] = useState(false);
+    const [voteError, setVoteError] = useState<string | null>(null);
 
     const liveData = useMatchLive();
     
@@ -46,21 +47,25 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
 
     const handleVote = async () => {
         if (!COMMUNITY_VOTING_ENABLED || !selectedPlayer || hasVoted || isVoting || isVotingClosed) return;
+        setVoteError(null);
         setIsVoting(true);
-
         try {
-            await fetch(WORKER_URL, {
+            const response = await fetch(WORKER_URL, {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ matchId, playerName: selectedPlayer })
             });
-
+            if (!response.ok) throw new Error('MOTM vote was not accepted.');
+            // localStorage is a UI convenience, never voter authorization.
             localStorage.setItem(`motm_voted_${matchId}`, 'true');
             setHasVoted(true);
-            fetchVotes(); 
-        } catch (e) {}
-        
-        setIsVoting(false);
+            void fetchVotes();
+        } catch {
+            setVoteError('Your vote was not recorded. Please try again.');
+        } finally {
+            setIsVoting(false);
+        }
     };
 
     if (!lineups || (!lineups.home && !lineups.away)) return null;
@@ -70,6 +75,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
         <div className="w-[95%] md:max-w-md mx-auto bg-[#0a1428] rounded-lg border border-slate-800 mb-3 text-white relative overflow-hidden py-2 px-3 shadow-sm flex flex-col justify-center min-h-[40px]">
             
             {!COMMUNITY_VOTING_ENABLED && <p role="status" className="mb-2 text-center text-[10px] font-bold text-amber-300">MOTM voting is paused pending secure PostgreSQL voter verification. Existing results can still be viewed when available.</p>}
+            {voteError && <p role="alert" className="mb-2 text-center text-[10px] text-red-300">{voteError}</p>}
             {!hasVoted && !isVotingClosed ? (
                 <div className="relative z-10 flex items-center justify-between gap-2 w-full">
                     <div className="flex items-center gap-1 shrink-0">
