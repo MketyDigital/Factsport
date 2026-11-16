@@ -13,6 +13,10 @@ const ADMIN_EMAILS = [
     'fact@factsport.com'
 ];
 
+// V2 community writes are fail-closed until authenticated PostgreSQL
+// identity, moderation and rate limiting are fully verified.
+const COMMUNITY_WRITES_ENABLED = false;
+
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
 export default function FanZoneChat({ matchId, espnId }: { matchId: string, espnId?: string }) {
@@ -30,7 +34,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
     const [isAnnouncement, setIsAnnouncement] = useState(false); 
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const CHAT_WORKER_URL = "https://chat-api.factsport.com"; 
+    const CHAT_WORKER_URL = '/api/media/chat'; 
 
     const liveData = useMatchLive();
     
@@ -150,7 +154,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         let messageText = newMessage.trim();
-        if (!messageText || !user || isSending) return;
+        if (!COMMUNITY_WRITES_ENABLED || !messageText || !user || isSending) return;
 
         if (!isAdmin) {
             const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/i;
@@ -381,7 +385,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                 )}
                 
                 <div className="p-2 md:p-3 flex items-center gap-2">
-                    {isAdmin && !isUniversallyFinished && (
+                    {COMMUNITY_WRITES_ENABLED && isAdmin && !isUniversallyFinished && (
                         <div className="flex items-center bg-slate-100 rounded-full border border-slate-200 p-1 shrink-0">
                             <button onClick={() => setShowPinUI(!showPinUI)} className={`p-1.5 rounded-full transition ${showPinUI ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`} title="Manage Pinned Message">
                                 <Settings size={14} />
@@ -397,6 +401,8 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                             <div className="w-full text-center bg-slate-50 border border-slate-200 text-slate-400 text-[10px] font-black uppercase tracking-widest py-3 rounded-full shadow-inner">
                                 Match Ended. Chat is Closed.
                             </div>
+                        ) : !COMMUNITY_WRITES_ENABLED ? (
+                            <div role="status" className="w-full text-center rounded-xl bg-amber-50 border border-amber-200 py-2 px-3 text-[10px] font-bold text-amber-900">Chat posting is paused until secure PostgreSQL community identity and moderation are ready.</div>
                         ) : authLoading ? (
                              <div className="h-10 w-full bg-slate-100 rounded-full animate-pulse border border-slate-200"></div>
                         ) : user ? (
