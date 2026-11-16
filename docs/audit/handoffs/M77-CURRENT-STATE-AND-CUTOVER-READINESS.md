@@ -71,3 +71,11 @@ See the master `ROADMAP.md`, `PRODUCTION-EXECUTION-PLAN.md`, `PAGE-MIGRATION-MAT
 
 
 The subsequent Factsport TV design addition and owner-directed phased release order are recorded in [M78](./M78-FACTSPORT-TV-AND-PHASED-RELEASE.md). The first Azure inventory corrections are recorded in ROADMAP M79; this does not establish PostgreSQL absence because the initial listing was filtered by resource name/group.
+
+## M79 Azure evidence update — 2026-11-16
+
+The owner's Cloud Shell output establishes that the Azure Flexible Server and database already exist: `mketypostgres` in `mkety_group`, West US, Ready, PostgreSQL 18, `Standard_B1ms`, 32 GiB, seven-day backup retention; database `factsport_v2` is present. The prior filtered resource query missed it because the server name/resource group did not contain “factsport”. The legacy bootstrap creates a new PG16 server and must not be run with `APPLY=1`; a duplicate-database guard was added before any provisioning.
+
+The same output confirms `la-factsport-v2-staging` is Disabled, with a five-minute recurrence and only `NonMutatingDesignOnly`. No API connections were listed in the staging group and no subscription budgets were listed. It is not an active social delivery integration. The `factsports.onmicrosoft.com` External ID tenant exists; customer app registrations, credentials, callbacks and OIDC journeys remain unverified.
+
+Still required: a clean read-only server firewall/TLS and networking inventory; actual database role/grant and migration ledger evidence; proof that the intended Cloudflare Hyperdrive maps to this exact server/database/least-privilege role; backup/PITR and restore proof; and the customer app registration/OIDC configuration. The prior firewall command returned `UNAVAILABLE` after terminal paste corruption, so it is not evidence that no firewall rules exist. No Azure cloud resource was changed.
