@@ -23,7 +23,7 @@ This plan operationalizes `docs/audit/ROADMAP.md`, the handoffs under `docs/audi
 | Automation | Application-owned JobRunner + durable run keys/idempotency; Azure Logic Apps Consumption is the selected third-party automation orchestrator; Cloudflare scheduler alternative remains disabled unless deliberately selected for a job |
 | Social | Facebook Graph API and Telegram Bot API remain direct first-party integrations; Buffer/Make-type third-party distribution may use Logic Apps |
 | AI and transactional email | Mkety AI and Mkety Mail behind server-only replaceable adapters; every AI article remains review-gated |
-| Identity | Factsport-owned immutable user IDs, roles and entitlements; OIDC/Auth provider behind an adapter. Final provider and tenant configuration remain a release decision; do not assume Entra or shared Mkety Auth is live |
+| Identity | Factsport-owned immutable user IDs, roles and entitlements; Microsoft Entra External ID in a dedicated customer external tenant for customer sign-in, with OIDC behind an adapter. Media editor identity remains isolated. Tenant, app registrations, secrets and runtime acceptance are not provisioned; do not use workforce Entra for customers or assume Entra is live |
 | Legacy operational data | Clean start for matches, scores, events, predictions, points, rankings and transient logs; preserve accounts/paid obligations and authored editorial assets only after explicit review |
 
 Do not silently replace PostgreSQL with D1. Do not make a provider change that breaks stable internal match IDs, prediction references, authored article slugs, or paid entitlement obligations.
@@ -389,3 +389,8 @@ M75 also found an active external legacy Player Ratings Worker call inside the m
 Vinext page-level ISR now declares the Cloudflare Workers Cache adapter and its typed response entrypoints. This is a source change only; it adds no paid cache store and does not establish runtime cache behavior. The unused Cloudinary `/cdn/*` rewrite was removed because it had no source consumers and Vinext reported that external rewrite requests forward caller credentials.
 
 The current branch's latest protected staging run (`43871889138`, HEAD `64b5d75ab2227748264d1e0f1fd9f10ae1340bd1`) passed source tests, TypeScript and Vinext build, then stopped at the pre-deploy compatibility gate. The build emits `.cloudflare/output/v1/config.json`; installed `cf` and Vinext deployment tooling expect `.cloudflare/output/v0/config.json`. A direct local `cf deploy --prebuilt --mode production --dry-run` reproduced the missing-v0-config error without uploading. Keep staging deployment and production cutover blocked until a supported toolchain combination passes the dry run and the protected staging workflow. Full details and local verification are in `docs/audit/handoffs/M76-CLOUDFLARE-CACHE-AND-DEPLOYMENT-COMPATIBILITY.md`.
+
+
+### M77 status reconciliation — 2026-11-16
+
+The current V2 completion and non-use inventory is recorded in [M77](./handoffs/M77-CURRENT-STATE-AND-CUTOVER-READINESS.md). Exact Cloudflare tool pins now pass local engine/type/build and a prebuilt dry run, but protected staging has not yet passed at the updated commit. Customer Entra External ID is selected but not provisioned; Logic Apps remains a disabled template/adapter, not a live integration. No P0–P9 exit gate or production cutover is complete.

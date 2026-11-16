@@ -3,7 +3,7 @@
 Date: 2026-11-16  
 Branch: `refactor/factsport-v2`  
 Baseline HEAD: `64b5d75ab2227748264d1e0f1fd9f10ae1340bd1`  
-Status: source changes locally verified and committed for delivery to the refactor branch; **not staged or production-ready**.
+Status: cache source changes and the Cloudflare output compatibility fix are locally verified; protected staging must still pass before release. **Not production-ready.**
 
 ## 1. Scope and owner constraints
 
@@ -30,16 +30,16 @@ The source edits are committed locally. Branch delivery is being performed throu
 
 - `npm run test:engine`: **275 passed, 0 failed**, including the two new source checks.
 - `npm run typecheck`: passed after removing generated `.cloudflare/types`; a prior local run with generated Cloudflare types present was not a clean verification and produced unrelated generated-type conflicts.
-- `npm run build:vinext`: passed; the Cloudinary credential-forwarding warning disappeared. The build generated `.cloudflare/output/v1/config.json`.
-- `vinext-cloudflare deploy --dry-run`: passed setup/cache preflight; this command did not build or deploy.
-- `cf deploy --prebuilt --mode production --dry-run`: failed safely with `Build Output Specification: no root config found at .cloudflare/output/v0/config.json`.
-- Build outputs, generated Vinext files, and generated `next-env.d.ts` edits were removed/restored after checks.
+- `npm run build:vinext`: passed with `@cloudflare/vite-plugin@2.0.0-beta.v.17`; the Cloudinary credential-forwarding warning disappeared. This plugin emits `.cloudflare/output/v0/config.json`.
+- `npx --no-install cf deploy --prebuilt --mode production --dry-run`: passed using `cf@1.0.0-beta.32`; it read the staging bindings and exited at `--dry-run` without upload.
+- `package.json` now pins both Cloudflare prerelease tools exactly so CI does not float to the incompatible `2.0.0-rc.0`. This is not a fully locked dependency graph; P0 deterministic install/lockfile work remains open.
+- Generated build outputs and `next-env.d.ts` edits were cleaned/restored.
 
-## 5. Exact deployment blocker
+## 5. Deployment compatibility finding
 
-The installed Cloudflare CLI is `1.0.0-beta.32`, whose local Build Output reader requires `v0`. The installed Vite plugin is `2.0.0-rc.0`; its build emits `v1`. Vinext's deploy helper reads and deploys the V2 typed Cloudflare Build Output using the `v0` path as well. The official CLI documentation describes `.cloudflare/output/v0/` as the Build Output directory, while the actual local build and the latest staging job show `v1`.
+The failure was caused by the open prerelease range `^2.0.0-beta.v.11` resolving to Vite plugin `2.0.0-rc.0`, which emitted output v1, while `cf@1.0.0-beta.32` expects `.cloudflare/output/v0`. Pinning the known-compatible `2.0.0-beta.v.17` makes the build output match the CLI. The local CLI prebuilt production-mode dry-run confirms that it can read the generated output and bindings; it does not upload or deploy.
 
-The source-level cache configuration is now complete and the Vinext helper preflight passes. The protected staging deploy must remain blocked until a supported toolchain combination reads the generated output correctly. Do not copy/symlink the `v1` output into `v0`, invent a config, bypass the workflow guard, or report a staging pass. The temporary staging token is not generated because the guard runs before the deploy step.
+The workflow should now be rerun at the updated commit. Do not bypass its output guard or interpret the local dry-run as staging acceptance.
 
 ## 6. Remaining release blockers
 
@@ -51,7 +51,6 @@ The source-level cache configuration is now complete and the Vinext helper prefl
 
 ## 7. Next actions
 
-1. Find a Cloudflare CLI and Vite plugin release pair that both supports the current typed config and consumes the emitted Build Output; prove it in an isolated dry run.
-2. Preserve the current fail-closed staging workflow and confirm no Cloudflare upload occurs when the compatibility check fails.
-3. Once that check passes, run protected staging and verify unauthenticated denials, Hyperdrive/R2 health, initial `/matches` render, keyset pagination and cache isolation.
-4. Continue the existing staged database, product parity, security, AdSense and production execution plan. Do not interpret this handoff as a production go/no-go.
+1. Run isolated verification and protected staging at the package-pin commit. Confirm workflow install resolves the exact pinned tools.
+2. Verify the staging deployment and HTTP acceptance checks: unauthenticated denials, Hyperdrive/R2 health, initial `/matches`, keyset pagination and cache isolation.
+3. Continue the existing database, product parity, identity, security, AdSense and production execution plan. Do not interpret this handoff as production go/no-go.

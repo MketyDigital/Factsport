@@ -1,0 +1,70 @@
+# M77 — Current V2 implementation and cutover readiness
+
+Date: 2026-11-16  
+Repository: `MketyDigital/Factsport`  
+Branch: `refactor/factsport-v2`  
+Purpose: reconcile the plans, roadmap, migration and product matrices, handoffs, and explicit V2 non-use decisions. This is a status record, not a release approval.
+
+## Executive state
+
+V2 is an active refactor with meaningful verified source and a narrow historic staging slice. It is not a complete replacement for the current product, and it is not production-ready. Source presence, compilation, or a health endpoint does not mean that customer journeys, provider provisioning, data migrations, or operational acceptance are complete.
+
+The current immediate technical blocker from M76 is resolved locally: exact package pins produce the Cloudflare Build Output format consumed by `cf`. Local engine checks, TypeScript, Worker build, and prebuilt dry-run pass. The updated branch still needs its protected staging workflow and runtime acceptance before this fix is accepted remotely.
+
+## Completed or implemented, with evidence boundaries
+
+| Area | Implemented / verified | Boundary still applying |
+|---|---|---|
+| Cloudflare/Vinext | ISR adapter uses Workers Cache; typed Worker cache configuration; unsafe unused Cloudinary credential-forwarding rewrite removed. Plugin and CLI pinned to `2.0.0-beta.v.17` and `1.0.0-beta.32`. | Exact pinned local build emits `v0`; `cf deploy --prebuilt --mode production --dry-run` reads 131 assets and staging bindings, exits before upload. Not a remote staging deploy. Whole dependency graph is not locked. |
+| Local code gates | Engine suite: 275/275. TypeScript: pass after removing build-generated Cloudflare declarations. Vinext Worker build: pass. | Current branch commit still needs isolated and protected GitHub Actions; full lint, browser, security, load and provider tests remain. |
+| Database foundation | Earlier release evidence records Azure PostgreSQL database `factsport_v2`, restricted reader/schedule/ESPN writer roles and Cloudflare Hyperdrives; migration CI covers the repository chain. | These are historical slices. Reconcile the actual staging migration versions, role grants, restore point and current Worker bindings before further staging writes. Migrations 0044–0048 are not accepted/applied in the evidence reviewed. |
+| Matches | A prior protected staging run accepted PostgreSQL-backed `/matches` and its bounded API path, with deny-by-default and cache/auth isolation checks. Schedule and ESPN ingestion/reconciliation source/jobs exist. | Not full match-centre parity. Exact legacy deployed fast-score/chat/MOTM worker source was missing at M69; 3-second viewer path, full match lifecycle, conditional provider fallback, current staging status and provider accuracy remain open. |
+| Media/editorial | Many CMS, media, rights/provenance, derivatives, Stream upload/room, social outbox/adapters, live center, ratings and visual changes exist in source and handoffs M35–M75. | Migrations, provider credentials, real Stream rooms/webhooks, private social deliveries, editorial workflow/RBAC, browser/mobile/accessibility, match-centre parity and production evidence remain incomplete. Do not promote source-only milestones to complete runtime features. |
+| Public predictions | Migration 0003 and later scoped submit-function/API work add anonymous secure submission boundaries, participant cookie, email on submission, optional unticked marketing consent, host gate and feature flag. | Feature stays off. Public reads/history/leaderboard, account claim, campaign/bonus, official score settlement, audit/monthly rules, VIP/payment, real dedicated role/binding, migration acceptance and browser E2E remain open. |
+| Customer identity | Identity interfaces/mapping groundwork and a separate Entra adapter for Media editors exist. | Per latest owner direction, customer user sign-in is Entra External ID in a customer external tenant. Tenant, application registrations, runtime secrets, callbacks, session/account/recovery journeys and real staging tests do not exist in reviewed evidence. Media editor identity is not customer auth. |
+| Azure Logic Apps | Disabled-by-default workflow template and Logic Apps/APIM adapter seam exist for approved Buffer/Make-style distribution. | No Logic App, APIM connection, role/identity/secrets, provider credentials, schedule, monitored run or delivery/reconciliation E2E is provisioned. Facebook and Telegram remain direct integrations. |
+| Staging operations | Historical Cloudflare protected staging Worker, R2 and narrow health/runtime proofs exist. | Current branch head after tool pins needs protected deploy and probes. Full migration, restore, alerting, logs, rollback, cost and workload acceptance remain open. |
+
+See the master `ROADMAP.md`, `PRODUCTION-EXECUTION-PLAN.md`, `PAGE-MIGRATION-MATRIX.md`, `ROUTE-MIGRATION-MATRIX.md`, `COMPONENT-MIGRATION-MATRIX.md`, `DB-003-functions-and-cron.md`, AUTH-004/AUTH-005, and M44–M76 for per-feature source and acceptance evidence. P0–P9 remain the ordered release gates.
+
+## Prediction and identity: remaining product work
+
+1. Provision the dedicated Entra External ID customer tenant and separate application registration(s); set exact issuer, client IDs, allowed origins/redirects, server-side secrets, session keys and cookie domains in the approved secret stores. Keep email matching from auto-linking old accounts. Define verified account recovery, duplicate-account conflict, consent and deletion handling.
+2. Implement/accept customer registration, login, logout, session refresh, internal immutable UUID mapping, roles, entitlements, abuse controls and host isolation on the private Predict surface. Keep Media editor identity separate.
+3. Reconcile Prediction migration state and grants on isolated Azure staging, especially 0044–0048 and any Prediction/community roles. Keep flags off until function privilege checks and rollback-only acceptance pass.
+4. Finish public prediction reads/history/leaderboards; registered-account claim/migration; campaign and bonus lifecycle; official match event mapping; scoring, idempotent settlement, correction, reconciliation and audit ledger; monthly qualification, winner, reset and dispute policy; VIP/payment/entitlement, refunds and notifications.
+5. Preserve the M44/M49 constraints: the legacy dormant eligibility trigger is not safe to attach as-is; legacy scoring/prize/monthly implementations conflict. Do not invent or activate prize, VIP, monthly, payment or migration behavior until owner policy is recorded and the full end-to-end tests prove it.
+6. Run anonymous and signed-in browser journeys, consent/refusal, cookie expiry, cross-host leakage, email conflict, duplicate callback, concurrent submission, kickoff races, replay/settlement idempotency, adjustment and rollback tests.
+
+## Azure and Logic Apps provisioning still needed
+
+- Reconcile the owner subscription resource inventory with the historical Azure PostgreSQL evidence: region, server/database identity, networking allowlist/TLS, backup retention/PITR, restore proof, health, actual migration versions, roles/grants, Hyperdrive mappings and cost/budget alerts. Do not infer existence/configuration from source or old run notes.
+- Provision the dedicated Entra External ID tenant/apps and approved Cloudflare secrets, then run real OIDC staging sign-in and recovery acceptance.
+- If external Buffer/Make-style distribution is approved, provision Logic Apps **Consumption** only after region, billing and budget review. Configure one clear job owner, authenticated APIM/connection, least-privilege workflow role, server-only credentials, private destination tests, durable idempotency/retries, dead-letter/unknown-outcome reconciliation and alerts. The template remains disabled until this passes.
+- Do not provision or assume any Azure item absent approval/evidence: workforce-tenant customer auth, Logic Apps Standard, Functions, Azure OpenAI, ACS Email, Redis, Service Bus, VM/AKS, Azure Blob or Cosmos. Use Mkety AI/Mail adapters where selected, and keep replaceable provider boundaries.
+
+## Explicit V2 non-use / do-not-carry-forward list
+
+- Do not use the legacy workforce Entra tenant for customer identities. Use the dedicated customer external tenant for Entra External ID; isolate it from Media editor auth.
+- Do not use legacy Supabase sessions or mutations as the V2 Media/Admin/Prediction runtime. Archived legacy endpoints remain fail-closed; no blind legacy account/history import and no unsafe SQL monthly reset/standings functions.
+- Do not activate D1 or browser calls to old external Workers. Recover missing Worker source/config only by read-only authorized inventory; implement and verify the V2 same-origin Postgres path before retiring anything.
+- Do not switch to OpenNext. Do not re-add the Cloudinary `/cdn/*` rewrite that forwards credentials. Use Vinext, Workers Cache, Azure PostgreSQL through server-side Hyperdrive, and R2 within the approved architecture.
+- No query-string cron keys; no database access from the browser; no app use of the admin Hyperdrive; no duplicate scheduler/job owners; no moving 3-second ESPN display polling into PostgreSQL/Logic Apps.
+- Keep direct Facebook Graph API and Telegram Bot API adapters direct; Logic Apps is only for the approved third-party distribution layer. Never enable a disabled workflow based on template existence.
+- Do not enable paid Cloudflare Stream hosted VOD, unapproved paid Azure services, or resources outside the selected architecture without an explicit architecture/cost change.
+- Keep clean-start policy: no generated historical matches, scores, gameplay, prediction points/rankings or transient logs. Preserve/review human-authored editorial content, identities, paid entitlements and legal/financial obligations; do not delete or migrate them by guess.
+- Do not activate AdSense until actual publisher approval, public-domain readiness, ads.txt/crawlability, consent/privacy, sports betting policy and page-surface rules are verified. No ad code on private, account, chat, payment or admin surfaces.
+
+## Exact next gates
+
+1. Deliver the exact package pins/docs to `refactor/factsport-v2` and run current-head isolated Actions. Run protected staging workflow and inspect both deployment result and HTTP probes; local dry run is not staging proof.
+2. Read-only reconcile Azure and Cloudflare staging resources and migration state. Apply only owner-approved migrations to isolated staging; validate roles, rollback, backups and restore. Keep all user-facing feature flags disabled until their gates pass.
+3. Finish the customer Entra External ID implementation/provisioning and the Prediction, Media, match-centre, community, job and provider journeys in their ordered roadmap sequence.
+4. Complete browser/mobile parity, accessibility, SEO/consent, privacy, adversarial/security, dependency, load, observability, backup/restore, and rollback evidence.
+5. Complete shadow comparisons and a full real match + user-account + payment/VIP/prize lifecycle rehearsal. Resolve all open policy/data obligations and secure explicit written owner go/no-go.
+6. Only after P0–P9 pass, deploy the production Worker with production-specific bindings/secrets, rehearse canary and rollback, then perform the approved DNS/route cutover. Preserve legacy system/backups until stable acceptance.
+
+## Current no-go
+
+**Staging:** pending updated protected workflow and runtime probes.  
+**Production:** no-go. P0–P9 gates remain open; no production Worker deploy, DNS change, legacy shutdown, production data write or cutover is claimed or authorized by this status report.
