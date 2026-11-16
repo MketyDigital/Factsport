@@ -29,6 +29,13 @@ CREATE UNIQUE INDEX media_motm_visitor_once_idx
   ON public.media_match_motm_votes (match_id, visitor_id)
   WHERE visitor_id IS NOT NULL;
 
+-- Extend the public read model with only a safe reply UUID. All private
+-- visitor identifiers and moderator audit metadata remain excluded.
+CREATE OR REPLACE VIEW public.public_media_match_chat_messages AS
+SELECT id, match_id, display_name AS username, avatar_url, message, created_at, reply_to_id
+FROM public.media_match_chat_messages
+WHERE hidden_at IS NULL;
+
 -- Anonymous callers share an independently derived rotating network token.
 -- Hashes are produced server-side using a private pepper; no raw IP stored.
 CREATE TABLE public.media_community_network_limits (
