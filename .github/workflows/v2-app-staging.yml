@@ -60,6 +60,16 @@ jobs:
         run: npm run build:vinext
       # cf --prebuilt currently assumes v0 output while the vinext Vite build emits v1.
       # Use cf's supported build-and-deploy path with the same temporary secret.
+      - name: Assert CLI supports generated Build Output before any staging API call
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --no-install cf --version
+          if [ ! -f .cloudflare/output/v0/config.json ]; then
+            echo "::error::Cloudflare CLI expects v0 Build Output but vinext emitted a different layout (currently v1); resolve the cf/Vite plugin compatibility first."
+            find .cloudflare/output -maxdepth 2 -name config.json -print
+            exit 1
+          fi
       - name: Deploy Factsport staging Worker with temporary access secret
         shell: bash
         run: |
