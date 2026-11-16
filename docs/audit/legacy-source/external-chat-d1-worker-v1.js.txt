@@ -1,0 +1,64 @@
+export default {
+  async fetch(request, env, ctx) {
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    };
+
+    if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+    const url = new URL(request.url);
+    const cache = caches.default;
+
+    try {
+      if (request.method === "GET") {
+        const matchId = url.searchParams.get("match_id");
+        const status = (url.searchParams.get("status") || '').toUpperCase();
+        
+        if (!matchId) return new Response(JSON.stringify({ error: "Missing match_id" }), { status: 400, headers: corsHeaders });
+
+        const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED', 'ABD'].includes(status);
+        const isLive = ['LIVE', 'HT', 'IN_PLAY', '1H', '2H', 'ET', 'P'].includes(status);
+        
+        // 🟢 DYNAMIC CHAT CACHE
+        let chatCacheTime = 60; // Default for SCHEDULED
+        if (isLive) chatCacheTime = 2;
+        if (isFinished) chatCacheTime = 3600;
+
+        const cacheKey = new Request(url.toString(), request);
+        const cachedResponse = await cache.match(cacheKey);
+        if (cachedResponse) return cachedResponse;
+
+        const { results } = await env.DB.prepare(
+          "SELECT * FROM messages WHERE match_id = ? ORDER BY created_at DESC LIMIT 50"
+        ).bind(matchId).all();
+
+        const response = new Response(JSON.stringify({ messages: results.reverse() }), { 
+            headers: {
+                ...corsHeaders,
+                "Cache-Control": `public, s-maxage=${chatCacheTime}, max-age=${chatCacheTime}`
+            } 
+        });
+
+        ctx.waitUntil(cache.put(cacheKey, response.clone()));
+        return response;
+      }
+
+      if (request.method === "POST") {
+        const body = await request.json();
+        const id = crypto.randomUUID();
+        
+        await env.DB.prepare(
+          "INSERT INTO messages (id, match_id, user_id, username, avatar_url, message) VALUES (?, ?, ?, ?, ?, ?)"
+        ).bind(id, body.match_id, body.user_id, body.username, body.avatar_url, body.message).run();
+
+        return new Response(JSON.stringify({ success: true, id }), { headers: corsHeaders });
+      }
+
+      return new Response("Not found", { status: 404, headers: corsHeaders });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+    }
+  }
+};
