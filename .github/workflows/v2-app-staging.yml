@@ -58,6 +58,8 @@ jobs:
         run: npm run typecheck
       - name: Build native Factsport Cloudflare Worker
         run: npm run build:vinext
+      # cf --prebuilt currently assumes v0 output while the vinext Vite build emits v1.
+      # Use cf's supported build-and-deploy path with the same temporary secret.
       - name: Deploy Factsport staging Worker with temporary access secret
         shell: bash
         run: |
@@ -67,7 +69,7 @@ jobs:
           echo "::add-mask::$FACTSPORT_STAGING_TOKEN"
           printf 'FACTSPORT_STAGING_TOKEN=%s\n' "$FACTSPORT_STAGING_TOKEN" >> "$GITHUB_ENV"
           printf '{"FACTSPORT_STAGING_TOKEN":"%s"}\n' "$FACTSPORT_STAGING_TOKEN" > /tmp/factsport-staging-secrets.json
-          npx --no-install cf deploy --prebuilt --secrets-file /tmp/factsport-staging-secrets.json
+          npx --no-install cf deploy --mode production --secrets-file /tmp/factsport-staging-secrets.json
           rm -f /tmp/factsport-staging-secrets.json
       - name: Resolve Factsport staging Worker subdomain and test deny-by-default
         shell: bash
