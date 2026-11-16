@@ -69,3 +69,9 @@ Selected commits:
 5. Connect authentic media-identity chat moderation and MOTM write actions on PostgreSQL (M70). Preserve chat pins and official events while eliminating old Supabase admin writes.
 6. Build the independent scheduled canonical match writer, social outbox, and verified ESPN/FD source policy; keep Prediction settlement separate.
 7. No production DNS/old Worker/custom-route, D1, provider account, paid Cloudflare Stream VOD, or billing change without explicit approval.
+
+## M71 follow-up — stale fallback must not regress a live browser
+
+The same-origin endpoint intentionally returns `stale:true` for its last stored PostgreSQL fallback. The legacy `MatchLiveProvider` and `LiveScoreLabel` originally merged any non-error payload, which could roll visible live scores back to older database values after an ESPN request fault. Both frontend consumers now skip updates with `stale === true`, while retaining the server-rendered initial snapshot and last good live observations. Added the corresponding source-regression assertion to `tests/media-fast-espn-no-d1.test.mjs`.
+
+Commits: `45cba3052b148142c638555603a8f571104c6cef`, `e0de0491b96a5987112e569c98cb94bb95ab01e0`, `7d2e62a532612ee0b05a87a14b4b7c986dadd6f8`.
