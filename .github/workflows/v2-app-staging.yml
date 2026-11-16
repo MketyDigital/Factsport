@@ -83,7 +83,7 @@ jobs:
           umask 077
           FACTSPORT_STAGING_TOKEN="$(openssl rand -hex 32)"
           echo "::add-mask::$FACTSPORT_STAGING_TOKEN"
-          printf 'FACTSPORT_STAGING_TOKEN=%s\\n' "$FACTSPORT_STAGING_TOKEN" >> "$GITHUB_ENV"
+          printf 'FACTSPORT_STAGING_TOKEN=%s\n' "$FACTSPORT_STAGING_TOKEN" >> "$GITHUB_ENV"
           ENTRA_SET=0
           for value in "$ENTRA_EXTERNAL_DISCOVERY_URL" "$ENTRA_EXTERNAL_ISSUER" "$ENTRA_EXTERNAL_CLIENT_ID" "$ENTRA_EXTERNAL_REDIRECT_URI" "$FACTSPORT_AUTH_SESSION_SECRET"; do
             if [ -n "$value" ]; then ENTRA_SET=$((ENTRA_SET + 1)); fi
@@ -98,37 +98,37 @@ jobs:
             done
             export ENTRA_EXTERNAL_DISCOVERY_URL ENTRA_EXTERNAL_ISSUER ENTRA_EXTERNAL_CLIENT_ID ENTRA_EXTERNAL_REDIRECT_URI FACTSPORT_AUTH_SESSION_SECRET
             node <<'NODE'
-            const required = [
-              'ENTRA_EXTERNAL_DISCOVERY_URL', 'ENTRA_EXTERNAL_ISSUER',
-              'ENTRA_EXTERNAL_CLIENT_ID', 'ENTRA_EXTERNAL_REDIRECT_URI',
-              'FACTSPORT_AUTH_SESSION_SECRET',
-            ];
-            for (const key of required) {
-              if (!process.env[key]) throw new Error(`Missing ${key}`);
-            }
-            const discovery = new URL(process.env.ENTRA_EXTERNAL_DISCOVERY_URL);
-            const issuer = new URL(process.env.ENTRA_EXTERNAL_ISSUER);
-            const redirect = new URL(process.env.ENTRA_EXTERNAL_REDIRECT_URI);
-            if ([discovery, issuer, redirect].some(url => url.protocol !== 'https:')) {
-              throw new Error('Entra discovery, issuer, and redirect URLs must use HTTPS');
-            }
-            if (redirect.pathname !== '/api/auth/entra/callback') {
-              throw new Error('Entra redirect path must exactly be /api/auth/entra/callback');
-            }
-            const session = process.env.FACTSPORT_AUTH_SESSION_SECRET;
-            const decoded = Buffer.from(session, 'base64url');
-            if (decoded.length !== 32 || decoded.toString('base64url') !== session) {
-              throw new Error('FACTSPORT_AUTH_SESSION_SECRET must be canonical base64url for 32 bytes');
-            }
-            NODE
-            jq -n \\
-              --arg staging "$FACTSPORT_STAGING_TOKEN" \\
-              --arg discovery "$ENTRA_EXTERNAL_DISCOVERY_URL" \\
-              --arg issuer "$ENTRA_EXTERNAL_ISSUER" \\
-              --arg client "$ENTRA_EXTERNAL_CLIENT_ID" \\
-              --arg redirect "$ENTRA_EXTERNAL_REDIRECT_URI" \\
-              --arg session "$FACTSPORT_AUTH_SESSION_SECRET" \\
-              '{FACTSPORT_STAGING_TOKEN:$staging,ENTRA_EXTERNAL_DISCOVERY_URL:$discovery,ENTRA_EXTERNAL_ISSUER:$issuer,ENTRA_EXTERNAL_CLIENT_ID:$client,ENTRA_EXTERNAL_REDIRECT_URI:$redirect,FACTSPORT_AUTH_SESSION_SECRET:$session}' \\
+          const required = [
+            'ENTRA_EXTERNAL_DISCOVERY_URL', 'ENTRA_EXTERNAL_ISSUER',
+            'ENTRA_EXTERNAL_CLIENT_ID', 'ENTRA_EXTERNAL_REDIRECT_URI',
+            'FACTSPORT_AUTH_SESSION_SECRET',
+          ];
+          for (const key of required) {
+            if (!process.env[key]) throw new Error(`Missing ${key}`);
+          }
+          const discovery = new URL(process.env.ENTRA_EXTERNAL_DISCOVERY_URL);
+          const issuer = new URL(process.env.ENTRA_EXTERNAL_ISSUER);
+          const redirect = new URL(process.env.ENTRA_EXTERNAL_REDIRECT_URI);
+          if ([discovery, issuer, redirect].some(url => url.protocol !== 'https:')) {
+            throw new Error('Entra discovery, issuer, and redirect URLs must use HTTPS');
+          }
+          if (redirect.pathname !== '/api/auth/entra/callback') {
+            throw new Error('Entra redirect path must exactly be /api/auth/entra/callback');
+          }
+          const session = process.env.FACTSPORT_AUTH_SESSION_SECRET;
+          const decoded = Buffer.from(session, 'base64url');
+          if (decoded.length !== 32 || decoded.toString('base64url') !== session) {
+            throw new Error('FACTSPORT_AUTH_SESSION_SECRET must be canonical base64url for 32 bytes');
+          }
+          NODE
+            jq -n \
+              --arg staging "$FACTSPORT_STAGING_TOKEN" \
+              --arg discovery "$ENTRA_EXTERNAL_DISCOVERY_URL" \
+              --arg issuer "$ENTRA_EXTERNAL_ISSUER" \
+              --arg client "$ENTRA_EXTERNAL_CLIENT_ID" \
+              --arg redirect "$ENTRA_EXTERNAL_REDIRECT_URI" \
+              --arg session "$FACTSPORT_AUTH_SESSION_SECRET" \
+              '{FACTSPORT_STAGING_TOKEN:$staging,ENTRA_EXTERNAL_DISCOVERY_URL:$discovery,ENTRA_EXTERNAL_ISSUER:$issuer,ENTRA_EXTERNAL_CLIENT_ID:$client,ENTRA_EXTERNAL_REDIRECT_URI:$redirect,FACTSPORT_AUTH_SESSION_SECRET:$session}' \
               > /tmp/factsport-staging-secrets.json
             echo "Entra Media editor login configuration validated and included in staging deployment."
           else
