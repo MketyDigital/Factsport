@@ -34,7 +34,7 @@ export default function LiveScoreLabel({
       try {
           const matchData = await fetchLiveMatchDeduplicated(espnId, matchId);
           
-          if (matchData && !matchData.error) {
+          if (matchData && !matchData.error && matchData.stale !== true) {
               hasFetchedLive.current = true; 
               
               setData(prev => {
