@@ -1,11 +1,12 @@
 import { bindings, defineConfig, defineWorker } from "cf/config";
+import { createWorkersCacheConfig } from "@vinext/cloudflare/cache/config";
 
-/**
- * Factsport v2 staging application. Never bind to the existing factsport.com
- * production route until parity and security checks have passed.
- */
-export default defineConfig({
-  worker: defineWorker({
+const factsportWorker = defineWorker(async () => {
+  const workersCache = await createWorkersCacheConfig();
+
+  return {
+    ...workersCache,
+
     name: "factsport-v2-staging",
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-11-03",
@@ -30,6 +31,16 @@ export default defineConfig({
       FACTSPORT_COMPETITIONS_BACKEND: bindings.text("disabled"),
       FACTSPORT_HOMEPAGE_BACKEND: bindings.text("disabled"),
       FACTSPORT_PREDICTION_SETTINGS_BACKEND: bindings.text("disabled"),
+      ...workersCache.env,
     },
-  }),
+    exports: { ...workersCache.exports },
+  };
+});
+
+/**
+ * Factsport v2 staging application. Never bind to the existing factsport.com
+ * production route until parity and security checks have passed.
+ */
+export default defineConfig({
+  worker: factsportWorker,
 });
