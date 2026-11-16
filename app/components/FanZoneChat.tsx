@@ -360,6 +360,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                         ) : (
                             <div>
                             {submissionError && <p role="alert" className="mb-2 text-xs text-red-700">{submissionError}</p>}
+                            <p className="mb-1 text-[10px] text-slate-500">No account or email needed. Chat messages are public; a secure visitor cookie and bot verification help prevent abuse.</p>
                             {COMMUNITY_TURNSTILE_SITE_KEY ? (
                                 <Turnstile ref={turnstileRef} siteKey={COMMUNITY_TURNSTILE_SITE_KEY}
                                     options={{ action: 'media-chat' }}
