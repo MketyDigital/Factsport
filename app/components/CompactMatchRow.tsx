@@ -21,8 +21,8 @@ export default function CompactMatchRow({ match: initialMatch, disablePolling = 
 
         isFetching.current = true;
         try {
-            const data = await fetchLiveMatchDeduplicated(match.espn_id);
-            if (data && !data.error) {
+            const data = await fetchLiveMatchDeduplicated(match.espn_id, match.id);
+            if (data && !data.error && data.stale !== true) {
                 setMatch((prev: any) => ({ ...prev, status: data.status, home_score: data.home_score, away_score: data.away_score, displayClock: data.displayClock }));
             }
         } catch (e) {} finally {
@@ -41,7 +41,7 @@ export default function CompactMatchRow({ match: initialMatch, disablePolling = 
 
     return (
         // 🟢 THE FIX: Stronger individual background and shadow
-        <div className="bg-white hover:bg-slate-50 transition-colors group flex flex-col h-full rounded-md border border-slate-200 shadow-md overflow-hidden">
+        <div className="fs-visual-panel fs-visual-card-interactive group flex flex-col h-full hover:border-blue-200">
             {showLeague && match.league && (
                 <div className="px-1.5 py-0.5 bg-slate-50/80 border-b border-slate-100 flex items-center gap-1">
                     <Trophy size={8} className="text-slate-400"/>
@@ -61,7 +61,7 @@ export default function CompactMatchRow({ match: initialMatch, disablePolling = 
                     )}
                 </div>
 
-                <Link href={`/match/${match.id}`} className="flex-1 flex flex-col justify-center gap-0.5 min-w-0 pl-1.5 pr-0.5">
+                <Link href={`/match/${match.id}`} className="flex-1 flex flex-col justify-center gap-0.5 min-w-0 pl-1.5 pr-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1 min-w-0">
                             {match.home_logo ? <img src={match.home_logo} className="w-3 h-3 object-contain shrink-0" alt=""/> : <div className="w-3 h-3 bg-slate-200 rounded-full shrink-0"/>}
