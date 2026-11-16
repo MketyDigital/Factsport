@@ -99,9 +99,9 @@ BEGIN
   IF jsonb_typeof(home_roster) IS DISTINCT FROM 'array' THEN home_roster := '[]'::jsonb; END IF;
   IF jsonb_typeof(away_roster) IS DISTINCT FROM 'array' THEN away_roster := '[]'::jsonb; END IF;
   SELECT EXISTS (
-    SELECT 1 FROM jsonb_array_elements(home_roster || away_roster) AS player(row)
-    WHERE player.row ->> 'name' = NEW.player_name
-      AND player.row ->> 'is_starter' = 'true'
+    SELECT 1 FROM jsonb_array_elements(home_roster || away_roster) AS player(item)
+    WHERE player.item ->> 'name' = NEW.player_name
+      AND player.item ->> 'is_starter' = 'true'
   ) INTO valid_candidate;
   IF NOT valid_candidate THEN
     RAISE EXCEPTION 'motm_player_not_in_verified_starting_lineup' USING ERRCODE = '22023';
