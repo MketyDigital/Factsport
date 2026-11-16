@@ -29,7 +29,7 @@ test('chat and MOTM clients do not call the legacy D1-backed hostnames', () => {
   assert.match(motm, /const WORKER_URL = '\/api\/media\/motm'/);
   assert.match(chat, /NEXT_PUBLIC_FACTSPORT_MEDIA_COMMUNITY_WRITES === 'enabled'/);
   assert.match(motm, /NEXT_PUBLIC_FACTSPORT_MEDIA_COMMUNITY_WRITES === 'enabled'/);
-  assert.match(chat, /Chat posting is paused/);
+  assert.match(chat, /Guest chat is temporarily unavailable/);
   assert.match(motm, /MOTM voting is being prepared for account-free visitors/);
 });
 
