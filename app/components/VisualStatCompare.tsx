@@ -26,7 +26,7 @@ export default function VisualStatCompare({
   const a = parseVisualStat(away);
   const hasBoth = h !== null && a !== null;
   const total = hasBoth ? h + a : 0;
-  const homePercentage = hasBoth && total > 0 ? Math.max(0, Math.min(100, h / total * 100)) : 50;
+  const homePercentage = hasBoth && total > 0 ? Math.max(0, Math.min(100, h / total * 100)) : 0;
   const homeText = h === null ? '—' : String(home).trim();
   const awayText = a === null ? '—' : String(away).trim();
 
@@ -48,7 +48,7 @@ export default function VisualStatCompare({
         role="img"
         aria-label={hasBoth ? `${homeTeam}: ${homeText}; ${awayTeam}: ${awayText}` : `${label} data not fully available`}
       >
-        {hasBoth ? (
+        {hasBoth && total > 0 ? (
           <>
             <div className="h-full bg-gradient-to-r from-blue-700 to-sky-400" style={{ width: `${homePercentage}%` }} />
             <div className="h-full flex-1 bg-gradient-to-r from-rose-400 to-rose-600" />
