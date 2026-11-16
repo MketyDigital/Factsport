@@ -267,11 +267,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                             const isGoal = msg.type === 'goal';
                             return (
                                 <div key={msg.id} className="flex justify-end w-full pl-8 my-2 group">
-                                    {!isUniversallyFinished && (
-                                        <button onClick={() => setReplyTo({id: '', user: 'System', text: `${msg.time} ${msg.text}`})} className="mr-2 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500 transition active:scale-95 self-center">
-                                            <Reply size={14} />
-                                        </button>
-                                    )}
+
                                     <div className={`px-3 py-2 md:px-4 rounded-l-xl rounded-tr-xl shadow-md border text-[9px] md:text-[10px] font-black uppercase tracking-wider flex flex-col items-end gap-1 max-w-[90%] text-right leading-tight ${isGoal ? 'bg-green-600 text-white border-green-500 shadow-[0_4px_15px_rgba(34,197,94,0.3)]' : 'bg-[#0a1428] text-slate-200 border-slate-800'}`}>
                                         <div className="flex items-center gap-1.5 opacity-80 mb-0.5">
                                              <span className="text-[8px] md:text-[9px]">{msg.time}</span>
@@ -308,6 +304,11 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                                         )}
                                     </div>
                                     
+                                    {msg.reply_to_id && (
+                                        <div className="mb-1 text-[10px] text-slate-500 border-l-2 border-blue-300 pl-2">
+                                            Reply to {messages.find((item: any) => item.id === msg.reply_to_id)?.username || 'earlier message'}
+                                        </div>
+                                    )}
                                     <div className={`text-[11px] md:text-xs font-medium leading-relaxed px-3 py-2 rounded-2xl rounded-tl-sm border shadow-sm break-words ${
                                         isAlert 
                                         ? 'bg-red-50 text-red-900 border-red-200 shadow-[0_4px_15px_rgba(239,68,68,0.2)] font-bold' 
@@ -347,7 +348,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                                 Match Ended. Chat is Closed.
                             </div>
                         ) : !COMMUNITY_WRITES_ENABLED ? (
-                            <div role="status" className="w-full text-center rounded-xl bg-amber-50 border border-amber-200 py-2 px-3 text-[10px] font-bold text-amber-900">Chat posting is paused until secure PostgreSQL community identity and moderation are ready.</div>
+                            <div role="status" className="w-full text-center rounded-xl bg-amber-50 border border-amber-200 py-2 px-3 text-[10px] font-bold text-amber-900">Guest chat is temporarily unavailable.</div>
                             
                         ) : (
                             <div>
