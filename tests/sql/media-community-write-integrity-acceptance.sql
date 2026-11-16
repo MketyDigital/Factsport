@@ -8,6 +8,7 @@ DO $verify$
 DECLARE
   match_a uuid := gen_random_uuid();
   match_b uuid := gen_random_uuid();
+  match_c uuid := gen_random_uuid();
   user_a uuid := gen_random_uuid();
   user_b uuid := gen_random_uuid();
   first_message uuid;
@@ -22,7 +23,9 @@ BEGIN
     (match_a, 'M72 staging fixture', 'Test Home', 'Test Away', now() - interval '1 hour', 'LIVE',
       '{"home":[{"name":"Starter Alpha","is_starter":true},{"name":"Bench Player","is_starter":false}],"away":[{"name":"Starter Beta","is_starter":true}]}'::jsonb),
     (match_b, 'M72 staging fixture', 'Test Home B', 'Test Away B', now() - interval '30 hours', 'FT',
-      '{"home":[{"name":"Starter Alpha","is_starter":true}],"away":[]}'::jsonb);
+      '{"home":[{"name":"Starter Alpha","is_starter":true}],"away":[]}'::jsonb),
+    (match_c, 'M72 staging fixture', 'Test Home C', 'Test Away C', now() - interval '1 hour', 'LIVE',
+      '{"home":[],"away":[]}'::jsonb);
 
   -- Valid post.
   INSERT INTO public.media_match_chat_messages
@@ -50,7 +53,7 @@ BEGIN
   BEGIN
     INSERT INTO public.media_match_chat_messages
       (match_id, author_user_id, display_name, message, reply_to_id)
-    VALUES (match_b, user_b, 'Other Fan', 'Wrong match reply', first_message);
+    VALUES (match_c, user_b, 'Other Fan', 'Wrong match reply', first_message);
     RAISE EXCEPTION 'cross-match reply filter failed';
   EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
   END;
