@@ -102,3 +102,13 @@ test('frontend fast ESPN switch uses verified canonical match ID without enablin
   assert.match(page, /<MatchLiveProvider matchId=\{dbData\.id\}/);
   assert.match(label, /fetchLiveMatchDeduplicated\(espnId, matchId\)/);
 });
+
+test('frontend refuses stale database fallbacks rather than regressing live updates', () => {
+  const provider = read('app/providers/MatchLiveProvider.tsx');
+  const label = read('app/components/LiveScoreLabel.tsx');
+  assert.match(provider, /data\.stale !== true/);
+  assert.match(label, /matchData\.stale !== true/);
+  const route = read('app/api/media/live/matches/[id]/route.ts');
+  assert.match(route, /lastStoredSnapshot\(match, servedAt\)/);
+  assert.match(route, /stale: true/);
+});
