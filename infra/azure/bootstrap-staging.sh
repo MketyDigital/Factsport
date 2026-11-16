@@ -29,7 +29,19 @@ if [[ "$APPLY" == "1" ]]; then
   echo "Checking for an existing $DB_NAME database before any provisioning"
   EXISTING_SERVERS="$(az postgres flexible-server list --subscription "$SUBSCRIPTION_ID" \
     --query "[].[resourceGroup,name]" --output tsv)"
-  while IFS=az account show --query '{subscription:id,tenant:tenantId,name:name}' -o table
+  while read -r EXISTING_RG EXISTING_SERVER; do
+    [[ -n "$EXISTING_SERVER" ]] || continue
+    EXISTING_DBS="$(az postgres flexible-server db list --subscription "$SUBSCRIPTION_ID" \
+      --resource-group "$EXISTING_RG" --server-name "$EXISTING_SERVER" \
+      --query "[].name" --output tsv)"
+    if printf '%s\n' "$EXISTING_DBS" | grep -Fxq "$DB_NAME"; then
+      echo "Refusing duplicate provisioning: $DB_NAME already exists on $EXISTING_SERVER in $EXISTING_RG." >&2
+      echo "Reconcile the existing database and update its roles/migrations instead." >&2
+      exit 3
+    fi
+  done <<< "$EXISTING_SERVERS"
+fi
+az account show --query '{subscription:id,tenant:tenantId,name:name}' -o table
 echo "Target: $RG / $AZ_REGION / $PG_SERVER; Burstable Standard_B1ms, storage 32GiB, no HA, 7d backups"
 echo "This is a BILLABLE Azure Database for PostgreSQL server when APPLY=1."
 if [[ "$APPLY" != "1" ]]; then
