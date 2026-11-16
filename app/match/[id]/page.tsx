@@ -104,28 +104,20 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
     const isLive = LIVE_STATUSES.includes(status);
     const isFinished = FINISHED_STATUSES.includes(status);
     
-    let hScore = match.home_score || 0;
-    let aScore = match.away_score || 0;
-
-    if (isLive && match.espn_id) {
-        try {
-            const res = await fetch(`https://live-api.factsport.com/?espn_id=${match.espn_id}`, { next: { revalidate: 3 } });
-            if (res.ok) {
-                const liveData = await res.json();
-                if (!liveData.error) {
-                    hScore = liveData.home_score;
-                    aScore = liveData.away_score;
-                }
-            }
-        } catch (e) {}
-    }
+    // Never contact the archived D1-capable external live Worker from V2.
+    // SEO metadata uses the canonical PostgreSQL snapshot until a verified,
+    // internally cached fast-read projection is available for server rendering.
+    // Unknown scores stay unknown rather than being published as 0–0.
+    const hScore: number | null = typeof match.home_score === 'number' ? match.home_score : null;
+    const aScore: number | null = typeof match.away_score === 'number' ? match.away_score : null;
+    const scoreText = `${hScore ?? '–'}-${aScore ?? '–'}`;
 
     let title = `${match.home_team} vs ${match.away_team} Predictions, H2H & Live Score | FactSport`;
     let description = `View match details, team form, starting lineups and live updates for ${match.home_team} vs ${match.away_team} in the ${match.league}.`;
     let label = 'UPCOMING MATCH';
 
     if (isLive) {
-        title = `🔴 LIVE: ${match.home_team} ${hScore}-${aScore} ${match.away_team}`;
+        title = `🔴 LIVE: ${match.home_team} ${scoreText} ${match.away_team}`;
         description = `Follow the live score, minute-by-minute text commentary, and live match stats for ${match.home_team} vs ${match.away_team}.`;
         label = 'LIVE MATCH UPDATE';
     } else if (isFinished) {
@@ -140,8 +132,8 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
         away: match.away_team,
         homeLogo: match.home_logo,
         awayLogo: match.away_logo,
-        hScore: isLive || isFinished ? hScore : undefined,
-        aScore: isLive || isFinished ? aScore : undefined,
+        hScore: isLive || isFinished ? hScore ?? undefined : undefined,
+        aScore: isLive || isFinished ? aScore ?? undefined : undefined,
         label: label,
         homeTla: match.home_team?.substring(0, 3).toUpperCase(),
         awayTla: match.away_team?.substring(0, 3).toUpperCase()
