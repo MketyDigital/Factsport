@@ -393,4 +393,4 @@ The current branch's latest protected staging run (`43871889138`, HEAD `64b5d75a
 
 ### M77 status reconciliation — 2026-11-16
 
-The current V2 completion and non-use inventory is recorded in [M77](./handoffs/M77-CURRENT-STATE-AND-CUTOVER-READINESS.md). Exact Cloudflare tool pins now pass local engine/type/build and a prebuilt dry run, but protected staging has not yet passed at the updated commit. Customer Entra External ID is selected but not provisioned; Logic Apps remains a disabled template/adapter, not a live integration. No P0–P9 exit gate or production cutover is complete.
+The current V2 completion and non-use inventory is recorded in [M77](./handoffs/M77-CURRENT-STATE-AND-CUTOVER-READINESS.md). Exact Cloudflare tool pins passed isolated verification (43888295007), native Worker build (43888295073), and protected app staging (43888294900), including DB/R2, `/matches`, pagination, cache and access-isolation probes. Customer Entra External ID is selected but not provisioned; Logic Apps remains a disabled template/adapter, not a live integration. No P0–P9 exit gate or production cutover is complete.

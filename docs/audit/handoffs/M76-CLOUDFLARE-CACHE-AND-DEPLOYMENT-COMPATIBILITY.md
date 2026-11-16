@@ -3,7 +3,7 @@
 Date: 2026-11-16  
 Branch: `refactor/factsport-v2`  
 Baseline HEAD: `64b5d75ab2227748264d1e0f1fd9f10ae1340bd1`  
-Status: cache source changes and the Cloudflare output compatibility fix are locally verified; protected staging must still pass before release. **Not production-ready.**
+Status: cache source changes and Cloudflare output compatibility fix are verified locally and in protected app staging; **not production-ready** because full product and release acceptance remain open.
 
 ## 1. Scope and owner constraints
 
@@ -24,7 +24,7 @@ Continue the V2 audit from the actual refactor branch. Preserve the existing sep
 4. `tests/vinext-cache-config.test.cjs` asserts the cache adapter and typed Worker configuration stay connected.
 5. `tests/external-rewrite-security.test.cjs` prevents reintroducing the external rewrite.
 
-The source edits are committed locally. Branch delivery is being performed through the authenticated GitHub connection because this workspace has no command-line Git credentials. No migrations, secrets, routes, database, billing, domains or production resources were changed.
+The cache source edits did not change migrations, database, billing, domains or production resources. The later package-pin commit deployed the separate protected staging Worker with a temporary staging-only access secret; it did not change production.
 
 ## 4. Verification performed
 
@@ -39,11 +39,11 @@ The source edits are committed locally. Branch delivery is being performed throu
 
 The failure was caused by the open prerelease range `^2.0.0-beta.v.11` resolving to Vite plugin `2.0.0-rc.0`, which emitted output v1, while `cf@1.0.0-beta.32` expects `.cloudflare/output/v0`. Pinning the known-compatible `2.0.0-beta.v.17` makes the build output match the CLI. The local CLI prebuilt production-mode dry-run confirms that it can read the generated output and bindings; it does not upload or deploy.
 
-The workflow should now be rerun at the updated commit. Do not bypass its output guard or interpret the local dry-run as staging acceptance.
+The workflow rerun passed at the updated commit; the earlier output guard was not bypassed. The protected app staging checks are now accepted for this narrow slice only, not as complete product or production acceptance.
 
 ## 6. Remaining release blockers
 
-- Resolve the Cloudflare CLI/Vite plugin Build Output compatibility with a supported package combination and prove it with a dry run, then run the existing protected staging workflow.
+- No further output-format blocker is known after the exact pin and successful protected staging run; keep the guard and pins in place.
 - Review staging SQL/role acceptance and migrations 0044–0048; those migrations and anonymous chat/MOTM/ratings role tests have not been applied or executed.
 - Complete Media/browser accessibility and responsive acceptance, ESPN live/FT reconciliation, Stream.io real-room/webhook proof, CMS/social providers, identity and prediction/settlement parity, dependency/security review, load and rollback rehearsal.
 - Verify actual AdSense site readiness and publisher approval. Repository policy/source gates do not imply AdSense approval.
@@ -51,6 +51,5 @@ The workflow should now be rerun at the updated commit. Do not bypass its output
 
 ## 7. Next actions
 
-1. Run isolated verification and protected staging at the package-pin commit. Confirm workflow install resolves the exact pinned tools.
-2. Verify the staging deployment and HTTP acceptance checks: unauthenticated denials, Hyperdrive/R2 health, initial `/matches`, keyset pagination and cache isolation.
-3. Continue the existing database, product parity, identity, security, AdSense and production execution plan. Do not interpret this handoff as production go/no-go.
+1. **Completed:** isolated verification `43888295007`, native Worker build `43888295073`, and protected app staging `43888294900` passed on package-pin commit `0980fc374168627a7e49e3bb113aca10f4602834`. The staging workflow confirmed unauthorized 404 denials, authorized Hyperdrive and R2 readiness, `/matches` initial render, populated PostgreSQL-backed fixtures, stable keyset pagination, private/no-store response and cache/auth isolation.
+2. Continue the existing database, product parity, identity, security, AdSense and production execution plan. This narrow staging run is not production go/no-go.

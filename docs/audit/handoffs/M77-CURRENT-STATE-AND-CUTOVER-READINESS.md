@@ -7,23 +7,23 @@ Purpose: reconcile the plans, roadmap, migration and product matrices, handoffs,
 
 ## Executive state
 
-V2 is an active refactor with meaningful verified source and a narrow historic staging slice. It is not a complete replacement for the current product, and it is not production-ready. Source presence, compilation, or a health endpoint does not mean that customer journeys, provider provisioning, data migrations, or operational acceptance are complete.
+V2 is an active refactor with meaningful verified source and a narrow protected staging acceptance slice. It is not a complete replacement for the current product, and it is not production-ready. Source presence, compilation, or a health endpoint does not mean that customer journeys, provider provisioning, data migrations, or operational acceptance are complete.
 
-The current immediate technical blocker from M76 is resolved locally: exact package pins produce the Cloudflare Build Output format consumed by `cf`. Local engine checks, TypeScript, Worker build, and prebuilt dry-run pass. The updated branch still needs its protected staging workflow and runtime acceptance before this fix is accepted remotely.
+The current immediate technical blocker from M76 is resolved locally: exact package pins produce the Cloudflare Build Output format consumed by `cf`. Local engine checks, TypeScript, Worker build, and prebuilt dry-run pass. The updated branch passed isolated verification (`43888295007`), native Worker build (`43888295073`) and protected app staging (`43888294900`). The protected staging workflow passed its intended access denial, Hyperdrive/R2 health, PostgreSQL `/matches` render, keyset pagination and cache/auth-isolation checks.
 
 ## Completed or implemented, with evidence boundaries
 
 | Area | Implemented / verified | Boundary still applying |
 |---|---|---|
 | Cloudflare/Vinext | ISR adapter uses Workers Cache; typed Worker cache configuration; unsafe unused Cloudinary credential-forwarding rewrite removed. Plugin and CLI pinned to `2.0.0-beta.v.17` and `1.0.0-beta.32`. | Exact pinned local build emits `v0`; `cf deploy --prebuilt --mode production --dry-run` reads 131 assets and staging bindings, exits before upload. Not a remote staging deploy. Whole dependency graph is not locked. |
-| Local code gates | Engine suite: 275/275. TypeScript: pass after removing build-generated Cloudflare declarations. Vinext Worker build: pass. | Current branch commit still needs isolated and protected GitHub Actions; full lint, browser, security, load and provider tests remain. |
+| Local and branch CI gates | Engine suite: 275/275. TypeScript: pass after removing build-generated Cloudflare declarations. Vinext Worker build: pass. Isolated verification `43888295007`, native Worker build `43888295073` and protected staging `43888294900` succeeded on commit `0980fc374168627a7e49e3bb113aca10f4602834`. | Full lint, browser, security, load and provider tests remain. |
 | Database foundation | Earlier release evidence records Azure PostgreSQL database `factsport_v2`, restricted reader/schedule/ESPN writer roles and Cloudflare Hyperdrives; migration CI covers the repository chain. | These are historical slices. Reconcile the actual staging migration versions, role grants, restore point and current Worker bindings before further staging writes. Migrations 0044–0048 are not accepted/applied in the evidence reviewed. |
 | Matches | A prior protected staging run accepted PostgreSQL-backed `/matches` and its bounded API path, with deny-by-default and cache/auth isolation checks. Schedule and ESPN ingestion/reconciliation source/jobs exist. | Not full match-centre parity. Exact legacy deployed fast-score/chat/MOTM worker source was missing at M69; 3-second viewer path, full match lifecycle, conditional provider fallback, current staging status and provider accuracy remain open. |
 | Media/editorial | Many CMS, media, rights/provenance, derivatives, Stream upload/room, social outbox/adapters, live center, ratings and visual changes exist in source and handoffs M35–M75. | Migrations, provider credentials, real Stream rooms/webhooks, private social deliveries, editorial workflow/RBAC, browser/mobile/accessibility, match-centre parity and production evidence remain incomplete. Do not promote source-only milestones to complete runtime features. |
 | Public predictions | Migration 0003 and later scoped submit-function/API work add anonymous secure submission boundaries, participant cookie, email on submission, optional unticked marketing consent, host gate and feature flag. | Feature stays off. Public reads/history/leaderboard, account claim, campaign/bonus, official score settlement, audit/monthly rules, VIP/payment, real dedicated role/binding, migration acceptance and browser E2E remain open. |
 | Customer identity | Identity interfaces/mapping groundwork and a separate Entra adapter for Media editors exist. | Per latest owner direction, customer user sign-in is Entra External ID in a customer external tenant. Tenant, application registrations, runtime secrets, callbacks, session/account/recovery journeys and real staging tests do not exist in reviewed evidence. Media editor identity is not customer auth. |
 | Azure Logic Apps | Disabled-by-default workflow template and Logic Apps/APIM adapter seam exist for approved Buffer/Make-style distribution. | No Logic App, APIM connection, role/identity/secrets, provider credentials, schedule, monitored run or delivery/reconciliation E2E is provisioned. Facebook and Telegram remain direct integrations. |
-| Staging operations | Historical Cloudflare protected staging Worker, R2 and narrow health/runtime proofs exist. | Current branch head after tool pins needs protected deploy and probes. Full migration, restore, alerting, logs, rollback, cost and workload acceptance remain open. |
+| Staging operations | Protected `factsport-v2-staging` Worker deployed on commit `0980fc374168627a7e49e3bb113aca10f4602834`. Workflow checked unauthorized 404 for `/`, `/api/matches`, `/admin`, `/matches`; authorized Hyperdrive+R2 health; initial `/matches` page; populated PostgreSQL fixtures; timestamp+UUID pagination; private/no-store and auth/cache isolation. | This is narrow app staging acceptance. Full migration, restore, alerting, logs, rollback, cost, workload and all product journeys remain open. |
 
 See the master `ROADMAP.md`, `PRODUCTION-EXECUTION-PLAN.md`, `PAGE-MIGRATION-MATRIX.md`, `ROUTE-MIGRATION-MATRIX.md`, `COMPONENT-MIGRATION-MATRIX.md`, `DB-003-functions-and-cron.md`, AUTH-004/AUTH-005, and M44–M76 for per-feature source and acceptance evidence. P0–P9 remain the ordered release gates.
 
@@ -57,14 +57,14 @@ See the master `ROADMAP.md`, `PRODUCTION-EXECUTION-PLAN.md`, `PAGE-MIGRATION-MAT
 
 ## Exact next gates
 
-1. Deliver the exact package pins/docs to `refactor/factsport-v2` and run current-head isolated Actions. Run protected staging workflow and inspect both deployment result and HTTP probes; local dry run is not staging proof.
-2. Read-only reconcile Azure and Cloudflare staging resources and migration state. Apply only owner-approved migrations to isolated staging; validate roles, rollback, backups and restore. Keep all user-facing feature flags disabled until their gates pass.
-3. Finish the customer Entra External ID implementation/provisioning and the Prediction, Media, match-centre, community, job and provider journeys in their ordered roadmap sequence.
+1. **Completed:** package pins delivered to `refactor/factsport-v2`; isolated verification, native Worker build and protected app staging passed at commit `0980fc374168627a7e49e3bb113aca10f4602834`.
+2. Read-only reconcile Azure and Cloudflare staging resources and migration state. Apply only owner-approved migrations to isolated staging; validate roles, rollback, backups and restore. Keep unaccepted capability flags—especially Prediction, identity, community and media write/provider paths—disabled until their gates pass.
+3. Finish customer Entra External ID implementation/provisioning and the Prediction, Media, match-centre, community, job and provider journeys in roadmap order.
 4. Complete browser/mobile parity, accessibility, SEO/consent, privacy, adversarial/security, dependency, load, observability, backup/restore, and rollback evidence.
-5. Complete shadow comparisons and a full real match + user-account + payment/VIP/prize lifecycle rehearsal. Resolve all open policy/data obligations and secure explicit written owner go/no-go.
-6. Only after P0–P9 pass, deploy the production Worker with production-specific bindings/secrets, rehearse canary and rollback, then perform the approved DNS/route cutover. Preserve legacy system/backups until stable acceptance.
+5. Complete shadow comparisons and full match + account + payment/VIP/prize lifecycle rehearsal. Resolve open policy/data obligations and secure explicit written owner go/no-go.
+6. Only after P0–P9 pass, deploy the production Worker with production-specific bindings/secrets, rehearse canary and rollback, then perform approved DNS/route cutover. Preserve legacy system/backups until stable acceptance.
 
 ## Current no-go
 
-**Staging:** pending updated protected workflow and runtime probes.  
+**Staging:** narrow protected app deployment and probes pass on commit `0980fc374168627a7e49e3bb113aca10f4602834`; all broader acceptance remains open.  
 **Production:** no-go. P0–P9 gates remain open; no production Worker deploy, DNS change, legacy shutdown, production data write or cutover is claimed or authorized by this status report.
