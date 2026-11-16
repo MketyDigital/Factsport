@@ -6,7 +6,7 @@ import { fetchLiveMatchDeduplicated } from '@/app/utils/liveFetcher';
 
 const MatchLiveContext = createContext<any>(null);
 
-export function MatchLiveProvider({ espnId, initialData, children }: { espnId: string | null, initialData: any, children: React.ReactNode }) {
+export function MatchLiveProvider({ matchId, espnId, initialData, children }: { matchId?: string | null, espnId: string | null, initialData: any, children: React.ReactNode }) {
     const [liveData, setLiveData] = useState(initialData);
     const isFetching = useRef(false);
     
@@ -20,7 +20,7 @@ export function MatchLiveProvider({ espnId, initialData, children }: { espnId: s
         isFetching.current = true;
         try {
             // 🟢 USES THE GLOBAL DEDUPLICATOR
-            const data = await fetchLiveMatchDeduplicated(espnId);
+            const data = await fetchLiveMatchDeduplicated(espnId, matchId);
             
             if (data && !data.error) {
                 setLiveData((prev: any) => {
