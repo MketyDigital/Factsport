@@ -59,7 +59,7 @@ export default function StatsLineupsTabs({ matchId, dbData }: { matchId: string,
                     <VisualStatCompare label="Fouls" home={stats?.home?.fouls} away={stats?.away?.fouls} homeTeam={homeTeam} awayTeam={awayTeam} />
                     <VisualStatCompare label="Saves" home={stats?.home?.saves} away={stats?.away?.saves} homeTeam={homeTeam} awayTeam={awayTeam} />
                 </>}
-                <MatchTimeline events={events} />
+                <div className="col-span-full"><MatchTimeline events={events} /></div>
             </div>
         )}
         {activeTab === 'lineups' && (
