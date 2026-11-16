@@ -100,6 +100,8 @@ test('Media chat and MOTM allow visitors without an account and never trust loca
   assert.match(motm, /NEXT_PUBLIC_FACTSPORT_MEDIA_COMMUNITY_WRITES === 'enabled'/);
   assert.match(motm, /\/api\/media\/motm\/state\?matchId=/);
   assert.match(motm, /voteStateReady/);
+  assert.match(motm, /Voting opens at kickoff/);
+  assert.match(motm, /hoursSinceKickoff < 0/);
   assert.doesNotMatch(motm, /localStorage|useAuth\(|supabase\/client|D1Database/);
 });
 
