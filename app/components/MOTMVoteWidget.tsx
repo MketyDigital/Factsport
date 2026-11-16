@@ -98,6 +98,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
             
             {!COMMUNITY_VOTING_ENABLED && <p role="status" className="mb-2 text-center text-[10px] font-bold text-amber-300">MOTM voting is being prepared for account-free visitors; results remain available when enabled.</p>}
             {voteError && <p role="alert" className="mb-2 text-center text-[10px] text-red-300">{voteError}</p>}
+            {COMMUNITY_VOTING_ENABLED && !hasVoted && <p className="mb-1 text-center text-[10px] text-slate-300">No account or email needed. One vote per visitor cookie, with bot and network protections.</p>}
             {COMMUNITY_VOTING_ENABLED && !hasVoted && !isVotingClosed && (
                 COMMUNITY_TURNSTILE_SITE_KEY ? (
                     <Turnstile ref={turnstileRef} siteKey={COMMUNITY_TURNSTILE_SITE_KEY}
