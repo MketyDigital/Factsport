@@ -19,13 +19,13 @@ export default function StatsLineupsTabs({ matchId, dbData }: { matchId: string,
   const getSafeShots = (teamStats: any): number | null => {
     if (!teamStats) return null;
     const direct = teamStats.shots;
-    if (direct !== null && direct !== undefined && /^\\d+$/.test(String(direct).trim())) {
+    if (direct !== null && direct !== undefined && /^\d+$/.test(String(direct).trim())) {
       return Number(direct);
     }
     const on = teamStats.shotsOnTarget ?? teamStats.shots_on_target;
     const off = teamStats.shotsOffTarget ?? teamStats.shots_off_target;
     if (on === null || on === undefined || off === null || off === undefined) return null;
-    if (!/^\\d+$/.test(String(on).trim()) || !/^\\d+$/.test(String(off).trim())) return null;
+    if (!/^\d+$/.test(String(on).trim()) || !/^\d+$/.test(String(off).trim())) return null;
     return Number(on) + Number(off);
   };
 
