@@ -83,3 +83,15 @@ test('standings shares reuse existing 1200x630 OG renderer with controlled leagu
   assert.match(og, /parsedData\.type === 'versus'/);
   assert.match(og, /parsedData\.type === 'pitch'/);
 });
+
+
+test('existing 2D pitch gains gentle depth without losing starters or substitutes', () => {
+  const pitch = read('app/components/PitchLineup.tsx');
+  assert.match(pitch, /starting eleven pitch/);
+  assert.match(pitch, /fs-visual-card-interactive/);
+  assert.match(pitch, /bench\.map/);
+  assert.match(pitch, /starters = lineups\[activeTab\]\.filter/);
+  assert.match(pitch, /formationArray/);
+  assert.match(pitch, /role="group"/);
+  assert.doesNotMatch(pitch, /cursor-pointer animate-in zoom-in/);
+});
