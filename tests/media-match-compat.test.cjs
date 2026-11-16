@@ -34,5 +34,13 @@ test('V2 Media match projection preserves legacy playback and live frontend fiel
   assert.match(playback, /safePlaybackUrl/);
   assert.match(matchWidget, /getPostgresMatchById/);
   assert.match(matchPin, /getPostgresMatchById/);
-  assert.doesNotMatch(reader, /pro_analysis|prediction|settlement/i);
+  // Media may expose a public predictor percentage, but this reader must
+  // never depend on VIP analysis, Prediction participant state or settlement.
+  assert.doesNotMatch(reader, /pro_analysis|settlement|prediction_participant|prediction_entries/i);
+  const matchProjection = reader.slice(
+    reader.indexOf('export async function getPostgresMatchById'),
+    reader.indexOf('export async function getPostgresMatchPlaybackById'),
+  );
+  assert.match(matchProjection, /m\.predictor/);
+  assert.doesNotMatch(matchProjection, /pro_analysis|settlement|prediction_participant/i);
 });
