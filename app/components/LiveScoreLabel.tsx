@@ -32,7 +32,7 @@ export default function LiveScoreLabel({
       isFetching.current = true;
 
       try {
-          const matchData = await fetchLiveMatchDeduplicated(espnId);
+          const matchData = await fetchLiveMatchDeduplicated(espnId, matchId);
           
           if (matchData && !matchData.error) {
               hasFetchedLive.current = true; 
