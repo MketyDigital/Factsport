@@ -74,3 +74,13 @@ GitHub full application staging run `43870292345` **passed engine tests, TypeScr
 The next source fix removed `--prebuilt` from the protected staging workflow and used the documented `cf deploy --mode production --secrets-file /tmp/factsport-staging-secrets.json` so cf performs the supported build-and-deploy flow with a single temporary staging access secret. Commit `abfcaab2773a92f43d1df5a20b05514595a61e98`. Official current documentation: https://developers.cloudflare.com/cf/projects/ and https://vinext.dev/docs/deploying/cloudflare.
 
 **This workflow is not proven fixed until the latest GitHub staging run completes successfully**, including deny-by-default path checks. No production routes, DNS, D1 or billing settings were modified.
+
+## 8. Final protected staging evidence (do not claim staging pass)
+
+GitHub protected staging run `43871102395` on `abfcaab2` also **failed** after tests, TypeScript and Vinext build had completed. Removing `--prebuilt` was insufficient: `cf deploy --mode production --secrets-file` still expected `.cloudflare/output/v0/config.json` while `vite build` generates `.cloudflare/output/v1`. The temporary secret was kept in the CI environment and the deployment did not reach the HTTP deny-by-default check. **Do not claim staging deployment, public page/browser acceptance or activation.**
+
+The correct next engineering action is a compatibility-focused Cloudflare CLI/Vite plugin/Vinext package investigation using supported matched releases and an isolated `cf deploy --dry-run` before any protected deploy. Do not symlink v1 output into v0 or blindly fabricate config. Source docs: https://developers.cloudflare.com/cf/projects/ and https://vinext.dev/docs/deploying/cloudflare. Commit of the failed attempt: `abfcaab2773a92f43d1df5a20b05514595a61e98`.
+
+Latest isolated source CI at documentation commit `b6186b637a019fee351f92167f9bdc66b5e73a36` succeeded in workflow `43871256189`. The last directly observed native Vinext build success on ratings code was at `5508ff9aacbd3584e4b81271c0d563a9c5b07b8f`, workflow `43870292428`. Later docs/workflow commits do not change application source; this does not prove any future migration or Cloudflare deploy.
+
+Focused browser-component source scan included `FanZoneChat`, `MOTMVoteWidget`, `PlayerRatingsWidget`, `ScoreAxisWidget`, `MatchRow`, `MatchHeaderClient`, `HeroMatchCards`, `CompactMatchRow`, `MatchMobileHub`, `LiveScoreLabel`, `HomeDashboardClient`, `LiveMediaClient`; no hardcoded legacy D1 Worker hostnames in those files. This is a **focused** scan, not a claim of exhaustive branch-wide verification.
