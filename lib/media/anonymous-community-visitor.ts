@@ -118,3 +118,24 @@ export async function existingAnonymousMediaTokenHash(request: Request): Promise
     return null;
   }
 }
+
+/**
+ * Bootstrap a returning or new anonymous session on a same-origin GET before
+ * accepting voting. This avoids two tabs independently minting visitor IDs
+ * during simultaneous first votes. A cookie is not proof of one human.
+ */
+export async function ensureAnonymousMediaSession(request: Request) {
+  const existing = await existingAnonymousMediaTokenHash(request);
+  if (existing) return { tokenHash: existing };
+  const url = new URL(request.url);
+  if (!['https:', 'http:'].includes(url.protocol)) throw new Error('Invalid session origin');
+  const nonce = base64url(crypto.getRandomValues(new Uint8Array(32)));
+  const mac = await signature(nonce);
+  const name = url.protocol === 'https:' ? COOKIE_NAME : DEV_COOKIE_NAME;
+  return {
+    tokenHash: await sha256('factsport-media-v1:' + nonce),
+    setCookie: name + '=' + nonce + '.' + mac +
+      '; Path=/; HttpOnly; SameSite=Lax; Max-Age=15552000' +
+      (url.protocol === 'https:' ? '; Secure' : ''),
+  };
+}
