@@ -66,3 +66,11 @@ The original external rating Worker source/config has **not** been verified in t
 ## 6. Rollback / no-production affirmation
 
 Individual source commits can be reverted safely on V2. **M75 migration is not applied**; eventual DB rollback after live votes requires a separate retention-safe strategy, not DROP TABLE. The historical owner-uploaded D1 scripts remain reference-only. No production D1, database writes, DNS, paid Cloudflare Stream, billing, ad activation, or production deployment was intentionally performed during M75 remediation. Protected staging workflow may auto-run from branch pushes and is tracked separately; not evidence of production deployment.
+
+## 7. Protected Cloudflare staging deployment failure diagnosed
+
+GitHub full application staging run `43870292345` **passed engine tests, TypeScript and Vinext build**, then failed during its deploy step. Exact error: `Build Output Specification: no root config found at .cloudflare/output/v0/config.json`. The Vinext Vite build produced `.cloudflare/output/v1/` but `cf deploy --prebuilt` expected v0. This is a **staging pipeline/build-output mismatch**, not evidence that the Cloudflare API token or Cloudflare 2FA is invalid.
+
+The next source fix removed `--prebuilt` from the protected staging workflow and used the documented `cf deploy --mode production --secrets-file /tmp/factsport-staging-secrets.json` so cf performs the supported build-and-deploy flow with a single temporary staging access secret. Commit `abfcaab2773a92f43d1df5a20b05514595a61e98`. Official current documentation: https://developers.cloudflare.com/cf/projects/ and https://vinext.dev/docs/deploying/cloudflare.
+
+**This workflow is not proven fixed until the latest GitHub staging run completes successfully**, including deny-by-default path checks. No production routes, DNS, D1 or billing settings were modified.
