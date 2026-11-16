@@ -59,7 +59,7 @@ export default function PitchLineup({ data, dbData }: { data: any, dbData: any }
 
             <div className="p-4 bg-[#F0F2F5]">
                 {/* 🟢 THE 2D PITCH */}
-                <div className="relative w-full aspect-[3/4] max-w-md mx-auto bg-[#2E8B57] rounded-xl overflow-hidden border-2 border-white/40 shadow-inner">
+                <div className="relative w-full aspect-[3/4] max-w-md mx-auto bg-[linear-gradient(160deg,#247a4d,#145c3d)] rounded-2xl overflow-hidden border-4 border-white/70 shadow-[0_15px_28px_rgba(15,52,35,0.22)]" role="group" aria-label={`${activeTab === 'home' ? homeTeamName : awayTeamName} starting eleven pitch`}>
                     
                     {/* Pitch Markings (CSS Drawn) */}
                     <div className="absolute top-0 left-0 w-full h-full opacity-40 pointer-events-none flex flex-col">
@@ -89,8 +89,8 @@ export default function PitchLineup({ data, dbData }: { data: any, dbData: any }
                                 {row.map((player: any, pIndex: number) => {
                                     if (!player) return null;
                                     return (
-                                        <div key={pIndex} className="flex flex-col items-center group cursor-pointer animate-in zoom-in duration-500" style={{ animationDelay: `${rowIndex * 100}ms` }}>
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-black shadow-[0_4px_10px_rgba(0,0,0,0.5)] border-2 border-white/20 mb-1 ${activeColor} group-hover:scale-110 transition-transform`}>
+                                        <div key={pIndex} className="flex flex-col items-center group" aria-label={`${player.name}, number ${player.number || 'unknown'}`}>
+                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-[11px] font-black shadow-[0_7px_10px_rgba(0,0,0,0.35)] ring-2 ring-white/80 border border-white/30 mb-1 ${activeColor} fs-visual-card-interactive`}>
                                                 {player.number || <Shield size={12}/>}
                                             </div>
                                             <span className="text-[8px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded shadow-sm text-center max-w-[60px] truncate border border-white/10 backdrop-blur-sm">
