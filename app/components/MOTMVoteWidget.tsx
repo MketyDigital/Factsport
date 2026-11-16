@@ -1,11 +1,14 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Turnstile } from '@marsidev/react-turnstile';
+import type { TurnstileInstance } from '@marsidev/react-turnstile';
 import { Star, CheckCircle, Lock } from 'lucide-react';
 import { useMatchLive } from '@/app/providers/MatchLiveProvider';
 
 // No D1 writes on V2. Enable only after authenticated PostgreSQL voter
 // identity, match window and candidate validation are ready.
 const COMMUNITY_VOTING_ENABLED = process.env.NEXT_PUBLIC_FACTSPORT_MEDIA_COMMUNITY_WRITES === 'enabled';
+const COMMUNITY_TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_FACTSPORT_MEDIA_TURNSTILE_SITE_KEY || '';
 
 export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, lineups: any }) {
     const [hasVoted, setHasVoted] = useState(false);
@@ -14,6 +17,8 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
     const [isVoting, setIsVoting] = useState(false);
     const [voteError, setVoteError] = useState<string | null>(null);
     const [voteStateReady, setVoteStateReady] = useState(false);
+    const [turnstileToken, setTurnstileToken] = useState('');
+    const turnstileRef = useRef<TurnstileInstance | null>(null);
 
     const liveData = useMatchLive();
     
@@ -62,7 +67,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
     };
 
     const handleVote = async () => {
-        if (!COMMUNITY_VOTING_ENABLED || !voteStateReady || !selectedPlayer || hasVoted || isVoting || isVotingClosed) return;
+        if (!COMMUNITY_VOTING_ENABLED || !turnstileToken || !voteStateReady || !selectedPlayer || hasVoted || isVoting || isVotingClosed) return;
         setVoteError(null);
         setIsVoting(true);
         try {
@@ -70,7 +75,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ matchId, playerName: selectedPlayer })
+                body: JSON.stringify({ matchId, playerName: selectedPlayer, turnstileToken })
             });
             if (!response.ok) throw new Error('MOTM vote was not accepted.');
             // Cookie-backed PostgreSQL vote uniqueness is the authority.
@@ -79,6 +84,8 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
         } catch {
             setVoteError('Your vote was not recorded. Please try again.');
         } finally {
+            turnstileRef.current?.reset();
+            setTurnstileToken('');
             setIsVoting(false);
         }
     };
@@ -91,6 +98,13 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
             
             {!COMMUNITY_VOTING_ENABLED && <p role="status" className="mb-2 text-center text-[10px] font-bold text-amber-300">MOTM voting is being prepared for account-free visitors; results remain available when enabled.</p>}
             {voteError && <p role="alert" className="mb-2 text-center text-[10px] text-red-300">{voteError}</p>}
+            {COMMUNITY_VOTING_ENABLED && !hasVoted && !isVotingClosed && (
+                COMMUNITY_TURNSTILE_SITE_KEY ? (
+                    <Turnstile ref={turnstileRef} siteKey={COMMUNITY_TURNSTILE_SITE_KEY}
+                        options={{ action: 'media-motm' }}
+                        onSuccess={setTurnstileToken} onExpire={() => setTurnstileToken('')} />
+                ) : <p className="text-[10px] text-amber-300">Visitor verification is not configured.</p>
+            )}
             {!hasVoted && !isVotingClosed ? (
                 <div className="relative z-10 flex items-center justify-between gap-2 w-full">
                     <div className="flex items-center gap-1 shrink-0">
@@ -112,7 +126,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
                     
                     <button 
                         onClick={handleVote}
-                        disabled={!COMMUNITY_VOTING_ENABLED || !voteStateReady || !selectedPlayer || hasVoted || isVoting || isVotingClosed}
+                        disabled={!COMMUNITY_VOTING_ENABLED || !COMMUNITY_TURNSTILE_SITE_KEY || !turnstileToken || !voteStateReady || !selectedPlayer || hasVoted || isVoting || isVotingClosed}
                         className="bg-yellow-500 hover:bg-yellow-400 text-black font-black text-[9px] uppercase tracking-widest px-3 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed h-6 shrink-0 flex items-center justify-center"
                     >
                         {isVoting ? '...' : 'Vote'}
