@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Send, MessageCircle, ShieldAlert, Zap, Reply, X, ArrowDown, Pin, Settings, Megaphone } from 'lucide-react';
 import Link from 'next/link';
+import { Turnstile } from '@marsidev/react-turnstile';
+import type { TurnstileInstance } from '@marsidev/react-turnstile';
 
 
 import { useSmartInterval } from '@/app/hooks/useSmartInterval';
@@ -16,6 +18,7 @@ const ADMIN_EMAILS = [
 // V2 community writes are fail-closed until authenticated PostgreSQL
 // identity, moderation and rate limiting are fully verified.
 const COMMUNITY_WRITES_ENABLED = process.env.NEXT_PUBLIC_FACTSPORT_MEDIA_COMMUNITY_WRITES === 'enabled';
+const COMMUNITY_TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_FACTSPORT_MEDIA_TURNSTILE_SITE_KEY || '';
 
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
 
@@ -24,6 +27,8 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
     const [newMessage, setNewMessage] = useState("");
     const [isSending, setIsSending] = useState(false);
     const [submissionError, setSubmissionError] = useState<string | null>(null);
+    const [turnstileToken, setTurnstileToken] = useState('');
+    const turnstileRef = useRef<TurnstileInstance | null>(null);
     const [replyTo, setReplyTo] = useState<{id: string, user: string, text: string} | null>(null);
     const [showScrollBottom, setShowScrollBottom] = useState(false);
     // Anonymous Media participants never need fan, editor or Prediction accounts.
@@ -133,7 +138,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         let messageText = newMessage.trim();
-        if (!COMMUNITY_WRITES_ENABLED || !messageText || isSending) return;
+        if (!COMMUNITY_WRITES_ENABLED || !turnstileToken || !messageText || isSending) return;
 
         {
             const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/i;
@@ -176,7 +181,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ match_id: matchId, message: tempMsg.message, reply_to_id: replyTo?.id || null })
+                body: JSON.stringify({ match_id: matchId, message: tempMsg.message, reply_to_id: replyTo?.id || null, turnstileToken })
             });
             if (!response.ok) throw new Error('Message was not accepted.');
             setLastMsgTime(Date.now());
@@ -186,6 +191,8 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
             setNewMessage(messageText);
             setSubmissionError('Your message was not posted. Please try again.');
         } finally {
+            turnstileRef.current?.reset();
+            setTurnstileToken('');
             setIsSending(false);
         }
     };
@@ -353,6 +360,11 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                         ) : (
                             <div>
                             {submissionError && <p role="alert" className="mb-2 text-xs text-red-700">{submissionError}</p>}
+                            {COMMUNITY_TURNSTILE_SITE_KEY ? (
+                                <Turnstile ref={turnstileRef} siteKey={COMMUNITY_TURNSTILE_SITE_KEY}
+                                    options={{ action: 'media-chat' }}
+                                    onSuccess={setTurnstileToken} onExpire={() => setTurnstileToken('')} />
+                            ) : <p role="status" className="text-xs text-amber-700">Visitor verification is not configured.</p>}
                             <form onSubmit={handleSendMessage} className="relative flex items-center">
                                 <input 
                                     type="text" 
@@ -362,7 +374,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                                     className="w-full border rounded-full pl-4 pr-12 py-2 md:py-2.5 text-xs font-medium bg-[#F0F2F5] border-slate-200" 
                                     maxLength={200} 
                                 />
-                                <button type="submit" disabled={!newMessage.trim() || isSending} className="absolute right-1 p-1.5 text-white rounded-full disabled:opacity-50 bg-blue-600">
+                                <button type="submit" disabled={!COMMUNITY_TURNSTILE_SITE_KEY || !turnstileToken || !newMessage.trim() || isSending} className="absolute right-1 p-1.5 text-white rounded-full disabled:opacity-50 bg-blue-600">
                                     <Send size={14} />
                                 </button>
                             </form>
