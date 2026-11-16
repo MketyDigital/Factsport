@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { BarChart2, Users } from 'lucide-react';
 import PitchLineup from './PitchLineup';
+import VisualStatCompare from './VisualStatCompare';
 import MatchTimeline from './MatchTimeline';
 import PlayerRatingsWidget from './PlayerRatingsWidget';
 import { useMatchLive } from '@/app/providers/MatchLiveProvider';
@@ -15,19 +16,27 @@ export default function StatsLineupsTabs({ matchId, dbData }: { matchId: string,
   const lineups = liveData?.lineups || { home: [], away: [], formations: { home: null, away: null } };
   const events = liveData?.match_events || liveData?.events || [];
 
-  const getSafeShots = (teamStats: any) => {
-      if (!teamStats) return '0';
-      if (teamStats.shots && parseInt(teamStats.shots) > 0) return teamStats.shots.toString();
-      const onTarget = parseInt(teamStats.shotsOnTarget || teamStats.shots_on_target || 0) || 0;
-      const offTarget = parseInt(teamStats.shotsOffTarget || teamStats.shots_off_target || 0) || 0;
-      return (onTarget + offTarget) > 0 ? (onTarget + offTarget).toString() : '0';
+  const getSafeShots = (teamStats: any): number | null => {
+    if (!teamStats) return null;
+    const direct = teamStats.shots;
+    if (direct !== null && direct !== undefined && /^\\d+$/.test(String(direct).trim())) {
+      return Number(direct);
+    }
+    const on = teamStats.shotsOnTarget ?? teamStats.shots_on_target;
+    const off = teamStats.shotsOffTarget ?? teamStats.shots_off_target;
+    if (on === null || on === undefined || off === null || off === undefined) return null;
+    if (!/^\\d+$/.test(String(on).trim()) || !/^\\d+$/.test(String(off).trim())) return null;
+    return Number(on) + Number(off);
   };
 
-  const homeShotsOn = stats?.home?.shotsOnTarget || stats?.home?.shots_on_target || '0';
-  const awayShotsOn = stats?.away?.shotsOnTarget || stats?.away?.shots_on_target || '0';
-  const showTargetStats = parseInt(homeShotsOn) > 0 || parseInt(awayShotsOn) > 0;
-  const hasStats = stats?.home?.possession || getSafeShots(stats?.home) !== '0' || stats?.home?.corners;
-
+  const homeShotsOn = stats?.home?.shotsOnTarget ?? stats?.home?.shots_on_target;
+  const awayShotsOn = stats?.away?.shotsOnTarget ?? stats?.away?.shots_on_target;
+  const showTargetStats = homeShotsOn != null || awayShotsOn != null;
+  const hasStats = [stats?.home?.possession, stats?.away?.possession,
+    stats?.home?.corners, stats?.away?.corners,
+    getSafeShots(stats?.home), getSafeShots(stats?.away)].some(value => value !== null && value !== undefined);
+  const homeTeam = dbData?.home_team || 'Home';
+  const awayTeam = dbData?.away_team || 'Away';
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full flex flex-col mt-4">
       <div className="flex border-b border-slate-200 bg-slate-50">
@@ -41,14 +50,14 @@ export default function StatsLineupsTabs({ matchId, dbData }: { matchId: string,
 
       <div className="p-4 min-h-[250px] bg-white">
         {activeTab === 'stats' && (
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {!hasStats ? <div className="text-center py-10 opacity-50"><p className="text-xs font-bold tracking-widest uppercase">Stats updating...</p></div> : <>
-                    <StatRow label="Possession" home={stats?.home?.possession || '50%'} away={stats?.away?.possession || '50%'} />
-                    <StatRow label="Total Shots" home={getSafeShots(stats?.home)} away={getSafeShots(stats?.away)} />
-                    {showTargetStats && <StatRow label="Shots on Target" home={homeShotsOn} away={awayShotsOn} />}
-                    <StatRow label="Corners" home={stats?.home?.corners || '0'} away={stats?.away?.corners || '0'} />
-                    <StatRow label="Fouls" home={stats?.home?.fouls || '0'} away={stats?.away?.fouls || '0'} />
-                    <StatRow label="Saves" home={stats?.home?.saves || '0'} away={stats?.away?.saves || '0'} />
+                    <VisualStatCompare label="Possession" home={stats?.home?.possession} away={stats?.away?.possession} homeTeam={homeTeam} awayTeam={awayTeam} />
+                    <VisualStatCompare label="Total Shots" home={getSafeShots(stats?.home)} away={getSafeShots(stats?.away)} homeTeam={homeTeam} awayTeam={awayTeam} />
+                    {showTargetStats && <VisualStatCompare label="Shots on Target" home={homeShotsOn} away={awayShotsOn} homeTeam={homeTeam} awayTeam={awayTeam} />}
+                    <VisualStatCompare label="Corners" home={stats?.home?.corners} away={stats?.away?.corners} homeTeam={homeTeam} awayTeam={awayTeam} />
+                    <VisualStatCompare label="Fouls" home={stats?.home?.fouls} away={stats?.away?.fouls} homeTeam={homeTeam} awayTeam={awayTeam} />
+                    <VisualStatCompare label="Saves" home={stats?.home?.saves} away={stats?.away?.saves} homeTeam={homeTeam} awayTeam={awayTeam} />
                 </>}
                 <MatchTimeline events={events} />
             </div>
@@ -66,22 +75,3 @@ export default function StatsLineupsTabs({ matchId, dbData }: { matchId: string,
   );
 }
 
-function StatRow({ label, home, away }: any) {
-    const hVal = parseInt(home?.toString().replace(/\D/g,'')) || 0;
-    const aVal = parseInt(away?.toString().replace(/\D/g,'')) || 0;
-    const total = hVal + aVal || 1;
-    const hWidth = (hVal / total) * 100;
-    return (
-        <div className="py-1">
-            <div className="flex justify-between text-[9px] font-bold text-slate-600 mb-0.5 uppercase tracking-tight">
-                <span>{home}</span>
-                <span className="text-slate-400 font-medium">{label}</span>
-                <span>{away}</span>
-            </div>
-            <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden flex">
-                <div style={{ width: `${hWidth}%` }} className="bg-blue-600 h-full"></div>
-                <div className="flex-1 bg-red-500 h-full"></div>
-            </div>
-        </div>
-    );
-}
