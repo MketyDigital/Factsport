@@ -1,120 +1,140 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Star, Lock } from 'lucide-react';
-import { useMatchLive } from '@/app/providers/MatchLiveProvider';
+import { Turnstile } from '@marsidev/react-turnstile';
+import type { TurnstileInstance } from '@marsidev/react-turnstile';
 
-export default function PlayerRatingsWidget({ matchId, lineups, status }: { matchId: string, lineups: any, status: string }) {
-    const [ratingsData, setRatingsData] = useState<any[]>([]);
-    const [userRatings, setUserRatings] = useState<Record<string, number>>({});
-    
-    const isFinished = ['FT', 'FINISHED', 'AET', 'PEN', 'AWARDED'].includes((status || '').toUpperCase());
-    const WORKER_URL = 'https://fse.mkpoikankes.workers.dev/api/ratings';
+const RATINGS_ENABLED = process.env.NEXT_PUBLIC_FACTSPORT_MEDIA_COMMUNITY_WRITES === 'enabled';
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_FACTSPORT_MEDIA_TURNSTILE_SITE_KEY || '';
+type RatingTotal = { player_name: string; total_score: number; vote_count: number };
 
-    const liveData = useMatchLive();
-    
-    // 🟢 24-HOUR AUTO-LOCK LOGIC
-    const matchDateMs = liveData?.match_date ? new Date(liveData.match_date).getTime() : 0;
-    const hoursSinceKickoff = matchDateMs ? (Date.now() - matchDateMs) / 3600000 : 0;
-    const isVotingClosed = hoursSinceKickoff > 24;
+export default function PlayerRatingsWidget({
+  matchId, lineups, status, matchDate,
+}: { matchId: string; lineups: any; status: string; matchDate?: string | null }) {
+  const [totals, setTotals] = useState<RatingTotal[]>([]);
+  const [ownRatings, setOwnRatings] = useState<Record<string, number>>({});
+  const [ready, setReady] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [message, setMessage] = useState('');
+  const [token, setToken] = useState('');
+  const turnstile = useRef<TurnstileInstance | null>(null);
+  const isFinished = ['FT', 'FINISHED', 'POST', 'ENDED', 'AET', 'PEN', 'AWARDED']
+    .includes(String(status || '').toUpperCase());
+  const dateMs = matchDate ? new Date(matchDate).getTime() : NaN;
+  const hoursSinceKickoff = (Date.now() - dateMs) / 3_600_000;
+  const canRate = RATINGS_ENABLED && isFinished && Number.isFinite(hoursSinceKickoff) &&
+    hoursSinceKickoff >= 0 && hoursSinceKickoff <= 24;
 
-    useEffect(() => {
-        if (isFinished) {
-            fetchRatings();
-            const saved = localStorage.getItem(`ratings_${matchId}`);
-            if (saved) setUserRatings(JSON.parse(saved));
-        }
-    }, [matchId, isFinished]);
+  const starters: Array<{ name: string; number?: string | number }> = [
+    ...(Array.isArray(lineups?.home) ? lineups.home.filter((p: any) => p?.is_starter) : []),
+    ...(Array.isArray(lineups?.away) ? lineups.away.filter((p: any) => p?.is_starter) : []),
+  ].filter((p: any) => typeof p?.name === 'string' && p.name.trim());
 
-    const fetchRatings = async () => {
-        try {
-            const res = await fetch(`${WORKER_URL}?matchId=${matchId}`);
-            if (res.ok) setRatingsData(await res.json());
-        } catch (e) {}
-    };
+  useEffect(() => {
+    let cancelled = false;
+    setReady(false);
+    setTotals([]);
+    setOwnRatings({});
+    setMessage('');
+    if (!RATINGS_ENABLED || !isFinished) return;
+    const query = encodeURIComponent(matchId);
+    void Promise.all([
+      fetch('/api/media/ratings?matchId=' + query, { cache: 'no-store' }),
+      fetch('/api/media/ratings/state?matchId=' + query, {
+        cache: 'no-store', credentials: 'same-origin',
+      }),
+    ]).then(async ([allResponse, ownResponse]) => {
+      if (!allResponse.ok || !ownResponse.ok) throw new Error('Ratings temporarily unavailable.');
+      const [all, own] = await Promise.all([allResponse.json(), ownResponse.json()]);
+      if (!cancelled) {
+        setTotals(Array.isArray(all) ? all : []);
+        setOwnRatings(own?.ratings && typeof own.ratings === 'object' ? own.ratings : {});
+        setReady(true);
+      }
+    }).catch(() => { if (!cancelled) setMessage('Ratings temporarily unavailable.'); });
+    return () => { cancelled = true; };
+  }, [matchId, isFinished]);
 
-    const handleRate = async (playerName: string, rating: number) => {
-        if (isVotingClosed) return;
-        
-        const newRatings = { ...userRatings, [playerName]: rating };
-        setUserRatings(newRatings);
-        localStorage.setItem(`ratings_${matchId}`, JSON.stringify(newRatings));
-        
-        const existing = ratingsData.find(r => r.player_name === playerName);
-        if (existing) {
-            setRatingsData(ratingsData.map(r => r.player_name === playerName ? { ...r, total_score: r.total_score + rating, vote_count: r.vote_count + 1 } : r));
-        } else {
-            setRatingsData([...ratingsData, { player_name: playerName, total_score: rating, vote_count: 1 }]);
-        }
-        
-        try {
-            await fetch(WORKER_URL, { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ matchId, playerName, rating }) 
-            });
-        } catch (e) {}
-    };
+  async function rate(playerName: string, rating: number) {
+    if (!canRate || !ready || sending || !token || ownRatings[playerName] !== undefined) return;
+    setSending(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/media/ratings', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matchId, playerName, rating, turnstileToken: token }),
+      });
+      if (!response.ok) throw new Error(response.status === 409 ?
+        'You already rated this player.' : 'Rating was not accepted.');
+      const totalsResponse = await fetch('/api/media/ratings?matchId=' + encodeURIComponent(matchId), {
+        cache: 'no-store',
+      });
+      setOwnRatings(previous => ({ ...previous, [playerName]: rating }));
+      if (totalsResponse.ok) {
+        const updated = await totalsResponse.json();
+        if (Array.isArray(updated)) setTotals(updated);
+      }
+      setMessage('Rating recorded.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Rating was not accepted.');
+    } finally {
+      turnstile.current?.reset();
+      setToken('');
+      setSending(false);
+    }
+  }
 
-    if (!isFinished || !lineups || (!lineups.home && !lineups.away)) return null;
+  if (!isFinished || !starters.length) return null;
+  if (!RATINGS_ENABLED) return (
+    <section className="fs-visual-panel mt-3 p-4" aria-label="Fan player ratings">
+      <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+        <Star size={15} /> Fan player ratings
+      </div>
+      <p className="mt-2 text-xs text-slate-500">Account-free fan ratings will be available after secure Media community activation.</p>
+    </section>
+  );
 
-    const allStarters = [...(lineups.home?.filter((p: any) => p.is_starter) || []), ...(lineups.away?.filter((p: any) => p.is_starter) || [])];
-    
-    const getAverage = (playerName: string) => {
-        const data = ratingsData.find(r => r.player_name === playerName);
-        return (!data || data.vote_count === 0) ? '-' : (data.total_score / data.vote_count).toFixed(1);
-    };
-
-    return (
-        <div className="w-full bg-slate-50 rounded-lg p-2 border border-slate-200 mt-2">
-            <div className="flex items-center justify-between mb-2 border-b border-slate-200 pb-1">
-                <div className="flex items-center gap-1.5">
-                    <Star size={10} className="text-yellow-500 fill-yellow-500" />
-                    <h3 className="font-black uppercase tracking-widest text-[9px] text-slate-500">Fan Ratings</h3>
-                </div>
-                {isVotingClosed && (
-                    <span className="text-[8px] font-bold text-slate-400 flex items-center gap-1">
-                        <Lock size={8} /> Closed
-                    </span>
-                )}
+  return <section className="fs-visual-panel mt-3 p-3 sm:p-4" aria-label="Fan player ratings">
+    <div className="flex items-center justify-between gap-2">
+      <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-700">
+        <Star size={16} className="text-amber-500" /> Fan player ratings
+      </h3>
+      {!canRate && <span className="flex items-center gap-1 text-xs text-slate-500"><Lock size={13} /> Closed</span>}
+    </div>
+    <p className="my-2 text-[11px] text-slate-500">No account or email required. Verified visitors may rate each starting player once.</p>
+    {canRate && ready && TURNSTILE_SITE_KEY && (
+      <Turnstile ref={turnstile} siteKey={TURNSTILE_SITE_KEY}
+        options={{ action: 'media-rating' }}
+        onSuccess={setToken} onExpire={() => setToken('')} />
+    )}
+    {message && <p role="status" className="my-2 text-xs text-blue-700">{message}</p>}
+    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      {starters.map((player, index) => {
+        const row = totals.find(item => item.player_name === player.name);
+        const average = row && row.vote_count > 0
+          ? (row.total_score / row.vote_count).toFixed(1) : '—';
+        const mine = ownRatings[player.name];
+        return <div key={player.name + index} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <span className="text-xs font-bold text-slate-800">{player.name}</span>
+              <span className="ml-1 text-[10px] text-slate-500">{player.number ?? ''}</span>
             </div>
-
-            <div className="grid grid-cols-1 gap-1">
-                {allStarters.map((p, i) => {
-                    const avg = getAverage(p.name);
-                    const isRated = userRatings[p.name] !== undefined;
-
-                    return (
-                        <div key={i} className="flex items-center justify-between bg-white px-2 py-1.5 rounded border border-slate-100 h-8">
-                            <div className="flex items-center gap-2 overflow-hidden">
-                                <span className="text-[9px] font-bold text-slate-400 w-3">{p.number}</span>
-                                <span className="text-[10px] font-black text-slate-700 truncate max-w-[100px]">{p.name}</span>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                {!isRated && !isVotingClosed ? (
-                                    <div className="flex gap-0.5">
-                                        {[6, 7, 8, 9, 10].map(score => (
-                                            <button 
-                                                key={score} 
-                                                onClick={() => handleRate(p.name, score)} 
-                                                className="w-5 h-5 rounded bg-slate-100 hover:bg-yellow-400 hover:text-white text-[8px] font-black text-slate-500 transition-colors"
-                                            >
-                                                {score}
-                                            </button>
-                                        ))}
-                                    </div>
-                                ) : isRated ? (
-                                    <span className="text-[8px] font-bold text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded">You: {userRatings[p.name]}</span>
-                                ) : null}
-                                
-                                <div className="w-6 h-6 bg-[#0a1428] rounded flex items-center justify-center shrink-0 shadow-sm border border-slate-800">
-                                    <span className="text-yellow-400 font-black text-[9px]">{avg}</span>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
+            <span className="rounded-lg bg-slate-900 px-2 py-1 text-sm font-black text-amber-300" aria-label={`Average rating ${average}`}>{average}</span>
+          </div>
+          {mine !== undefined ? <p className="text-[11px] font-bold text-amber-700">Your rating: {mine}</p> :
+            canRate && ready && TURNSTILE_SITE_KEY ? (
+              <div className="flex flex-wrap gap-1" aria-label={'Rate ' + player.name}>
+                {[6,7,8,9,10].map(value => (
+                  <button type="button" key={value} disabled={!token || sending}
+                    onClick={() => void rate(player.name, value)}
+                    aria-label={`Rate ${player.name} ${value} out of 10`}
+                    className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-bold text-slate-700 hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-700 disabled:opacity-40">{value}</button>
+                ))}
+              </div>
+            ) : null}
+        </div>;
+      })}
+    </div>
+  </section>;
 }
