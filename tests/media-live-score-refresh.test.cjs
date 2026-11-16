@@ -69,10 +69,10 @@ test('Live Center loads rights-cleared video and audio separately from score ref
   assert.match(migration, /WHERE is_public = true/);
   assert.match(migration, /rights_reviewed_at IS NOT NULL/);
   assert.match(migration, /usage_expires_at IS NULL OR usage_expires_at > now\(\)/);
-  const scoreProjection = adapter.slice(
-    adapter.indexOf('export async function listPostgresLiveScoreSnapshot'),
-    index,
-  );
+  const scoreStart = adapter.indexOf('export async function listPostgresLiveScoreSnapshot');
+  const scoreEnd = adapter.indexOf('\n}\n', scoreStart) + 3;
+  assert.ok(scoreStart >= 0 && scoreEnd > scoreStart && scoreEnd < index);
+  const scoreProjection = adapter.slice(scoreStart, scoreEnd);
   assert.doesNotMatch(scoreProjection, /public_match_media|match_media|livestream_url|audio_url/);
 });
 
