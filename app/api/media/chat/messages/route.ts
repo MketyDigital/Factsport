@@ -49,11 +49,15 @@ export async function POST(request: Request) {
     }
     const body = JSON.parse(bodyText);
     if (!body || typeof body !== 'object' || Array.isArray(body) ||
-        Object.keys(body).some(key => !['match_id', 'message'].includes(key))) {
+        Object.keys(body).some(key => !['match_id', 'message', 'reply_to_id'].includes(key))) {
       return NextResponse.json({ error: 'Unexpected submission fields.' }, { status: 400, headers });
     }
     const matchId = body.match_id;
     const value = body.message;
+    const replyId = body.reply_to_id ?? null;
+    if (replyId !== null && !validCommunityMatchId(replyId)) {
+      return NextResponse.json({ error: 'Invalid reply reference.' }, { status: 400, headers });
+    }
     if (!validCommunityMatchId(matchId) || typeof value !== 'string' ||
         value.trim().length < 1 || value.trim().length > 200) {
       return NextResponse.json({ error: 'Invalid match or content.' }, { status: 400, headers });
@@ -61,7 +65,7 @@ export async function POST(request: Request) {
     const rows = await withFactsportCommunityPostgres(sql => sql`
       SELECT public.submit_anonymous_media_chat(
         ${visitor.tokenHash}, ${visitor.networkHash},
-        ${matchId}::uuid, ${value.trim()}
+        ${matchId}::uuid, ${value.trim()}, ${replyId}::uuid
       ) AS result
     `);
     const response = NextResponse.json({ messageId: rows[0]?.result }, {
@@ -77,7 +81,7 @@ export async function POST(request: Request) {
       : error instanceof Error && /Cross-origin|Invalid content type|Verified network identity/.test(error.message) ? 403
       : 503;
     return NextResponse.json({
-      error: status === 409 ? 'You have already voted on this match.' :
+      error: status === 409 ? 'This message could not be accepted.' :
         status === 429 ? 'Too many submissions. Please try again later.' :
         status === 422 ? 'This submission is not permitted for this match.' :
         status === 403 ? 'Submission blocked by security policy.' :
