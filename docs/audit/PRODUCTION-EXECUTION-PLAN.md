@@ -373,3 +373,12 @@ P8 remains OPEN. The 2026-11-08 Publisher Restrictions recheck confirms that onl
 7. **No-go until proven:** run `npm run test:engine`, `npm run typecheck`, `npm run build:vinext`; compare preserved ESPN clock/scores and existing match/prediction/social behavior; test protected staging with real match data. Visual design does **not** waive existing DB, identity, rights, ad compliance or Cloudflare production cutover gates.
 
 M74 source and audit handoff: `docs/audit/handoffs/M74-MEDIA-VISUAL-SYSTEM-MATCH-CENTER-AND-SHARE.md`. Source changes are on `refactor/factsport-v2` only. No production assets, DNS, ad code, paid Cloudflare Stream, D1, database or provider changes are authorized.
+
+
+## M75 — November 16 CI/ratings follow-up (release gate, not activation)
+
+Read `docs/audit/handoffs/M75-V2-ROUNDUP-CI-AND-ANONYMOUS-RATINGS.md` before cutover. M74's branch source tests masked 6 outdated-contract assertions and 5 TypeScript issues; actual GitHub verification and native Vinext builds both passed on commit `eb228e89` (runs `43870176745` and `43870176596`). This is **not** a pass for all subsequent commits or database migrations.
+
+M75 also found an active external legacy Player Ratings Worker call inside the match center, in addition to the previously archived chat and MOTM Worker paths. `PlayerRatingsWidget` now uses an opt-in, same-origin anonymous PostgreSQL rating service (migration 0048) with cookie/Turnstile and verified lineup, FT/time window and one-vote-per-visitor-per-player. It is not safe to enable until migrations 0044–0048, community-only Hyperdrive role, Turnstile keys, rollback-only SQL acceptance, abuse tests and browser acceptance are **actually** verified. No D1 binding or provider resource is introduced.
+
+**Remaining release no-gos:** latest commit CI; complete current Media, article, match center tabs and social OG/browser accessibility; CDN 3-second ESPN cache/quota tests; published editorial rights and AdSense publisher approval; Stream.io real-room proofs; Prediction enrollment, entitlements and settlement/scoring parity; staging database role/audit; owner approval for production DNS/deployment. Do not mark entire V2 as completed based solely on the now-successful CI slice.
