@@ -9,7 +9,9 @@ test('live score projection reads previously-ingested rows without private or pr
   const adapter = read('lib/adapters/postgres-matches.ts');
   const start = adapter.indexOf('export async function listPostgresLiveScoreSnapshot');
   assert.ok(start > 0);
-  const projection = adapter.slice(start);
+  const coverageStart = adapter.indexOf('export async function listPostgresLiveCoverageWindow', start);
+  assert.ok(coverageStart > start, 'score and playback projections must remain separate');
+  const projection = adapter.slice(start, coverageStart);
   assert.match(projection, /withFactsportPostgres\(sql => sql`/);
   assert.match(projection, /FROM public\.matches/);
   assert.match(projection, /home_score, away_score/);
@@ -57,7 +59,7 @@ test('Live Center loads rights-cleared video and audio separately from score ref
   const migration = read('db/migrations/0017_factsport_media_match_metadata.sql');
   const index = adapter.indexOf('export async function listPostgresLiveCoverageWindow');
   assert.ok(index > 0, 'separate coverage read model is required');
-  const coverage = adapter.slice(index);
+  const coverage = adapter.slice(index, adapter.indexOf('\nexport async function ', index + 30) > 0 ? adapter.indexOf('\nexport async function ', index + 30) : undefined);
   assert.match(coverage, /LEFT JOIN public\.public_match_media mm ON mm\.match_id = m\.id/);
   assert.match(coverage, /mm\.video_url, mm\.livestream_url, mm\.audio_url/);
   assert.match(coverage, /mm\.stream_url, mm\.media_mode/);
