@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { env } from 'cloudflare:workers';
 import { validCommunityMatchId } from '@/lib/adapters/postgres-community';
-import { existingAnonymousMediaTokenHash } from '@/lib/media/anonymous-community-visitor';
+import { ensureAnonymousMediaSession } from '@/lib/media/anonymous-community-visitor';
 import { withFactsportCommunityPostgres } from '@/lib/adapters/postgres-client';
 
 export const runtime = 'edge';
@@ -19,13 +19,15 @@ export async function GET(request: Request) {
   if (!validCommunityMatchId(matchId)) {
     return NextResponse.json({ error: 'Invalid match.' }, { status: 400, headers: HEADERS });
   }
-  const tokenHash = await existingAnonymousMediaTokenHash(request);
-  if (!tokenHash) return NextResponse.json({ hasVoted: false }, { headers: HEADERS });
   try {
+    // Establish the guest identity before enabling the vote button.
+    const visitor = await ensureAnonymousMediaSession(request);
     const rows = await withFactsportCommunityPostgres(sql => sql`
-      SELECT public.get_anonymous_media_vote_state(${tokenHash}, ${matchId}::uuid) AS has_voted
+      SELECT public.get_anonymous_media_vote_state(${visitor.tokenHash}, ${matchId}::uuid) AS has_voted
     `);
-    return NextResponse.json({ hasVoted: rows[0]?.has_voted === true }, { headers: HEADERS });
+    const response = NextResponse.json({ hasVoted: rows[0]?.has_voted === true }, { headers: HEADERS });
+    if (visitor.setCookie) response.headers.append('Set-Cookie', visitor.setCookie);
+    return response;
   } catch {
     return NextResponse.json({ error: 'Voting state unavailable.' }, { status: 503, headers: HEADERS });
   }
