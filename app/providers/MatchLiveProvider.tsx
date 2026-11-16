@@ -22,7 +22,7 @@ export function MatchLiveProvider({ matchId, espnId, initialData, children }: { 
             // 🟢 USES THE GLOBAL DEDUPLICATOR
             const data = await fetchLiveMatchDeduplicated(espnId, matchId);
             
-            if (data && !data.error) {
+            if (data && !data.error && data.stale !== true) {
                 setLiveData((prev: any) => {
                     const eventsChanged = (prev.events?.length || 0) !== (data.events?.length || 0);
                     if (
