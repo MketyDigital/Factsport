@@ -5,7 +5,7 @@ import { useMatchLive } from '@/app/providers/MatchLiveProvider';
 
 // No D1 writes on V2. Enable only after authenticated PostgreSQL voter
 // identity, match window and candidate validation are ready.
-const COMMUNITY_VOTING_ENABLED = false;
+const COMMUNITY_VOTING_ENABLED = process.env.NEXT_PUBLIC_FACTSPORT_MEDIA_COMMUNITY_WRITES === 'enabled';
 
 export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, lineups: any }) {
     const [hasVoted, setHasVoted] = useState(false);
@@ -74,7 +74,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
     return (
         <div className="w-[95%] md:max-w-md mx-auto bg-[#0a1428] rounded-lg border border-slate-800 mb-3 text-white relative overflow-hidden py-2 px-3 shadow-sm flex flex-col justify-center min-h-[40px]">
             
-            {!COMMUNITY_VOTING_ENABLED && <p role="status" className="mb-2 text-center text-[10px] font-bold text-amber-300">MOTM voting is paused pending secure PostgreSQL voter verification. Existing results can still be viewed when available.</p>}
+            {!COMMUNITY_VOTING_ENABLED && <p role="status" className="mb-2 text-center text-[10px] font-bold text-amber-300">MOTM voting is being prepared for account-free visitors; results remain available when enabled.</p>}
             {voteError && <p role="alert" className="mb-2 text-center text-[10px] text-red-300">{voteError}</p>}
             {!hasVoted && !isVotingClosed ? (
                 <div className="relative z-10 flex items-center justify-between gap-2 w-full">
