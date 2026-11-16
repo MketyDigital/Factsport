@@ -22,3 +22,42 @@ body {
     )
     rgb(var(--background-start-rgb));
 }
+
+/* Factsport Media visual system M74: lightweight 2.5D depth, no WebGL dependency. */
+@layer components {
+  .fs-visual-panel {
+    @apply relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_3px_14px_rgba(15,23,42,0.06)];
+  }
+
+  .fs-visual-card {
+    @apply relative overflow-hidden rounded-2xl border border-white/10 shadow-[0_10px_28px_rgba(2,6,23,0.20)];
+    background: linear-gradient(145deg, #142c57 0%, #0b1831 80%);
+  }
+
+  .fs-visual-card-interactive {
+    @apply transition-[transform,box-shadow,border-color] duration-200;
+  }
+
+  .fs-status-live {
+    @apply inline-flex items-center gap-1 rounded-full border border-red-400/40 bg-red-600 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white;
+  }
+
+  .fs-standings-rank {
+    @apply inline-flex h-6 min-w-6 items-center justify-center rounded-lg bg-slate-100 px-1 text-xs font-black tabular-nums text-slate-700;
+  }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .fs-visual-card-interactive:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 15px 34px rgba(2, 6, 23, 0.26);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fs-visual-card-interactive,
+  .fs-visual-card-interactive:hover {
+    transition: none;
+    transform: none;
+  }
+}
