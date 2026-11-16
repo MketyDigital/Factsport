@@ -1,5 +1,8 @@
 # M69 — Verified legacy fast-live and chat source locator
 
+> **2026-11-16 update:** Superseded by [M70](M70-ORIGINAL-FAST-ESPN-CHAT-WORKERS-POSTGRES-NO-D1.md). The owner has now provided both exact original Worker files; they are archived byte-for-byte under `docs/audit/legacy-source/external-chat-d1-worker-v1.js.txt` and `external-fast-espn-motm-d1-worker-v1.js.txt`. The missing-source conclusion below describes the M69 audit snapshot, not the current branch.
+
+
 Date: 2026-11-15
 Branch: `refactor/factsport-v2`
 Scope: **repository-wide current-tree inventory**, not a full Git historical-object or deployed Cloudflare account audit.
