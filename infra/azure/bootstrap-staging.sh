@@ -2,6 +2,8 @@
 # Factsport 2.0 - Azure staging PostgreSQL bootstrap
 # Run manually in Azure Portal > Cloud Shell (Bash).
 # SAFETY: defaults to DRY RUN. Explicit APPLY=1 required before billable resources.
+# M79 inventory found the existing PostgreSQL 18 server mketypostgres with DB factsport_v2.
+# This legacy PG16 bootstrap must not create a duplicate staging server.
 # The script NEVER changes main Mkety tenant roles, production databases, or live endpoints.
 set -euo pipefail
 : "${SUBSCRIPTION_ID:?Set SUBSCRIPTION_ID to the intended Azure subscription GUID}"
@@ -20,16 +22,14 @@ fi
 
 echo "Inspecting current Azure context"
 az account show --query '{subscription:id,tenant:tenantId,name:name}' -o table
-az account set --subscription "$SUBSCRIPTION_ID"
 
-# M79 inventory found factsport_v2 on an existing PostgreSQL Flexible Server.
-# Refuse duplicate billable provisioning if the target DB already exists anywhere
-# in the selected subscription. Reconcile/reuse the existing database instead.
+# Before any billable action, refuse if this subscription already has the
+# target database on any Flexible Server. Reuse/reconcile that database instead.
 if [[ "$APPLY" == "1" ]]; then
   echo "Checking for an existing $DB_NAME database before any provisioning"
   EXISTING_SERVERS="$(az postgres flexible-server list --subscription "$SUBSCRIPTION_ID" \
     --query "[].[resourceGroup,name]" --output tsv)"
-  while read -r EXISTING_RG EXISTING_SERVER; do
+  while IFS=$'\t' read -r EXISTING_RG EXISTING_SERVER; do
     [[ -n "$EXISTING_SERVER" ]] || continue
     EXISTING_DBS="$(az postgres flexible-server db list --subscription "$SUBSCRIPTION_ID" \
       --resource-group "$EXISTING_RG" --server-name "$EXISTING_SERVER" \
@@ -41,53 +41,7 @@ if [[ "$APPLY" == "1" ]]; then
     fi
   done <<< "$EXISTING_SERVERS"
 fi
-az account show --query '{subscription:id,tenant:tenantId,name:name}' -o table
-echo "Target: $RG / $AZ_REGION / $PG_SERVER; Burstable Standard_B1ms, storage 32GiB, no HA, 7d backups"
-echo "This is a BILLABLE Azure Database for PostgreSQL server when APPLY=1."
-if [[ "$APPLY" != "1" ]]; then
-  echo "DRY RUN ONLY. Confirm subscription and region quote, then run APPLY=1."
-  exit 0
-fi
-
-read -r -p "Type PROVISION-FACTSPORT-STAGING to create billable resources: " confirmation
-[[ "$confirmation" == "PROVISION-FACTSPORT-STAGING" ]] || { echo "Cancelled"; exit 1; }
-# Avoid printing the password or storing it in shell history/public repos.
-read -r -s -p "Enter a NEW strong PostgreSQL admin password (not shared with other apps): " PG_PASSWORD
-printf '\n'
-[[ ${#PG_PASSWORD} -ge 20 ]] || { echo "Password must be at least 20 characters" >&2; exit 2; }
-
-az group create --name "$RG" --location "$AZ_REGION" --tags app=Factsport environment=staging project=factsport-v2 -o table
-# Public networking mode WITHOUT ANY allow-all firewall rule. Add a narrowly
-# scoped Cloudflare Hyperdrive source after egress IP is positively verified.
-# No database data is imported from Supabase.
-az postgres flexible-server create \
-  --resource-group "$RG" --name "$PG_SERVER" --location "$AZ_REGION" \
-  --sku-name Standard_B1ms --tier Burstable \
-  --storage-size 32 --storage-type Premium_LRS \
-  --version 16 --backup-retention 7 \
-  --geo-redundant-backup Disabled --zonal-resiliency Disabled \
-  --public-access None \
-  --admin-user "$PG_ADMIN" --admin-password "$PG_PASSWORD" \
-  --tags app=Factsport environment=staging project=factsport-v2 \
-  --yes --output table
-unset PG_PASSWORD
-az postgres flexible-server db create --resource-group "$RG" --server-name "$PG_SERVER" --database-name "$DB_NAME" --output table
-echo "Created empty factsport_v2 DB; NO application tables/roles/data have been migrated."
-echo "Next: scoped firewall/Hyperdrive networking, then 'CREATE DATABASE factsport_v2' via psql on a trusted client."
-echo "Never allow 0.0.0.0-255.255.255.255, never store connection strings in code."
-az postgres flexible-server show -g "$RG" -n "$PG_SERVER" --query '{name:name,sku:sku.name,storage:storage.storageSizeGb,version:version,state:state,ha:highAvailability.mode}' -o jsonc
-\t' read -r EXISTING_RG EXISTING_SERVER; do
-    [[ -n "$EXISTING_SERVER" ]] || continue
-    EXISTING_DBS="$(az postgres flexible-server db list --subscription "$SUBSCRIPTION_ID" \
-      --resource-group "$EXISTING_RG" --server-name "$EXISTING_SERVER" \
-      --query "[].name" --output tsv)"
-    if printf '%s\\n' "$EXISTING_DBS" | grep -Fxq "$DB_NAME"; then
-      echo "Refusing duplicate provisioning: $DB_NAME already exists on $EXISTING_SERVER in $EXISTING_RG." >&2
-      echo "Reconcile the existing database and update its roles/migrations instead." >&2
-      exit 3
-    fi
-  done <<< "$EXISTING_SERVERS"
-fi
+az account set --subscription "$SUBSCRIPTION_ID"
 az account show --query '{subscription:id,tenant:tenantId,name:name}' -o table
 echo "Target: $RG / $AZ_REGION / $PG_SERVER; Burstable Standard_B1ms, storage 32GiB, no HA, 7d backups"
 echo "This is a BILLABLE Azure Database for PostgreSQL server when APPLY=1."
