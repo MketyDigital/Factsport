@@ -79,3 +79,11 @@ The owner's Cloud Shell output establishes that the Azure Flexible Server and da
 The same output confirms `la-factsport-v2-staging` is Disabled, with a five-minute recurrence and only `NonMutatingDesignOnly`. No API connections were listed in the staging group and no subscription budgets were listed. It is not an active social delivery integration. The `factsports.onmicrosoft.com` External ID tenant exists; customer app registrations, credentials, callbacks and OIDC journeys remain unverified.
 
 Still required: a clean read-only server firewall/TLS and networking inventory; actual database role/grant and migration ledger evidence; proof that the intended Cloudflare Hyperdrive maps to this exact server/database/least-privilege role; backup/PITR and restore proof; and the customer app registration/OIDC configuration. The prior firewall command returned `UNAVAILABLE` after terminal paste corruption, so it is not evidence that no firewall rules exist. No Azure cloud resource was changed.
+
+## M79 PostgreSQL network evidence — 2026-11-16
+
+The owner's Cloud Shell screenshot shows the PostgreSQL server's `publicNetworkAccess` is `Enabled`, `subnetId` is null, and 15 IPv4 firewall rules are listed under `mketypostgres`. This is a public endpoint restricted by firewall allowlists, not private network integration. The database-detail command failed with `unrecognized arguments: --database-name factsport_v2`; metadata output was not obtained.
+
+The listed rules align with Cloudflare IPv4 ranges except `factsport-cf-04`, shown as `104.16.0.0–104.31.255.255`. Cloudflare's current published ranges list `104.16.0.0/13` and `104.24.0.0/14` separately; `factsport-cf-04` therefore includes `104.28.0.0–104.31.255.255`, outside those published ranges. Record as firewall drift and verify the exact intended Hyperdrive/Cloudflare egress path before a carefully scoped rule correction. Do not make a live firewall change based only on the screenshot. Source: https://developers.cloudflare.com/fundamentals/concepts/cloudflare-ip-addresses/.
+
+No Azure network settings or firewall rules were changed. Next: re-run the database metadata command using the Cloud Shell CLI's accepted syntax; inspect the Hyperdrive target and TLS/role configuration without outputting secrets; then validate migration state and backup/restore.
