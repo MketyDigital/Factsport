@@ -13,6 +13,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
     const [selectedPlayer, setSelectedPlayer] = useState('');
     const [isVoting, setIsVoting] = useState(false);
     const [voteError, setVoteError] = useState<string | null>(null);
+    const [voteStateReady, setVoteStateReady] = useState(false);
 
     const liveData = useMatchLive();
     
@@ -20,7 +21,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
     const currentStatus = (liveData?.status || '').toUpperCase();
     const matchDateMs = liveData?.match_date ? new Date(liveData.match_date).getTime() : 0;
     const hoursSinceKickoff = matchDateMs ? (Date.now() - matchDateMs) / 3600000 : 0;
-    const isVotingClosed = hoursSinceKickoff > 24;
+    const isVotingClosed = !matchDateMs || hoursSinceKickoff < 0 || hoursSinceKickoff > 24;
 
     const homeStarters = lineups?.home?.filter((p: any) => p.is_starter) || [];
     const awayStarters = lineups?.away?.filter((p: any) => p.is_starter) || [];
@@ -30,12 +31,27 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
     const WORKER_URL = '/api/media/motm';
 
     useEffect(() => {
-        if (localStorage.getItem(`motm_voted_${matchId}`)) {
-            setHasVoted(true);
+        let cancelled = false;
+        setVoteStateReady(false);
+        setHasVoted(false);
+        if (COMMUNITY_VOTING_ENABLED) {
+            void fetch(`/api/media/motm/state?matchId=${encodeURIComponent(matchId)}`, {
+                credentials: 'same-origin', cache: 'no-store',
+            }).then(async response => {
+                if (!response.ok) throw new Error('Guest vote state unavailable.');
+                const state = await response.json();
+                if (!cancelled) {
+                    setHasVoted(state.hasVoted === true);
+                    setVoteStateReady(true);
+                }
+            }).catch(() => {
+                if (!cancelled) setVoteError('MOTM voting is temporarily unavailable.');
+            });
         }
-        fetchVotes();
+        void fetchVotes();
+        return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [matchId, currentStatus]); // Added currentStatus so it refreshes if match goes FT
+    }, [matchId, currentStatus]);
 
     const fetchVotes = async () => {
         try {
@@ -46,7 +62,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
     };
 
     const handleVote = async () => {
-        if (!COMMUNITY_VOTING_ENABLED || !selectedPlayer || hasVoted || isVoting || isVotingClosed) return;
+        if (!COMMUNITY_VOTING_ENABLED || !voteStateReady || !selectedPlayer || hasVoted || isVoting || isVotingClosed) return;
         setVoteError(null);
         setIsVoting(true);
         try {
@@ -57,8 +73,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
                 body: JSON.stringify({ matchId, playerName: selectedPlayer })
             });
             if (!response.ok) throw new Error('MOTM vote was not accepted.');
-            // localStorage is a UI convenience, never voter authorization.
-            localStorage.setItem(`motm_voted_${matchId}`, 'true');
+            // Cookie-backed PostgreSQL vote uniqueness is the authority.
             setHasVoted(true);
             void fetchVotes();
         } catch {
@@ -97,7 +112,7 @@ export default function MOTMVoteWidget({ matchId, lineups }: { matchId: string, 
                     
                     <button 
                         onClick={handleVote}
-                        disabled={!COMMUNITY_VOTING_ENABLED || !selectedPlayer || isVoting || isVotingClosed}
+                        disabled={!COMMUNITY_VOTING_ENABLED || !voteStateReady || !selectedPlayer || hasVoted || isVoting || isVotingClosed}
                         className="bg-yellow-500 hover:bg-yellow-400 text-black font-black text-[9px] uppercase tracking-widest px-3 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed h-6 shrink-0 flex items-center justify-center"
                     >
                         {isVoting ? '...' : 'Vote'}
