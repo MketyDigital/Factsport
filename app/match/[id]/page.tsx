@@ -324,7 +324,7 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
 
       <GoalRushTicker allMatches={tickerMatches || []} currentMatchId={dbData.id} />
 
-      <MatchLiveProvider espnId={dbData.espn_id} initialData={data}>
+      <MatchLiveProvider matchId={dbData.id} espnId={dbData.espn_id} initialData={data}>
           {!hasWidget ? (
               <div className="w-full">
                   <div className="bg-[#0a1428]">
