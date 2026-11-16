@@ -67,4 +67,7 @@ See the master `ROADMAP.md`, `PRODUCTION-EXECUTION-PLAN.md`, `PAGE-MIGRATION-MAT
 ## Current no-go
 
 **Staging:** narrow protected app deployment and probes pass on commit `0980fc374168627a7e49e3bb113aca10f4602834`; all broader acceptance remains open.  
-**Production:** no-go. P0–P9 gates remain open; no production Worker deploy, DNS change, legacy shutdown, production data write or cutover is claimed or authorized by this status report.
+**Production:** no-go. Media and Prediction release gates in P0–P9 remain open; no production Worker deploy, DNS change, legacy shutdown, production data write or cutover is claimed. The TV specification was added afterward and is integrated separately in M78/P10, after Media and Prediction.
+
+
+The subsequent Factsport TV design addition and owner-directed phased release order are recorded in [M78](./M78-FACTSPORT-TV-AND-PHASED-RELEASE.md).

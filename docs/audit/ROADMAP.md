@@ -1,8 +1,8 @@
-Warning: truncated output (original token count: 28061)
-Total output lines: 709
+Warning: truncated output (original token count: 28655)
+Total output lines: 720
 
 # Factsport modernization — master roadmap
-Status: M0 baseline still in progress; M6 Cloudflare staging and M7 PostgreSQL foundation partially verified; production remains paused | Repository: MketyDigital/Factsport | Branch: refactor/factsport-v2
+Status: V2 refactor active; protected app staging slice passed on 2026-11-16; broader Media/Prediction acceptance and production remain open | Repository: MketyDigital/Factsport | Branch: refactor/factsport-v2
 Updated: 2026-10-30
 
 ## Governing decisions
@@ -313,7 +313,57 @@ The implementation remains on \`refactor/factsport-v2\` and follows the media-fi
 - **Editorial provenance/review:** migration 0005 adds explicit origin values (\`manual\`, \`ai_assisted\`, \`automated\`, \`imported\`, \`unknown\`), original timestamps, SEO/reverification metadata and distinct legacy \`body\`/\`content\` preservation fields. A published article must have an approved review state, identified reviewer and review timestamp. Public media requires a recorded rights review.
 - **Homepage sports read models:** migration 0006 adds featured-match metadata, a safe homepage setting view, season/group-aware standings, and provider-locked YouTube/Vimeo highlights with rights review and optional R2 thumbnails. The public reader receives only narrow views.
 - **Hyperdrive lifecycle (supersedes the earlier isolate-wide client):** each database adapter operation now creates and closes a request-scoped postgres.js client (max one connection per client); Hyperdrive owns and reuses its managed pool. Never cache a postgres.js client in module scope across Worker requests. Static SQL projections preserve prepared statements.
-- **Public pages:** homepage now has opt-in PostgreSQL reads for the main match window, featured matches and rights-cleared highlights; news/arti…8061 tokens truncated…ects and the minimum effective grants for anonymous submission.
+- **Public pages:** homepage now has opt-in PostgreSQL reads for the main match window, featured matches and rights-cleared highlights; news/article have opt-in published/reviewed PostgreSQL reads; homepage mini standings can use the new standings view. \`HomeDashboardClient\` no longer queries Supabase directly for featured-match settings.
+- **Editorial security/SEO:** raw article HTML passes through \`rehype-sanitize\`; iframe embeds are restricted to HTTPS YouTube, YouTube-nocookie and Vimeo player hosts. Existing match-widget tokens use a dedicated safe protocol. NewsArticle JSON-LD escapes script-breaking characters; reviewed SEO title/description/canonical and article author are projected.
+- **Known gaps:** the full \`/highlights\` and \`/standings\` routes remain legacy-backed; Bet of the Day's \`pro_analysis\` and public affiliate/config settings need V2 models; CMS writes/review/publish, media ingestion and rights operations are not yet implemented. These are not complete pages.
+- **Migration state:** migrations 0004-0006 and their tests are committed but unapplied. No legacy article bodies, match history or media have been imported. No production resource or data has been changed. Staging migration, role verification, content preservation classification and browser parity remain gates.
+
+
+## 2026-11-07 competition read paths — highlights and standings
+
+- Added migration 0007 for current-season player goals/assists, stable player IDs, team identity and provider freshness; public reader receives a narrow view only.
+- Full \`/highlights\` page now supports opt-in PostgreSQL pagination, league filters, source-video canonical links and rights-cleared R2 thumbnails. Legacy fallback remains.
+- Full \`/standings\` page now supports opt-in PostgreSQL standings, same-season completed-match form and a goals/assists leaders API. \`LeagueLeaders\` no longer queries Supabase directly in the browser.
+- Added \`matches.season\` and a bounded final-results index; form calculations are isolated to the selected current season.
+- No current-season rows are imported or fabricated. Migrations 0004-0007 are committed but unapplied. Provider ingestion, stats reconciliation, tie-break parity, team-crest rights mapping, live refresh and staging data evidence remain required.
+
+
+### Migration-specific public read flags
+
+Keep each read path disabled until its exact schema and reader grants are applied in isolated staging:
+
+- \`FACTSPORT_MATCHES_BACKEND=postgres\`: base matches read model from migration 0001 only; must not select season or newer homepage/competition views.
+- \`FACTSPORT_EDITORIAL_BACKEND=postgres\`: reviewed articles and rights-cleared media; requires 0004-0005.
+- \`FACTSPORT_HOMEPAGE_BACKEND=postgres\`: featured matches and safe homepage settings; requires 0006.
+- \`FACTSPORT_HIGHLIGHTS_BACKEND=postgres\`: full highlights page and reviewed video metadata; requires 0006.
+- \`FACTSPORT_COMPETITIONS_BACKEND=postgres\`: standings, same-season form and player leaders; requires 0006-0007.
+
+Do not use one broad match flag to activate later schema surfaces. This separation was added after protected staging correctly exposed that the base match reader must remain compatible with the base schema while 0006 is still unapplied.
+
+
+### Protected staging finding — base match reader / migration boundary
+
+The protected staging run on commit \`24484f5\` built and deployed the Worker but returned HTTP 500 on the authorized \`/matches\` page. Source inspection found that the base \`MATCH_SELECT\` projection had accidentally started selecting \`matches.season\`, which is introduced only by migration 0006 and is not present in the currently provisioned staging schema. The column was removed from the base match projection; season remains selected only by the competition-results reader behind \`FACTSPORT_COMPETITIONS_BACKEND\`. New homepage/highlights/competition flags are now separate from \`FACTSPORT_MATCHES_BACKEND\`. A fresh protected staging run on the corrected code is pending. The earlier keyset-pagination 503 still needs a fresh probe after the page render succeeds.
+
+
+## 2026-11…6655 tokens truncated…ates remain open.
+
+
+## 2026-11-09 Media Entra host isolation — M47
+
+- Media login is now fail-closed on Entra configuration, dedicated editorial Hyperdrive and exact registered Media host. Entra start/callback reject any other origin; sign-out is a same-origin POST.
+- Public Media middleware no longer refreshes Supabase sessions. Unauthenticated `/admin` redirects to `/media-login`; cookie presence is only a routing hint and admin layout/actions still verify the signed session and DB role.
+- The private Prediction host alone retains legacy Supabase session refresh during its separate migration. Media admin/login/Entra routes are not served on that host.
+- Private host normalization is consistent in middleware, metadata and server guards. CI path filters now include all auth and host-guard files.
+- Isolated verification passed on `5e87b07c098c19e7cc037ea7acefa56c49f9b473` (run `42575473484`). Native build and protected staging were running at handoff time.
+- Actual Entra tenant/app registration, Cloudflare secret provisioning, editorial Hyperdrive role/grants and live OIDC E2E remain owner-provisioning gates. No Cloudflare API token or 2FA configuration was changed.
+- Details: `docs/audit/handoffs/M47-MEDIA-ENTRA-HOST-ISOLATION.md`.
+
+
+## 2026-11-09 Prediction runtime boundary — M48
+
+- Added a dedicated `withFactsportPredictionPostgres()` adapter using only `FACTSPORT_PREDICTION_HYPERDRIVE`; no shared reader/editorial/Supabase/`DATABASE_URL` fallback exists.
+- Added a fail-closed readiness probe requiring the exact `factsport_v2_prediction_api` role, the matches/contact/participant/prediction schema objects and the minimum effective grants for anonymous submission.
 - Added static regression tests for the separate database identity and readiness contract.
 - Source commits: `184519eea565d5b84e75ff771170970c86475b67` and `6f083d51a8738fb8c69953e92b51c528951ed551`. Isolated verification and native build were running at handoff; no pass is claimed until complete.
 - This is only a connection boundary. No prediction API, visitor cookie, role/grants, campaign, claim, settlement or public UI was activated. Dedicated role/Hyperdrive provisioning and isolated DB grant tests are still required.
@@ -480,3 +530,14 @@ The implementation remains on \`refactor/factsport-v2\` and follows the media-fi
 - **Do not use on V2:** no workforce Entra tenant for customers; no legacy Supabase auth/session/mutations for new Media/Admin/Prediction; no active D1 or browser-to-external-Worker calls; no OpenNext, Cloudinary credential-forwarding rewrite, old unsafe monthly reset functions, `?key=` cron auth or browser-to-database access; no duplicated scheduler owners; no Azure Functions, Azure OpenAI, ACS Email, Redis, Service Bus, VM/AKS, Azure Blob or Cosmos, nor paid Logic Apps Standard unless a later approved architecture change explicitly selects them. Keep PostgreSQL/Hyperdrive and R2 boundaries, 3-second ESPN viewer behavior, anonymous Prediction consent/security rules, direct social adapters and free/approved Cloudflare surfaces. Do not activate AdSense until publisher/site/privacy/crawl approval is evidenced.
 - **Release decision:** the current protected staging slice passed, but full product acceptance, production readiness, DNS change, legacy retirement and cutover are not complete. Production remains blocked until P0–P9 evidence is collected, owner-controlled Azure/Cloudflare resources are reconciled, full match/account/paid journeys and money/privacy obligations are accepted, restore/rollback is rehearsed, and explicit owner go/no-go is recorded.
 - See `docs/audit/handoffs/M77-CURRENT-STATE-AND-CUTOVER-READINESS.md` for completed-vs-open detail and immediate next gates.
+
+
+## M78 — Factsport TV specification integrated into V2 roadmap
+
+- Read `docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md` from the latest `refactor/factsport-v2` branch commit `c2fe0ab49dad81c3c4fd9c8be4b23e8f8a2805b6`. It is marked design approved in principle and implementation not started.
+- Factsport TV is a modular subsystem inside V2, not a standalone product. One shared production engine will support Match Story first, then Factsport Daily, Weekend Football Review and Monday Team of the Week/Table Changes. The Match Story target is a data-backed, editor-overridable, 3–5 minute 3D-first video, using 2D where it gives more accurate/readable context.
+- The supplied architecture proposes a read-only canonical sports snapshot, source/provenance/rights gates, human-reviewed narrative, an editable EpisodePlan, local/free-first render tooling (Blender + Three.js + FFmpeg subject to license review), private R2 storage, durable orchestration and approval-only publishing. These are design requirements, not selected or provisioned production services.
+- Priority follows the owner's sequence: complete public Media and its eligible cutover first; complete Prediction/business migration next; only then begin Factsport TV implementation. TV is not a dependency or release blocker for the core Media or Prediction systems.
+- TV production schedules, YouTube uploads, public integration, renderer credentials/resources, TV schema/workers and production publishing stay OFF. No TV code or migrations are claimed. Data-reuse rights, asset/player/voice/music licenses, renderer costs, model licensing and YouTube permissions remain open approval gates.
+- V2 release sequencing is now explicitly phased: Media-only cutover may proceed after its complete P0/P3 plus shared security/restore acceptance if and only if route/domain mapping proves Prediction can remain isolated and unchanged; Prediction has its own later release gate; Factsport TV has a separate later launch approval. If Media and Prediction routes cannot be separated safely, do not cut over early.
+- Implementation plan: `docs/implementation/TV-001-factsport-tv-engine.md`; detailed governing product spec: `docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md`; release gates: `docs/audit/PRODUCTION-EXECUTION-PLAN.md`; reconciliation: `docs/audit/handoffs/M78-FACTSPORT-TV-AND-PHASED-RELEASE.md`.
