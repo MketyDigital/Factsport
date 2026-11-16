@@ -16,7 +16,7 @@ type SiteverifyResult = {
 export async function verifyMediaCommunityTurnstile(
   request: Request,
   token: unknown,
-  expectedAction: 'media-chat' | 'media-motm',
+  expectedAction: 'media-chat' | 'media-motm' | 'media-rating',
 ): Promise<boolean> {
   if (typeof token !== 'string' || !token.trim() || token.length > 2048) return false;
   const bindings = env as unknown as Record<string, unknown>;
