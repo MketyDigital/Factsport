@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { anonymousCommunityVisitor } from '@/lib/media/anonymous-community-visitor';
+import { anonymousCommunityVisitor, ensureAnonymousMediaSession } from '@/lib/media/anonymous-community-visitor';
 import { withFactsportCommunityPostgres } from '@/lib/adapters/postgres-client';
 import { verifyMediaCommunityTurnstile } from '@/lib/media/community-turnstile';
 import { env } from 'cloudflare:workers';
@@ -24,7 +24,14 @@ export async function GET(request: Request) {
   }
   try {
     const rows = await listPostgresPublicChatMessages(matchId);
-    return NextResponse.json({ messages: rows }, { headers });
+    const response = NextResponse.json({ messages: rows }, { headers });
+    if (env.FACTSPORT_MEDIA_COMMUNITY_WRITES === 'enabled') {
+      // Mint the first signed visitor cookie on the initial read, before chat
+      // posting; no personal data or account is created by this operation.
+      const visitor = await ensureAnonymousMediaSession(request);
+      if (visitor.setCookie) response.headers.append('Set-Cookie', visitor.setCookie);
+    }
+    return response;
   } catch {
     return NextResponse.json({ error: 'Media community temporarily unavailable.' }, { status: 503, headers });
   }
