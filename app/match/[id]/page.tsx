@@ -357,7 +357,7 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
 
           <div className="max-w-4xl mx-auto mt-3 px-2">
               {!hasWidget ? (
-                  <MatchMobileHub matchId={dbData.id} espnId={dbData.espn_id} dbData={clientMatchData} chatEnabled={process.env.NODE_ENV === 'development'} />
+                  <MatchMobileHub matchId={dbData.id} espnId={dbData.espn_id} dbData={clientMatchData} chatEnabled={(env.FACTSPORT_MEDIA_COMMUNITY_BACKEND ?? process.env.FACTSPORT_MEDIA_COMMUNITY_BACKEND) === 'postgres'} />
               ) : (
                   <ScoreAxisWidget matchId={dbData.widget_id} />
               )}
