@@ -1,5 +1,8 @@
 # M72 — Community write integrity and strict no-legacy-Worker V2 boundary
 
+> **2026-11-16 supersession:** [M73](M73-ACCOUNT-FREE-MEDIA-CHAT-MOTM-POSTGRES.md) records the owner's updated rule: **Media visitors chat and vote without accounts**. The registered-fan identity requirement and disabled-forever posting assumptions below are historical M72 design notes. Anonymous signed visitor cookies, PostgreSQL-only constraints and Turnstile replace that requirement; source remains feature-gated until isolated staging verification.
+
+
 Date: 2026-11-16
 Branch: `refactor/factsport-v2`
 Status: source and tests committed, no PostgreSQL migration applied, no public community writes or V2 fast-reader activation.
