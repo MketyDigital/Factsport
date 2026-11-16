@@ -102,3 +102,29 @@ test('Media chat and MOTM allow visitors without an account and never trust loca
   assert.match(motm, /voteStateReady/);
   assert.doesNotMatch(motm, /localStorage|useAuth\(|supabase\/client|D1Database/);
 });
+
+test('all guest writes verify single-use Turnstile tokens on the server', () => {
+  const verify = read('lib/media/community-turnstile.ts');
+  const chat = read('app/api/media/chat/messages/route.ts');
+  const motm = read('app/api/media/motm/route.ts');
+  const chatUI = read('app/components/FanZoneChat.tsx');
+  const motmUI = read('app/components/MOTMVoteWidget.tsx');
+  const types = read('types/factsport-cloudflare-workers.d.ts');
+  assert.match(verify, /FACTSPORT_MEDIA_TURNSTILE_SECRET/);
+  assert.match(verify, /turnstile\/v0\/siteverify/);
+  assert.match(verify, /data\.success === true/);
+  assert.match(verify, /data\.hostname\.toLowerCase\(\) === expectedHost/);
+  assert.match(verify, /data\.action === expectedAction/);
+  assert.match(verify, /token\.length > 2048/);
+  assert.match(verify, /AbortSignal\.timeout\(4500\)/);
+  assert.match(chat, /verifyMediaCommunityTurnstile\(request, body\.turnstileToken, 'media-chat'\)/);
+  assert.match(motm, /verifyMediaCommunityTurnstile\(request, body\.turnstileToken, 'media-motm'\)/);
+  assert.match(chatUI, /Turnstile ref=\{turnstileRef\}/);
+  assert.match(motmUI, /Turnstile ref=\{turnstileRef\}/);
+  assert.match(chatUI, /options=\{\{ action: 'media-chat' \}\}/);
+  assert.match(motmUI, /options=\{\{ action: 'media-motm' \}\}/);
+  assert.match(chatUI, /turnstileRef\.current\?\.reset\(\)/);
+  assert.match(motmUI, /turnstileRef\.current\?\.reset\(\)/);
+  assert.match(types, /FACTSPORT_MEDIA_TURNSTILE_SECRET/);
+  assert.doesNotMatch(verify, /D1Database|env\.DB|SUPABASE_SERVICE_ROLE_KEY/);
+});
