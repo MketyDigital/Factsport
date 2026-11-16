@@ -42,15 +42,16 @@ function externalVideoCanonicalUrls(body: string): string[] {
       if (id) urls.add('https://vimeo.com/' + id[1]);
     }
   }
-  return [...urls];
+  return Array.from(urls);
 }
 
 function assertExternalVideoSourceRights(
-  body: string, sources: Array<{ canonical_url: string; attribution_text: string | null; rights_reference: string | null }>
+  body: string, sources: ReadonlyArray<{ canonical_url?: unknown; attribution_text?: unknown; rights_reference?: unknown }>
 ) {
   for (const canonicalUrl of externalVideoCanonicalUrls(body)) {
     if (!sources.some(source => source.canonical_url === canonicalUrl &&
-        Boolean(source.attribution_text?.trim()) && Boolean(source.rights_reference?.trim()))) {
+        typeof source.attribution_text === 'string' && Boolean(source.attribution_text.trim()) &&
+        typeof source.rights_reference === 'string' && Boolean(source.rights_reference.trim()))) {
       throw new Error('An external video requires a matching source, public attribution and private rights reference on this editorial revision.');
     }
   }
