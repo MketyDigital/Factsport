@@ -100,6 +100,9 @@ test('frontend fast ESPN reader uses verified canonical match ID and never calls
   assert.match(fetcher, /const key = 'match:' \+ matchId/);
   assert.match(provider, /fetchLiveMatchDeduplicated\(espnId, matchId\)/);
   assert.match(page, /<MatchLiveProvider matchId=\{dbData\.id\}/);
+  assert.doesNotMatch(page, /live-api\.factsport\.com/);
+  assert.match(page, /const scoreText =/);
+  assert.match(page, /hScore: isLive \|\| isFinished \? hScore \?\? undefined : undefined/);
   assert.match(label, /fetchLiveMatchDeduplicated\(espnId, matchId\)/);
 });
 
