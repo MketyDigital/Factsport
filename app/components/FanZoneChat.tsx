@@ -23,6 +23,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
     const [messages, setMessages] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [isSending, setIsSending] = useState(false);
+    const [submissionError, setSubmissionError] = useState<string | null>(null);
     const [replyTo, setReplyTo] = useState<{user: string, text: string} | null>(null);
     const [showScrollBottom, setShowScrollBottom] = useState(false);
     const { user, isAdmin, loading: authLoading } = useAuth();
@@ -167,7 +168,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                 return;
             }
         }
-        setLastMsgTime(Date.now());
+        setSubmissionError(null);
         setIsSending(true);
         
         messageText = messageText.replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -196,19 +197,24 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
         setTimeout(() => scrollToBottom(true), 50);
 
         try {
-            await fetch(`${CHAT_WORKER_URL}/messages`, {
+            // The future V2 API must derive identity, display name and avatar
+            // from the verified fan session. Never trust browser-supplied IDs.
+            const response = await fetch(`${CHAT_WORKER_URL}/messages`, {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    match_id: matchId,
-                    user_id: user.id,
-                    username: tempMsg.username,
-                    avatar_url: tempMsg.avatar_url,
-                    message: tempMsg.message
-                })
+                body: JSON.stringify({ match_id: matchId, message: tempMsg.message })
             });
-        } catch (e) {}
-        setIsSending(false);
+            if (!response.ok) throw new Error('Message was not accepted.');
+            setLastMsgTime(Date.now());
+            void fetchChat();
+        } catch {
+            setMessages(prev => prev.filter(message => message.id !== tempMsg.id));
+            setNewMessage(messageText);
+            setSubmissionError('Your message was not posted. Please try again.');
+        } finally {
+            setIsSending(false);
+        }
     };
 
     const combinedFeed = [...messages, ...officialEvents]
@@ -403,9 +409,12 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                             </div>
                         ) : !COMMUNITY_WRITES_ENABLED ? (
                             <div role="status" className="w-full text-center rounded-xl bg-amber-50 border border-amber-200 py-2 px-3 text-[10px] font-bold text-amber-900">Chat posting is paused until secure PostgreSQL community identity and moderation are ready.</div>
+                            
                         ) : authLoading ? (
                              <div className="h-10 w-full bg-slate-100 rounded-full animate-pulse border border-slate-200"></div>
                         ) : user ? (
+                            <div>
+                            {submissionError && <p role="alert" className="mb-2 text-xs text-red-700">{submissionError}</p>}
                             <form onSubmit={handleSendMessage} className="relative flex items-center">
                                 <input 
                                     type="text" 
@@ -419,6 +428,7 @@ export default function FanZoneChat({ matchId, espnId }: { matchId: string, espn
                                     <Send size={14} />
                                 </button>
                             </form>
+                            </div>
                         ) : (
                             <div className="flex items-center justify-between bg-[#F0F2F5] rounded-full p-1 pl-4 shadow-inner border border-slate-200">
                                 <div className="flex items-center gap-1.5 text-slate-500"><ShieldAlert size={12} /><span className="text-[9px] font-bold uppercase tracking-widest">Login to chat</span></div>
