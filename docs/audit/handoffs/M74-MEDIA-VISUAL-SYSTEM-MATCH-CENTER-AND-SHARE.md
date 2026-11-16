@@ -1,0 +1,71 @@
+# M74 — Factsport Media 2D/2.5D visual system, match center and social-preview foundation
+
+**Date:** 2026-11-16  
+**Branch:** `refactor/factsport-v2`  
+**Status:** SOURCE IMPLEMENTATION + SOURCE TESTS COMMITTED. Full engine suite, TypeScript, Vinext, protected Cloudflare staging, browser screenshots, real OG crawler and accessibility/performance acceptance **NOT VERIFIED**.
+
+## 1. Owner instruction and relationship to existing plans
+
+The owner requires the existing Factsport V2 Media experience to become premium visual sports media rather than text-heavy: homepage, live/matches, league/standings, match center and **all** match-details tabs, news/highlights/social preview/sharing. Use 2D/purposeful 2.5D and selective 3D where supported; no heavy 3D/WebGL default or fake source data. It must look attractive on mobile and desktop, remain fast, AdSense-safe, SEO/crawler-friendly, accessible, and integrated with two-in-one product ownership (Factsport.com **Media** first; separate `predict.factsport.com` Prediction).
+
+This is explicitly integrated with master `docs/audit/ROADMAP.md` **M1, M8 and M10**, plus `docs/audit/PRODUCTION-EXECUTION-PLAN.md`. Both governing documents were edited during M74. This milestone is the **first implementation slice**, not a claim that the complete multi-page visual redesign is finished.
+
+The M70-M73 owner decisions remain binding: archived D1 scripts never active; anonymous Media chat/MOTM without accounts; Prediction stays separate; approved Stream.io room studio remains; owner rejected paid Cloudflare Stream hosted VOD; no new ad code/monetization assumptions.
+
+## 2. Source baseline and files inspected
+
+Starting from the branch containing handoff `M73-ACCOUNT-FREE-MEDIA-CHAT-MOTM-POSTGRES.md`, source inspected:
+- `docs/audit/ROADMAP.md`, `docs/audit/PRODUCTION-EXECUTION-PLAN.md`, and M73 community handoff.
+- `app/page.tsx`, `HeroMatchCards.tsx`, `CompactMatchRow.tsx`, `MatchRow.tsx`, `MatchesClientView.tsx`, `MatchHeaderClient.tsx`.
+- `StatsLineupsTabs.tsx`, `PitchLineup.tsx`, `MatchTimeline.tsx`, `LiveStandings.tsx`, `MiniStandings.tsx`, `MatchMobileHub.tsx`.
+- `app/standings/page.tsx`, `app/match/[id]/page.tsx`, `app/api/og/route.tsx`, `ShareButton.tsx`, `app/globals.css`.
+
+**Key preexisting capabilities to preserve:** the 2D pitch, formations, event chronology, match time, tabs, canonical IDs, live ESPN frontend, conditional public media, standings stage/group logic, existing OG `versus` and `pitch` formats and rights-reviewed social outbox. The original social generator was already substantial (not missing) and should be **extended** rather than replaced.
+
+## 3. Implementation committed
+
+### Visual foundation and match details
+- `app/components/VisualStatCompare.tsx`: new accessible team-side stat card with large numeric values, descriptive label and proportional color bars. Parser accepts only finite nonnegative numbers, including percentages, and retains `null`/unknown as unknown. A 0–0 stat uses a neutral track instead of showing invented 50/50 dominance.
+- `StatsLineupsTabs.tsx`: replaced tiny `StatRow` bars with visual cards in a responsive grid, removed fabricated `50%` possession and default `0` shots/corners/fouls/saves, preserved original lineup/pitch and player rating tools, kept the event timeline full width. Direct or derived shots only display when valid provider values exist.
+- `PitchLineup.tsx`: enhanced the existing 2D pitch with a subtle green gradient, elevated player tiles and a descriptive pitch group label; existing starting XI, formation, substitute cards and behavior retained. Removed fake click affordance/entrance animation from static player markers.
+- `app/globals.css`: centralized `fs-visual-panel`, `fs-visual-card`, `fs-visual-card-interactive`, live status and standings rank tokens. All hover lift effects respect `prefers-reduced-motion`; no JavaScript 3D runtime/WebGL/canvas dependency introduced.
+
+### Homepage and matches
+- `HeroMatchCards.tsx`: deeper, larger and keyboard-focus-visible featured match panels, with existing imagery, crest/media markers and score data retained. Fixed the shared fetcher invocation to pass **canonical match ID** and ignore backend `stale:true` results—important because the M71/M72 V2 ESPN reader deliberately rejects legacy-ID-only calls.
+- `CompactMatchRow.tsx`: cohesive elevation and focus treatment for fixture/result cards; same canonical-ID and stale-fallback correction. No new live polling cadence, media permissions or Prediction data path introduced.
+
+### Standings
+- `app/standings/page.tsx`: preserved semantic `<table>`, group/knockout structure, all columns, team links, existing promotion/relegation logic and form display. Added elevated container, visible rank pill, strong points capsule and bigger accessible W/D/L form chips. Did **not** invent new movement/qualification logic.
+- `generateMetadata` now restricts the league used in social card generation to the existing `LEAGUE_MAP` keys, UTF-8-safe encodes the payload and includes exact 1200x630 Open Graph image plus `summary_large_image` metadata.
+- `app/api/og/route.tsx`: added `type: 'standings'` to the existing `ImageResponse` engine, with league branding, layered typography and an abstract decorative chart. **It is explicitly a league preview, not a fabricated ranking**. Original `versus` and `pitch` modes untouched; no new third-party image generator, logo download or paid service.
+
+### Tests
+- `tests/media-visual-system.test.cjs`: six focused tests: execute the actual visual-stat parser via Node VM; assert no invented defaults and retained timeline/pitch; confirm canonical live fetch + stale-protection in two card families; assert semantic standings rank/points/form; assert existing OG renderer reused and original share formats intact; preserve pitch formations/bench and lightweight accessible depth.
+
+Selected commits in implementation order:
+- `d6dcdee` reusable stat card; `1db19cc` Stats tab integration; `d50890d` depth tokens; `4f4f573` homepage hero/canonical match.
+- `6217ea7` match list card; `7a21730` standings presentation; `1517d0f` correct rank JSX; `60ff810` full-width timeline.
+- `a9f2dc6` OG standings template; `db82bf2` standings metadata; `b44e9fb` regression tests; `c3e3fd0` and `93a1da0` correct regex escapes; `36af1fa` neutral 0–0 stat bar.
+- `b136941` pitch depth; `6aaf63c` pitch regression; `1424140` renderer-compatible OG styling.
+- `57ec97f` master roadmap M8 expansion; `3a65a5d` execution plan M74 gates.
+
+## 4. Not implemented / nonclaims
+
+**NOT** claiming the full visual redesign of the entire site is complete:
+- News/editorial hero, article cards/search and highlights, match-header scoreboard, team form/H2H, league hubs and deeper standings cards remain to be applied consistently.
+- Tactical pitch improvements, shot location and momentum require provider-sourced positions/events; no fictitious shot maps or invented metrics.
+- Match tabs (overview, chat/MOTM, predictions, H2H, live table, video) need coordinated mobile/desktop UI review. Prediction registration/consent is NOT to be pulled into Media community.
+- Remaining dedicated social formats (article, FT, lineups, verified MOTM) and OG crawler/rights/expiry validation remain. The generic OG renderer is not an authorization mechanism for external image URLs; inspect and harden remote image-fetch policy before using rights-sensitive artwork.
+- No real browser screenshots, mobile interaction testing, contrast audit, Core Web Vitals measurement, semantic screen reader audit or Cloudflare ImageResponse/preview crawl have been executed.
+- No code was deployed. No production DNS, database, secrets, live workers, chat/MOTM enablement, D1, AdSense, paid Cloudflare Stream or Stream.io rooms were changed.
+
+## 5. Acceptance criteria and rollback
+
+1. Run `npm run test:engine`, `npm run typecheck`, `npm run build:vinext` on the latest V2 head. Correct all failures. Source tests alone do not prove TypeScript/Vinext compatibility.
+2. Protected Cloudflare staging: browser screenshots at 320px / 375px / 768px / 1440px on homepage, matches fixtures/results, league/group standings, match scoreboard, stats, lineups, timeline, chat/MOTM, and article preview; no overflow or low-contrast labels.
+3. Compare real ESPN data for null scores, 0–0, partial possession, missing shots, changing status/clock and 3s updates. Cards must not propagate `stale:true` payloads, lose media URLs or change eligibility/scoring systems.
+4. Inspect keyboard navigation, accessible names for all stat bars/player pitch/form indicators, reduced-motion behavior, actual 1200x630 generated card, X/Facebook/WhatsApp/Telegram crawler images and no false rankings.
+5. Verify brand consistency, image rights/provenance, safe social remote images, and AdSense content/ad-position separation. Avoid monetizing interactive chat/Prediction pages through unapproved ad integrations.
+6. Rollback individual M74 source commits or restore previous components/OG template; no migration or data rollback is required for this UI slice.
+
+**Next actions:** finish remaining M74-A/B/C/D source integrations, run real test/build/staging checks, then review all Media/Predict feature parity and production cutover with explicit owner approval.
