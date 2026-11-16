@@ -213,7 +213,7 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
                 )}
 
                 <div className="flex flex-col lg:flex-row gap-4 mt-4">
-                    <div className="w-full lg:w-2/3 bg-white rounded-xl md:rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                    <div className="w-full lg:w-2/3 fs-visual-panel overflow-hidden">
                         <div className="bg-slate-50 p-2.5 md:p-4 border-b border-slate-200 flex justify-between items-center">
                              <h2 className="font-black text-slate-700 uppercase tracking-widest text-[10px] md:text-sm">{validLeague} Table</h2>
                         </div>
@@ -256,11 +256,11 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
                                                 const safeUrlName = teamName.replace(/['"]/g, '');
 
                                                 return (
-                                                    <tr key={entry.team.id} className={`hover:bg-slate-50 transition-colors ${isUCL ? 'bg-blue-50/20' : ''} ${isRelegation ? 'bg-red-50/20' : ''}`}>
+                                                    <tr key={entry.team.id} className={`hover:bg-slate-50 transition-colors ${isUCL ? 'bg-blue-50/40' : ''} ${isRelegation ? 'bg-rose-50/40' : ''}`}>
                                                         <td className="py-2 md:py-2.5 px-1 md:px-2 relative text-center font-bold text-slate-500">
                                                             {isUCL && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-r-sm"></div>}
                                                             {isRelegation && <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r-sm"></div>}
-                                                            {entry.position}
+                                                            <span className={`fs-standings-rank ${isUCL ? 'bg-blue-100 text-blue-700' : isRelegation ? 'bg-rose-100 text-rose-700' : ''}`} aria-label={`Position ${entry.position}`}>${entry.position}</span>
                                                     </td>
                                                     
                                                     <td className="py-2 md:py-2.5 px-1 md:px-2 font-black text-slate-800">
@@ -282,13 +282,13 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
                                                     <td className="py-2 md:py-2.5 px-0.5 md:px-1 text-center text-slate-500">{entry.draw}</td>
                                                     <td className="py-2 md:py-2.5 px-0.5 md:px-1 text-center text-slate-500">{entry.lost}</td>
                                                     <td className="py-2 md:py-2.5 px-0.5 md:px-1 text-center font-bold text-slate-600">{entry.goalDifference > 0 ? `+${entry.goalDifference}` : entry.goalDifference}</td>
-                                                    <td className="py-2 md:py-2.5 px-1 md:px-2 text-center font-black text-[11px] md:text-sm text-slate-900 bg-slate-50/50">{entry.points}</td>
+                                                    <td className="py-2 md:py-2.5 px-1 md:px-2 text-center"><span className="inline-flex min-w-8 justify-center rounded-lg bg-slate-900 px-2 py-1 text-xs font-black tabular-nums text-white">{entry.points}</span></td>
                                                     
                                                     {hasFormData && (
                                                         <td className="py-2 md:py-2.5 px-1 md:px-2 text-center">
                                                             <div className="flex items-center justify-center gap-0.5">
                                                                 {formArray.map((result: string, i: number) => (
-                                                                    <span key={i} className={`w-3 h-3 md:w-3.5 md:h-3.5 flex items-center justify-center text-[6px] md:text-[7px] font-black text-white rounded-[2px] md:rounded-sm ${result === 'W' ? 'bg-green-500' : result === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>
+                                                                    <span key={i} title={result === 'W' ? 'Win' : result === 'L' ? 'Loss' : 'Draw'} aria-label={result === 'W' ? 'Win' : result === 'L' ? 'Loss' : 'Draw'} className={`w-4 h-4 md:w-5 md:h-5 flex items-center justify-center text-[8px] font-black text-white rounded-md ${result === 'W' ? 'bg-emerald-600' : result === 'L' ? 'bg-rose-600' : 'bg-slate-500'}`}>
                                                                         {result}
                                                                     </span>
                                                                 ))}
