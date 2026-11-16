@@ -332,7 +332,7 @@ export async function GET(req: NextRequest) {
             <div style={{
               display: 'flex', flexDirection: 'column', gap: 22,
               padding: '35px 42px', borderRadius: 35, background: '#0a1e3d',
-              border: '1px solid #31537d', boxShadow: '0 20px 45px rgba(0,0,0,0.35)',
+              border: '1px solid #31537d',
             }}>
               <span style={{ display: 'flex', fontSize: 24, color: '#9fc9ec', letterSpacing: 3, fontWeight: 700 }}>THE RACE FOR THE TOP</span>
               <span style={{ display: 'flex', fontSize: 76, lineHeight: 1.08, fontWeight: 900, maxWidth: 980 }}>{league}</span>
