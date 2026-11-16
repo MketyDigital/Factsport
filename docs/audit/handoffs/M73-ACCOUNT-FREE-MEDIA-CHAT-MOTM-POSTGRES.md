@@ -60,3 +60,9 @@ The exact original fast ESPN/MOTM D1 and chat D1 Workers remain under `docs/audi
 - Full Node suite, TypeScript/Vinext build, SQL triggers, API runtime and real Turnstile/Cloudflare tests are unverified. Source inspection and committed tests are not passing CI.
 
 This handoff **supersedes M72's requirement for a registered fan identity** for Media visitor submissions. Authenticated staff moderation remains separate. Prediction systems remain unchanged.
+
+## Follow-up UI acceptance correction (2026-11-16)
+
+MOTM widget now distinguishes **pre-kickoff** (`Voting opens at kickoff`), missing fixture time (`Voting unavailable`) and **post-24-hour** voting closure, preserving the database's kickoff-to-24-hour eligibility window. Regression test updated.
+
+Commits: `2c32735fc912a123cd4ac7488df5dc7d0cb7176e`, `0034b335dbd3114eba58e6f3b16571872bf68938`.
