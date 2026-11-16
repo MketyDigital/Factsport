@@ -13,6 +13,7 @@ declare module 'cloudflare:workers' {
     FACTSPORT_MEDIA_COMMUNITY_WRITES?: string;
     FACTSPORT_MEDIA_VISITOR_SECRET?: string;
     FACTSPORT_MEDIA_NETWORK_PEPPER?: string;
+    FACTSPORT_MEDIA_TURNSTILE_SECRET?: string;
     FACTSPORT_COMMUNITY_HYPERDRIVE?: { connectionString: string };
     FACTSPORT_FAST_LIVE_BACKEND?: string;
     FACTSPORT_COMPETITIONS_BACKEND?: string;
