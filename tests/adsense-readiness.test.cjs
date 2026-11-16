@@ -121,7 +121,7 @@ test('public Media pages use V2 read adapters in production and never fall back 
   assert.match(match, /getPostgresMatchById/);
   assert.match(match, /getPostgresMatchPlaybackById/);
   assert.match(match, /process\.env\.NODE_ENV !== 'development'/);
-  assert.match(live, /listPostgresMatchesWindow/);
+  assert.match(live, /listPostgresLiveCoverageWindow/);
   assert.match(live, /getPublicMediaStudioSettings/);
   assert.match(matches, /process\.env\.NODE_ENV !== 'development'/);
   assert.match(news, /process\.env\.NODE_ENV !== 'development'/);
@@ -178,11 +178,15 @@ test('root layout has one valid document shell after public/private split', () =
   assert.equal(rootLayout.split('</html>').length - 1, 1);
 });
 
-test('legacy user-generated chat is not exposed in production Media surfaces', () => {
+test('Media community chat is explicitly gated to PostgreSQL while legacy global chat remains hidden', () => {
   const match = read('app/match/[id]/page.tsx');
   const live = read('app/live/page.tsx');
-  assert.match(match, /chatEnabled=\{process\.env\.NODE_ENV === 'development'\}/);
+  assert.match(match, /chatEnabled=\{\(env\.FACTSPORT_MEDIA_COMMUNITY_BACKEND/);
   assert.match(live, /process\.env\.NODE_ENV === 'development' \? <div/);
+  const chat = read('app/api/media/chat/messages/route.ts');
+  assert.match(chat, /FACTSPORT_MEDIA_COMMUNITY_BACKEND/);
+  assert.match(chat, /FACTSPORT_MEDIA_COMMUNITY_WRITES/);
+  assert.doesNotMatch(chat, /env\.DB|D1Database/);
 });
 
 test('public Media homepage announcements have a separate screened editor and render path', () => {
