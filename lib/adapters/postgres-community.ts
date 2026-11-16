@@ -15,7 +15,7 @@ export function validCommunityMatchId(id: unknown): id is string {
 export async function listPostgresPublicChatMessages(matchId: string) {
   if (!validCommunityMatchId(matchId)) throw new Error('Invalid match identifier');
   const rows = await withFactsportPostgres(sql => sql`
-    SELECT c.id, c.username, c.avatar_url, c.message, c.created_at
+    SELECT c.id, c.username, c.avatar_url, c.message, c.created_at, c.reply_to_id
     FROM public.public_media_match_chat_messages c
     WHERE c.match_id = (
       SELECT id FROM public.matches
