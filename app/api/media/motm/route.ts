@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { anonymousCommunityVisitor } from '@/lib/media/anonymous-community-visitor';
 import { withFactsportCommunityPostgres } from '@/lib/adapters/postgres-client';
+import { verifyMediaCommunityTurnstile } from '@/lib/media/community-turnstile';
 import { env } from 'cloudflare:workers';
 import { listPostgresPublicMotmTotals, validCommunityMatchId } from '@/lib/adapters/postgres-community';
 
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
     }
     const body = JSON.parse(bodyText);
     if (!body || typeof body !== 'object' || Array.isArray(body) ||
-        Object.keys(body).some(key => !['matchId', 'playerName'].includes(key))) {
+        Object.keys(body).some(key => !['matchId', 'playerName', 'turnstileToken'].includes(key))) {
       return NextResponse.json({ error: 'Unexpected submission fields.' }, { status: 400, headers });
     }
     const matchId = body.matchId;
@@ -57,6 +58,12 @@ export async function POST(request: Request) {
     if (!validCommunityMatchId(matchId) || typeof value !== 'string' ||
         value.trim().length < 1 || value.trim().length > 120) {
       return NextResponse.json({ error: 'Invalid match or content.' }, { status: 400, headers });
+    }
+    if (!(await verifyMediaCommunityTurnstile(request, body.turnstileToken, 'media-motm'))) {
+      return NextResponse.json(
+        { error: 'Please complete visitor verification and try again.' },
+        { status: 403, headers },
+      );
     }
     const rows = await withFactsportCommunityPostgres(sql => sql`
       SELECT public.submit_anonymous_media_motm(
