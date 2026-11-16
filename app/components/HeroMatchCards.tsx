@@ -33,13 +33,13 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                 try {
                     let data;
                     if (m.espn_id) {
-                        data = await fetchLiveMatchDeduplicated(m.espn_id);
+                        data = await fetchLiveMatchDeduplicated(m.espn_id, m.id);
                     } else {
                         const res = await fetch(`/api/match-data?id=${m.id}`, { cache: 'no-store' });
                         data = await res.json();
                     }
 
-                    if (data && !data.error) {
+                    if (data && !data.error && data.stale !== true) {
                         return { ...m, status: data.status, home_score: data.home_score, away_score: data.away_score, displayClock: data.displayClock };
                     }
                 } catch(e) { }
@@ -60,7 +60,7 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
     if (!liveMatches || liveMatches.length === 0) return null;
 
     return (
-        <div className="w-full overflow-hidden bg-[#0f1c3a]">
+        <div className="w-full overflow-hidden bg-[#0f1c3a]" aria-label="Featured matches">
             {/* 🟢 Tiny Title, No extra margins */}
             <div className="px-3 pt-2 pb-1">
                 <h3 className="text-[9px] md:text-[11px] font-black uppercase tracking-widest text-slate-400">Top Matches</h3>
@@ -74,8 +74,8 @@ export default function HeroMatchCards({ heroMatches }: { heroMatches: any[] }) 
                     const hasMedia = match.livestream_url || match.audio_url || match.video_url;
 
                     return (
-                        <Link key={match.id} href={`/match/${match.id}`} className="block relative z-10 w-[185px] md:w-[240px] shrink-0 snap-center">
-                            <div className="bg-[#14234b] rounded-lg p-2 shadow-md border border-slate-700 relative overflow-hidden group h-[75px]">
+                        <Link key={match.id} href={`/match/${match.id}`} className="block relative z-10 w-[205px] md:w-[256px] shrink-0 snap-center fs-visual-card-interactive focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400">
+                            <div className="fs-visual-card p-3 relative group min-h-[90px]">
                                 {match.home_fanart || match.home_stadium ? (
                                     <>
                                         <img src={match.home_fanart || match.home_stadium} className="absolute inset-0 w-full h-full object-cover opacity-20" />
