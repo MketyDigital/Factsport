@@ -347,3 +347,29 @@ P8 remains OPEN. The 2026-11-08 Publisher Restrictions recheck confirms that onl
 - Do not enable the social dispatcher readiness flag, provider readiness flags or Logic Apps workflow until dispatcher Hyperdrive, bearer secrets, Meta/Telegram credentials, secured Buffer/Make APIM adapter and private provider-destination E2E are complete. The Logic Apps template is disabled by default and is the single intended scheduler; do not add a Cloudflare Cron duplicate.
 - Validate editorial source visibility against the latest published revision, rights-reference exclusion, image eligibility after rights/expiry changes, Telegram/Meta provider limits, one-provider-call locking, retry/backoff and unknown-result manual reconciliation.
 - Studio participant moderation and role demotion require signed Stream webhook/token issuer staging proof. No Stream room activation, production migration or production write is implied by the source commits.
+
+
+## M74 — Media visual-system acceptance and phased rollout (2026-11-16)
+
+**Owner-directed product requirement:** Factsport.com Media must be visual-first throughout the homepage, fixtures/results, league standings, match center, match-detail tabs, articles and public social-share surfaces. Avoid generic plain-text-heavy layouts. Apply purposeful 2D/2.5D depth and selective 3D where useful; **do not require heavy WebGL/3D frameworks, invented provider data or paid visual services**. This is an extension of master-roadmap M8 and M1/M10, not a new standalone product or replacement for the two-system ownership model.
+
+### Source-delivered M74 entry slice (not yet runtime accepted)
+
+- Reuses legacy `PitchLineup`, `MatchTimeline`, `MatchHeaderClient`, live match feed and `/api/og` instead of reimplementing their behaviors.
+- Adds `VisualStatCompare` in the match-details Stats tab with screen-reader value labels and a neutral track when data is absent/0–0; no fabricated possession or shot totals.
+- Adds centralized CSS `fs-visual-*` elevation and status/rank tokens; hover animation respects `prefers-reduced-motion`.
+- Upgrades homepage hero and match fixture cards, preserving canonical-match-ID frontend reads and discarding stale backend updates.
+- Gives standings clear rank/points/form visuals without removing semantic table columns or league/group logic.
+- Extends the existing 1200×630 Open Graph image generator to a standings league-preview template; standings page metadata now supplies a bounded known league name to the existing renderer for Facebook/WhatsApp/X etc. No fabricated table results.
+
+### Required implementation sequence and acceptance
+
+1. **Shared foundation:** brand tokens, status/competition/team crest, labels/alt text, keyboard focus, hover/focus parity, reduced motion, semantic live data, light CSS/SVG. Do not silently change Factsport's established branding.
+2. **Match center, all tabs:** scoreboard, events timeline, statistics, pitch lineups and bench, H2H/form, standings, predictions (respect separate Prediction roles), fan chat/MOTM, official media playback. Only show momentum/shot maps when trusted coordinates/sources exist.
+3. **Homepage and matches:** visual article-led hero and highlight cards, responsible media thumbnails, live fixtures, date filters, cards, game states, empty/error/loading and local timezone. Avoid layout thrashing or unbounded polling.
+4. **Standings/leagues:** mobile accessible rankings, promotion/relegation rules, form streaks and stage/group formats; avoid falsely displaying qualifying tiers for tournaments and unverified leagues.
+5. **Social:** use **one** server-owned `/api/og` and existing publishing/outbox. Add article/match/FT/lineup/MOTM/standings visuals with exact public provenance, safe logos, accessible canonical metadata, verified crawler response and 1200x630 crop. Do not permit unsupported user-provided logos or rights-prohibited images to appear in public cards.
+6. **Quality/release:** capture mobile 320px, tablet and desktop screenshots; verify no horizontal overflow; accessibility keyboard/screen reader, heading order, aria announcements and contrast; reduced-motion setting; image sizing and lazy loading; actual Web Vitals and Cloudflare/Vinext Edge ImageResponse support; remote OG fetch rights/SSRF constraints; social unfurl on X/WhatsApp/Telegram/Facebook; AdSense content/placement safe areas.
+7. **No-go until proven:** run `npm run test:engine`, `npm run typecheck`, `npm run build:vinext`; compare preserved ESPN clock/scores and existing match/prediction/social behavior; test protected staging with real match data. Visual design does **not** waive existing DB, identity, rights, ad compliance or Cloudflare production cutover gates.
+
+M74 source and audit handoff: `docs/audit/handoffs/M74-MEDIA-VISUAL-SYSTEM-MATCH-CENTER-AND-SHARE.md`. Source changes are on `refactor/factsport-v2` only. No production assets, DNS, ad code, paid Cloudflare Stream, D1, database or provider changes are authorized.
