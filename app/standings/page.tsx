@@ -260,7 +260,7 @@ export default async function StandingsPage({ searchParams }: { searchParams: Pr
                                                         <td className="py-2 md:py-2.5 px-1 md:px-2 relative text-center font-bold text-slate-500">
                                                             {isUCL && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-r-sm"></div>}
                                                             {isRelegation && <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r-sm"></div>}
-                                                            <span className={`fs-standings-rank ${isUCL ? 'bg-blue-100 text-blue-700' : isRelegation ? 'bg-rose-100 text-rose-700' : ''}`} aria-label={`Position ${entry.position}`}>${entry.position}</span>
+                                                            <span className={`fs-standings-rank ${isUCL ? 'bg-blue-100 text-blue-700' : isRelegation ? 'bg-rose-100 text-rose-700' : ''}`} aria-label={`Position ${entry.position}`}>{entry.position}</span>
                                                     </td>
                                                     
                                                     <td className="py-2 md:py-2.5 px-1 md:px-2 font-black text-slate-800">
