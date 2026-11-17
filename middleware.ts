@@ -20,7 +20,22 @@ export async function middleware(request: NextRequest) {
   // Factsport v2 staging Worker: fail closed on EVERY matched path, including
   // /api and /admin. The hostname guard above also protects against a missing
   // staging environment binding.
+  const pathname = request.nextUrl.pathname;
+  const isMediaSignInBrowserPath =
+    pathname === '/media-login' ||
+    (pathname === '/api/auth/entra/start' && request.method === 'GET') ||
+    (pathname === '/api/auth/entra/callback' && request.method === 'GET') ||
+    (pathname === '/api/auth/entra/logout' && request.method === 'POST');
+  const isMediaAdminBrowserPath =
+    (pathname === '/admin' || pathname.startsWith('/admin/')) &&
+    Boolean(request.cookies.get('__Host-factsport_media_session')?.value);
+
   if (env.FACTSPORT_ENVIRONMENT === 'staging' || isFactsportStagingWorkerHost) {
+    // Let the real Entra browser flow reach its routes on staging without an
+    // out-of-band header. The callback still requires an existing issuer/subject
+    // link; admin pages/actions re-decrypt the session and re-check DB membership.
+    // Every other staging path remains behind the short-lived CI-only token.
+    if (!isMediaSignInBrowserPath && !isMediaAdminBrowserPath) {
     const secret = env.FACTSPORT_STAGING_TOKEN;
     const provided = request.headers.get('x-factsport-staging-token') || '';
     if (typeof secret !== 'string' || !secret || !provided ||
@@ -45,8 +60,8 @@ export async function middleware(request: NextRequest) {
         headers: { 'Cache-Control': 'no-store' },
       });
     }
+    }
   }
-  const pathname = request.nextUrl.pathname;
   const searchParams = request.nextUrl.search;
 
   // Health and public match reads are staging-only database probes. The mandatory
