@@ -182,8 +182,8 @@ jobs:
               exit 1
             }
           else
-            [ "$BROWSER_ENTRA_STATUS" = "404" ] || {
-              echo "::error::Entra login is not configured but the staging browser route did not remain closed (HTTP $BROWSER_ENTRA_STATUS)."
+            [ "$BROWSER_ENTRA_STATUS" = "503" ] || {
+              echo "::error::Entra login is not configured but the browser endpoint did not fail closed with HTTP 503 (HTTP $BROWSER_ENTRA_STATUS)."
               exit 1
             }
           fi
