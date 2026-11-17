@@ -184,6 +184,38 @@ jobs:
           }
           echo "Factsport native vinext app: authorized Hyperdrive and R2 dependency check passed"
 
+          ENTRA_STATUS="$(curl --silent --show-error --max-time 30 \
+            -D /tmp/factsport-entra-start.headers \
+            -o /tmp/factsport-entra-start.body -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+            "$BASE/api/auth/entra/start")"
+          if [ -n "${ENTRA_EXTERNAL_CLIENT_ID:-}" ] && [ -n "${ENTRA_EXTERNAL_REDIRECT_URI:-}" ]; then
+            [ "$ENTRA_STATUS" = "302" ] || {
+              echo "::error::Configured Entra sign-in start did not return an authorization redirect (HTTP $ENTRA_STATUS)."
+              exit 1
+            }
+            ENTRA_LOCATION="$(grep -i '^location:' /tmp/factsport-entra-start.headers | tail -n 1 | sed -E 's/^[^:]*:[[:space:]]*//; s/\\r$//')"
+            export ENTRA_LOCATION ENTRA_EXPECTED_CLIENT_ID="$ENTRA_EXTERNAL_CLIENT_ID" ENTRA_EXPECTED_REDIRECT_URI="$ENTRA_EXTERNAL_REDIRECT_URI"
+            node <<'NODE'
+          const location = new URL(process.env.ENTRA_LOCATION);
+          const query = location.searchParams;
+          if (query.get('client_id') !== process.env.ENTRA_EXPECTED_CLIENT_ID ||
+              query.get('redirect_uri') !== process.env.ENTRA_EXPECTED_REDIRECT_URI ||
+              query.get('response_type') !== 'code' ||
+              query.get('code_challenge_method') !== 'S256' ||
+              !query.get('state') || !query.get('nonce') || !query.get('code_challenge')) {
+            throw new Error('Entra authorization redirect is missing expected app, callback, or PKCE parameters');
+          }
+          NODE
+            grep -Eiq '^set-cookie: __Host-factsport_entra_state=' /tmp/factsport-entra-start.headers || {
+              echo "::error::Entra sign-in start did not set the protected OIDC state cookie."
+              exit 1
+            }
+            echo "Factsport staging Entra start: discovery/issuer, app callback and PKCE redirect passed."
+          else
+            echo "Factsport staging Entra start: skipped because Entra app secrets are not configured."
+          fi
+
           MATCH_PAGE_STATUS="$(curl --silent --show-error --max-time 30 \
             -o /tmp/factsport-staging-match-page.html -w '%{http_code}' \
             -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" "$BASE/matches")"
