@@ -2,6 +2,7 @@ name: Factsport v2 full application staging (protected)
 
 # No production domain, DNS, or main-branch changes. Separate Worker only.
 on:
+  workflow_dispatch:
   push:
     branches:
       - refactor/factsport-v2
