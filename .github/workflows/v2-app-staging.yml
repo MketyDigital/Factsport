@@ -1,4 +1,4 @@
-name: Factsport v2 full application staging (protected)
+name: Factsport v2 staging + read-only database preflight
 
 # No production domain, DNS, or main-branch changes. Separate Worker only.
 on:
@@ -210,6 +210,18 @@ jobs:
             exit 1
           }
           echo "Factsport native vinext app: authorized Hyperdrive and R2 dependency check passed"
+
+          DB_PREFLIGHT_STATUS="$(curl --silent --show-error --max-time 30 \
+            -o /tmp/factsport-staging-db-preflight.json -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+            "$BASE/api/v2/staging/db-preflight")"
+          [ "$DB_PREFLIGHT_STATUS" = "200" ] && jq -e '.ok == true and .targetDatabaseMatches == true and .tlsEnabled == true' \
+            /tmp/factsport-staging-db-preflight.json >/dev/null || {
+              echo "::error::Read-only database preflight failed through staging Hyperdrive (HTTP $DB_PREFLIGHT_STATUS)."
+              exit 1
+            }
+          echo "Factsport staging database preflight (sanitized):"
+          jq . /tmp/factsport-staging-db-preflight.json | tee -a "$GITHUB_STEP_SUMMARY"
 
           ENTRA_STATUS="$(curl --silent --show-error --max-time 30 \
             -D /tmp/factsport-entra-start.headers \
