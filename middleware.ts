@@ -17,9 +17,9 @@ export async function middleware(request: NextRequest) {
     });
   }
 
-  // Factsport v2 staging Worker: fail closed on EVERY matched path, including
-  // /api and /admin. The hostname guard above also protects against a missing
-  // staging environment binding.
+  // Factsport v2 staging Worker: fail closed by default. The small Entra
+  // browser-flow exception below is limited to sign-in endpoints and a session-
+  // cookie-present Media admin request; server code still verifies identity/role.
   const pathname = request.nextUrl.pathname;
   const isMediaSignInBrowserPath =
     pathname === '/media-login' ||
@@ -36,30 +36,30 @@ export async function middleware(request: NextRequest) {
     // link; admin pages/actions re-decrypt the session and re-check DB membership.
     // Every other staging path remains behind the short-lived CI-only token.
     if (!isMediaSignInBrowserPath && !isMediaAdminBrowserPath) {
-    const secret = env.FACTSPORT_STAGING_TOKEN;
-    const provided = request.headers.get('x-factsport-staging-token') || '';
-    if (typeof secret !== 'string' || !secret || !provided ||
-        provided.length > 4096 || secret.length > 4096) {
-      return new NextResponse('Not found', {
-        status: 404,
-        headers: { 'Cache-Control': 'no-store' },
-      });
-    }
-    const encoder = new TextEncoder();
-    const [expectedDigest, providedDigest] = await Promise.all([
-      crypto.subtle.digest('SHA-256', encoder.encode(secret)),
-      crypto.subtle.digest('SHA-256', encoder.encode(provided)),
-    ]);
-    const a = new Uint8Array(expectedDigest);
-    const b = new Uint8Array(providedDigest);
-    let mismatch = 0;
-    for (let i = 0; i < a.length; i++) mismatch |= a[i] ^ b[i];
-    if (mismatch !== 0) {
-      return new NextResponse('Not found', {
-        status: 404,
-        headers: { 'Cache-Control': 'no-store' },
-      });
-    }
+      const secret = env.FACTSPORT_STAGING_TOKEN;
+      const provided = request.headers.get('x-factsport-staging-token') || '';
+      if (typeof secret !== 'string' || !secret || !provided ||
+          provided.length > 4096 || secret.length > 4096) {
+        return new NextResponse('Not found', {
+          status: 404,
+          headers: { 'Cache-Control': 'no-store' },
+        });
+      }
+      const encoder = new TextEncoder();
+      const [expectedDigest, providedDigest] = await Promise.all([
+        crypto.subtle.digest('SHA-256', encoder.encode(secret)),
+        crypto.subtle.digest('SHA-256', encoder.encode(provided)),
+      ]);
+      const a = new Uint8Array(expectedDigest);
+      const b = new Uint8Array(providedDigest);
+      let mismatch = 0;
+      for (let i = 0; i < a.length; i++) mismatch |= a[i] ^ b[i];
+      if (mismatch !== 0) {
+        return new NextResponse('Not found', {
+          status: 404,
+          headers: { 'Cache-Control': 'no-store' },
+        });
+      }
     }
   }
   const searchParams = request.nextUrl.search;
