@@ -141,6 +141,9 @@ jobs:
           rm -f /tmp/factsport-staging-secrets.json
       - name: Resolve Factsport staging Worker subdomain and test deny-by-default
         shell: bash
+        env:
+          ENTRA_EXTERNAL_CLIENT_ID: ${{ secrets.ENTRA_EXTERNAL_CLIENT_ID }}
+          ENTRA_EXTERNAL_REDIRECT_URI: ${{ secrets.ENTRA_EXTERNAL_REDIRECT_URI }}
         run: |
           set -euo pipefail
           SUBDOMAIN_STATUS="$(curl --silent --show-error --max-time 20 -o /tmp/factsport-worker-subdomain.json -w '%{http_code}' \
