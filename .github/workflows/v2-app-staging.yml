@@ -165,6 +165,30 @@ jobs:
             }
             echo "Factsport staging $path: unauthorized access blocked"
           done
+
+          LOGIN_PAGE_STATUS="$(curl --silent --show-error --max-time 25 \
+            -o /tmp/factsport-staging-media-login -w '%{http_code}' "$BASE/media-login")"
+          [ "$LOGIN_PAGE_STATUS" = "200" ] || {
+            echo "::error::Staging Media sign-in page did not open for a browser (HTTP $LOGIN_PAGE_STATUS)."
+            exit 1
+          }
+          BROWSER_ENTRA_STATUS="$(curl --silent --show-error --max-time 30 \
+            -D /tmp/factsport-browser-entra-start.headers \
+            -o /tmp/factsport-browser-entra-start.body -w '%{http_code}' \
+            "$BASE/api/auth/entra/start")"
+          if [ -n "${ENTRA_EXTERNAL_CLIENT_ID:-}" ] && [ -n "${ENTRA_EXTERNAL_REDIRECT_URI:-}" ]; then
+            [ "$BROWSER_ENTRA_STATUS" = "302" ] || {
+              echo "::error::Unauthenticated browser could not start the configured Entra flow (HTTP $BROWSER_ENTRA_STATUS)."
+              exit 1
+            }
+          else
+            [ "$BROWSER_ENTRA_STATUS" = "404" ] || {
+              echo "::error::Entra login is not configured but the staging browser route did not remain closed (HTTP $BROWSER_ENTRA_STATUS)."
+              exit 1
+            }
+          fi
+          echo "Factsport staging browser sign-in routes: checked without Cloudflare Access"
+
           HEALTH_READY=false
           HEALTH_STATUS=000
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
