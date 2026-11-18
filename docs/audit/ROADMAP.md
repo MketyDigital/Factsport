@@ -2,8 +2,8 @@ Warning: truncated output (original token count: 29058)
 Total output lines: 728
 
 # Factsport modernization — master roadmap
-Status: V2 refactor active; protected app staging slice passed on 2026-11-16; broader Media/Prediction acceptance and production remain open | Repository: MketyDigital/Factsport | Branch: refactor/factsport-v2
-Updated: 2026-10-30
+Status: V2 refactor active; full clean-start database migration chain applied to factsport_v2 on 2026-11-18; broader Media/Prediction acceptance and production remain open | Repository: MketyDigital/Factsport | Branch: refactor/factsport-v2
+Updated: 2026-11-18
 
 ## Governing decisions
 - Preserve original repository and commit history throughout the modernization; repository remains PUBLIC until release and production reactivation. Do not put confidential audit outputs, user data, credentials or Supabase exports in this repo.
@@ -615,3 +615,9 @@ The extended read-only admin audit passed in [run 44350763779](https://github.co
 ### Owner clarification — fresh V2 database
 
 No legacy database restore or import is part of the V2 clean-reset plan. `factsport_v2` is the V2 target; the intended operational/gameplay state starts fresh, while new V2 fixture rows already present are preserved. Continue by applying the reviewed ordered schema migrations to this target. The production plan's backup/PITR requirement is a recovery-resilience gate for the V2 target before production release, not a source-data restore gate and not a reason to pause implementation. No production resources or legacy data are to be changed.
+
+### 2026-11-18 — fresh V2 schema chain applied
+
+The guarded staging migration workflow [44358887095](https://github.com/MketyDigital/Factsport/actions/runs/44358887095) completed successfully against the verified Azure PostgreSQL target `factsport_v2`, connecting as the administrative migration identity `mketydbadmin` through the exact V2 Hyperdrive. It applied all 49 ordered migrations, versions 0000–0048, and verified a contiguous SHA-256 migration ledger. No legacy operational data was restored or imported; the V2 clean-start target and existing V2 fixtures remain the intended source of truth.
+
+This closes the applied-schema step for the V2 migration chain. It does not prove all Media/runtime roles and credentials are provisioned, create runtime Hyperdrive bindings/logins, complete the real Entra editor journey, complete Media/provider acceptance, enable the disabled Azure Logic App, or establish backup/PITR recovery. Production remains no-go. Continue with a separate read-only schema/role/ledger audit, then finish Media runtime provisioning and acceptance, recovery rehearsal, route isolation and P9A rollback/go-no-go before any Media cutover. Prediction remains P9B; Factsport TV remains P10 after Media and Prediction are stable.
