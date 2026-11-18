@@ -3,7 +3,7 @@
 BEGIN;
 CREATE TABLE IF NOT EXISTS public.factsport_schema_migrations (
   version integer PRIMARY KEY CHECK (version >= 0),
-  filename text NOT NULL UNIQUE CHECK (filename ~ '^[0-9]{4}_[a-z0-9_]+\\.sql$'),
+  filename text NOT NULL UNIQUE CHECK (filename ~ '^[0-9]{4}_[a-z0-9_]+[.]sql$'),
   checksum_sha256 char(64) NOT NULL CHECK (checksum_sha256 ~ '^[a-f0-9]{64}$'),
   applied_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   applied_by name NOT NULL DEFAULT current_user
