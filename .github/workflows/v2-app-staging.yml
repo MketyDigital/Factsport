@@ -1,0 +1,343 @@
+name: Factsport v2 staging + read-only database preflight
+
+# No production domain, DNS, or main-branch changes. Separate Worker only.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - '.github/workflows/v2-app-staging.yml'
+      - 'cloudflare.config.ts'
+      - 'vite.config.ts'
+      - 'middleware.ts'
+      - 'package.json'
+      - 'postcss.config.*'
+      - 'app/**'
+      - 'lib/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'types/**'
+      - 'next.config.*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factsport-v2-app-staging
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/refactor/factsport-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: factsport_staging_nonproduction_placeholder
+    steps:
+      - name: Validate Cloudflare credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ] ||
+            { echo "::error::Existing CLOUDFLARE_ID or CLOUDFLARE_KEY repository secret unavailable"; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/factsport-v2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Run Factsport regression suite
+        run: npm run test:engine
+      - name: Check Typescript
+        run: npm run typecheck
+      - name: Build native Factsport Cloudflare Worker
+        run: npm run build:vinext
+      # cf --prebuilt currently assumes v0 output while the vinext Vite build emits v1.
+      # Use cf's supported build-and-deploy path with the same temporary secret.
+      - name: Assert CLI supports generated Build Output before any staging API call
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --no-install cf --version
+          if [ ! -f .cloudflare/output/v0/config.json ]; then
+            echo "::error::Cloudflare CLI expects v0 Build Output but vinext emitted a different layout (currently v1); resolve the cf/Vite plugin compatibility first."
+            find .cloudflare/output -maxdepth 2 -name config.json -print
+            exit 1
+          fi
+      - name: Deploy Factsport staging Worker with temporary access secret
+        shell: bash
+        env:
+          ENTRA_EXTERNAL_DISCOVERY_URL: ${{ secrets.ENTRA_EXTERNAL_DISCOVERY_URL }}
+          ENTRA_EXTERNAL_ISSUER: ${{ secrets.ENTRA_EXTERNAL_ISSUER }}
+          ENTRA_EXTERNAL_CLIENT_ID: ${{ secrets.ENTRA_EXTERNAL_CLIENT_ID }}
+          ENTRA_EXTERNAL_REDIRECT_URI: ${{ secrets.ENTRA_EXTERNAL_REDIRECT_URI }}
+          FACTSPORT_AUTH_SESSION_SECRET: ${{ secrets.FACTSPORT_AUTH_SESSION_SECRET }}
+        run: |
+          set -euo pipefail
+          umask 077
+          FACTSPORT_STAGING_TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$FACTSPORT_STAGING_TOKEN"
+          printf 'FACTSPORT_STAGING_TOKEN=%s\n' "$FACTSPORT_STAGING_TOKEN" >> "$GITHUB_ENV"
+          ENTRA_SET=0
+          for value in "$ENTRA_EXTERNAL_DISCOVERY_URL" "$ENTRA_EXTERNAL_ISSUER" "$ENTRA_EXTERNAL_CLIENT_ID" "$ENTRA_EXTERNAL_REDIRECT_URI" "$FACTSPORT_AUTH_SESSION_SECRET"; do
+            if [ -n "$value" ]; then ENTRA_SET=$((ENTRA_SET + 1)); fi
+          done
+          if [ "$ENTRA_SET" -ne 0 ] && [ "$ENTRA_SET" -ne 5 ]; then
+            echo "::error::Entra staging configuration is partial; set all five Entra GitHub Actions secrets or none."
+            exit 1
+          fi
+          if [ "$ENTRA_SET" -eq 5 ]; then
+            for value in "$ENTRA_EXTERNAL_DISCOVERY_URL" "$ENTRA_EXTERNAL_ISSUER" "$ENTRA_EXTERNAL_CLIENT_ID" "$ENTRA_EXTERNAL_REDIRECT_URI" "$FACTSPORT_AUTH_SESSION_SECRET"; do
+              echo "::add-mask::$value"
+            done
+            export ENTRA_EXTERNAL_DISCOVERY_URL ENTRA_EXTERNAL_ISSUER ENTRA_EXTERNAL_CLIENT_ID ENTRA_EXTERNAL_REDIRECT_URI FACTSPORT_AUTH_SESSION_SECRET
+            node <<'NODE'
+          const required = [
+            'ENTRA_EXTERNAL_DISCOVERY_URL', 'ENTRA_EXTERNAL_ISSUER',
+            'ENTRA_EXTERNAL_CLIENT_ID', 'ENTRA_EXTERNAL_REDIRECT_URI',
+            'FACTSPORT_AUTH_SESSION_SECRET',
+          ];
+          for (const key of required) {
+            if (!process.env[key]) throw new Error(`Missing ${key}`);
+          }
+          const discovery = new URL(process.env.ENTRA_EXTERNAL_DISCOVERY_URL);
+          const issuer = new URL(process.env.ENTRA_EXTERNAL_ISSUER);
+          const redirect = new URL(process.env.ENTRA_EXTERNAL_REDIRECT_URI);
+          if ([discovery, issuer, redirect].some(url => url.protocol !== 'https:')) {
+            throw new Error('Entra discovery, issuer, and redirect URLs must use HTTPS');
+          }
+          if (redirect.pathname !== '/api/auth/entra/callback') {
+            throw new Error('Entra redirect path must exactly be /api/auth/entra/callback');
+          }
+          const session = process.env.FACTSPORT_AUTH_SESSION_SECRET;
+          const decoded = Buffer.from(session, 'base64url');
+          if (decoded.length !== 32 || decoded.toString('base64url') !== session) {
+            throw new Error('FACTSPORT_AUTH_SESSION_SECRET must be canonical base64url for 32 bytes');
+          }
+          NODE
+            jq -n \
+              --arg staging "$FACTSPORT_STAGING_TOKEN" \
+              --arg discovery "$ENTRA_EXTERNAL_DISCOVERY_URL" \
+              --arg issuer "$ENTRA_EXTERNAL_ISSUER" \
+              --arg client "$ENTRA_EXTERNAL_CLIENT_ID" \
+              --arg redirect "$ENTRA_EXTERNAL_REDIRECT_URI" \
+              --arg session "$FACTSPORT_AUTH_SESSION_SECRET" \
+              '{FACTSPORT_STAGING_TOKEN:$staging,ENTRA_EXTERNAL_DISCOVERY_URL:$discovery,ENTRA_EXTERNAL_ISSUER:$issuer,ENTRA_EXTERNAL_CLIENT_ID:$client,ENTRA_EXTERNAL_REDIRECT_URI:$redirect,FACTSPORT_AUTH_SESSION_SECRET:$session}' \
+              > /tmp/factsport-staging-secrets.json
+            echo "Entra Media editor login configuration validated and included in staging deployment."
+          else
+            jq -n --arg staging "$FACTSPORT_STAGING_TOKEN" '{FACTSPORT_STAGING_TOKEN:$staging}' > /tmp/factsport-staging-secrets.json
+            echo "Entra Media editor login remains disabled in staging; no Entra secrets were supplied."
+          fi
+          chmod 600 /tmp/factsport-staging-secrets.json
+          npx --no-install cf deploy --mode production --secrets-file /tmp/factsport-staging-secrets.json
+          rm -f /tmp/factsport-staging-secrets.json
+      - name: Resolve Factsport staging Worker subdomain and test deny-by-default
+        shell: bash
+        env:
+          ENTRA_EXTERNAL_CLIENT_ID: ${{ secrets.ENTRA_EXTERNAL_CLIENT_ID }}
+          ENTRA_EXTERNAL_REDIRECT_URI: ${{ secrets.ENTRA_EXTERNAL_REDIRECT_URI }}
+        run: |
+          set -euo pipefail
+          SUBDOMAIN_STATUS="$(curl --silent --show-error --max-time 20 -o /tmp/factsport-worker-subdomain.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain")"
+          if [ "$SUBDOMAIN_STATUS" != "200" ]; then
+            echo "::error::Unable to locate account Workers subdomain (HTTP $SUBDOMAIN_STATUS)"
+            exit 1
+          fi
+          SUBDOMAIN="$(jq -r '.result.subdomain // empty' /tmp/factsport-worker-subdomain.json)"
+          [ -n "$SUBDOMAIN" ] || { echo "::error::Workers subdomain not present"; exit 1; }
+          BASE="https://factsport-v2-staging.$SUBDOMAIN.workers.dev"
+          for path in / /api/matches /admin /matches; do
+            STATUS="$(curl --silent --show-error --max-time 25 --retry 6 --retry-all-errors --retry-delay 3 \
+              -o /tmp/factsport-staging-unauthenticated -w '%{http_code}' "$BASE$path")"
+            [ "$STATUS" = "404" ] || {
+              echo "::error::Unsafe staging access: unauthenticated $path returned HTTP $STATUS instead of 404"
+              exit 1
+            }
+            echo "Factsport staging $path: unauthorized access blocked"
+          done
+
+          LOGIN_PAGE_STATUS="$(curl --silent --show-error --max-time 25 \
+            -o /tmp/factsport-staging-media-login -w '%{http_code}' "$BASE/media-login")"
+          [ "$LOGIN_PAGE_STATUS" = "200" ] || {
+            echo "::error::Staging Media sign-in page did not open for a browser (HTTP $LOGIN_PAGE_STATUS)."
+            exit 1
+          }
+          BROWSER_ENTRA_STATUS="$(curl --silent --show-error --max-time 30 \
+            -D /tmp/factsport-browser-entra-start.headers \
+            -o /tmp/factsport-browser-entra-start.body -w '%{http_code}' \
+            "$BASE/api/auth/entra/start")"
+          if [ -n "${ENTRA_EXTERNAL_CLIENT_ID:-}" ] && [ -n "${ENTRA_EXTERNAL_REDIRECT_URI:-}" ]; then
+            [ "$BROWSER_ENTRA_STATUS" = "302" ] || {
+              echo "::error::Unauthenticated browser could not start the configured Entra flow (HTTP $BROWSER_ENTRA_STATUS)."
+              exit 1
+            }
+          else
+            [ "$BROWSER_ENTRA_STATUS" = "503" ] || {
+              echo "::error::Entra login is not configured but the browser endpoint did not fail closed with HTTP 503 (HTTP $BROWSER_ENTRA_STATUS)."
+              exit 1
+            }
+          fi
+          echo "Factsport staging browser sign-in routes: checked without Cloudflare Access"
+
+          HEALTH_READY=false
+          HEALTH_STATUS=000
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            HEALTH_STATUS="$(curl --silent --show-error --max-time 30 \
+              -o /tmp/factsport-staging-authorized-health -w '%{http_code}' \
+              -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+              "$BASE/api/v2/health" || true)"
+            if [ "$HEALTH_STATUS" = "200" ] && jq -e '.ok == true and .databaseReady == true and .mediaBucketReady == true' /tmp/factsport-staging-authorized-health >/dev/null 2>&1; then
+              HEALTH_READY=true
+              break
+            fi
+            BODY_CLASS="$(head -c 100 /tmp/factsport-staging-authorized-health 2>/dev/null | tr '\\n' ' ' | tr -cd '[:print:]' || true)"
+            CODE="$(jq -r '.error // "non-json"' /tmp/factsport-staging-authorized-health 2>/dev/null || echo non-json)"
+            echo "Authorized staging health probe $attempt: HTTP $HEALTH_STATUS; code $CODE; body=$BODY_CLASS"
+            sleep 4
+          done
+          [ "$HEALTH_READY" = "true" ] || {
+            echo "::error::Authorized staging health check failed after propagation retries: HTTP $HEALTH_STATUS."
+            exit 1
+          }
+          echo "Factsport native vinext app: authorized Hyperdrive and R2 dependency check passed"
+
+          DB_PREFLIGHT_STATUS="$(curl --silent --show-error --max-time 30 \
+            -o /tmp/factsport-staging-db-preflight.json -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+            "$BASE/api/v2/staging/db-preflight")"
+          [ "$DB_PREFLIGHT_STATUS" = "200" ] && jq -e '.ok == true and .targetDatabaseMatches == true and .tlsEnabled == true' \
+            /tmp/factsport-staging-db-preflight.json >/dev/null || {
+              echo "::error::Read-only database preflight failed through staging Hyperdrive (HTTP $DB_PREFLIGHT_STATUS)."
+              exit 1
+            }
+          echo "Factsport staging database preflight (sanitized):"
+          jq . /tmp/factsport-staging-db-preflight.json | tee -a "$GITHUB_STEP_SUMMARY"
+
+          ENTRA_STATUS="$(curl --silent --show-error --max-time 30 \
+            -D /tmp/factsport-entra-start.headers \
+            -o /tmp/factsport-entra-start.body -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+            "$BASE/api/auth/entra/start")"
+          if [ -n "${ENTRA_EXTERNAL_CLIENT_ID:-}" ] && [ -n "${ENTRA_EXTERNAL_REDIRECT_URI:-}" ]; then
+            [ "$ENTRA_STATUS" = "302" ] || {
+              echo "::error::Configured Entra sign-in start did not return an authorization redirect (HTTP $ENTRA_STATUS)."
+              exit 1
+            }
+            ENTRA_LOCATION="$(grep -i '^location:' /tmp/factsport-entra-start.headers | tail -n 1 | sed -E 's/^[^:]*:[[:space:]]*//; s/\\r$//')"
+            export ENTRA_LOCATION ENTRA_EXPECTED_CLIENT_ID="$ENTRA_EXTERNAL_CLIENT_ID" ENTRA_EXPECTED_REDIRECT_URI="$ENTRA_EXTERNAL_REDIRECT_URI"
+            node <<'NODE'
+          const location = new URL(process.env.ENTRA_LOCATION);
+          const query = location.searchParams;
+          if (query.get('client_id') !== process.env.ENTRA_EXPECTED_CLIENT_ID ||
+              query.get('redirect_uri') !== process.env.ENTRA_EXPECTED_REDIRECT_URI ||
+              query.get('response_type') !== 'code' ||
+              query.get('code_challenge_method') !== 'S256' ||
+              !query.get('state') || !query.get('nonce') || !query.get('code_challenge')) {
+            throw new Error('Entra authorization redirect is missing expected app, callback, or PKCE parameters');
+          }
+          NODE
+            grep -Eiq '^set-cookie: __Host-factsport_entra_state=' /tmp/factsport-entra-start.headers || {
+              echo "::error::Entra sign-in start did not set the protected OIDC state cookie."
+              exit 1
+            }
+            echo "Factsport staging Entra start: discovery/issuer, app callback and PKCE redirect passed."
+          else
+            echo "Factsport staging Entra start: skipped because Entra app secrets are not configured."
+          fi
+
+          MATCH_PAGE_STATUS="$(curl --silent --show-error --max-time 30 \
+            -o /tmp/factsport-staging-match-page.html -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" "$BASE/matches")"
+          [ "$MATCH_PAGE_STATUS" = "200" ] && grep -q "Match Center" /tmp/factsport-staging-match-page.html || {
+            echo "::error::Protected /matches page did not render from the v2 PostgreSQL reader (HTTP $MATCH_PAGE_STATUS)."
+            exit 1
+          }
+          echo "Factsport staging /matches page: PostgreSQL-backed initial render passed"
+          matches_ok=false
+          for attempt in 1 2 3 4 5 6 7 8; do
+            MATCH_STATUS="$(curl --silent --show-error --max-time 25 \
+              -D /tmp/factsport-staging-matches.headers \
+              -o /tmp/factsport-staging-matches -w '%{http_code}' \
+              -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+              "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=2026-11-01")"
+            if [ "$MATCH_STATUS" = "200" ] && jq -e 'type == "array" and length > 0' /tmp/factsport-staging-matches >/dev/null 2>&1; then
+              matches_ok=true
+              break
+            fi
+            CODE="$(jq -r '.error // "non-json"' /tmp/factsport-staging-matches 2>/dev/null || echo non-json)"
+            DETAILS="$(jq -r 'if type == "object" then "sqlState=" + (.sqlState // "none") + " class=" + (.errorClass // "none") + " hint=" + (.errorHint // "none") else "" end' /tmp/factsport-staging-matches 2>/dev/null || true)"
+            GATE="$(grep -qFx 'Not found' /tmp/factsport-staging-matches && echo gate-or-404 || echo other)"
+            echo "Factsport match probe attempt $attempt: HTTP $MATCH_STATUS; code $CODE; bodyClass=$GATE $DETAILS"
+            sleep 3
+          done
+          [ "$matches_ok" = true ] || {
+            echo "::error::Authorized Factsport matches API did not return a JSON array. See sanitized diagnostics."
+            exit 1
+          }
+          if ! grep -Eiq '^cache-control:[[:space:]]*.*(private|no-store)' /tmp/factsport-staging-matches.headers; then
+            echo "::error::Token-protected staging match response must not be publicly cacheable."
+            exit 1
+          fi
+          CURSOR_DATE="$(jq -r '.[0].match_date // empty' /tmp/factsport-staging-matches)"
+          CURSOR_ID="$(jq -r '.[0].id // empty' /tmp/factsport-staging-matches)"
+          [ -n "$CURSOR_DATE" ] && [ -n "$CURSOR_ID" ] || {
+            echo "::error::Staging match response did not include a date and UUID cursor."
+            exit 1
+          }
+          CURSOR_DATE_ENCODED="$(jq -nr --arg value "$CURSOR_DATE" '$value | @uri')"
+          CURSOR_ID_ENCODED="$(jq -nr --arg value "$CURSOR_ID" '$value | @uri')"
+          PAGINATION_STATUS="$(curl --silent --show-error --max-time 25 \
+            -o /tmp/factsport-staging-pagination -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+            "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=$CURSOR_DATE_ENCODED&cursorId=$CURSOR_ID_ENCODED")"
+          if [ "$PAGINATION_STATUS" != "200" ] || ! jq -e --arg cursorId "$CURSOR_ID" 'type == "array" and all(.[]; .id != $cursorId)' /tmp/factsport-staging-pagination >/dev/null 2>&1; then
+            PAGINATION_CODE="$(jq -r '.error // "non-json"' /tmp/factsport-staging-pagination 2>/dev/null || echo non-json)"
+            PAGINATION_DETAILS="$(jq -r 'if type == "object" then "sqlState=" + (.sqlState // "none") + " class=" + (.errorClass // "none") + " hint=" + (.errorHint // "none") else "" end' /tmp/factsport-staging-pagination 2>/dev/null || true)"
+            echo "::error::Stable timestamp+UUID keyset pagination failed (HTTP $PAGINATION_STATUS; code $PAGINATION_CODE; $PAGINATION_DETAILS)."
+            exit 1
+          fi
+          echo "Factsport staging pagination: timestamp+UUID cursor accepted and did not repeat the cursor row."
+
+          UNAUTH_MATCH_STATUS="$(curl --silent --show-error --max-time 25 \
+            -o /tmp/factsport-staging-after-auth-unauthorized -w '%{http_code}' \
+            "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=2026-11-01")"
+          [ "$UNAUTH_MATCH_STATUS" = "404" ] || {
+            echo "::error::Unauthenticated match request after authorized request returned HTTP $UNAUTH_MATCH_STATUS; possible cache isolation failure."
+            exit 1
+          }
+          AUTH_MATCH_STATUS=000
+          auth_match_ok=false
+          for attempt in 1 2 3 4 5 6; do
+            AUTH_MATCH_STATUS="$(curl --silent --show-error --max-time 25 \
+              -o /tmp/factsport-staging-after-unauth-authorized -w '%{http_code}' \
+              -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+              "$BASE/api/matches?league=Premier%20League&type=fixtures&cursor=2026-11-01")"
+            if [ "$AUTH_MATCH_STATUS" = "200" ] && jq -e 'type == "array" and length > 0' /tmp/factsport-staging-after-unauth-authorized >/dev/null 2>&1; then
+              auth_match_ok=true
+              break
+            fi
+            FINAL_CODE="$(jq -r '.error // "non-json"' /tmp/factsport-staging-after-unauth-authorized 2>/dev/null || echo non-json)"
+            FINAL_DETAILS="$(jq -r 'if type == "object" then "sqlState=" + (.sqlState // "none") + " class=" + (.errorClass // "none") else "" end' /tmp/factsport-staging-after-unauth-authorized 2>/dev/null || true)"
+            echo "Authorized post-cache probe attempt $attempt: HTTP $AUTH_MATCH_STATUS; code $FINAL_CODE; $FINAL_DETAILS"
+            sleep 2
+          done
+          [ "$auth_match_ok" = true ] || {
+            echo "::error::Authorized match request failed after cache isolation check (HTTP $AUTH_MATCH_STATUS)."
+            exit 1
+          }
+          echo "Factsport native vinext app: protected PostgreSQL matches API returned populated fixtures; staging response is private/no-store and auth isolation passed."
+
+          echo "## Factsport v2 application staging" >> "$GITHUB_STEP_SUMMARY"
+          echo "Deployed separate protected Worker: $BASE" >> "$GITHUB_STEP_SUMMARY"
+          echo "Unauthenticated /, /api/matches and /admin blocked; authorized /api/v2/health and /api/matches passed native Hyperdrive + R2 integration." >> "$GITHUB_STEP_SUMMARY"
+          echo "No production routes or domains changed. No production Supabase service role deployed." >> "$GITHUB_STEP_SUMMARY"
