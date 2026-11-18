@@ -51,6 +51,25 @@ export default {
           status: 503, headers: { 'Cache-Control': 'no-store' },
         });
       }
+      const publicRelations = await sql`
+        SELECT namespace.nspname AS schema_name, relation.relname AS object_name,
+          CASE relation.relkind
+            WHEN 'r' THEN 'table'
+            WHEN 'p' THEN 'partitioned_table'
+            WHEN 'v' THEN 'view'
+            WHEN 'm' THEN 'materialized_view'
+            WHEN 'f' THEN 'foreign_table'
+            ELSE relation.relkind::text
+          END AS object_type
+        FROM pg_class relation
+        JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+        WHERE namespace.nspname = 'public'
+          AND relation.relkind IN ('r', 'p', 'v', 'm', 'f')
+        ORDER BY relation.relkind, relation.relname
+      `;
+      const migrationLedgerCandidates = publicRelations
+        .map((relation) => String(relation.object_name))
+        .filter((name) => /migration|schema[_-]?version|drizzle|prisma/i.test(name));
       const roles = await sql`
         SELECT rolname AS role_name, rolcanlogin AS can_login,
           rolsuper AS is_superuser, rolinherit AS inherits_roles,
@@ -170,6 +189,7 @@ export default {
         connectedAs: identity.connected_as,
         databaseOwner: databaseOwner.database_owner,
         roles, tablePrivileges, matchColumnPrivileges, memberships, databaseAndSchemaPrivileges,
+        publicRelations, publicRelationCount: publicRelations.length, migrationLedgerCandidates,
         publicFunctionAccess, publicSequenceAccess,
       }, { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
