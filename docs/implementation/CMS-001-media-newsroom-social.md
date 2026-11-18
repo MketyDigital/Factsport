@@ -131,3 +131,8 @@ Migration `0038_factsport_media_asset_column_grants.sql` removes the editorial w
 ## 2026-11-18 database status follow-up
 
 The V2 migration chain including migrations 0038–0048 is now applied to Azure `factsport_v2` by [run 44358887095](https://github.com/MketyDigital/Factsport/actions/runs/44358887095); read-only verification [44360257808](https://github.com/MketyDigital/Factsport/actions/runs/44360257808) confirms the migration ledger and Media/editorial/broadcast/community relations. This supersedes earlier notes in this document that migration 0040 or later SQL remained unapplied. The Media schema and capability roles now exist; provider credentials, LOGIN roles/Hyperdrive binding, real Entra editor acceptance, Logic Apps, external delivery reconciliation and end-to-end UI/provider acceptance remain open. Production cutover remains gated by P9A.
+
+
+## 2026-11-18 editorial runtime provisioned in staging
+
+A dedicated editorial application LOGIN and TLS-required, cache-disabled Hyperdrive are now provisioned for `factsport_v2` through staging bootstrap [44362059881](https://github.com/MketyDigital/Factsport/actions/runs/44362059881). The V2 app binding deployed successfully in [44362390781](https://github.com/MketyDigital/Factsport/actions/runs/44362390781). This supersedes the earlier note that the editorial LOGIN/binding had not yet been provisioned. Real Entra editor linking/session, CMS browser acceptance, Media access/broadcast/token/social runtimes as required, content/provider acceptance, Logic Apps adapter and delivery reconciliation, recovery and P9A remain open. No legacy content/data restore was performed.

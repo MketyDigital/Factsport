@@ -46,3 +46,8 @@ No tenant, app registration, issuer, client ID, callback or secret was created o
 ## 2026-11-18 owner configuration update
 
 The owner reports that the app registration callback URI and required Entra/session secrets have been added to the application configuration. V2 database migrations are now applied, including `external_identities` and `media_editorial_memberships`; [read-only audit 44360257808](https://github.com/MketyDigital/Factsport/actions/runs/44360257808) confirms the broader schema/role state. This does not yet prove a live Entra sign-in. The flow remains invite/link-only: a test editor’s exact issuer+subject must be linked in `external_identities` and have an active Media membership, and the app still needs its dedicated editorial LOGIN/Hyperdrive binding. Complete actual External ID discovery/JWKS/token exchange, linked-user callback, role authorization and logout tests on the Media host before P9A. No workforce tenant login or self-service customer sign-up is implied.
+
+
+## 2026-11-18 staging binding follow-up
+
+The owner reports the Entra callback URI and required application secrets were added. Dedicated editorial database LOGIN/Hyperdrive provisioning passed in [44362059881](https://github.com/MketyDigital/Factsport/actions/runs/44362059881), and the binding was deployed with the protected staging app in [44362390781](https://github.com/MketyDigital/Factsport/actions/runs/44362390781). This closes the missing runtime binding prerequisite for staging login testing; actual discovery/JWKS/token exchange, approved `(issuer, subject)` link and active Media membership, callback/session, protected editor authorization and logout are still unverified. Never link by email or create a user implicitly.
