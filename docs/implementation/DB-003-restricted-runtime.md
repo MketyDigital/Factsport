@@ -30,3 +30,10 @@ The staging app uses non-production Supabase placeholders; it demonstrates nativ
 The stage gate is a one-time random token rotated each staging deploy. The GitHub Action probes the gate and authorized health. Its value is masked in CI and stored only as a Cloudflare Worker secret, not as a GitHub repository secret.
 
 The separate `factsport-v2-reader-bootstrap` / `factsport-v2-runtime-db-check` one-time workflows should not be retriggered; a duplicate runtime Hyperdrive refuses modification.
+
+
+### 2026-11-18 follow-up — schema state advanced
+
+The complete V2 migration chain is now applied to `factsport_v2`: [44358887095](https://github.com/MketyDigital/Factsport/actions/runs/44358887095). Read-only audit [44360257808](https://github.com/MketyDigital/Factsport/actions/runs/44360257808) confirms the 49-row checksum ledger, 80 public relations and 11 constrained NOLOGIN capability roles. This supersedes the older statement that Prediction tables/prize schema are not implemented: prediction tables and submission/state functions exist in the database. It does **not** mean customer registration/account-claim, prediction UI/API acceptance, settlement, prize/payment parity or P9B cutover is complete.
+
+The public app remains bound to the read-only role. No Media editor/login, social dispatcher, broadcast, community, or Prediction LOGIN identity/Hyperdrive binding has been provisioned by the migrations. The existing admin Hyperdrive remains limited to temporary migration/audit workflows. Do not add writes to the public reader or enable the Azure Logic App before the separate Media runtime and operational gates pass.
