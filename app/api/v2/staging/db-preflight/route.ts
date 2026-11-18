@@ -33,12 +33,16 @@ export async function GET() {
           to_regclass('public.media_editorial_memberships') IS NOT NULL AS media_editorial_memberships
       `;
       const rolesToCheck = [
-        'factsport_v2_public_reader',
+        'factsport_v2_reader',
+        'factsport_v2_schedule_writer',
+        'factsport_v2_espn_writer',
         'factsport_v2_editorial_writer',
-        'factsport_v2_prediction_api',
+        'factsport_v2_media_automation_writer',
         'factsport_v2_social_dispatcher',
-        'factsport_v2_broadcast_admin',
+        'factsport_v2_media_broadcast_admin',
         'factsport_v2_broadcast_token_issuer',
+        'factsport_v2_media_access_admin',
+        'factsport_v2_prediction_api',
       ];
       phase = 'role_inventory';
       const roles = await sql`
