@@ -164,6 +164,7 @@ export default {
           return Response.json({
             ok: false, error: 'untracked_core_schema_mismatch',
             database: identity.database, connectedAs: identity.connected_as,
+            actualColumns: columnMap, expectedColumns: CORE_COLUMNS,
           }, { status: 409, headers: { 'Cache-Control': 'no-store' } });
         }
       }
