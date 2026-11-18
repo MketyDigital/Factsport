@@ -66,7 +66,7 @@ export async function middleware(request: NextRequest) {
 
   // Health and public match reads are staging-only database probes. The mandatory
   // access-token gate above has already run, so skip legacy Supabase auth.
-  if (env.FACTSPORT_ENVIRONMENT === 'staging' && (pathname === '/api/v2/health' || pathname === '/api/v2/staging/db-preflight' || pathname === '/api/matches')) {
+  if (env.FACTSPORT_ENVIRONMENT === 'staging' && (pathname === '/api/v2/health' || pathname === '/api/v2/staging/db-preflight' || pathname === '/api/matches' || pathname === '/matches')) {
     return NextResponse.next();
   }
 
