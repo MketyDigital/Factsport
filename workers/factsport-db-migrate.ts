@@ -18,7 +18,7 @@ const CORE_COLUMNS: Record<string, string[]> = {
   external_identities: ['created_at', 'issuer', 'subject', 'user_id'],
   job_runs: ['error_code', 'finished_at', 'job_id', 'run_key', 'started_at', 'status'],
   matches: [
-    'away_logo', 'away_score', 'api_id', 'created_at', 'espn_id', 'h2h',
+    'away_logo', 'away_score', 'away_team', 'api_id', 'created_at', 'espn_id', 'h2h',
     'home_logo', 'home_score', 'home_team', 'id', 'league', 'lineups',
     'match_date', 'match_events', 'match_group', 'points_distributed',
     'predictor', 'referees', 'source', 'source_updated_at', 'stage', 'stats',
