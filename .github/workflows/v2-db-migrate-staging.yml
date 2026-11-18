@@ -81,6 +81,7 @@ jobs:
           printf '%s' "$TOKEN" | npx --yes wrangler@4.158.0 secret put FACTSPORT_MIGRATE_TOKEN \
             --config wrangler.factsport-db-migrate.jsonc
           printf 'FACTSPORT_MIGRATE_TOKEN=%s\n' "$TOKEN" >> "$GITHUB_ENV"
+          sleep 10
       - name: Apply forward migrations and record checksums
         shell: bash
         run: |
@@ -95,6 +96,9 @@ jobs:
           if [ "$HTTP" != "200" ]; then
             echo "::error::V2 migration apply failed with HTTP $HTTP."
             jq -c '{ok,error,failedVersion,phase,sqlState}' /tmp/factsport-v2-migrate-result.json 2>/dev/null || true
+            if ! jq -e . /tmp/factsport-v2-migrate-result.json >/dev/null 2>&1; then
+              head -c 200 /tmp/factsport-v2-migrate-result.json | tr -cd '[:print:]' || true
+            fi
             exit 1
           fi
           jq -e \
