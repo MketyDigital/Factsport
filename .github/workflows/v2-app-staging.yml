@@ -217,7 +217,7 @@ jobs:
             "$BASE/api/v2/staging/db-preflight")"
           if [ "$DB_PREFLIGHT_STATUS" != "200" ] || ! jq -e '.ok == true and .targetDatabaseMatches == true and .tlsEnabled == true' \
             /tmp/factsport-staging-db-preflight.json >/dev/null 2>&1; then
-            DB_DIAGNOSTICS="$(jq -c '{ok,error,sqlState,errorClass,errorHint,targetDatabaseMatches,tlsEnabled}' \
+            DB_DIAGNOSTICS="$(jq -c '{ok,error,phase,sqlState,errorClass,errorHint,targetDatabaseMatches,tlsEnabled}' \
               /tmp/factsport-staging-db-preflight.json 2>/dev/null || echo '{}')"
             echo "::error::Read-only database preflight failed through staging Hyperdrive (HTTP $DB_PREFLIGHT_STATUS; $DB_DIAGNOSTICS)."
             exit 1
