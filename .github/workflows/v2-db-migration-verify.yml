@@ -74,17 +74,42 @@ jobs:
         run: |
           set -euo pipefail
           count=0
+          expected_version=0
           for migration in db/migrations/[0-9][0-9][0-9][0-9]_*.sql; do
-            echo "::group::Applying $migration"
+            filename="${migration##*/}"
+            version="${filename%%_*}"
+            expected="$(printf '%04d' "$expected_version")"
+            [ "$version" = "$expected" ] || {
+              echo "::error::Migration sequence gap: expected $expected, found $version ($filename)."
+              exit 1
+            }
+            echo "::group::Applying $filename"
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+            checksum="$(sha256sum "$migration" | cut -d' ' -f1)"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+              -v version="$expected_version" -v filename="$filename" -v checksum="$checksum" <<'SQL'
+          INSERT INTO public.factsport_schema_migrations (version, filename, checksum_sha256)
+          VALUES (:'version'::integer, :'filename', :'checksum')
+          ON CONFLICT (version) DO NOTHING;
+          SQL
+            recorded="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc \
+              "SELECT checksum_sha256 FROM public.factsport_schema_migrations WHERE version=$expected_version")"
+            [ "$recorded" = "$checksum" ] || {
+              echo "::error::Migration ledger checksum mismatch for $filename."
+              exit 1
+            }
             echo "::endgroup::"
             count=$((count + 1))
+            expected_version=$((expected_version + 1))
           done
-          [ "$count" -eq 48 ] || {
-            echo "::error::Expected 48 ordered migrations; applied $count."
+          [ "$count" -gt 0 ] || { echo "::error::No ordered SQL migrations found."; exit 1; }
+          ledger_count="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -Atc \
+            "SELECT count(*) FROM public.factsport_schema_migrations")"
+          [ "$ledger_count" = "$count" ] || {
+            echo "::error::Migration ledger has $ledger_count rows for $count migrations."
             exit 1
           }
-          echo "Applied $count migrations to the disposable CI database."
+          echo "Applied and checksummed $count ordered migrations in PostgreSQL 18 disposable CI."
 
       - name: Verify Prediction submission function and least-privilege boundary
         run: |
