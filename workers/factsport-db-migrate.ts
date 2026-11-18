@@ -152,7 +152,7 @@ export default {
           SELECT table_name, column_name
           FROM information_schema.columns
           WHERE table_schema = 'public'
-            AND table_name = ANY(${CORE_RELATIONS})
+            AND table_name IN ('app_users', 'external_identities', 'job_runs', 'matches')
           ORDER BY table_name, column_name
         `;
         const columnMap: Record<string, string[]> = {};
