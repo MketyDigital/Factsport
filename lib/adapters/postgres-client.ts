@@ -39,7 +39,8 @@ export async function isFactsportEditorialPostgresReady(): Promise<boolean> {
   try {
     const rows = await withFactsportEditorialPostgres(sql => sql`
       SELECT
-        current_user = 'factsport_v2_editorial_writer' AS role_ready,
+        current_user = 'factsport_v2_editorial_app' AND
+        pg_has_role(current_user, 'factsport_v2_editorial_writer', 'USAGE') AS role_ready,
         to_regclass('public.external_identities') IS NOT NULL AS identities_table_ready,
         to_regclass('public.media_editorial_memberships') IS NOT NULL AS memberships_table_ready,
         has_column_privilege(current_user, 'public.external_identities', 'issuer', 'SELECT')
