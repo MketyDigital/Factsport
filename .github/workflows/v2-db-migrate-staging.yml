@@ -71,7 +71,11 @@ jobs:
       - name: Deploy temporary guarded migration Worker
         id: deploy
         shell: bash
-        run: npx --yes wrangler@4.158.0 deploy --config wrangler.factsport-db-migrate.jsonc
+        run: |
+          set -euo pipefail
+          WORKER_NAME="factsport-v2-db-migrate-${GITHUB_RUN_ID}"
+          npx --yes wrangler@4.158.0 deploy --name "$WORKER_NAME" --config wrangler.factsport-db-migrate.jsonc
+          printf 'name=%s\n' "$WORKER_NAME" >> "$GITHUB_OUTPUT"
       - name: Install one-run migration token
         shell: bash
         run: |
@@ -90,7 +94,7 @@ jobs:
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" | jq -r '.result.subdomain // empty')"
           [ -n "$DOMAIN" ] || { echo "::error::Missing Cloudflare Workers subdomain"; exit 1; }
-          URL="https://factsport-v2-db-migrate.$DOMAIN.workers.dev/__internal/factsport-migrate"
+          URL="https://${{ steps.deploy.outputs.name }}.$DOMAIN.workers.dev/__internal/factsport-migrate"
           HTTP="$(curl -sS --max-time 180 -o /tmp/factsport-v2-migrate-result.json -w '%{http_code}' \
             -X POST -H "Authorization: Bearer $FACTSPORT_MIGRATE_TOKEN" "$URL")"
           if [ "$HTTP" != "200" ]; then
@@ -122,7 +126,7 @@ jobs:
           set -euo pipefail
           HTTP="$(curl -sS -o /tmp/factsport-migrate-delete.json -w '%{http_code}' -X DELETE \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/factsport-v2-db-migrate")"
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/${{ steps.deploy.outputs.name }}")"
           [ "$HTTP" = "200" ] && jq -e '.success == true' /tmp/factsport-migrate-delete.json >/dev/null || {
             echo "::error::Temporary migration Worker cleanup failed; delete only factsport-v2-db-migrate."
             exit 1
