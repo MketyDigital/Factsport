@@ -96,6 +96,7 @@ export default {
       max: 1, fetch_types: false, prepare: false, connect_timeout: 10, idle_timeout: 5,
     });
     let failedVersion: number | null = null;
+    let phase = 'connect';
     try {
       const [identity] = await sql`
         SELECT current_database() AS database, current_user AS connected_as
@@ -106,6 +107,7 @@ export default {
         });
       }
 
+      phase = 'inspect_schema';
       const relations = await sql`
         SELECT relation.relname AS object_name,
           CASE relation.relkind
@@ -145,6 +147,7 @@ export default {
           }, { status: 409, headers: { 'Cache-Control': 'no-store' } });
         }
 
+        phase = 'inspect_core_columns';
         const actualColumns = await sql`
           SELECT table_name, column_name
           FROM information_schema.columns
@@ -179,6 +182,7 @@ export default {
       }
 
       if (ledgerRows.length === 0) {
+        phase = 'seed_runtime_roles';
         await sql.unsafe(ROLE_SEED_SQL);
       }
 
@@ -186,6 +190,7 @@ export default {
       for (const migration of FACTSPORT_MIGRATIONS) {
         if (migration.version < ledgerRows.length) continue;
         failedVersion = migration.version;
+        phase = `migration_${migration.version}`;
         await sql.begin(async (tx) => {
           await tx`SELECT pg_advisory_xact_lock(720061, 3)`;
           const [exists] = await tx`
@@ -250,6 +255,7 @@ export default {
         ok: false,
         error: 'factsport_migration_failed',
         failedVersion,
+        phase,
         sqlState: sanitizedSqlState(error),
       }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     } finally {
