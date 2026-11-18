@@ -41,7 +41,7 @@ export async function GET() {
       const roles = await sql`
         SELECT rolname, rolsuper, rolcreaterole, rolcreatedb
         FROM pg_roles
-        WHERE rolname = ANY(${rolesToCheck})
+        WHERE rolname::text = ANY(${sql.array(rolesToCheck)})
         ORDER BY rolname
       `;
       const migrationTables = await sql`
