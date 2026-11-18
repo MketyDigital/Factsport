@@ -3,6 +3,7 @@ name: Factsport v2 staging PostgreSQL role audit (read-only)
 # Temporary Cloudflare Worker; admin Hyperdrive is used only for SELECT catalog introspection.
 # Does not modify roles, grants, data, migrations, or production resources.
 on:
+  workflow_dispatch:
   push:
     branches:
       - refactor/factsport-v2
