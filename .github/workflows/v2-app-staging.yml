@@ -166,13 +166,25 @@ jobs:
             echo "Factsport staging $path: unauthorized access blocked"
           done
 
-          LOGIN_PAGE_STATUS="$(curl --silent --show-error --max-time 25 \
+          LOGIN_PAGE_STATUS="$(curl --silent --show-error --max-time 25 --retry 6 --retry-all-errors --retry-delay 3 \
             -o /tmp/factsport-staging-media-login -w '%{http_code}' "$BASE/media-login")"
           [ "$LOGIN_PAGE_STATUS" = "200" ] || {
             echo "::error::Staging Media sign-in page did not open for a browser (HTTP $LOGIN_PAGE_STATUS)."
             exit 1
           }
-          BROWSER_ENTRA_STATUS="$(curl --silent --show-error --max-time 30 \
+          if [ -n "${ENTRA_EXTERNAL_CLIENT_ID:-}" ] && [ -n "${ENTRA_EXTERNAL_REDIRECT_URI:-}" ]; then
+            grep -q 'Continue with Microsoft' /tmp/factsport-staging-media-login || {
+              echo "::error::Entra is configured but the Media login page still reports sign-in is not provisioned."
+              exit 1
+            }
+            echo "Factsport staging Media login page: Entra and editorial database readiness passed."
+          else
+            grep -q 'Media sign-in is not provisioned yet' /tmp/factsport-staging-media-login || {
+              echo "::error::Unconfigured Entra sign-in did not fail closed on the Media login page."
+              exit 1
+            }
+          fi
+          BROWSER_ENTRA_STATUS="$(curl --silent --show-error --max-time 30 --retry 6 --retry-all-errors --retry-delay 3 \
             -D /tmp/factsport-browser-entra-start.headers \
             -o /tmp/factsport-browser-entra-start.body -w '%{http_code}' \
             "$BASE/api/auth/entra/start")"
