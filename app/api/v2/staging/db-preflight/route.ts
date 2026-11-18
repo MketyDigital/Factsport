@@ -18,6 +18,7 @@ export async function GET() {
     });
   }
 
+  let phase = 'server_identity';
   try {
     const inventory = await withFactsportPostgres(async sql => {
       const [server] = await sql`
@@ -25,6 +26,7 @@ export async function GET() {
                current_user AS connected_role,
                (SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()) AS tls_enabled
       `;
+      phase = 'media_table_inventory';
       const [tables] = await sql`
         SELECT
           to_regclass('public.external_identities') IS NOT NULL AS external_identities,
@@ -38,12 +40,14 @@ export async function GET() {
         'factsport_v2_broadcast_admin',
         'factsport_v2_broadcast_token_issuer',
       ];
+      phase = 'role_inventory';
       const roles = await sql`
         SELECT rolname, rolsuper, rolcreaterole, rolcreatedb
         FROM pg_roles
         WHERE rolname::text = ANY(${sql.array(rolesToCheck)})
         ORDER BY rolname
       `;
+      phase = 'migration_tracking_inventory';
       const migrationTables = await sql`
         SELECT table_schema, table_name
         FROM information_schema.tables
@@ -92,6 +96,7 @@ export async function GET() {
     return NextResponse.json({
       ok: false,
       error: 'factsport_staging_database_preflight_unavailable',
+      phase,
       sqlState,
       errorClass,
       errorHint,
