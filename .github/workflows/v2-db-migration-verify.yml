@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 15
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_DB: factsport_v2
           POSTGRES_USER: postgres
@@ -80,8 +80,8 @@ jobs:
             echo "::endgroup::"
             count=$((count + 1))
           done
-          [ "$count" -eq 43 ] || {
-            echo "::error::Expected 43 ordered migrations; applied $count."
+          [ "$count" -eq 48 ] || {
+            echo "::error::Expected 48 ordered migrations; applied $count."
             exit 1
           }
           echo "Applied $count migrations to the disposable CI database."
