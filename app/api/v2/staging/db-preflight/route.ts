@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { env } from 'cloudflare:workers';
-import { withFactsportPostgres } from '@/lib/adapters/postgres-client';
+import { getFactsportEditorialPostgresReadiness, withFactsportPostgres } from '@/lib/adapters/postgres-client';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -79,11 +79,12 @@ export async function GET() {
       };
     });
 
+    const editorialRuntime = await getFactsportEditorialPostgresReadiness();
     const ok = inventory.targetDatabaseMatches && inventory.tlsEnabled;
     const error = !ok
       ? inventory.targetDatabaseMatches ? 'tls_not_verified' : 'unexpected_database'
       : undefined;
-    return NextResponse.json({ ...inventory, ok, error }, {
+    return NextResponse.json({ ...inventory, editorialRuntime, ok, error }, {
       status: ok ? 200 : 503,
       headers: { 'Cache-Control': 'no-store' },
     });

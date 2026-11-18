@@ -33,14 +33,35 @@ export function withFactsportPostgres<T>(operation: (sql: FactsportSql) => Promi
  * backed by factsport_v2_editorial_writer, never the public or sports writer.
  * There is deliberately no DATABASE_URL or Supabase service-role fallback.
  */
-export async function isFactsportEditorialPostgresReady(): Promise<boolean> {
+export type FactsportEditorialPostgresReadiness = {
+  ready: boolean;
+  bindingConfigured: boolean;
+  targetDatabaseMatches: boolean;
+  expectedLogin: boolean;
+  writerCapability: boolean;
+  identitiesTableReady: boolean;
+  membershipsTableReady: boolean;
+  identityColumnsReadable: boolean;
+  membershipsReadable: boolean;
+  sqlState?: string;
+  errorClass?: string;
+};
+
+export async function getFactsportEditorialPostgresReadiness(): Promise<FactsportEditorialPostgresReadiness> {
   const bindings = env as unknown as Record<string, HyperdriveBinding | undefined>;
-  if (!bindings.FACTSPORT_EDITORIAL_HYPERDRIVE?.connectionString) return false;
+  if (!bindings.FACTSPORT_EDITORIAL_HYPERDRIVE?.connectionString) {
+    return {
+      ready: false, bindingConfigured: false, targetDatabaseMatches: false, expectedLogin: false,
+      writerCapability: false, identitiesTableReady: false, membershipsTableReady: false,
+      identityColumnsReadable: false, membershipsReadable: false,
+    };
+  }
   try {
     const rows = await withFactsportEditorialPostgres(sql => sql`
       SELECT
-        current_user = 'factsport_v2_editorial_app' AND
-        pg_has_role(current_user, 'factsport_v2_editorial_writer', 'USAGE') AS role_ready,
+        current_database() = 'factsport_v2' AS target_database_matches,
+        current_user = 'factsport_v2_editorial_app' AS expected_login,
+        pg_has_role(current_user, 'factsport_v2_editorial_writer', 'USAGE') AS writer_capability,
         to_regclass('public.external_identities') IS NOT NULL AS identities_table_ready,
         to_regclass('public.media_editorial_memberships') IS NOT NULL AS memberships_table_ready,
         has_column_privilege(current_user, 'public.external_identities', 'issuer', 'SELECT')
@@ -50,13 +71,37 @@ export async function isFactsportEditorialPostgresReady(): Promise<boolean> {
         has_table_privilege(current_user, 'public.media_editorial_memberships', 'SELECT')
           AS memberships_readable
     `);
-    const ready = rows[0];
-    return !!ready && ready.role_ready === true && ready.identities_table_ready === true &&
-      ready.memberships_table_ready === true && ready.identity_columns_readable === true &&
-      ready.memberships_readable === true;
-  } catch {
-    return false;
+    const row = rows[0];
+    const result = {
+      ready: !!row && row.target_database_matches === true && row.expected_login === true &&
+        row.writer_capability === true && row.identities_table_ready === true &&
+        row.memberships_table_ready === true && row.identity_columns_readable === true &&
+        row.memberships_readable === true,
+      bindingConfigured: true,
+      targetDatabaseMatches: row?.target_database_matches === true,
+      expectedLogin: row?.expected_login === true,
+      writerCapability: row?.writer_capability === true,
+      identitiesTableReady: row?.identities_table_ready === true,
+      membershipsTableReady: row?.memberships_table_ready === true,
+      identityColumnsReadable: row?.identity_columns_readable === true,
+      membershipsReadable: row?.memberships_readable === true,
+    };
+    return result;
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error
+      ? String((error as { code?: unknown }).code || '') : '';
+    return {
+      ready: false, bindingConfigured: true, targetDatabaseMatches: false, expectedLogin: false,
+      writerCapability: false, identitiesTableReady: false, membershipsTableReady: false,
+      identityColumnsReadable: false, membershipsReadable: false,
+      sqlState: /^[A-Z0-9]{5}$/.test(code) ? code : 'none',
+      errorClass: error instanceof Error ? error.name : 'Unknown',
+    };
   }
+}
+
+export async function isFactsportEditorialPostgresReady(): Promise<boolean> {
+  return (await getFactsportEditorialPostgresReadiness()).ready;
 }
 
 export function withFactsportEditorialPostgres<T>(operation: (sql: FactsportSql) => Promise<T> | T): Promise<T> {
