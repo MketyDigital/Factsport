@@ -95,7 +95,7 @@ jobs:
             -X POST -H "Authorization: Bearer $FACTSPORT_MIGRATE_TOKEN" "$URL")"
           if [ "$HTTP" != "200" ]; then
             echo "::error::V2 migration apply failed with HTTP $HTTP."
-            jq -c '{ok,error,failedVersion,phase,sqlState}' /tmp/factsport-v2-migrate-result.json 2>/dev/null || true
+            jq -c '{ok,error,failedVersion,phase,sqlState,actualColumns,expectedColumns}' /tmp/factsport-v2-migrate-result.json 2>/dev/null || true
             if ! jq -e . /tmp/factsport-v2-migrate-result.json >/dev/null 2>&1; then
               head -c 200 /tmp/factsport-v2-migrate-result.json | tr -cd '[:print:]' || true
             fi
