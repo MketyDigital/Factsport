@@ -1,0 +1,169 @@
+name: Factsport v2 Media editorial runtime provisioning (staging)
+
+# Staging-only: creates one separate LOGIN identity and Hyperdrive for the Media
+# editor adapter. The admin Hyperdrive is used only by the temporary bootstrap Worker.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - 'ops/provision-editorial-runtime.trigger'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factsport-v2-editorial-runtime-provision
+  cancel-in-progress: false
+
+jobs:
+  provision-editorial:
+    if: github.ref == 'refs/heads/refactor/factsport-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KEY }}
+      FACTSPORT_ADMIN_DB_URL: ${{ secrets.DATABASE_URL }}
+      HD_ADMIN_ID: 08cee41a81be4c3980450be9563af5e2
+      HD_EDITORIAL_NAME: factsport-v2-editorial-postgres
+    steps:
+      - name: Validate existing V2 database and Cloudflare configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ] &&
+            [ -n "$FACTSPORT_ADMIN_DB_URL" ] || {
+              echo "::error::Required existing repository secrets are unavailable."
+              exit 1
+            }
+          node <<'NODE'
+          let db;
+          try { db = new URL(process.env.FACTSPORT_ADMIN_DB_URL); }
+          catch { console.error('::error::DATABASE_URL is not a valid URL.'); process.exit(1); }
+          if (!['postgres:', 'postgresql:'].includes(db.protocol) ||
+              db.hostname !== 'mketypostgres.postgres.database.azure.com' ||
+              db.pathname !== '/factsport_v2' || db.username !== 'mketydbadmin' || !db.password) {
+            console.error('::error::DATABASE_URL does not identify the existing factsport_v2 admin connection.');
+            process.exit(1);
+          }
+          console.log('DATABASE_URL identity confirmed for factsport_v2; value withheld.');
+          NODE
+          STATUS="$(curl -sS -o /tmp/factsport-editorial-admin-hd.json -w '%{http_code}'             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/$HD_ADMIN_ID")"
+          [ "$STATUS" = "200" ] && jq -e             '.success == true and .result.name == "factsport-v2-postgres" and
+             .result.origin.database == "factsport_v2" and
+             .result.origin.user == "mketydbadmin" and .result.mtls.sslmode == "require"'             /tmp/factsport-editorial-admin-hd.json >/dev/null || {
+              echo "::error::Admin Hyperdrive did not match the exact staging V2 target."
+              exit 1
+            }
+          STATUS="$(curl -sS -o /tmp/factsport-editorial-existing-hd.json -w '%{http_code}'             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs")"
+          [ "$STATUS" = "200" ] || { echo "::error::Unable to list Hyperdrive configs."; exit 1; }
+          if jq -e --arg name "$HD_EDITORIAL_NAME" '.result[]? | select(.name == $name)'               /tmp/factsport-editorial-existing-hd.json >/dev/null; then
+            echo "::error::The editorial Hyperdrive already exists; refusing to rotate or overwrite it."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/factsport-v2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies and typecheck
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+      - name: Deploy temporary staging-only role provisioner
+        id: bootstrap
+        shell: bash
+        run: npx --yes wrangler@4.158.0 deploy --config wrangler.factsport-editorial-provision.jsonc
+      - name: Install one-run credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          PASSWORD="$(openssl rand -hex 32)"
+          TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$PASSWORD"
+          echo "::add-mask::$TOKEN"
+          printf 'FACTSPORT_EDITORIAL_PASSWORD=%s\n' "$PASSWORD" >> "$GITHUB_ENV"
+          printf 'FACTSPORT_PROVISION_TOKEN=%s\n' "$TOKEN" >> "$GITHUB_ENV"
+          printf '%s' "$PASSWORD" | npx --yes wrangler@4.158.0 secret put FACTSPORT_EDITORIAL_PASSWORD             --config wrangler.factsport-editorial-provision.jsonc
+          printf '%s' "$TOKEN" | npx --yes wrangler@4.158.0 secret put FACTSPORT_PROVISION_TOKEN             --config wrangler.factsport-editorial-provision.jsonc
+          sleep 10
+      - name: Create isolated editorial LOGIN role and verify its grants
+        shell: bash
+        run: |
+          set -euo pipefail
+          DOMAIN="$(curl -sS --fail-with-body             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" |
+            jq -r '.result.subdomain // empty')"
+          [ -n "$DOMAIN" ] || { echo "::error::Cloudflare Workers subdomain missing."; exit 1; }
+          URL="https://factsport-v2-editorial-provision.$DOMAIN.workers.dev/__internal/provision-editorial-login"
+          READY=false
+          for attempt in 1 2 3 4 5 6 7 8; do
+            STATUS="$(curl -sS --max-time 30 -o /tmp/factsport-editorial-provision.json -w '%{http_code}'               -X POST -H "Authorization: Bearer $FACTSPORT_PROVISION_TOKEN" "$URL")"
+            if [ "$STATUS" = "200" ] && jq -e               '.ok == true and .database == "factsport_v2" and
+               .capabilityRole == "factsport_v2_editorial_writer" and
+               .loginRole == "factsport_v2_editorial_app" and .leastPrivilege == true'               /tmp/factsport-editorial-provision.json >/dev/null 2>&1; then
+              READY=true
+              break
+            fi
+            echo "Editorial role provisioning attempt $attempt returned HTTP $STATUS."
+            jq -c '{ok,error,sqlState}' /tmp/factsport-editorial-provision.json 2>/dev/null || true
+            sleep 3
+          done
+          [ "$READY" = "true" ] || { echo "::error::Editorial login role verification failed."; exit 1; }
+      - name: Create dedicated editorial Hyperdrive
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          jq -n --arg name "$HD_EDITORIAL_NAME" --arg password "$FACTSPORT_EDITORIAL_PASSWORD" '{
+            name: $name,
+            origin: {
+              scheme: "postgresql",
+              host: "mketypostgres.postgres.database.azure.com",
+              port: 5432,
+              database: "factsport_v2",
+              user: "factsport_v2_editorial_app",
+              password: $password
+            },
+            mtls: { sslmode: "require" },
+            caching: { disabled: true },
+            origin_connection_limit: 5
+          }' > /tmp/factsport-editorial-hyperdrive-create.json
+          STATUS="$(curl -sS --max-time 60 -o /tmp/factsport-editorial-hyperdrive-result.json -w '%{http_code}'             -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H 'Content-Type: application/json'             --data-binary @/tmp/factsport-editorial-hyperdrive-create.json             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs")"
+          rm -f /tmp/factsport-editorial-hyperdrive-create.json
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "201" ]; then
+            CODES="$(jq -r '[.errors[]?.code] | join(",")' /tmp/factsport-editorial-hyperdrive-result.json 2>/dev/null || true)"
+            echo "::error::Editorial Hyperdrive creation failed (HTTP $STATUS), API codes: $CODES."
+            exit 1
+          fi
+          jq -e '.success == true and .result.name == "factsport-v2-editorial-postgres" and
+            .result.origin.database == "factsport_v2" and
+            .result.origin.user == "factsport_v2_editorial_app" and
+            .result.mtls.sslmode == "require" and .result.caching.disabled == true'             /tmp/factsport-editorial-hyperdrive-result.json >/dev/null || {
+              echo "::error::Unexpected editorial Hyperdrive result."
+              exit 1
+            }
+          ID="$(jq -r '.result.id' /tmp/factsport-editorial-hyperdrive-result.json)"
+          [[ "$ID" =~ ^[a-f0-9]{32}$ ]] || { echo "::error::Invalid Hyperdrive ID."; exit 1; }
+          {
+            echo "## Factsport V2 Media editorial database identity"
+            echo "Target: factsport_v2 via the dedicated factsport_v2_editorial_app LOGIN role."
+            echo "Capability membership: factsport_v2_editorial_writer; five-connection cap; TLS required."
+            echo "Hyperdrive config: factsport-v2-editorial-postgres"
+            echo "Hyperdrive ID: $ID"
+            echo "Admin Hyperdrive remains migration/audit only; public reader unchanged."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Remove temporary editorial provisioner
+        if: always() && steps.bootstrap.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl -sS -o /tmp/factsport-editorial-provision-delete.json -w '%{http_code}' -X DELETE             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/factsport-v2-editorial-provision")"
+          [ "$STATUS" = "200" ] && jq -e '.success == true' /tmp/factsport-editorial-provision-delete.json >/dev/null || {
+            echo "::error::Temporary editorial provisioner cleanup failed."
+            exit 1
+          }
+          echo "Temporary editorial provisioning Worker deleted."
