@@ -60,3 +60,10 @@ This successful retry re-verifies the narrow staging match-read and Entra-start 
 ### 2026-11-18 admin-audit attempt — no database query performed
 
 A follow-up read-only catalog audit was attempted with the existing temporary audit Worker workflow [44347722061](https://github.com/MketyDigital/Factsport/actions/runs/44347722061). Typecheck passed, but Cloudflare rejected deployment because the temporary Worker factsport-v2-db-role-audit did not exist in the account (API code 10007). The job failed before installing its audit token or opening the admin Hyperdrive; no database query, role change, schema write, or production change occurred. This leaves admin-side grant/migration audit and backup/restore evidence open. The application-worker read-only inventory from run [44346109481](https://github.com/MketyDigital/Factsport/actions/runs/44346109481) remains valid for current database identity, TLS, table presence, and expected-role existence only.
+
+
+### 2026-11-18 — admin role audit result
+
+The admin Hyperdrive read-only catalog audit passed in [run 44350082264](https://github.com/MketyDigital/Factsport/actions/runs/44350082264). A temporary audit Worker used the exact verified `factsport-v2-postgres` Hyperdrive target for `factsport_v2`, then was deleted. The database was not modified. The three inventoried runtime roles are non-superuser, non-inheriting, have no memberships, no database/role creation or replication rights, no public function/sequence rights, and no public object creation/temp-table rights. The reader has SELECT on `matches` only; schedule and ESPN roles retain narrow column privileges on `matches`.
+
+This does not establish migration history or backup/restore recoverability. The planned editorial, media automation, social, broadcast, media-access and prediction runtime roles remain absent in the latest app inventory. Before migration writes, prove restore capability and inventory current schema/migration state; provision only reviewed staging roles and bindings. Production stays no-go.
