@@ -633,3 +633,8 @@ Next: provision only the reviewed Media LOGIN identities and dedicated Hyperdriv
 ### 2026-11-18 follow-up — Media editorial runtime provisioned
 
 The staging-only editorial LOGIN and dedicated Hyperdrive are now provisioned and bound to the V2 staging Worker: bootstrap [44362059881](https://github.com/MketyDigital/Factsport/actions/runs/44362059881) and app deploy [44362390781](https://github.com/MketyDigital/Factsport/actions/runs/44362390781) succeeded. This supersedes the immediately preceding next-step note that all Media LOGIN identities/bindings were still to be provisioned. It does not close Entra editor acceptance, other Media runtime/provider integrations, Logic Apps operational acceptance, V2-target recovery rehearsal, browser acceptance, route isolation, rollback or P9A. No legacy DB restore/import is planned or needed; the P1 recovery rehearsal concerns the V2 target only. See M77 for exact evidence and open gates.
+
+
+### 2026-11-18 follow-up — staging Media sign-in readiness passes
+
+A false-negative Media login readiness check was fixed: the dedicated runtime connects as `factsport_v2_editorial_app` and inherits the NOLOGIN `factsport_v2_editorial_writer` capability role. The app now checks the actual login plus effective role membership and scoped grants. Updated staging smoke verifies the login page renders “Continue with Microsoft,” as well as the Entra authorization redirect/PKCE contract. Run [44367785398](https://github.com/MketyDigital/Factsport/actions/runs/44367785398) passed. Interactive Entra callback, linked editor membership and protected authoring acceptance remain open; no legacy restore/import or production cutover is required for this fix.

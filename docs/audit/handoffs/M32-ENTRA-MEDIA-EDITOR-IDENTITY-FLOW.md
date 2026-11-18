@@ -51,3 +51,8 @@ The owner reports that the app registration callback URI and required Entra/sess
 ## 2026-11-18 staging binding follow-up
 
 The owner reports the Entra callback URI and required application secrets were added. Dedicated editorial database LOGIN/Hyperdrive provisioning passed in [44362059881](https://github.com/MketyDigital/Factsport/actions/runs/44362059881), and the binding was deployed with the protected staging app in [44362390781](https://github.com/MketyDigital/Factsport/actions/runs/44362390781). This closes the missing runtime binding prerequisite for staging login testing; actual discovery/JWKS/token exchange, approved `(issuer, subject)` link and active Media membership, callback/session, protected editor authorization and logout are still unverified. Never link by email or create a user implicitly.
+
+
+## 2026-11-18 readiness check fix and staging evidence
+
+The owner screenshot exposed a false-negative readiness check: PostgreSQL `current_user` is the dedicated LOGIN identity `factsport_v2_editorial_app`, not the NOLOGIN capability role `factsport_v2_editorial_writer`. The readiness query now checks the expected login and effective membership in the capability role, plus required read grants. Staging workflow [44367785398](https://github.com/MketyDigital/Factsport/actions/runs/44367785398) passed the actual Media login page “Continue with Microsoft” assertion and Entra start redirect/PKCE check. Interactive account callback/session, approved exact issuer+subject link, active membership, protected editorial actions and logout remain to be accepted in the browser.
