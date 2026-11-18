@@ -1,0 +1,14 @@
+{
+  "name": "factsport-v2-db-migrate",
+  "main": "workers/factsport-db-migrate.ts",
+  "compatibility_date": "2026-11-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "hyperdrive": [
+    {
+      "binding": "FACTSPORT_HYPERDRIVE",
+      "id": "08cee41a81be4c3980450be9563af5e2"
+    }
+  ]
+}
