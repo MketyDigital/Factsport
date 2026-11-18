@@ -21,6 +21,9 @@ const factsportWorker = defineWorker(async () => {
       FACTSPORT_HYPERDRIVE: bindings.hyperdrive({
         id: "895cca4c06104b8ab9f7c1b72a8ba18f",
       }),
+      FACTSPORT_EDITORIAL_HYPERDRIVE: bindings.hyperdrive({
+        id: "57ee2a1f84744e74b2a51cee07f830a4",
+      }),
       FACTSPORT_MEDIA_BUCKET: bindings.r2({
         name: "factsport-v2-media-staging",
       }),
