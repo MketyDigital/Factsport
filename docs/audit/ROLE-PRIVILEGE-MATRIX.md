@@ -91,3 +91,10 @@ The signed Stream webhook endpoint now verifies raw-body HMAC, handles gzip payl
 - Migration 0038 revokes table-wide UPDATE on `media_assets` from `factsport_v2_editorial_writer` and grants only rights metadata, rights-review identity/time, public-promotion and `updated_at` columns. Asset identity, object key, content type, byte size, hash, dimensions and uploader cannot be rewritten through the CMS role.
 
 - Media rights withdrawal is exposed through the `rights_admin` capability, restricted in application authorization to the `media_admin` role. The action writes only the already-granted rights/publication columns and appends a `media_rights_revoked` audit event; migration 0040 registers that action.
+
+
+### 2026-11-18 applied-schema follow-up
+
+The database migration workflow [44358887095](https://github.com/MketyDigital/Factsport/actions/runs/44358887095) applied all migrations through 0048. Read-only audit [44360257808](https://github.com/MketyDigital/Factsport/actions/runs/44360257808) found 11 capability roles: reader, schedule writer, ESPN writer, editorial writer, Media automation writer, social dispatcher, broadcast admin, broadcast token issuer, Media access admin, Prediction API, and anonymous community API. All are NOLOGIN, non-superuser/non-inheriting, without create/replication/RLS-bypass privileges; memberships are empty. The ledger has 49 contiguous checksum-valid rows; there are 80 public relations. Community and Prediction roles have only their intended public function executions; the editorial writer has its lineage guard function.
+
+These are capability roles, not bound application credentials. The audit confirms no LOGIN identities for the new Media/Prediction roles and no dedicated Hyperdrive bindings for them. The original reader/schedule/ESPN Hyperdrive IDs above remain purpose-specific. The admin Hyperdrive remains migration/audit only and must never be bound to runtime. Provision distinct LOGIN identities and bindings only after reviewing each role’s required grants; keep Media, community and Prediction identities isolated.
