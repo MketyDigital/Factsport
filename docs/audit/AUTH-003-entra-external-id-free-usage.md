@@ -43,3 +43,8 @@ Docs: https://learn.microsoft.com/en-us/entra/external-id/customers/reference-se
 
 ## Recommendation
 Entra External ID Basic is a credible **zero-additional-core-authentication-fee, low-maintenance** solution up to 50k MAU if it meets feature/tenant requirements. Prefer it over new self-hosted Zitadel for Factsport while testing its Cloudflare Worker integration. Final provider selection remains pending actual staging proof.
+
+
+### 2026-11-18 owner preference — Factsport-branded identity journey
+
+Owner preference is a Factsport-only customer-facing identity experience. Keep Entra External ID as the current managed identity backend for now; do not expose Microsoft naming in Factsport-owned UI. The Media login button now says “Sign in to Factsport” and staging asserts the Factsport label. Next tenant-side steps are to set the display name to Factsport, apply External ID company branding, configure a Factsport custom login domain, and grant tenant-wide admin consent to the minimum app permissions so customer users do not encounter the first-party Microsoft consent prompt. Microsoft’s consent surface cannot be reskinned; tenant-wide admin consent is the way to remove it from the routine customer journey. The default verification email can show the configured tenant name; a fully Factsport-branded OTP email requires the custom OTP send extension and a verified sender through an approved mail provider (assess the existing Mkety Mail/Logic Apps adapters before enabling). The `Continue with Microsoft` source regression assertion was updated to enforce Factsport-owned wording.

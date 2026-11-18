@@ -173,7 +173,7 @@ jobs:
             exit 1
           }
           if [ -n "${ENTRA_EXTERNAL_CLIENT_ID:-}" ] && [ -n "${ENTRA_EXTERNAL_REDIRECT_URI:-}" ]; then
-            grep -q 'Continue with Microsoft' /tmp/factsport-staging-media-login || {
+            grep -q 'Sign in to Factsport' /tmp/factsport-staging-media-login || {
               echo "::error::Entra is configured but the Media login page still reports sign-in is not provisioned."
               exit 1
             }

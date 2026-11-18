@@ -25,7 +25,7 @@ export default async function MediaLoginPage({ searchParams }: { searchParams?: 
       <p className="mt-3 text-sm leading-6 text-slate-600">Sign in with your authorized Factsport editorial identity. Access is assigned through Factsport Media roles.</p>
       {hasError && <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Sign-in could not be completed. Check your account assignment or contact the Media administrator.</p>}
       {signInReady
-        ? <a href="/api/auth/entra/start?returnTo=%2Fadmin" className="mt-7 block rounded-xl bg-slate-950 px-5 py-3 text-center text-sm font-bold text-white hover:bg-slate-800">Continue with Microsoft</a>
+        ? <a href="/api/auth/entra/start?returnTo=%2Fadmin" className="mt-7 block rounded-xl bg-slate-950 px-5 py-3 text-center text-sm font-bold text-white hover:bg-slate-800">Sign in to Factsport</a>
         : <div role="status" className="mt-7 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
             Media sign-in is not provisioned yet. The Entra external tenant/app registration, HTTPS callback, session secret and dedicated editorial database connection must all be configured before sign-in is enabled. No legacy email allowlist fallback is available.
           </div>}
