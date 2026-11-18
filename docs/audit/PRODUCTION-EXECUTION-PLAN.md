@@ -442,3 +442,9 @@ This is **not yet customer Entra sign-up/login or Prediction account auth**. Pub
 ### 2026-11-18 owner clarification — clean V2 target
 
 The clean-reset decision means no legacy operational database restore/import: the existing `factsport_v2` database is the V2 target, its operational gameplay data starts fresh, and newly ingested V2 fixtures are preserved. The P1 backup/PITR requirement is a recovery-resilience check of this V2 target before production release; it is not a legacy data source and does not block implementation of the reviewed forward migration chain. Keep production routes and data untouched.
+
+### 2026-11-18 — fresh V2 schema chain applied
+
+The guarded staging migration workflow [44358887095](https://github.com/MketyDigital/Factsport/actions/runs/44358887095) completed successfully against the verified Azure PostgreSQL target `factsport_v2`, connecting as the administrative migration identity `mketydbadmin` through the exact V2 Hyperdrive. It applied all 49 ordered migrations, versions 0000–0048, and verified a contiguous SHA-256 migration ledger. No legacy operational data was restored or imported; the V2 clean-start target and existing V2 fixtures remain the intended source of truth.
+
+This closes the applied-schema step for the V2 migration chain. It does not prove all Media/runtime roles and credentials are provisioned, create runtime Hyperdrive bindings/logins, complete the real Entra editor journey, complete Media/provider acceptance, enable the disabled Azure Logic App, or establish backup/PITR recovery. Production remains no-go. Continue with a separate read-only schema/role/ledger audit, then finish Media runtime provisioning and acceptance, recovery rehearsal, route isolation and P9A rollback/go-no-go before any Media cutover. Prediction remains P9B; Factsport TV remains P10 after Media and Prediction are stable.
