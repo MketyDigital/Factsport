@@ -73,9 +73,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          WORKER_NAME="factsport-v2-db-migrate-${GITHUB_RUN_ID}"
-          npx --yes wrangler@4.158.0 deploy --name "$WORKER_NAME" --config wrangler.factsport-db-migrate.jsonc
-          printf 'name=%s\n' "$WORKER_NAME" >> "$GITHUB_OUTPUT"
+          npx --yes wrangler@4.158.0 deploy --config wrangler.factsport-db-migrate.jsonc
+          printf 'name=factsport-v2-db-migrate\n' >> "$GITHUB_OUTPUT"
       - name: Install one-run migration token
         shell: bash
         run: |
