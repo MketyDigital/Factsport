@@ -83,7 +83,7 @@ jobs:
           TOKEN="$(openssl rand -hex 32)"
           echo "::add-mask::$TOKEN"
           printf '%s' "$TOKEN" | npx --yes wrangler@4.158.0 secret put FACTSPORT_MIGRATE_TOKEN \
-            --config wrangler.factsport-db-migrate.jsonc
+            --name "${{ steps.deploy.outputs.name }}" --config wrangler.factsport-db-migrate.jsonc
           printf 'FACTSPORT_MIGRATE_TOKEN=%s\n' "$TOKEN" >> "$GITHUB_ENV"
           sleep 10
       - name: Apply forward migrations and record checksums
@@ -128,7 +128,7 @@ jobs:
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/${{ steps.deploy.outputs.name }}")"
           [ "$HTTP" = "200" ] && jq -e '.success == true' /tmp/factsport-migrate-delete.json >/dev/null || {
-            echo "::error::Temporary migration Worker cleanup failed; delete only factsport-v2-db-migrate."
+            echo "::error::Temporary migration Worker cleanup failed; delete only the run-scoped temporary migrator named in the job output."
             exit 1
           }
           echo "Temporary migration Worker deleted."
