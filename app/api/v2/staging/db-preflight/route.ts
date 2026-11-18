@@ -72,14 +72,29 @@ export async function GET() {
     });
 
     const ok = inventory.targetDatabaseMatches && inventory.tlsEnabled;
-    return NextResponse.json({ ...inventory, ok }, {
+    const error = !ok
+      ? inventory.targetDatabaseMatches ? 'tls_not_verified' : 'unexpected_database'
+      : undefined;
+    return NextResponse.json({ ...inventory, ok, error }, {
       status: ok ? 200 : 503,
       headers: { 'Cache-Control': 'no-store' },
     });
-  } catch {
+  } catch (cause: unknown) {
+    const rawCode = cause && typeof cause === 'object' && 'code' in cause
+      ? String((cause as { code?: unknown }).code || '') : '';
+    const sqlState = /^[A-Z0-9]{5}$/.test(rawCode) ? rawCode : 'none';
+    const errorClass = cause instanceof Error ? cause.name : 'Unknown';
+    const message = cause instanceof Error ? cause.message.toLowerCase() : '';
+    const errorHint = /connection|socket|timeout|terminated|closed/.test(message) ? 'connection'
+      : /permission|not allowed|denied/.test(message) ? 'permission'
+      : /does not exist|undefined|relation/.test(message) ? 'schema_or_view'
+      : 'query_failed';
     return NextResponse.json({
       ok: false,
       error: 'factsport_staging_database_preflight_unavailable',
+      sqlState,
+      errorClass,
+      errorHint,
     }, {
       status: 503,
       headers: { 'Cache-Control': 'no-store' },
