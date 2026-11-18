@@ -1,0 +1,126 @@
+name: Factsport v2 staging migration apply (guarded)
+
+# Applies only the reviewed V2 SQL chain to factsport_v2 through the exact admin
+# Hyperdrive identity. Legacy data is not imported; current V2 fixtures are preserved.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - '.github/workflows/v2-db-migrate-staging.yml'
+      - 'db/migrations/**'
+      - 'scripts/generate-factsport-migration-chain.cjs'
+      - 'workers/factsport-db-migrate.ts'
+      - 'workers/generated-factsport-migration-chain.ts'
+      - 'wrangler.factsport-db-migrate.jsonc'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factsport-v2-staging-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: github.ref == 'refs/heads/refactor/factsport-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KEY }}
+    steps:
+      - name: Validate Cloudflare credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ] || {
+            echo "::error::Cloudflare repository credentials are unavailable."
+            exit 1
+          }
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/factsport-v2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies and generate the checked-in migration bundle
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-audit --no-fund
+          node scripts/generate-factsport-migration-chain.cjs
+          npm run typecheck
+      - name: Verify exact Azure PostgreSQL admin Hyperdrive
+        shell: bash
+        run: |
+          set -euo pipefail
+          HTTP="$(curl -sS -o /tmp/factsport-migrate-admin-hd.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/08cee41a81be4c3980450be9563af5e2")"
+          [ "$HTTP" = "200" ] && jq -e \
+            '.success == true and .result.name == "factsport-v2-postgres" and
+             .result.origin.database == "factsport_v2" and
+             .result.origin.user == "mketydbadmin" and
+             .result.mtls.sslmode == "require"' \
+            /tmp/factsport-migrate-admin-hd.json >/dev/null || {
+              echo "::error::Refusing migration: admin Hyperdrive identity/TLS did not match factsport_v2."
+              exit 1
+            }
+      - name: Deploy temporary guarded migration Worker
+        id: deploy
+        shell: bash
+        run: npx --yes wrangler@4.158.0 deploy --config wrangler.factsport-db-migrate.jsonc
+      - name: Install one-run migration token
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$TOKEN"
+          printf '%s' "$TOKEN" | npx --yes wrangler@4.158.0 secret put FACTSPORT_MIGRATE_TOKEN \
+            --config wrangler.factsport-db-migrate.jsonc
+          printf 'FACTSPORT_MIGRATE_TOKEN=%s\n' "$TOKEN" >> "$GITHUB_ENV"
+      - name: Apply forward migrations and record checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          DOMAIN="$(curl -sS --fail-with-body \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" | jq -r '.result.subdomain // empty')"
+          [ -n "$DOMAIN" ] || { echo "::error::Missing Cloudflare Workers subdomain"; exit 1; }
+          URL="https://factsport-v2-db-migrate.$DOMAIN.workers.dev/__internal/factsport-migrate"
+          HTTP="$(curl -sS --max-time 180 -o /tmp/factsport-v2-migrate-result.json -w '%{http_code}' \
+            -X POST -H "Authorization: Bearer $FACTSPORT_MIGRATE_TOKEN" "$URL")"
+          if [ "$HTTP" != "200" ]; then
+            echo "::error::V2 migration apply failed with HTTP $HTTP."
+            jq -c '{ok,error,failedVersion,sqlState}' /tmp/factsport-v2-migrate-result.json 2>/dev/null || true
+            exit 1
+          fi
+          jq -e \
+            '.ok == true and .database == "factsport_v2" and .connectedAs == "mketydbadmin" and
+             .totalMigrations == 49 and .firstVersion == 0 and .lastVersion == 48' \
+            /tmp/factsport-v2-migrate-result.json >/dev/null || {
+              echo "::error::Migration Worker returned an incomplete or unexpected ledger."
+              jq -c '{ok,error,appliedCount,totalMigrations,firstVersion,lastVersion}' /tmp/factsport-v2-migrate-result.json
+              exit 1
+            }
+          {
+            echo "## Factsport V2 clean-start migration apply"
+            echo "Database: factsport_v2 via verified admin Hyperdrive; no legacy data imported."
+            jq -S '{database,connectedAs,appliedCount,totalMigrations,firstVersion,lastVersion}' \
+              /tmp/factsport-v2-migrate-result.json
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Delete temporary migration Worker
+        if: always() && steps.deploy.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          HTTP="$(curl -sS -o /tmp/factsport-migrate-delete.json -w '%{http_code}' -X DELETE \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/factsport-v2-db-migrate")"
+          [ "$HTTP" = "200" ] && jq -e '.success == true' /tmp/factsport-migrate-delete.json >/dev/null || {
+            echo "::error::Temporary migration Worker cleanup failed; delete only factsport-v2-db-migrate."
+            exit 1
+          }
+          echo "Temporary migration Worker deleted."
