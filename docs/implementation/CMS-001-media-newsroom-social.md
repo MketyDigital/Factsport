@@ -126,3 +126,8 @@ Migration `0038_factsport_media_asset_column_grants.sql` removes the editorial w
 - Revalidates the homepage, newsroom index and all affected article routes after withdrawal. Public image shared-cache TTL is now 15 seconds with browser revalidation.
 - Added protected usage discovery across direct/derived asset lineage, article hero/inline/team-logo attachments and scheduled/published social posts. The Media library shows provider post links where available and warns that already-published third-party posts must be removed separately.
 - Migration 0040 registers the rights-withdrawal audit event. It is committed but unapplied; latest CI for the rights-withdrawal and usage-discovery source is running.
+
+
+## 2026-11-18 database status follow-up
+
+The V2 migration chain including migrations 0038–0048 is now applied to Azure `factsport_v2` by [run 44358887095](https://github.com/MketyDigital/Factsport/actions/runs/44358887095); read-only verification [44360257808](https://github.com/MketyDigital/Factsport/actions/runs/44360257808) confirms the migration ledger and Media/editorial/broadcast/community relations. This supersedes earlier notes in this document that migration 0040 or later SQL remained unapplied. The Media schema and capability roles now exist; provider credentials, LOGIN roles/Hyperdrive binding, real Entra editor acceptance, Logic Apps, external delivery reconciliation and end-to-end UI/provider acceptance remain open. Production cutover remains gated by P9A.
