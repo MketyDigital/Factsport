@@ -41,3 +41,8 @@ No tenant, app registration, issuer, client ID, callback or secret was created o
 - Native vinext build: passed, run `42490686088`.
 - Protected staging: run `42490686122` was in progress at this update; do not call it passed until completion.
 - The passing checks include the 163-test engine suite, TypeScript and native Worker build. They do not perform a real Entra tenant login or apply the editorial database migrations.
+
+
+## 2026-11-18 owner configuration update
+
+The owner reports that the app registration callback URI and required Entra/session secrets have been added to the application configuration. V2 database migrations are now applied, including `external_identities` and `media_editorial_memberships`; [read-only audit 44360257808](https://github.com/MketyDigital/Factsport/actions/runs/44360257808) confirms the broader schema/role state. This does not yet prove a live Entra sign-in. The flow remains invite/link-only: a test editor’s exact issuer+subject must be linked in `external_identities` and have an active Media membership, and the app still needs its dedicated editorial LOGIN/Hyperdrive binding. Complete actual External ID discovery/JWKS/token exchange, linked-user callback, role authorization and logout tests on the Media host before P9A. No workforce tenant login or self-service customer sign-up is implied.
