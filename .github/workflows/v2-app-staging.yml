@@ -3,6 +3,14 @@ name: Factsport v2 staging + read-only database preflight
 # No production domain, DNS, or main-branch changes. Separate Worker only.
 on:
   workflow_dispatch:
+    inputs:
+      source_branch:
+        description: Factsport v2 branch to deploy to the isolated staging Worker
+        type: choice
+        required: true
+        default: refactor/factsport-v2
+        options:
+          - refactor/factsport-v2
   push:
     branches:
       - refactor/factsport-v2
@@ -29,7 +37,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/refactor/factsport-v2'
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.source_branch == 'refactor/factsport-v2')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -46,7 +54,7 @@ jobs:
             { echo "::error::Existing CLOUDFLARE_ID or CLOUDFLARE_KEY repository secret unavailable"; exit 1; }
       - uses: actions/checkout@v4
         with:
-          ref: refactor/factsport-v2
+          ref: ${{ inputs.source_branch || github.ref }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
