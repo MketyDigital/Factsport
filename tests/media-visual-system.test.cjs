@@ -85,6 +85,18 @@ test('standings shares reuse existing 1200x630 OG renderer with controlled leagu
 });
 
 
+test('editorial article metadata uses the branded text-only Factsport share renderer', () => {
+  const page = read('app/news/[slug]/page.tsx');
+  const og = read('app/api/og/route.tsx');
+  assert.match(page, /type: 'article'/);
+  assert.match(page, /images: \[\{ url: ogImage, width: 1200, height: 630/);
+  assert.match(page, /twitter:[\s\S]*images: \[ogImage\]/);
+  assert.match(og, /parsedData\.type === 'article'/);
+  assert.match(og, /THE FACTSPORT NEWSROOM/);
+  assert.match(og, /INDEPENDENT FOOTBALL COVERAGE/);
+  assert.doesNotMatch(og, /fetch\([^)]*parsedData/);
+});
+
 test('existing 2D pitch gains gentle depth without losing starters or substitutes', () => {
   const pitch = read('app/components/PitchLineup.tsx');
   assert.match(pitch, /starting eleven pitch/);
