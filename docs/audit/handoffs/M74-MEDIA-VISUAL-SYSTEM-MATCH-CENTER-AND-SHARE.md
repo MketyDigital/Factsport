@@ -55,9 +55,9 @@ Selected commits in implementation order:
 - News/editorial hero, article cards/search and highlights, match-header scoreboard, team form/H2H, league hubs and deeper standings cards remain to be applied consistently.
 - Tactical pitch improvements, shot location and momentum require provider-sourced positions/events; no fictitious shot maps or invented metrics.
 - Match tabs (overview, chat/MOTM, predictions, H2H, live table, video) need coordinated mobile/desktop UI review. Prediction registration/consent is NOT to be pulled into Media community.
-- Remaining dedicated social formats (article, FT, lineups, verified MOTM) and OG crawler/rights/expiry validation remain. The generic OG renderer is not an authorization mechanism for external image URLs; inspect and harden remote image-fetch policy before using rights-sensitive artwork.
+- The article social card is now source-implemented and authorized-staging-smoke-verified (2026-11-20). FT, lineups and verified MOTM templates remain, as do production OG crawler, rights and expiry validation. The article card uses bounded editorial text and does not fetch remote images. The generic OG renderer is not an authorization mechanism for external image URLs; inspect and harden remote image-fetch policy before using rights-sensitive artwork.
 - No real browser screenshots, mobile interaction testing, contrast audit, Core Web Vitals measurement, semantic screen reader audit or Cloudflare ImageResponse/preview crawl have been executed.
-- No code was deployed. No production DNS, database, secrets, live workers, chat/MOTM enablement, D1, AdSense, paid Cloudflare Stream or Stream.io rooms were changed.
+- At M74 handoff time, no code had been deployed. On 2026-11-20 the current branch was rebuilt and deployed to the separate staging Worker only; production DNS, routes and data were not changed. No chat/MOTM enablement, D1, AdSense, paid Cloudflare Stream or Stream.io rooms were changed.
 
 ## 5. Acceptance criteria and rollback
 
@@ -69,3 +69,14 @@ Selected commits in implementation order:
 6. Rollback individual M74 source commits or restore previous components/OG template; no migration or data rollback is required for this UI slice.
 
 **Next actions:** finish remaining M74-A/B/C/D source integrations, run real test/build/staging checks, then review all Media/Predict feature parity and production cutover with explicit owner approval.
+
+
+## 7. 2026-11-20 follow-up — article share card
+
+- Added the Factsport-owned text-only `article` renderer to `app/api/og/route.tsx` and connected article Open Graph/Twitter metadata in `app/news/[slug]/page.tsx`. Input text is bounded; no remote image is fetched by this card.
+- Added regression coverage in `tests/media-visual-system.test.cjs`.
+- Added a staging smoke to `.github/workflows/v2-app-staging.yml` that sends a temporary staging-token-authorized article preview payload and requires a non-empty `image/png` response.
+- Source commits: `13f3a98`, `5487dfb`, `7f5a370`, `aef7cdb`, and smoke check `8b29c75`.
+- Verification: native vinext build `44702832677` passed; isolated verification `44703313261` passed; protected staging deploy and smoke `44703313309` passed, including the article PNG check.
+- A direct unauthenticated browser request to staging `/api/og` returned the staging gate's 404. This is not public crawler acceptance. Re-test the generated metadata and card on a public production-like host after route policy is defined, without exposing the staging token.
+- Remaining M74 acceptance is unchanged: all-tab/mobile/desktop screenshot review, accessibility/contrast, Core Web Vitals, licensed imagery and remote-image policy, FT/lineup/verified-MOTM templates, and full article/news/match/standings route review. No production cutover.
