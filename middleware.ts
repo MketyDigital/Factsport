@@ -75,7 +75,11 @@ export async function middleware(request: NextRequest) {
   // -----------------------------------------------------------------
   // Instantly blocks automated bots trying common SQLi or Path Traversal attacks in the URL
   const threatPatterns = /(\%27)|(\')|(\-\-)|(\%23)|(#)|(\%3B)|(;)|(\.\.\/)|(\%2e\%2e\%2f)/i;
-  if (threatPatterns.test(pathname) || threatPatterns.test(searchParams)) {
+  // OAuth authorization codes and state are opaque provider values. The exact Entra callback
+  // validates state, PKCE, issuer, audience, signature and nonce in its route handler.
+  const isEntraOidcCallback =
+    pathname === '/api/auth/entra/callback' && request.method === 'GET';
+  if (threatPatterns.test(pathname) || (!isEntraOidcCallback && threatPatterns.test(searchParams))) {
     return new NextResponse('Forbidden Request: Malicious payload detected.', { status: 403 });
   }
 

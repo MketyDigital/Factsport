@@ -41,6 +41,8 @@ test('Media sign-in stays hidden until Entra and dedicated editorial PostgreSQL 
   assert.match(entra, /export function isEntraMediaRequestHost/);
   assert.match(startRoute, /isEntraMediaRequestHost\(requestUrl\)/);
   assert.match(callbackRoute, /isEntraMediaRequestHost\(url\)/);
+  assert.ok(middleware.includes("const isEntraOidcCallback =\n    pathname === '/api/auth/entra/callback' && request.method === 'GET';"));
+  assert.ok(middleware.includes('(!isEntraOidcCallback && threatPatterns.test(searchParams))'), 'only the validated Entra callback skips opaque-query signature filtering');
   const logoutRoute = read('app/api/auth/entra/logout/route.ts');
   assert.match(logoutRoute, /export async function POST/);
   assert.match(logoutRoute, /Same-origin sign-out required/);
