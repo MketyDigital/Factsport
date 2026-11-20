@@ -277,6 +277,19 @@ jobs:
             exit 1
           }
           echo "Factsport staging /matches page: PostgreSQL-backed initial render passed"
+
+          ARTICLE_OG_DATA="$(node -e 'process.stdout.write(Buffer.from(JSON.stringify({type:"article",title:"Factsport staging article preview",summary:"A safe editorial share-card smoke check.",category:"Football"})).toString("base64url"))')"
+          ARTICLE_OG_STATUS="$(curl --silent --show-error --max-time 25 \
+            -D /tmp/factsport-article-og.headers \
+            -o /tmp/factsport-article-og.png -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+            "$BASE/api/og?data=$ARTICLE_OG_DATA")"
+          [ "$ARTICLE_OG_STATUS" = "200" ] && grep -Eiq '^content-type:[[:space:]]*image/png' /tmp/factsport-article-og.headers && [ -s /tmp/factsport-article-og.png ] || {
+            echo "::error::Authorized Factsport article Open Graph endpoint did not return a PNG image (HTTP $ARTICLE_OG_STATUS)."
+            exit 1
+          }
+          echo "Factsport staging article share card: authorized 1200x630 renderer returned PNG."
+
           matches_ok=false
           for attempt in 1 2 3 4 5 6 7 8; do
             MATCH_STATUS="$(curl --silent --show-error --max-time 25 \
