@@ -39,25 +39,39 @@ const getArticleData = cache(async (slug: string) => {
 export async function generateMetadata({ params }: { params: { slug: string } }) {
     const resolvedParams = await params;
     const article = await getArticleData(resolvedParams.slug);
-    
+
     if (!article) return { title: 'Article Not Found | FactSport' };
 
+    const title = article.seo_title || article.title;
+    const description = article.seo_description || article.excerpt || toPlainText(article.body, 160);
+    const payload = JSON.stringify({
+        type: 'article',
+        title,
+        summary: description,
+        category: article.category || 'Sports News',
+    });
+    const bytes = new TextEncoder().encode(payload);
+    const raw = Array.from(bytes, byte => String.fromCodePoint(byte)).join('');
+    const data = btoa(raw).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://factsport.com';
+    const ogImage = `${appUrl}/api/og?data=${data}`;
+
     return {
-        title: `${article.seo_title || article.title} | FactSport`,
-        description: article.seo_description || article.excerpt || toPlainText(article.body, 160),
+        title: `${title} | FactSport`,
+        description,
         alternates: article.canonical_url ? { canonical: article.canonical_url } : undefined,
         openGraph: {
-            title: article.seo_title || article.title,
-            description: article.seo_description || article.excerpt || toPlainText(article.body, 160),
+            title,
+            description,
             type: 'article',
             publishedTime: new Date(article.published_at || article.created_at).toISOString(),
-            images: [article.image_url || '/logo.png'],
+            images: [{ url: ogImage, width: 1200, height: 630, alt: `${title} – FactSport` }],
         },
         twitter: {
             card: 'summary_large_image',
-            title: article.seo_title || article.title,
-            description: article.seo_description || article.excerpt || toPlainText(article.body, 160),
-            images: [article.image_url || '/logo.png'],
+            title,
+            description,
+            images: [ogImage],
         }
     };
 }
