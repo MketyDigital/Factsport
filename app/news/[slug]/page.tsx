@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     });
     const bytes = new TextEncoder().encode(payload);
     const raw = Array.from(bytes, byte => String.fromCodePoint(byte)).join('');
-    const data = btoa(raw).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
+    const data = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://factsport.com';
     const ogImage = `${appUrl}/api/og?data=${data}`;
 
