@@ -355,6 +355,57 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Factsport-owned editorial share card. No remote assets are fetched here.
+    if (parsedData.type === 'article') {
+      const title = String(parsedData.title || 'FACTSPORT NEWS')
+        .replace(/\\s+/g, ' ')
+        .trim()
+        .slice(0, 110) || 'FACTSPORT NEWS';
+      const summary = String(parsedData.summary || 'Independent football coverage and sports analysis.')
+        .replace(/\\s+/g, ' ')
+        .trim()
+        .slice(0, 190);
+      const category = cleanText(parsedData.category || 'SPORTS NEWS').slice(0, 32);
+      return new ImageResponse(
+        (
+          <div style={{
+            width: 1200, height: 630, display: 'flex', flexDirection: 'column',
+            justifyContent: 'space-between', padding: '58px 72px',
+            color: '#fff', fontFamily: 'Arial, sans-serif',
+            background: 'linear-gradient(140deg, #071226 0%, #102b57 58%, #07556a 100%)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ display: 'flex', color: '#facc15', fontSize: 28, fontWeight: 900, letterSpacing: 5 }}>FACTSPORT</span>
+              <span style={{
+                display: 'flex', border: '1px solid #52749c', borderRadius: 30,
+                padding: '12px 22px', color: '#dbeafe', fontSize: 18, fontWeight: 800,
+                letterSpacing: 2, background: '#10264a',
+              }}>{category}</span>
+            </div>
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: 24, padding: '38px 42px',
+              borderRadius: 30, background: '#081a34', border: '1px solid #31537d',
+            }}>
+              <span style={{ display: 'flex', color: '#64c7f2', fontSize: 20, fontWeight: 800, letterSpacing: 4 }}>THE FACTSPORT NEWSROOM</span>
+              <span style={{
+                display: 'flex', fontSize: title.length > 70 ? 48 : 62, lineHeight: 1.08,
+                fontWeight: 900, overflow: 'hidden', maxHeight: 140,
+              }}>{title}</span>
+              <span style={{
+                display: 'flex', color: '#cbd5e1', fontSize: 25, lineHeight: 1.3,
+                overflow: 'hidden', maxHeight: 68,
+              }}>{summary}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#cbd5e1', fontSize: 21 }}>
+              <span>INDEPENDENT FOOTBALL COVERAGE</span>
+              <span>factsport.com</span>
+            </div>
+          </div>
+        ),
+        { width: 1200, height: 630 },
+      );
+    }
+
     // 📋 TEMPLATE 1: PITCH LINEUP INTERFACE
     if (parsedData.type === 'pitch') {
       const home = shortTeamName(parsedData.home, 'HOME');
