@@ -358,6 +358,25 @@ jobs:
             echo "::error::Authorized Factsport matches API did not return a JSON array. See sanitized diagnostics."
             exit 1
           }
+          if grep -Eiq '>Predict<|Match predictions|Bet Now|title="Bet"|/vip/upgrade' /tmp/factsport-staging-match-page.html; then
+            echo "::error::Public Media match list contains a Prediction or betting action."
+            exit 1
+          fi
+          DETAIL_MATCH_ID="$(jq -r '.[0].id // empty' /tmp/factsport-staging-matches)"
+          [ -n "$DETAIL_MATCH_ID" ] || { echo "::error::No staging match ID available for match-center isolation smoke."; exit 1; }
+          MATCH_DETAIL_STATUS="$(curl --silent --show-error --max-time 30 \
+            -o /tmp/factsport-staging-match-detail.html -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+            "$BASE/match/$DETAIL_MATCH_ID")"
+          [ "$MATCH_DETAIL_STATUS" = "200" ] || {
+            echo "::error::Protected V2 match detail did not render (HTTP $MATCH_DETAIL_STATUS)."
+            exit 1
+          }
+          if grep -Eiq 'Match predictions|PublicPredictionSubmit|WinProbability|Bet Now|refpa58144\.com|/vip/upgrade' /tmp/factsport-staging-match-detail.html; then
+            echo "::error::Public Media match detail exposes Prediction or betting UI/content."
+            exit 1
+          fi
+          echo "Factsport staging public match surfaces: Prediction and betting actions are isolated from list and match detail."
           if ! grep -Eiq '^cache-control:[[:space:]]*.*(private|no-store)' /tmp/factsport-staging-matches.headers; then
             echo "::error::Token-protected staging match response must not be publicly cacheable."
             exit 1
