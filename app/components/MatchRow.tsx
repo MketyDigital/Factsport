@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Zap, Ticket } from 'lucide-react';
 import { useSmartInterval } from '@/app/hooks/useSmartInterval'; // 🟢 NEW SHIELD
 
 export default function MatchRow({ match }: { match: any }) {
@@ -102,20 +101,6 @@ export default function MatchRow({ match }: { match: any }) {
             </div>
         </Link>
 
-        <div className="px-4 pb-3 pt-0 flex gap-2">
-            <Link href={`/match/${match.id}`} className="flex-1 flex items-center justify-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg py-2 text-[10px] font-bold text-slate-600 active:scale-95 transition hover:bg-white">
-                <Zap size={12} className="text-yellow-500 fill-yellow-500" /> Predict
-            </Link>
-            {match.booking_code ? (
-                <button className="flex-1 flex items-center justify-center gap-1.5 bg-[#1A1A1A] text-yellow-400 rounded-lg py-2 text-[10px] font-bold active:scale-95 transition">
-                    <Ticket size={12} /> {match.booking_code}
-                </button>
-            ) : (
-                <Link href="/vip/upgrade" className="flex-1 flex items-center justify-center gap-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg py-2 text-[10px] font-bold transition hover:bg-green-100">
-                    <Ticket size={12} /> Bet Now
-                </Link>
-            )}
-        </div>
     </div>
   );
 }
