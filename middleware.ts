@@ -79,7 +79,7 @@ export async function middleware(request: NextRequest) {
   // validates state, PKCE, issuer, audience, signature and nonce in its route handler.
   const isEntraOidcCallback =
     pathname === '/api/auth/entra/callback' && request.method === 'GET';
-  if (threatPatterns.test(pathname) || (!isEntraOidcCallback && threatPatterns.test(searchParams))) {
+  if (!isEntraOidcCallback && (threatPatterns.test(pathname) || threatPatterns.test(searchParams))) {
     return new NextResponse('Forbidden Request: Malicious payload detected.', { status: 403 });
   }
 
