@@ -467,3 +467,10 @@ Staging bootstrap [44362059881](https://github.com/MketyDigital/Factsport/action
 The exact Media Entra callback route now bypasses the legacy middleware threat-pattern heuristic so opaque OAuth query values can reach the existing OIDC validator. The validator still fails closed on missing/invalid state and enforces PKCE, issuer, audience, signature, nonce and an exact linked editorial identity. The staging workflow now checks the no-state failure redirect. Source/handoff: [M82](./handoffs/M82-ENTRA-CALLBACK-THREAT-BOUNDARY.md); roadmap record: [M82](./ROADMAP.md#m82--entra-callback-filter-and-release-reposition-2026-11-21).
 
 This is a staging verification hook, not completion of P4 identity acceptance. Confirm a run on the exact changed head, then complete real browser sign-in, issuer/subject membership, negative RBAC, publish/unpublish/logout and redacted operational evidence. P9A remains blocked on the full Media, sports, recovery, route-isolation, rollback and owner go/no-go gates; P9B and P10 remain separately ordered. No production changes.
+
+
+### 2026-11-21 M83 — match share-card implementation follow-up
+
+The M74-D source now has text-only finished-result and complete-starting-XI Open Graph templates, conditionally wired from canonical match metadata. Public match title metadata no longer includes Prediction wording. The staging workflow checks for non-empty result and lineup PNG output. Record: [M83](./handoffs/M83-MATCH-SHARE-CARDS.md), [ROADMAP M83](./ROADMAP.md#m83--match-result-and-lineup-share-cards-2026-11-21).
+
+This remains source implementation until exact-head build/staging and visual/crawler/mobile/accessibility/rights acceptance pass. It does not close P3, P8, P9A or establish public/private route isolation. No production change.
