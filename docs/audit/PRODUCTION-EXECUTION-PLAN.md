@@ -477,6 +477,6 @@ This remains source implementation until exact-head build/staging and visual/cra
 
 ### 2026-11-21 M84 — Public Media and Prediction boundary
 
-Removed Prediction/bookmaker actions from public match cards, match detail and the match-center tab, and renamed the homepage `/matches` shortcut. Prediction source and backend contracts remain available for the later private P9B product. A staging assertion now checks rendered `/matches` and a real `/match/{id}` route. See [M84](./handoffs/M84-PUBLIC-MEDIA-PREDICTION-ISOLATION.md) and [ROADMAP M84](./ROADMAP.md#m84--public-mediaprediction-surface-isolation-2026-11-21).
+Removed Prediction/bookmaker actions from public match cards, match detail and the match-center tab, renamed the homepage `/matches` shortcut, and stripped model probabilities from public match serialization/live API responses. Prediction source and backend contracts remain available for the later private P9B product. A staging assertion now checks rendered `/matches` and a real `/match/{id}` route. See [M84](./handoffs/M84-PUBLIC-MEDIA-PREDICTION-ISOLATION.md) and [ROADMAP M84](./ROADMAP.md#m84--public-mediaprediction-surface-isolation-2026-11-21).
 
 This is implementation only until exact-head build/staging and full public-route/metadata/feed/manifest review pass. It does not close P9A or authorize a route switch. No production changes.
