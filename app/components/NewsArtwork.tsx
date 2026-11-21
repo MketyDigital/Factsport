@@ -46,14 +46,14 @@ export default function NewsArtwork({ image, team1Logo, team2Logo, imageAlt, tea
     return (
       <div className={`relative overflow-hidden bg-[#0a1428] flex items-center justify-center ${className}`}>
         {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+        <div aria-hidden="true" className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.32)_1px,transparent_0)] bg-[size:18px_18px]"></div>
         <div className="absolute inset-0 bg-gradient-to-br from-blue-900/30 to-red-900/30"></div>
 
         {/* Logos */}
         <div className="relative z-10 flex items-center gap-4 md:gap-8 px-4 w-full justify-center">
            <img src={team1Logo} className="w-14 h-14 md:w-24 md:h-24 object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]" alt={team1Alt || 'Team 1'} loading={loading} fetchPriority={fetchPriority} decoding={decoding} />
            <div className="flex flex-col items-center">
-             <Zap size={24} className="text-yellow-400 fill-yellow-400 animate-pulse drop-shadow-md" />
+             <Zap size={24} className="text-yellow-400 fill-yellow-400 animate-pulse motion-reduce:animate-none drop-shadow-md" />
              <span className="text-[10px] md:text-xs font-black text-white/50 uppercase tracking-widest mt-1">VS</span>
            </div>
            <img src={team2Logo} className="w-14 h-14 md:w-24 md:h-24 object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]" alt={team2Alt || 'Team 2'} loading={loading} fetchPriority={fetchPriority} decoding={decoding} />
@@ -88,7 +88,7 @@ export default function NewsArtwork({ image, team1Logo, team2Logo, imageAlt, tea
 
       {/* Dynamic Gradient Background */}
       <div className="absolute inset-0 bg-gradient-to-tr from-blue-900 via-[#0a1428] to-slate-900"></div>
-      <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+      <div aria-hidden="true" className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.32)_1px,transparent_0)] bg-[size:18px_18px]"></div>
 
       {/* Factsport Branding Overlay */}
       <div className="relative z-10 flex flex-col items-center">
@@ -97,7 +97,7 @@ export default function NewsArtwork({ image, team1Logo, team2Logo, imageAlt, tea
         </span>
 
         <div className="flex items-center gap-2 mt-2 bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-2xl relative z-20">
-          <Activity size={16} className="text-red-500 animate-pulse" />
+          <Activity size={16} className="text-red-500 animate-pulse motion-reduce:animate-none" />
           <span className="text-white text-[10px] md:text-xs font-black uppercase tracking-widest">
             Latest Update
           </span>
