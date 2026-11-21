@@ -19,6 +19,13 @@ Reconciles ROADMAP M1/M8/M10, the parity/AdSense acceptance contract, P9A/P9B in
 - Added an optional staging probe for the public live-match API: when enabled, it requires JSON without a `predictor` property; a deliberate 503 feature-off response remains a skip.
 - Source commits: `1e98214` (`MatchRow`), `45a6457` (`CompactMatchRow`), `1cf686b` (match detail UI), `bc5bd6b` (`MatchMobileHub`), `a123041` (home shortcut), `ed5b69f` and `96fbd94` (live API projection), `219c102` and `c11bbba` (match page projection/query), and `10eba92`, `6e34c90`, `5e081cd` (staging boundary/data smoke).
 
+## Follow-up implementation — newsroom route and artwork boundary (2026-11-21)
+
+- Corrected the newsroom Explore Factsport shortcut from “Predictions” to “Matches”; it already routed to public `/matches`, so this was a label leak rather than a Prediction action. Added a visible keyboard focus outline to that shortcut.
+- Removed the newsroom artwork’s two third-party decorative texture requests and replaced them with an inline CSS dot pattern. Marked the decorative layer hidden from assistive technology and made the pulsing accents respect reduced-motion preferences.
+- Source commits: `f0a3b62` (newsroom shortcut), `9add1bd` (first-party artwork pattern).
+- This is a narrow route/content cleanup. It does not close the M84 route audit or P9A acceptance: the remaining pages, metadata, feeds, structured data, manifest, screenshots, CI, and editor flow still require review.
+
 ## Acceptance and limits
 
 Exact-head source/build and protected-staging results are not yet verified. The new smoke checks rendered public HTML on staging but does not prove every Media route, PWA manifest, server metadata/feed, or browser navigation is Prediction-free. Run the page/route scan and user-facing browser review before P9A. Private-host Prediction identity, registration, settlement, VIP/payment, prizes and audit remain P9B work.
