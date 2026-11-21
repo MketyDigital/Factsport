@@ -308,6 +308,7 @@ jobs:
             echo "::error::Authorized Factsport article Open Graph endpoint did not return a PNG image (HTTP $ARTICLE_OG_STATUS)."
             exit 1
           }
+          node -e 'const fs=require("fs"); const b=fs.readFileSync("/tmp/factsport-article-og.png"); if (b.length < 24 || b.toString("hex",0,4) !== "89504e47" || b.readUInt32BE(16) !== 1200 || b.readUInt32BE(20) !== 630) throw new Error("Article OG PNG must be 1200x630")'
           echo "Factsport staging article share card: authorized 1200x630 renderer returned PNG."
 
           RESULT_OG_DATA="$(node -e 'process.stdout.write(Buffer.from(JSON.stringify({type:"result",home:"Home Club",away:"Away Club",league:"Premier League",homeScore:2,awayScore:1})).toString("base64url"))')"
@@ -320,7 +321,8 @@ jobs:
             echo "::error::Authorized Factsport final-result share card did not return a PNG (HTTP $RESULT_OG_STATUS)."
             exit 1
           }
-          echo "Factsport staging result share card: complete-score renderer returned PNG."
+          node -e 'const fs=require("fs"); const b=fs.readFileSync("/tmp/factsport-result-og.png"); if (b.length < 24 || b.toString("hex",0,4) !== "89504e47" || b.readUInt32BE(16) !== 1200 || b.readUInt32BE(20) !== 630) throw new Error("Result OG PNG must be 1200x630")'
+          echo "Factsport staging result share card: complete-score renderer returned 1200x630 PNG."
 
           LINEUP_OG_DATA="$(node -e 'const homeXI=Array.from({length:11},(_,i)=>({name:"Home Player "+(i+1),is_starter:true})); const awayXI=Array.from({length:11},(_,i)=>({name:"Away Player "+(i+1),is_starter:true})); process.stdout.write(Buffer.from(JSON.stringify({type:"lineups",home:"Home Club",away:"Away Club",homeFormation:"4-3-3",awayFormation:"4-2-3-1",homeXI,awayXI})).toString("base64url"))')"
           LINEUP_OG_STATUS="$(curl --silent --show-error --max-time 25 \
@@ -332,7 +334,8 @@ jobs:
             echo "::error::Authorized Factsport starting-lineup share card did not return a PNG (HTTP $LINEUP_OG_STATUS)."
             exit 1
           }
-          echo "Factsport staging lineup share card: two complete starting-XI lists rendered to PNG."
+          node -e 'const fs=require("fs"); const b=fs.readFileSync("/tmp/factsport-lineup-og.png"); if (b.length < 24 || b.toString("hex",0,4) !== "89504e47" || b.readUInt32BE(16) !== 1200 || b.readUInt32BE(20) !== 630) throw new Error("Lineup OG PNG must be 1200x630")'
+          echo "Factsport staging lineup share card: two complete starting-XI lists rendered to 1200x630 PNG."
 
           matches_ok=false
           for attempt in 1 2 3 4 5 6 7 8; do
