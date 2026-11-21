@@ -377,6 +377,22 @@ jobs:
             exit 1
           fi
           echo "Factsport staging public match surfaces: Prediction and betting actions are isolated from list and match detail."
+          LIVE_DETAIL_STATUS="$(curl --silent --show-error --max-time 30 \
+            -o /tmp/factsport-staging-live-detail.json -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+            "$BASE/api/media/live/matches/$DETAIL_MATCH_ID")"
+          if [ "$LIVE_DETAIL_STATUS" = "200" ]; then
+            jq -e 'type == "object" and (has("predictor") | not)' /tmp/factsport-staging-live-detail.json >/dev/null || {
+              echo "::error::Public live match API exposed private Prediction model data."
+              exit 1
+            }
+            echo "Factsport staging public live API: match snapshot returned without Prediction model data."
+          elif [ "$LIVE_DETAIL_STATUS" = "503" ]; then
+            echo "Factsport staging public live API: disabled by feature gate; source boundary remains covered by build."
+          else
+            echo "::error::Public live match API boundary probe returned unexpected HTTP $LIVE_DETAIL_STATUS."
+            exit 1
+          fi
           if ! grep -Eiq '^cache-control:[[:space:]]*.*(private|no-store)' /tmp/factsport-staging-matches.headers; then
             echo "::error::Token-protected staging match response must not be publicly cacheable."
             exit 1
