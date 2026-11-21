@@ -167,8 +167,8 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
                 away: match.away_team,
                 homeLogo: match.home_logo,
                 awayLogo: match.away_logo,
-                hScore: isLive ? hScore ?? undefined : undefined,
-                aScore: isLive ? aScore ?? undefined : undefined,
+                hScore: isLive || isFinished ? hScore ?? undefined : undefined,
+                aScore: isLive || isFinished ? aScore ?? undefined : undefined,
                 label: label,
                 homeTla: match.home_team?.substring(0, 3).toUpperCase(),
                 awayTla: match.away_team?.substring(0, 3).toUpperCase()
