@@ -67,7 +67,7 @@ const getMatchData = cache(async (id: string): Promise<any> => {
     // legacy Supabase match row or its Prediction-only columns.
     const supabase = createPublicClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
     const { data, error } = await supabase.from('matches')
-        .select('id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, video_url, livestream_url, audio_url, widget_id, venue, stage, match_group, match_events, stats, lineups, h2h, referees, predictor, displayClock')
+        .select('id, api_id, espn_id, league, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, video_url, livestream_url, audio_url, widget_id, venue, stage, match_group, match_events, stats, lineups, h2h, referees, displayClock')
         .eq('id', id).single();
     if (error) return null;
     return data;
