@@ -10,14 +10,12 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Metadata, ResolvingMetadata } from 'next';
 import { cache } from 'react'; 
-import { ChevronLeft, Zap } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 
 import SecureMatchPlayer from '@/app/components/SecureMatchPlayer';
 import MatchHeaderClient from '@/app/components/MatchHeaderClient'; 
 import MatchMobileHub from '@/app/components/MatchMobileHub'; 
 import ScoreAxisWidget from '@/app/components/ScoreAxisWidget';
-import PredictionBoard from '@/app/components/PredictionBoard';
-import PublicPredictionSubmit from '@/app/components/PublicPredictionSubmit';
 import HeadToHeadStats from '@/app/components/HeadToHeadStats';
 
 import { getExternalData } from '@/app/lib/matchService';
@@ -285,9 +283,6 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
   const currentStatus = (dbData.status || '').toUpperCase();
   const isFinishedApi = FINISHED_STATUSES.includes(currentStatus);
   const isLive = LIVE_STATUSES.includes(currentStatus);
-  const isPredictionOpen = ['SCHEDULED', 'PRE_MATCH'].includes(currentStatus) &&
-      new Date(dbData.match_date).getTime() > Date.now();
-  const publicPredictionSubmissionReady = env.FACTSPORT_PREDICTION_SUBMISSION_READY === 'true';
   
   // Raw media URLs remain server-side; the playback API enforces the unlock time.
   const isUniversallyFinished = isFinishedApi;
@@ -399,24 +394,6 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
                   <ScoreAxisWidget matchId={dbData.widget_id} />
               )}
 
-              {!hasWidget && (
-                  <div className="mt-4 space-y-4">
-                      <div id="predictions" className="bg-white rounded-lg shadow-sm p-3 border border-slate-200 scroll-mt-20">
-                          <h3 className="text-[10px] font-black uppercase tracking-tight text-slate-800 flex items-center gap-1 mb-2">
-                              <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" /> Match predictions
-                          </h3>
-                          {publicPredictionSubmissionReady && isPredictionOpen && (
-                              <PublicPredictionSubmit
-                                  matchId={dbData.id}
-                                  matchDate={dbData.match_date}
-                                  homeTeam={dbData.home_team}
-                                  awayTeam={dbData.away_team}
-                              />
-                          )}
-                          {process.env.NODE_ENV === 'development' && <PredictionBoard matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} />}
-                      </div>
-                  </div>
-              )}
 
           </div>
       </MatchLiveProvider>
