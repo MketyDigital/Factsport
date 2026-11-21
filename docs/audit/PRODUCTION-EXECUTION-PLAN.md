@@ -480,3 +480,10 @@ This remains source implementation until exact-head build/staging and visual/cra
 Removed Prediction/bookmaker actions from public match cards, match detail and the match-center tab, renamed the homepage `/matches` shortcut, and stripped model probabilities from public match serialization/live API responses. Prediction source and backend contracts remain available for the later private P9B product. A staging assertion now checks rendered `/matches` and a real `/match/{id}` route, and an enabled public live API response must omit the `predictor` field. See [M84](./handoffs/M84-PUBLIC-MEDIA-PREDICTION-ISOLATION.md) and [ROADMAP M84](./ROADMAP.md#m84--public-mediaprediction-surface-isolation-2026-11-21).
 
 This is implementation only until exact-head build/staging and full public-route/metadata/feed/manifest review pass. It does not close P9A or authorize a route switch. No production changes.
+
+### 2026-11-21 M86 — newsroom boundary and M85 regression follow-up
+
+The public newsroom shortcut now says “Matches” for its existing `/matches` destination; decorative newsroom artwork no longer fetches a third-party texture. The match Open Graph fallback retains validated live/finished scores. Regression assertions now reflect the M84 public Media boundary and the exact Entra callback threat-filter exception. See [M84 follow-up](./handoffs/M84-PUBLIC-MEDIA-PREDICTION-ISOLATION.md) and [ROADMAP M86](./ROADMAP.md).
+
+The previous exact-head engine run (`44870017325`, source `34b7457`) failed at four assertions. The source/test corrections were pushed through `c9bfa9f`; the current Vercel check was pending, and a matching Actions outcome was not available during this update. This work remains unverified until engine, typecheck, Vinext build and protected staging pass at the same head. No production resource, route, database or DNS changed; P9A remains open.
+
