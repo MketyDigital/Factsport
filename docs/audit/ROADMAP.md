@@ -3,7 +3,7 @@ Total output lines: 728
 
 # Factsport modernization — master roadmap
 Status: V2 refactor active; full clean-start database migration chain applied to factsport_v2 on 2026-11-18; broader Media/Prediction acceptance and production remain open | Repository: MketyDigital/Factsport | Branch: refactor/factsport-v2
-Updated: 2026-11-18
+Updated: 2026-11-21
 
 ## Governing decisions
 - Preserve original repository and commit history throughout the modernization; repository remains PUBLIC until release and production reactivation. Do not put confidential audit outputs, user data, credentials or Supabase exports in this repo.
