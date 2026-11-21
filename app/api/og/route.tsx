@@ -415,9 +415,11 @@ export async function GET(req: NextRequest) {
           !Number.isSafeInteger(awayScore) || awayScore < 0) {
         return fallbackImage('RESULT UNAVAILABLE');
       }
-      const home = shortTeamName(parsedData.home, 'HOME');
-      const away = shortTeamName(parsedData.away, 'AWAY');
-      const league = cleanText(parsedData.league || 'FOOTBALL').slice(0, 42);
+      const home = shortTeamName(parsedData.home, 'HOME').slice(0, 16);
+      const away = shortTeamName(parsedData.away, 'AWAY').slice(0, 16);
+      const league = cleanText(parsedData.league || 'FOOTBALL').slice(0, 28);
+      const homeNameSize = home.length > 12 ? 28 : 36;
+      const awayNameSize = away.length > 12 ? 28 : 36;
       return new ImageResponse(
         (
           <div style={{
@@ -428,7 +430,7 @@ export async function GET(req: NextRequest) {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ display: 'flex', color: '#facc15', fontSize: 28, fontWeight: 900, letterSpacing: 5 }}>FACTSPORT</span>
-              <span style={{ display: 'flex', color: '#dbeafe', fontSize: 20, fontWeight: 800, letterSpacing: 2 }}>{league}</span>
+              <span style={{ display: 'flex', color: '#dbeafe', fontSize: league.length > 20 ? 16 : 20, fontWeight: 800, letterSpacing: 2 }}>{league}</span>
             </div>
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -437,9 +439,9 @@ export async function GET(req: NextRequest) {
             }}>
               <span style={{ display: 'flex', color: '#64c7f2', fontSize: 22, fontWeight: 900, letterSpacing: 5 }}>FULL TIME</span>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 28 }}>
-                <span style={{ display: 'flex', flex: 1, justifyContent: 'flex-end', textAlign: 'right', fontSize: 40, lineHeight: 1.1, fontWeight: 900 }}>{home}</span>
+                <span style={{ display: 'flex', flex: 1, justifyContent: 'flex-end', textAlign: 'right', fontSize: homeNameSize, lineHeight: 1.1, fontWeight: 900 }}>{home}</span>
                 <span style={{ display: 'flex', padding: '16px 30px', borderRadius: 22, background: '#10264a', border: '2px solid #31537d', color: '#fff', fontSize: 78, fontWeight: 900, letterSpacing: 4 }}>{homeScore}-{awayScore}</span>
-                <span style={{ display: 'flex', flex: 1, textAlign: 'left', fontSize: 40, lineHeight: 1.1, fontWeight: 900 }}>{away}</span>
+                <span style={{ display: 'flex', flex: 1, textAlign: 'left', fontSize: awayNameSize, lineHeight: 1.1, fontWeight: 900 }}>{away}</span>
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#cbd5e1', fontSize: 21 }}>
