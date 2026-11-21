@@ -676,3 +676,14 @@ Owner preference is a Factsport-only customer-facing identity experience. Keep E
 - **Verification pending:** the changes are eligible for the branch push-triggered and manual staging workflow. Do not call the new smoke or updated staging deploy passing until a run with exact source `head_sha` is checked. The screenshot alone does not prove whether the observed 403 came from a stale Worker, another request shape or an upstream layer.
 - Next: verify isolated build and protected staging at the changed source SHA; retry the real External ID browser login; then complete exact issuer/subject linkage, active editorial membership, denial cases, draft/review/publish, public canonical/share-card, unpublish and logout. Continue remaining M74 page/share/mobile/accessibility/rights gates, V2 backup/PITR restore and full sports lifecycle before P9A route isolation/go-no-go. P9B, P10, production cutover and legacy retirement remain separate and open.
 - No production DNS/routes/Worker/database/secrets/jobs/Logic Apps/AdSense or legacy services were changed. No release gate is closed by this middleware adjustment.
+
+
+## M83 — Match result and lineup share cards (2026-11-21)
+
+- M74-D implementation now includes a text-only full-time result card and a text-only starting-XI card. The result renderer requires two nonnegative integer scores. The lineup renderer requires eleven named starters per side. Incomplete inputs produce neutral unavailable cards; neither template invents values or fetches remote crests/player images.
+- Finished-match metadata selects the result card only when both canonical scores are valid. Upcoming-match metadata selects the lineup card only when both starting elevens are complete. Live/incomplete match metadata preserves the existing versus card.
+- Removed the “Predictions” phrase from the public match-page title metadata; this does not yet prove complete Media/Prediction route separation or complete private Prediction product behavior.
+- Source commits: `5663872` (renderers), `ab90b16` (metadata), `5429f86` (staging PNG smoke); handoff: [M83](./handoffs/M83-MATCH-SHARE-CARDS.md).
+- **Exact-head verification pending.** The staging workflow now requires non-empty PNGs for the result and lineup templates. Wait for matching-head isolated build and protected staging evidence before marking runtime acceptance complete. PNG generation does not satisfy visual, crawler, rights, mobile or accessibility acceptance.
+- Next: inspect actual generated cards and route metadata; complete authenticated editor publish/unpublish, public Media/M74-A/B/C/D responsiveness/accessibility/crawler/rights acceptance, ESPN-linked match lifecycle, recovery/rollback and P9A route isolation/go-no-go. Prediction P9B and Factsport TV P10 remain later phases.
+- No production DNS/routes/Worker/database/secrets/jobs/Logic Apps/AdSense changed. No release gate closed by source-only renderer work.
