@@ -26,6 +26,7 @@ Reconciles ROADMAP M1/M8/M10, the parity/AdSense acceptance contract, P9A/P9B in
 - Preserved known live **and finished** scores in the fallback match Open Graph template; valid finished results continue using the dedicated result card. Source commit: `f1645b6`.
 - Reconciled regression checks with the intended boundary: no Prediction form or board on public Media match detail; the Entra exception assertion now captures the exact GET callback plus grouped path/query filtering; fallback share-card score assertion includes finished matches. Source test commits: `4b084bc`, `c398d19`, `c9bfa9f`.
 - Source commits for newsroom follow-up: `f0a3b62` (shortcut), `9add1bd` (artwork patterns), `97c7edc` (hero pattern).
+- Added a focused regression assertion for the newsroom destination label, absence of remote texture hosts and reduced-motion treatment (`9e4f334`).
 - The prior exact-head engine suite failed with four assertions. These source/test corrections have been pushed and should trigger branch CI; current Vercel status is pending and no Actions result is yet available for the new head. This does not close the M84 route audit or P9A acceptance: remaining pages, metadata, feeds, structured data, manifest, screenshots, CI, and editor flow still require review.
 
 ## Acceptance and limits
