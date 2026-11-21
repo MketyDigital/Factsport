@@ -155,6 +155,9 @@ test('newsroom navigation stays within Media and uses first-party decorative art
   assert.doesNotMatch(news, />Predictions<|transparenttextures\.com/);
   assert.doesNotMatch(artwork, /transparenttextures\.com/);
   assert.match(news + artwork, /aria-hidden="true".*radial-gradient/);
+  assert.match(news, /CATEGORIES\.includes\(requestedCategory\)/);
+  assert.match(news, /aria-current=\{currentCategory === cat \? 'page' : undefined\}/);
+  assert.match(news, /focus-visible:outline/);
   assert.match(artwork, /motion-reduce:animate-none/);
 });
 
