@@ -707,7 +707,7 @@ Owner preference is a Factsport-only customer-facing identity experience. Keep E
 
 ### 2026-11-21 — M86 newsroom Media boundary and regression follow-up
 - Corrected the newsroom Explore Factsport shortcut from “Predictions” to “Matches”; its destination was already the public `/matches` route. Added visible keyboard focus styling.
-- Removed remote decorative texture fetches from `NewsArtwork`, replacing them with an inline CSS pattern; decorative artwork is hidden from assistive tech and pulse motion respects reduced-motion settings.
+- Removed all three remote decorative texture fetches from the newsroom hero and `NewsArtwork`, replacing them with inline CSS patterns; decorative artwork is hidden from assistive tech and pulse motion respects reduced-motion settings. Final hero commit: `97c7edc`.
 - Preserved known finished scores in the fallback match share card (`f1645b6`).
 - Reconciled four stale regression assertions against the selected M84 behavior: no Prediction submit UI on public Media match detail; exact Entra callback exception assertion; the valid fallback finished-score projection. Commits: `4b084bc`, `c398d19`, `c9bfa9f`.
 - Source commits: `f0a3b62`, `9add1bd`; handoff: `docs/audit/handoffs/M84-PUBLIC-MEDIA-PREDICTION-ISOLATION.md`.
