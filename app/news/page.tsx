@@ -90,7 +90,7 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
 
       <div className="bg-[#0a1428] text-white pt-8 pb-12 px-6 relative overflow-hidden shadow-lg border-b border-blue-900/30">
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
+        <div aria-hidden="true" className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.35)_1px,transparent_0)] bg-[size:22px_22px]"></div>
         <div className="relative z-10 max-w-7xl mx-auto">
              <Link href="/" className="text-xs font-bold text-slate-400 hover:text-white mb-6 inline-flex items-center gap-1 transition-colors"><ChevronRight size={14} className="rotate-180"/> Back Home</Link>
              <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter flex items-center gap-3">
