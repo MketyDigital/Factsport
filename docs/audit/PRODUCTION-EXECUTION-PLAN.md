@@ -2,7 +2,7 @@
 
 **Branch:** `refactor/factsport-v2`  
 **Plan owner:** Factsport maintainer  
-**Updated:** 2026-11-06  
+**Updated:** 2026-11-21  
 **Status:** Staging foundation exists; product migration is in progress. **Not production-ready.**
 
 This plan operationalizes `docs/audit/ROADMAP.md`, the handoffs under `docs/audit/handoffs/`, the clean-reset policy, provider decisions, and the implementation notes. The master roadmap remains authoritative for product scope. This document is the ordered engineering execution and release checklist. It is intentionally not a list of smoke tests: each phase must deliver working product capability, durable data semantics, operational ownership, and rollback.
