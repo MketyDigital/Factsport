@@ -148,6 +148,16 @@ test('PredictionBoard and submission UI are absent from public Media match pages
   assert.match(predictionMigration, /is_eligible_for_prize boolean NOT NULL DEFAULT false/);
 });
 
+test('newsroom navigation stays within Media and uses first-party decorative artwork', () => {
+  const news = read('app/news/page.tsx');
+  const artwork = read('app/components/NewsArtwork.tsx');
+  assert.ok(news.includes('>Matches</span></Link>'));
+  assert.doesNotMatch(news, />Predictions<|transparenttextures\.com/);
+  assert.doesNotMatch(artwork, /transparenttextures\.com/);
+  assert.match(news + artwork, /aria-hidden="true".*radial-gradient/);
+  assert.match(artwork, /motion-reduce:animate-none/);
+});
+
 test('registered Prediction account and authentication routes are private-host only', () => {
   const rootLayout = read('app/layout.tsx');
   const header = read('app/components/SiteHeader.tsx');
