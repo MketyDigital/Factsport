@@ -114,7 +114,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const normalized = normalizeLegacyEspnSummary(JSON.parse(raw), espnId);
     const observedAt = new Date().toISOString();
     const ttl = cacheSeconds(normalized.status);
-    const payload = { ...normalized, id: match.id, espn_id: espnId, source: 'espn_fast',
+    const payload: Record<string, any> = { ...normalized, id: match.id, espn_id: espnId, source: 'espn_fast',
       observedAt, stale: false };
     delete payload.predictor;
     if (edgeCache) {
