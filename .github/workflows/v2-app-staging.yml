@@ -265,6 +265,26 @@ jobs:
               exit 1
             }
             echo "Factsport staging Entra start: discovery/issuer, app callback and PKCE redirect passed."
+
+            CALLBACK_STATUS="$(curl --silent --show-error --max-time 25 \
+              -D /tmp/factsport-entra-callback.headers \
+              -o /tmp/factsport-entra-callback.body -w '%{http_code}' \
+              "$BASE/api/auth/entra/callback?code=%27%23%3B&state=%27%23%3B")"
+            CALLBACK_LOCATION="$(grep -i '^location:' /tmp/factsport-entra-callback.headers | tail -n 1 | sed -E 's/^[^:]*:[[:space:]]*//; s/\\r$//')"
+            export CALLBACK_STATUS CALLBACK_LOCATION CALLBACK_BASE="$BASE"
+            node <<'NODE'
+          const status = Number(process.env.CALLBACK_STATUS);
+          const location = process.env.CALLBACK_LOCATION;
+          if (status < 300 || status >= 400 || !location) {
+            throw new Error('Entra callback did not reach OIDC validation as a redirect');
+          }
+          const target = new URL(location, process.env.CALLBACK_BASE);
+          if (target.pathname !== '/media-login' ||
+              target.searchParams.get('error') !== 'identity-callback-failed') {
+            throw new Error('Entra callback did not fail closed on missing OIDC state');
+          }
+          NODE
+            echo "Factsport staging Entra callback: opaque OAuth parameters reached state validation and failed closed."
           else
             echo "Factsport staging Entra start: skipped because Entra app secrets are not configured."
           fi
