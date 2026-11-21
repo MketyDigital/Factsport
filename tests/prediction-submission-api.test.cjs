@@ -66,7 +66,7 @@ const matchPage = fs.readFileSync(
   'utf8'
 );
 
-test('Public prediction form reveals email only after explicit submit and reuses known visitor state', () => {
+test('Private Prediction form requires explicit submit and stays off public Media match pages', () => {
   assert.match(publicUi, /function openSubmitForm/);
   assert.match(publicUi, /method: 'GET'/);
   assert.ok(publicUi.includes('emailRequired &&'));
@@ -76,6 +76,5 @@ test('Public prediction form reveals email only after explicit submit and reuses
   assert.match(publicUi, /Confirm Prediction/);
   assert.match(publicUi, /checked=\{marketingOptIn\}/);
   assert.match(publicUi, /useState\(false\)/);
-  assert.match(matchPage, /publicPredictionSubmissionReady && isPredictionOpen/);
-  assert.match(matchPage, /process\.env\.NODE_ENV === 'development'.*PredictionBoard/);
+  assert.doesNotMatch(matchPage, /publicPredictionSubmissionReady|PublicPredictionSubmit|PredictionBoard/);
 });
