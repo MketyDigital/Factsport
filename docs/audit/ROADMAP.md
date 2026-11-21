@@ -705,8 +705,10 @@ Owner preference is a Factsport-only customer-facing identity experience. Keep E
 - **Next exact actions:** inspect diffs around `app/match/[id]/page.tsx`, Entra callback/middleware and the four tests; reproduce `npm run test:engine` in isolated CI; make one behavior-preserving correction with targeted regression coverage; rerun isolated verification, native Vinext and protected staging at the **same new SHA**. Then continue real Entra editor publish/unpublish/logout, PITR/restore and ESPN/chat/MOTM match lifecycle.
 - **Owner BLOCKED:** independent VIP/prize/payment/identity/editorial disposition and sportsbook affiliate/legal/AdSense eligibility decisions; no ad loader until owner verifies actual site/account Ready. Preserve existing Factsport identity and all production resources. No production changes, deployment, merge or cutover authorized.
 
-### 2026-11-21 — M86 newsroom Media boundary follow-up
+### 2026-11-21 — M86 newsroom Media boundary and regression follow-up
 - Corrected the newsroom Explore Factsport shortcut from “Predictions” to “Matches”; its destination was already the public `/matches` route. Added visible keyboard focus styling.
 - Removed remote decorative texture fetches from `NewsArtwork`, replacing them with an inline CSS pattern; decorative artwork is hidden from assistive tech and pulse motion respects reduced-motion settings.
-- Source commits: `f0a3b62`, `9add1bd`; handoff recorded in `docs/audit/handoffs/M84-PUBLIC-MEDIA-PREDICTION-ISOLATION.md`.
-- This closes only the newsroom label/artwork issue. M84 route-wide scan, exact-head CI, Media browser/accessibility acceptance, M74 completion, and P9A gates remain open. No production resource or route changed.
+- Preserved known finished scores in the fallback match share card (`f1645b6`).
+- Reconciled four stale regression assertions against the selected M84 behavior: no Prediction submit UI on public Media match detail; exact Entra callback exception assertion; the valid fallback finished-score projection. Commits: `4b084bc`, `c398d19`, `c9bfa9f`.
+- Source commits: `f0a3b62`, `9add1bd`; handoff: `docs/audit/handoffs/M84-PUBLIC-MEDIA-PREDICTION-ISOLATION.md`.
+- Previous exact-head engine suite failed at `34b7457`. Corrections are pushed; Vercel was pending at `c9bfa9f`, and no matching Actions result was available during this update. M84 route-wide scan, exact-head CI, Media browser/accessibility acceptance, M74 completion and P9A gates remain open. No production resource or route changed.
