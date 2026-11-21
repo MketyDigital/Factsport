@@ -112,7 +112,7 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
     const aScore: number | null = typeof match.away_score === 'number' ? match.away_score : null;
     const scoreText = `${hScore ?? '–'}-${aScore ?? '–'}`;
 
-    let title = `${match.home_team} vs ${match.away_team} Predictions, H2H & Live Score | FactSport`;
+    let title = `${match.home_team} vs ${match.away_team} H2H, Stats & Live Score | FactSport`;
     let description = `View match details, team form, starting lineups and live updates for ${match.home_team} vs ${match.away_team} in the ${match.league}.`;
     let label = 'UPCOMING MATCH';
 
@@ -126,18 +126,55 @@ export async function generateMetadata({ params, searchParams }: Props, parent: 
         label = 'FULL TIME RESULT';
     }
 
-    const ogDataObj = {
-        type: 'versus',
-        home: match.home_team,
-        away: match.away_team,
-        homeLogo: match.home_logo,
-        awayLogo: match.away_logo,
-        hScore: isLive || isFinished ? hScore ?? undefined : undefined,
-        aScore: isLive || isFinished ? aScore ?? undefined : undefined,
-        label: label,
-        homeTla: match.home_team?.substring(0, 3).toUpperCase(),
-        awayTla: match.away_team?.substring(0, 3).toUpperCase()
+    const getStartingPlayers = (side: 'home' | 'away'): Array<{ name: string; is_starter: true }> => {
+        const players = match.lineups?.[side];
+        if (!Array.isArray(players)) return [];
+        return players
+            .filter((player: any) => player && typeof player === 'object' && player.is_starter === true)
+            .map((player: any) => ({
+                name: typeof player.name === 'string' ? player.name.trim() : '',
+                is_starter: true as const,
+            }))
+            .filter((player: { name: string }) => player.name.length > 0)
+            .slice(0, 11);
     };
+    const homeStartingPlayers = getStartingPlayers('home');
+    const awayStartingPlayers = getStartingPlayers('away');
+    const hasCompleteStartingLineups = homeStartingPlayers.length === 11 && awayStartingPlayers.length === 11;
+    const hasValidFinalScore = Number.isSafeInteger(hScore) && (hScore as number) >= 0 &&
+        Number.isSafeInteger(aScore) && (aScore as number) >= 0;
+
+    const ogDataObj = isFinished && hasValidFinalScore
+        ? {
+            type: 'result',
+            home: match.home_team,
+            away: match.away_team,
+            league: match.league,
+            homeScore: hScore,
+            awayScore: aScore,
+        }
+        : !isLive && !isFinished && hasCompleteStartingLineups
+            ? {
+                type: 'lineups',
+                home: match.home_team,
+                away: match.away_team,
+                homeFormation: match.lineups?.formations?.home,
+                awayFormation: match.lineups?.formations?.away,
+                homeXI: homeStartingPlayers,
+                awayXI: awayStartingPlayers,
+            }
+            : {
+                type: 'versus',
+                home: match.home_team,
+                away: match.away_team,
+                homeLogo: match.home_logo,
+                awayLogo: match.away_logo,
+                hScore: isLive ? hScore ?? undefined : undefined,
+                aScore: isLive ? aScore ?? undefined : undefined,
+                label: label,
+                homeTla: match.home_team?.substring(0, 3).toUpperCase(),
+                awayTla: match.away_team?.substring(0, 3).toUpperCase()
+            };
     
     const jsonStr = JSON.stringify(ogDataObj);
     const bytes = new TextEncoder().encode(jsonStr);
