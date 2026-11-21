@@ -372,7 +372,7 @@ jobs:
             echo "::error::Protected V2 match detail did not render (HTTP $MATCH_DETAIL_STATUS)."
             exit 1
           }
-          if grep -Eiq 'Match predictions|PublicPredictionSubmit|WinProbability|Bet Now|refpa58144\.com|/vip/upgrade' /tmp/factsport-staging-match-detail.html; then
+          if grep -Eiq 'Match predictions|PublicPredictionSubmit|WinProbability|predictor|Bet Now|refpa58144\.com|/vip/upgrade' /tmp/factsport-staging-match-detail.html; then
             echo "::error::Public Media match detail exposes Prediction or betting UI/content."
             exit 1
           fi
