@@ -471,6 +471,6 @@ This is a staging verification hook, not completion of P4 identity acceptance. C
 
 ### 2026-11-21 M83 — match share-card implementation follow-up
 
-The M74-D source now has text-only finished-result and complete-starting-XI Open Graph templates, conditionally wired from canonical match metadata. Public match title metadata no longer includes Prediction wording. The staging workflow checks for non-empty result and lineup PNG output. Record: [M83](./handoffs/M83-MATCH-SHARE-CARDS.md), [ROADMAP M83](./ROADMAP.md#m83--match-result-and-lineup-share-cards-2026-11-21).
+The M74-D source now has text-only finished-result and complete-starting-XI Open Graph templates, conditionally wired from canonical match metadata. Public match title metadata no longer includes Prediction wording. The staging workflow checks PNG signatures and exact 1200×630 dimensions for article, result and lineup cards. Record: [M83](./handoffs/M83-MATCH-SHARE-CARDS.md), [ROADMAP M83](./ROADMAP.md#m83--match-result-and-lineup-share-cards-2026-11-21).
 
 This remains source implementation until exact-head build/staging and visual/crawler/mobile/accessibility/rights acceptance pass. It does not close P3, P8, P9A or establish public/private route isolation. No production change.
