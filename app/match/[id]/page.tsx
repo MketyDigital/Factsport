@@ -264,13 +264,15 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
       lineups: dbData.lineups,
       h2h: dbData.h2h,
       referees: dbData.referees,
-      predictor: dbData.predictor,
       widget_id: dbData.widget_id || dbData.provider_widget_id || null,
       displayClock: dbData.displayClock || dbData.display_clock || '',
   };
 
   const rawData = await getExternalData(clientMatchData);
-  const data: any = rawData || {};
+  const data: any = rawData ? { ...rawData } : {};
+  // Prediction probabilities belong to the separate private product and must not
+  // be serialized through the public Media match page or its live context.
+  delete data.predictor;
   
   if (isPostgresMatchDetail()) {
       data.home_form = await getPostgresTeamForm(dbData.home_team);
