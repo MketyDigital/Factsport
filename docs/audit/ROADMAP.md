@@ -687,3 +687,11 @@ Owner preference is a Factsport-only customer-facing identity experience. Keep E
 - **Exact-head verification pending.** The staging workflow now requires non-empty PNGs for the result and lineup templates and verifies PNG signatures and 1200×630 dimensions for the article, result and lineup cards. Wait for matching-head isolated build and protected staging evidence before marking runtime acceptance complete. PNG generation does not satisfy visual, crawler, rights, mobile or accessibility acceptance.
 - Next: inspect actual generated cards and route metadata; complete authenticated editor publish/unpublish, public Media/M74-A/B/C/D responsiveness/accessibility/crawler/rights acceptance, ESPN-linked match lifecycle, recovery/rollback and P9A route isolation/go-no-go. Prediction P9B and Factsport TV P10 remain later phases.
 - No production DNS/routes/Worker/database/secrets/jobs/Logic Apps/AdSense changed. No release gate closed by source-only renderer work.
+
+## M84 — Public Media/Prediction surface isolation (2026-11-21)
+
+- Removed Prediction and bookmaker actions from public match rows/cards, the public match detail, and the public match-center tab; changed the homepage `/matches` shortcut label from “Predict” to “Matches”. Public Media now renders sourced match/status content only in these locations.
+- Prediction schemas, APIs, components and feature configuration remain for the separate private product/P9B. No gameplay/account/financial data or backend state was changed.
+- Added an exact staging route assertion that reads a real fixture’s public match detail and fails if the `/matches` list or `/match/{id}` HTML exposes Prediction or bookmaker UI. Source commits: `1e98214`, `45a6457`, `1cf686b`, `bc5bd6b`, `a123041`, `10eba92`; handoff: [M84](./handoffs/M84-PUBLIC-MEDIA-PREDICTION-ISOLATION.md).
+- **Exact-head build/staging result pending.** The assertion does not yet cover every public page, feed, manifest, metadata or browser journey. Scan all P0 public routes and metadata before P9A. Do not mark public/private isolation complete on these component changes alone.
+- No production routes, Worker, database, secrets, jobs, Logic Apps, AdSense or legacy systems changed. P9A remains open; P9B is preserved as later private-product work; P10 TV follows Media and Prediction.
