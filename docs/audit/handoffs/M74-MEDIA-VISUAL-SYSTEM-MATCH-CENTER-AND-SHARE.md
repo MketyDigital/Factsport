@@ -87,5 +87,5 @@ Selected commits in implementation order:
 - Added dedicated text-only result and starting-lineup OG templates in `app/api/og/route.tsx`. Full-time cards require valid nonnegative integer scores; lineup cards require eleven named starters for each team. Neither template fetches remote logos or player imagery, and incomplete source data returns an unavailable card.
 - Match-page metadata selects result cards only for finished matches with valid scores and lineup cards only for upcoming matches with complete starting elevens. Existing versus metadata remains for live or incomplete matches.
 - Removed Prediction wording from the public match-page title metadata. This does not close the full route/product separation or Prediction release.
-- Added staging smoke checks requiring non-empty PNG responses for both templates. Source commits: `5663872`, `ab90b16`, `5429f86`.
+- Added staging smoke checks requiring non-empty 1200×630 PNG responses for both templates. Source commits: `5663872`, `ab90b16`, `5755f2f`, `5429f86`, `8803c41`.
 - Exact-head staging/build results, image inspection, actual route metadata, public crawler delivery, licensed asset policy, accessibility and mobile acceptance remain unverified. See [M83](./M83-MATCH-SHARE-CARDS.md).
