@@ -32,7 +32,6 @@ function lastStoredSnapshot(match: Record<string, any>, servedAt: string) {
     lineups: match.lineups || {},
     venue: match.venue || null,
     referees: match.referees || [],
-    predictor: match.predictor ?? null,
     source: 'postgres_snapshot',
     observedAt: match.source_updated_at || null,
     servedAt,
@@ -89,10 +88,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
       if (hit) {
         const cached = await hit.json() as Record<string, any>;
         const ttl = cacheSeconds(String(cached.status || ''));
-        return NextResponse.json({
-          ...cached, servedAt,
+        const publicCached = { ...cached, servedAt,
           stale: !cached.observedAt || Date.now() - Date.parse(cached.observedAt) > ttl * 1000,
-        }, { headers: { 'Cache-Control': `public, max-age=0, s-maxage=${ttl}` } });
+        };
+        delete publicCached.predictor;
+        return NextResponse.json(publicCached, { headers: { 'Cache-Control': `public, max-age=0, s-maxage=${ttl}` } });
       }
     } catch {
       // A cache fault is not an ESPN outage; continue to the provider.
@@ -116,6 +116,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const ttl = cacheSeconds(normalized.status);
     const payload = { ...normalized, id: match.id, espn_id: espnId, source: 'espn_fast',
       observedAt, stale: false };
+    delete payload.predictor;
     if (edgeCache) {
       try {
         await edgeCache.put(cacheKey, new Response(JSON.stringify(payload), {
