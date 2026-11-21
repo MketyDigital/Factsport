@@ -406,6 +406,114 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Factsport match-result share card. It uses only the supplied final score
+    // and team names, with no remote image fetch or inferred match statistic.
+    if (parsedData.type === 'result') {
+      const homeScore = parsedData.homeScore;
+      const awayScore = parsedData.awayScore;
+      if (!Number.isSafeInteger(homeScore) || homeScore < 0 ||
+          !Number.isSafeInteger(awayScore) || awayScore < 0) {
+        return fallbackImage('RESULT UNAVAILABLE');
+      }
+      const home = shortTeamName(parsedData.home, 'HOME');
+      const away = shortTeamName(parsedData.away, 'AWAY');
+      const league = cleanText(parsedData.league || 'FOOTBALL').slice(0, 42);
+      return new ImageResponse(
+        (
+          <div style={{
+            width: 1200, height: 630, display: 'flex', flexDirection: 'column',
+            justifyContent: 'space-between', padding: '58px 72px',
+            color: '#fff', fontFamily: 'Arial, sans-serif',
+            background: 'linear-gradient(140deg, #071226 0%, #102b57 58%, #07556a 100%)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ display: 'flex', color: '#facc15', fontSize: 28, fontWeight: 900, letterSpacing: 5 }}>FACTSPORT</span>
+              <span style={{ display: 'flex', color: '#dbeafe', fontSize: 20, fontWeight: 800, letterSpacing: 2 }}>{league}</span>
+            </div>
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              justifyContent: 'center', gap: 28, padding: '42px',
+              borderRadius: 32, background: '#081a34', border: '1px solid #31537d',
+            }}>
+              <span style={{ display: 'flex', color: '#64c7f2', fontSize: 22, fontWeight: 900, letterSpacing: 5 }}>FULL TIME</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 28 }}>
+                <span style={{ display: 'flex', flex: 1, justifyContent: 'flex-end', textAlign: 'right', fontSize: 40, lineHeight: 1.1, fontWeight: 900 }}>{home}</span>
+                <span style={{ display: 'flex', padding: '16px 30px', borderRadius: 22, background: '#10264a', border: '2px solid #31537d', color: '#fff', fontSize: 78, fontWeight: 900, letterSpacing: 4 }}>{homeScore}-{awayScore}</span>
+                <span style={{ display: 'flex', flex: 1, textAlign: 'left', fontSize: 40, lineHeight: 1.1, fontWeight: 900 }}>{away}</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#cbd5e1', fontSize: 21 }}>
+              <span>FINAL SCORE · MATCH REPORT</span>
+              <span>factsport.com</span>
+            </div>
+          </div>
+        ),
+        { width: 1200, height: 630 },
+      );
+    }
+
+    // Starting-XI preview requires eleven named starters for both teams.
+    // It intentionally omits crests and player photos to avoid remote asset fetching.
+    if (parsedData.type === 'lineups') {
+      const getStarters = (players: unknown): string[] => {
+        if (!Array.isArray(players)) return [];
+        return players
+          .filter((player: any) => player && typeof player === 'object' && player.is_starter === true)
+          .map((player: any) => getPlayerName(player))
+          .filter((name: string) => name.length > 0)
+          .slice(0, 11)
+          .map((name: string) => cleanText(name).slice(0, 24));
+      };
+      const homePlayers = getStarters(parsedData.homeXI);
+      const awayPlayers = getStarters(parsedData.awayXI);
+      if (homePlayers.length !== 11 || awayPlayers.length !== 11) {
+        return fallbackImage('LINEUPS NOT AVAILABLE');
+      }
+      const home = shortTeamName(parsedData.home, 'HOME');
+      const away = shortTeamName(parsedData.away, 'AWAY');
+      const homeFormation = cleanText(parsedData.homeFormation || 'STARTING XI').slice(0, 18);
+      const awayFormation = cleanText(parsedData.awayFormation || 'STARTING XI').slice(0, 18);
+      return new ImageResponse(
+        (
+          <div style={{
+            width: 1200, height: 630, display: 'flex', flexDirection: 'column',
+            padding: '42px 58px', gap: 24, color: '#fff', fontFamily: 'Arial, sans-serif',
+            background: 'linear-gradient(145deg, #071226 0%, #102b57 62%, #07556a 100%)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ display: 'flex', color: '#facc15', fontSize: 28, fontWeight: 900, letterSpacing: 5 }}>FACTSPORT</span>
+              <span style={{ display: 'flex', color: '#dbeafe', fontSize: 20, fontWeight: 800, letterSpacing: 3 }}>STARTING XI</span>
+            </div>
+            <div style={{ display: 'flex', flex: 1, gap: 20 }}>
+              {[
+                { team: home, formation: homeFormation, players: homePlayers },
+                { team: away, formation: awayFormation, players: awayPlayers },
+              ].map((side, index) => (
+                <div key={index} style={{
+                  display: 'flex', flex: 1, flexDirection: 'column', gap: 10,
+                  padding: '18px 22px', borderRadius: 24,
+                  background: index === 0 ? '#0d2a39' : '#11213d',
+                  border: '1px solid #31537d',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #31537d', paddingBottom: 10 }}>
+                    <span style={{ display: 'flex', fontSize: 26, fontWeight: 900 }}>{side.team}</span>
+                    <span style={{ display: 'flex', color: '#9fc9ec', fontSize: 15, fontWeight: 800 }}>{side.formation}</span>
+                  </div>
+                  {side.players.map((player, playerIndex) => (
+                    <div key={playerIndex} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 23 }}>
+                      <span style={{ display: 'flex', width: 25, color: '#64c7f2', fontSize: 15, fontWeight: 800 }}>{playerIndex + 1}</span>
+                      <span style={{ display: 'flex', color: '#f8fafc', fontSize: 18, fontWeight: 700 }}>{player}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        ),
+        { width: 1200, height: 630 },
+      );
+    }
+
     // 📋 TEMPLATE 1: PITCH LINEUP INTERFACE
     if (parsedData.type === 'pitch') {
       const home = shortTeamName(parsedData.home, 'HOME');
