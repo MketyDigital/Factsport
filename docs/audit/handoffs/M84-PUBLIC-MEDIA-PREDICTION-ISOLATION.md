@@ -15,7 +15,9 @@ Reconciles ROADMAP M1/M8/M10, the parity/AdSense acceptance contract, P9A/P9B in
 - Relabeled the homepage shortcut from “Predict” to “Matches” because it navigates to `/matches`.
 - Left Prediction schemas, components, APIs and feature-flag configuration in the repository for the separate P9B product. No Prediction records, accounts, scores, payments, prizes or entitlements were altered.
 - Extended the staging workflow to fetch a real staged fixture’s match-detail page and fail if the public `/matches` list or `/match/{id}` page renders Prediction or bookmaker actions/content.
-- Source commits: `1e98214` (`MatchRow`), `45a6457` (`CompactMatchRow`), `1cf686b` (match detail), `bc5bd6b` (`MatchMobileHub`), `a123041` (home shortcut), `10eba92` (staging boundary smoke).
+- Stripped the `predictor` model from both the public match detail's serialized client projection and the public same-origin live-match API responses (cached, live and DB fallback). The public Media UI no longer receives the private probability model.
+- Added an optional staging probe for the public live-match API: when enabled, it requires JSON without a `predictor` property; a deliberate 503 feature-off response remains a skip.
+- Source commits: `1e98214` (`MatchRow`), `45a6457` (`CompactMatchRow`), `1cf686b` (match detail UI), `bc5bd6b` (`MatchMobileHub`), `a123041` (home shortcut), `ed5b69f` (live API projection), `219c102` (match page projection), and `10eba92`/`6e34c90` (staging boundary/data smoke).
 
 ## Acceptance and limits
 
