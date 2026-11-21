@@ -460,3 +460,10 @@ The remaining P1 work is to prove V2-target backup/PITR recovery, not to restore
 ### 2026-11-18 follow-up — editorial runtime binding is live in staging
 
 Staging bootstrap [44362059881](https://github.com/MketyDigital/Factsport/actions/runs/44362059881) provisioned the dedicated editorial application LOGIN and TLS-required/cache-disabled Hyperdrive, and staging app run [44362390781](https://github.com/MketyDigital/Factsport/actions/runs/44362390781) passed on commit `3b1ef8fe79bbd39baea790bf747d81def0bda6f8`. Generated credentials remain out of source and CI logs. This closes the first editorial DB runtime identity/binding step; real Entra identity linking and editor flow, other required Media adapters, Logic Apps validation (workflow stays disabled), V2 backup/PITR recovery, public/editorial acceptance, route isolation, rollback and P9A remain open. No legacy database restore/import is part of V2; the recovery gate is for `factsport_v2`.
+
+
+### 2026-11-21 M82 — Entra callback acceptance follow-up
+
+The exact Media Entra callback route now bypasses the legacy middleware threat-pattern heuristic so opaque OAuth query values can reach the existing OIDC validator. The validator still fails closed on missing/invalid state and enforces PKCE, issuer, audience, signature, nonce and an exact linked editorial identity. The staging workflow now checks the no-state failure redirect. Source/handoff: [M82](./handoffs/M82-ENTRA-CALLBACK-THREAT-BOUNDARY.md); roadmap record: [M82](./ROADMAP.md#m82--entra-callback-filter-and-release-reposition-2026-11-21).
+
+This is a staging verification hook, not completion of P4 identity acceptance. Confirm a run on the exact changed head, then complete real browser sign-in, issuer/subject membership, negative RBAC, publish/unpublish/logout and redacted operational evidence. P9A remains blocked on the full Media, sports, recovery, route-isolation, rollback and owner go/no-go gates; P9B and P10 remain separately ordered. No production changes.
