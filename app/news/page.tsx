@@ -32,7 +32,8 @@ export const metadata: Metadata = {
 export default async function NewsListingPage({ searchParams }: { searchParams: { category?: string, page?: string } }) {
   const resolvedParams = await searchParams;
   
-  const currentCategory = resolvedParams.category || 'All';
+  const requestedCategory = resolvedParams.category || 'All';
+  const currentCategory = CATEGORIES.includes(requestedCategory) ? requestedCategory : 'All';
   const requestedPage = Number.parseInt(resolvedParams.page || '1', 10);
   const currentPage = Number.isFinite(requestedPage) ? Math.min(417, Math.max(1, requestedPage)) : 1;
 
@@ -108,7 +109,8 @@ export default async function NewsListingPage({ searchParams }: { searchParams: 
                       key={cat} 
                       href={`/news?category=${encodeURIComponent(cat)}&page=1`} 
                       scroll={false}
-                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${currentCategory === cat ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'}`}
+                      aria-current={currentCategory === cat ? 'page' : undefined}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 ${currentCategory === cat ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'}`}
                   >
                       {cat}
                   </Link>
