@@ -15,11 +15,11 @@ Implemented the next M74-D social-preview slice from the M74 visual handoff and 
 - Wired finished matches with valid scores to the result card, and upcoming matches with complete lineups to the starting-XI card. Live and incomplete matches keep their existing versus behavior.
 - Removed “Predictions” from the public match page title metadata; retained H2H, stats and live-score wording.
 - Extended `.github/workflows/v2-app-staging.yml` to request both templates with a short-lived CI token and require a non-empty `image/png` result.
-- Source commits: `5663872` (renderers), `ab90b16` (metadata), `5429f86` (staging smoke).
+- Source commits: `5663872` (renderers), `ab90b16` (metadata), `5755f2f` (long-label bounds), `5429f86` (staging smoke), and `8803c41` (1200×630 PNG dimension assertions).
 
 ## Acceptance still required
 
-The staging workflow was just extended and its result on the exact source head has not yet been confirmed. A PNG response proves the renderer produced an image, not that its typography is visually correct or that social crawlers can reach it on the eventual public host. Still required: inspect a real generated result and lineup card, verify the actual metadata on the match route, review mobile/crawler behavior, and confirm lineups/scores match ESPN/PostgreSQL source data. Rights and production OG URL accessibility remain open.
+The staging workflow was just extended and its result on the exact source head has not yet been confirmed. Its acceptance checks now require the PNG signature and exact 1200×630 dimensions for the article, result and lineup cards. A PNG response proves the renderer produced an image, not that its typography is visually correct or that social crawlers can reach it on the eventual public host. Still required: inspect a real generated result and lineup card, verify the actual metadata on the match route, review mobile/crawler behavior, and confirm lineups/scores match ESPN/PostgreSQL source data. Rights and production OG URL accessibility remain open.
 
 The staging-only Entra callback remediation in M82 is a separate, still-unverified sign-in path. The user must complete the real editor callback and authorize exact issuer/subject linkage; this M83 work does not close identity/RBAC.
 
