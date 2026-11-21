@@ -140,10 +140,10 @@ test('social embed uses secure playback without timed redirects or forced Telegr
   assert.match(page, /index: false/);
 });
 
-test('legacy free PredictionBoard cannot read or write Supabase from production Media match pages', () => {
+test('PredictionBoard and submission UI are absent from public Media match pages', () => {
   const match = read('app/match/[id]/page.tsx');
   const predictionMigration = read('db/migrations/0003_factsport_public_predictions.sql');
-  assert.match(match, /process\.env\.NODE_ENV === 'development' && <PredictionBoard/);
+  assert.doesNotMatch(match, /PredictionBoard|PublicPredictionSubmit|publicPredictionSubmissionReady/);
   assert.match(predictionMigration, /CREATE TABLE IF NOT EXISTS public\.predictions/);
   assert.match(predictionMigration, /is_eligible_for_prize boolean NOT NULL DEFAULT false/);
 });
