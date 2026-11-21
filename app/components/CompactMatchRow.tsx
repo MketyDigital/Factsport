@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Zap, Ticket, Trophy } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import MatchTime from './MatchTime';
 import LiveScoreLabel from './LiveScoreLabel';
 import { useSmartInterval } from '@/app/hooks/useSmartInterval';
@@ -9,7 +9,6 @@ import { fetchLiveMatchDeduplicated } from '@/app/utils/liveFetcher';
 
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
-const DEFAULT_AFFILIATE_LINK = "https://refpa58144.com/L?tag=d_1181253m_1599c_&site=1181253&ad=1599";
 
 export default function CompactMatchRow({ match: initialMatch, disablePolling = false, showLeague = false }: { match: any, disablePolling?: boolean, showLeague?: boolean }) {
     const [match, setMatch] = useState(initialMatch);
@@ -79,18 +78,6 @@ export default function CompactMatchRow({ match: initialMatch, disablePolling = 
                     </div>
                 </Link>
 
-                {!isFinished && (
-                    <div className="w-[24px] shrink-0 flex flex-col items-center justify-center pl-1 border-l border-slate-100 gap-1">
-                        {isScheduled && (
-                            <Link href={`/match/${match.id}#predictions`} className="w-full bg-blue-50 rounded flex items-center justify-center text-blue-600 py-1" title="Predict">
-                                <Zap size={10} className="fill-blue-600" />
-                            </Link>
-                        )}
-                        <a href={match.booking_code ? '#' : (match.affiliate_link || DEFAULT_AFFILIATE_LINK)} target="_blank" rel="noopener noreferrer" className="w-full bg-green-50 rounded flex items-center justify-center text-green-600 py-1" title="Bet">
-                            <Ticket size={10} />
-                        </a>
-                    </div>
-                )}
             </div>
         </div>
     );
