@@ -310,6 +310,30 @@ jobs:
           }
           echo "Factsport staging article share card: authorized 1200x630 renderer returned PNG."
 
+          RESULT_OG_DATA="$(node -e 'process.stdout.write(Buffer.from(JSON.stringify({type:"result",home:"Home Club",away:"Away Club",league:"Premier League",homeScore:2,awayScore:1})).toString("base64url"))')"
+          RESULT_OG_STATUS="$(curl --silent --show-error --max-time 25 \
+            -D /tmp/factsport-result-og.headers \
+            -o /tmp/factsport-result-og.png -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+            "$BASE/api/og?data=$RESULT_OG_DATA")"
+          [ "$RESULT_OG_STATUS" = "200" ] && grep -Eiq '^content-type:[[:space:]]*image/png' /tmp/factsport-result-og.headers && [ -s /tmp/factsport-result-og.png ] || {
+            echo "::error::Authorized Factsport final-result share card did not return a PNG (HTTP $RESULT_OG_STATUS)."
+            exit 1
+          }
+          echo "Factsport staging result share card: complete-score renderer returned PNG."
+
+          LINEUP_OG_DATA="$(node -e 'const homeXI=Array.from({length:11},(_,i)=>({name:"Home Player "+(i+1),is_starter:true})); const awayXI=Array.from({length:11},(_,i)=>({name:"Away Player "+(i+1),is_starter:true})); process.stdout.write(Buffer.from(JSON.stringify({type:"lineups",home:"Home Club",away:"Away Club",homeFormation:"4-3-3",awayFormation:"4-2-3-1",homeXI,awayXI})).toString("base64url"))')"
+          LINEUP_OG_STATUS="$(curl --silent --show-error --max-time 25 \
+            -D /tmp/factsport-lineup-og.headers \
+            -o /tmp/factsport-lineup-og.png -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+            "$BASE/api/og?data=$LINEUP_OG_DATA")"
+          [ "$LINEUP_OG_STATUS" = "200" ] && grep -Eiq '^content-type:[[:space:]]*image/png' /tmp/factsport-lineup-og.headers && [ -s /tmp/factsport-lineup-og.png ] || {
+            echo "::error::Authorized Factsport starting-lineup share card did not return a PNG (HTTP $LINEUP_OG_STATUS)."
+            exit 1
+          }
+          echo "Factsport staging lineup share card: two complete starting-XI lists rendered to PNG."
+
           matches_ok=false
           for attempt in 1 2 3 4 5 6 7 8; do
             MATCH_STATUS="$(curl --silent --show-error --max-time 25 \
