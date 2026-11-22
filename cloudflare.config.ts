@@ -31,6 +31,8 @@ const factsportWorker = defineWorker(async () => {
       FACTSPORT_MATCHES_BACKEND: bindings.text("postgres"),
       // V2 staging has migrations 0008/0017 applied and its reader grants verified.
       FACTSPORT_MATCH_DETAIL_BACKEND: bindings.text("postgres"),
+      // Editorial reads use the dedicated least-privilege staging Hyperdrive.
+      FACTSPORT_EDITORIAL_BACKEND: bindings.text("postgres"),
       FACTSPORT_COMPETITIONS_BACKEND: bindings.text("disabled"),
       FACTSPORT_HOMEPAGE_BACKEND: bindings.text("disabled"),
       FACTSPORT_PREDICTION_SETTINGS_BACKEND: bindings.text("disabled"),
