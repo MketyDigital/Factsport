@@ -25,7 +25,7 @@ test('Media match detail, live data, widget, pins and playback have explicit Pos
   assert.match(read('lib/adapters/postgres-matches.ts'), /export async function getPostgresMatchPlaybackById/);
 });
 
-test('competition standings and player leaders do not silently fall back to legacy Supabase in staging', () => {
+test('V2 competition APIs use PostgreSQL only and fail closed when not provisioned', () => {
   for (const path of [
     'app/api/competitions/matches/route.ts',
     'app/api/cache/standings/route.ts',
@@ -34,8 +34,9 @@ test('competition standings and player leaders do not silently fall back to lega
   ]) {
     const source = read(path);
     assert.match(source, /FACTSPORT_COMPETITIONS_BACKEND|FACTSPORT_MATCHES_BACKEND/);
-    assert.match(source, /FACTSPORT_ENVIRONMENT !== 'development'/);
+    assert.match(source, /!== 'postgres'/);
     assert.match(source, /status: 503/);
+    assert.doesNotMatch(source, /supabase|createClient|\.from\(/i);
   }
   assert.match(read('app/api/cache/leaders/route.ts'), /listCurrentCompetitionPlayerLeaders/);
   assert.match(read('app/api/cache/standings/route.ts'), /listCurrentCompetitionStandings/);
