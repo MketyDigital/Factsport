@@ -53,6 +53,7 @@ test('Prediction analysis remains a separate fail-closed route, not folded into 
 test('only the migration-verified PostgreSQL match-detail reader is enabled in Cloudflare staging', () => {
   const config = read('cloudflare.config.ts');
   assert.match(config, /FACTSPORT_MATCH_DETAIL_BACKEND: bindings\.text\("postgres"\)/);
+  assert.match(config, /FACTSPORT_EDITORIAL_BACKEND: bindings\.text\("postgres"\)/);
   assert.match(config, /FACTSPORT_COMPETITIONS_BACKEND: bindings\.text\("disabled"\)/);
   assert.match(config, /FACTSPORT_HOMEPAGE_BACKEND: bindings\.text\("disabled"\)/);
   assert.match(config, /FACTSPORT_PREDICTION_SETTINGS_BACKEND: bindings\.text\("disabled"\)/);
