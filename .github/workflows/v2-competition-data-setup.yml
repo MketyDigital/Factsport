@@ -1,0 +1,204 @@
+name: Factsport v2 competition data setup (staging)
+
+# One-click setup for the existing Factsport V2 database. Creates only a
+# dedicated competition LOGIN/Hyperdrive, ingests official snapshots, and
+# deploys the scheduled staging Worker. No production routes or DNS are changed.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factsport-v2-competition-setup
+  cancel-in-progress: false
+
+jobs:
+  setup-competition-sync:
+    if: github.ref == 'refs/heads/refactor/factsport-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KEY }}
+      FACTSPORT_ADMIN_DB_URL: ${{ secrets.DATABASE_URL }}
+      FACTSPORT_FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
+      HD_ADMIN_ID: 08cee41a81be4c3980450be9563af5e2
+      HD_COMPETITION_NAME: factsport-v2-competition-postgres
+      WORKER_NAME: factsport-v2-competition-sync
+    steps:
+      - name: Validate existing staging credentials and exact Factsport database
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN FACTSPORT_ADMIN_DB_URL FACTSPORT_FOOTBALL_DATA_KEY; do
+            [ -n "${!key:-}" ] || { echo "::error::Required existing repository secret is unavailable: $key"; exit 1; }
+          done
+          node <<'NODE'
+          let db;
+          try { db = new URL(process.env.FACTSPORT_ADMIN_DB_URL); }
+          catch { console.error('::error::DATABASE_URL is invalid.'); process.exit(1); }
+          if (!['postgres:', 'postgresql:'].includes(db.protocol) ||
+              db.hostname !== 'mketypostgres.postgres.database.azure.com' ||
+              db.pathname !== '/factsport_v2' || db.username !== 'mketydbadmin' || !db.password) {
+            console.error('::error::DATABASE_URL does not identify the existing factsport_v2 admin connection.');
+            process.exit(1);
+          }
+          console.log('Existing Factsport V2 database identity verified; secret value withheld.');
+          NODE
+          STATUS="$(curl -sS -o /tmp/factsport-comp-admin-hd.json -w '%{http_code}'             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/$HD_ADMIN_ID")"
+          [ "$STATUS" = 200 ] && jq -e             '.success == true and .result.name == "factsport-v2-postgres" and
+             .result.origin.database == "factsport_v2" and
+             .result.origin.user == "mketydbadmin" and .result.mtls.sslmode == "require"'             /tmp/factsport-comp-admin-hd.json >/dev/null || {
+              echo "::error::Refusing setup: admin Hyperdrive identity/TLS does not match factsport_v2."
+              exit 1
+            }
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/factsport-v2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies and verify competition contracts
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-audit --no-fund
+          node --test tests/factsport-competition-ingestion.test.mjs tests/factsport-competition-worker.test.mjs
+          node --check workers/factsport-competition-sync.mjs
+          npm run typecheck
+      - name: Resolve or create the dedicated competition Hyperdrive
+        id: hyperdrive
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl -sS -o /tmp/factsport-comp-hd-list.json -w '%{http_code}'             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs")"
+          [ "$STATUS" = 200 ] || { echo "::error::Unable to list Hyperdrive configs."; exit 1; }
+          CURRENT="$(jq -c --arg name "$HD_COMPETITION_NAME" '.result[]? | select(.name == $name)'             /tmp/factsport-comp-hd-list.json | head -n 1)"
+          if [ -n "$CURRENT" ]; then
+            jq -e --arg name "$HD_COMPETITION_NAME"               '.name == $name and .origin.database == "factsport_v2" and
+               .origin.user == "factsport_v2_competition_app" and
+               .mtls.sslmode == "require" and .caching.disabled == true'               <<<"$CURRENT" >/dev/null || {
+                echo "::error::Existing competition Hyperdrive has unexpected database identity or TLS."
+                exit 1
+              }
+            ID="$(jq -r '.id' <<<"$CURRENT")"
+            echo "Existing dedicated Factsport competition Hyperdrive verified."
+          else
+            npx --yes wrangler@4.158.0 deploy --config wrangler.factsport-competition-provision.jsonc
+            PASSWORD="$(openssl rand -hex 32)"
+            TOKEN="$(openssl rand -hex 32)"
+            echo "::add-mask::$PASSWORD"
+            echo "::add-mask::$TOKEN"
+            printf '%s' "$PASSWORD" | npx --yes wrangler@4.158.0 secret put               FACTSPORT_COMPETITION_PASSWORD --config wrangler.factsport-competition-provision.jsonc
+            printf '%s' "$TOKEN" | npx --yes wrangler@4.158.0 secret put               FACTSPORT_PROVISION_TOKEN --config wrangler.factsport-competition-provision.jsonc
+            sleep 8
+            DOMAIN="$(curl -sS --fail-with-body               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" |
+              jq -r '.result.subdomain // empty')"
+            [ -n "$DOMAIN" ] || { echo "::error::Cloudflare Workers subdomain missing."; exit 1; }
+            URL="https://factsport-v2-competition-provision.$DOMAIN.workers.dev/__internal/provision-competition-login"
+            STATUS="$(curl -sS --max-time 45 -o /tmp/factsport-comp-role.json -w '%{http_code}'               -X POST -H "Authorization: Bearer $TOKEN" "$URL")"
+            [ "$STATUS" = 200 ] && jq -e               '.ok == true and .database == "factsport_v2" and
+               .capabilityRole == "factsport_v2_competition_writer" and
+               .loginRole == "factsport_v2_competition_app" and
+               .leastPrivilege == true and (.canUpdateMatches | not) and (.canDeleteMatches | not)'               /tmp/factsport-comp-role.json >/dev/null || {
+                jq -c '{ok,error,sqlState}' /tmp/factsport-comp-role.json 2>/dev/null || true
+                echo "::error::Dedicated competition database role failed verification."
+                exit 1
+              }
+            jq -n --arg name "$HD_COMPETITION_NAME" --arg password "$PASSWORD" '{
+              name: $name,
+              origin: {
+                scheme: "postgresql",
+                host: "mketypostgres.postgres.database.azure.com",
+                port: 5432, database: "factsport_v2",
+                user: "factsport_v2_competition_app", password: $password
+              },
+              mtls: {sslmode: "require"},
+              caching: {disabled: true},
+              origin_connection_limit: 3
+            }' > /tmp/factsport-comp-hd-create.json
+            STATUS="$(curl -sS --max-time 60 -o /tmp/factsport-comp-hd-created.json -w '%{http_code}'               -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               -H 'Content-Type: application/json'               --data-binary @/tmp/factsport-comp-hd-create.json               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs")"
+            rm -f /tmp/factsport-comp-hd-create.json
+            if [ "$STATUS" != 200 ] && [ "$STATUS" != 201 ]; then
+              CODES="$(jq -r '[.errors[]?.code] | join(",")' /tmp/factsport-comp-hd-created.json 2>/dev/null || true)"
+              echo "::error::Dedicated Hyperdrive creation failed HTTP $STATUS, API codes: $CODES."
+              exit 1
+            fi
+            jq -e --arg name "$HD_COMPETITION_NAME"               '.success == true and .result.name == $name and
+               .result.origin.database == "factsport_v2" and
+               .result.origin.user == "factsport_v2_competition_app" and
+               .result.mtls.sslmode == "require" and .result.caching.disabled == true'               /tmp/factsport-comp-hd-created.json >/dev/null || {
+                echo "::error::Unexpected competition Hyperdrive result."
+                exit 1
+              }
+            ID="$(jq -r '.result.id // empty' /tmp/factsport-comp-hd-created.json)"
+            [[ "$ID" =~ ^[a-f0-9]{32}$ ]] || { echo "::error::Invalid competition Hyperdrive ID."; exit 1; }
+            echo "Created separate Factsport competition Hyperdrive."
+          fi
+          echo "FACTSPORT_COMPETITION_HD_ID=$ID" >> "$GITHUB_ENV"
+          echo "HD_ID=$ID" >> "$GITHUB_OUTPUT"
+      - name: Deploy scheduled staging sync and install private provider credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i "s/00000000000000000000000000000000/$FACTSPORT_COMPETITION_HD_ID/"             wrangler.factsport-competition-sync.jsonc
+          npx --yes wrangler@4.158.0 deploy --config wrangler.factsport-competition-sync.jsonc
+          TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$TOKEN"
+          printf '%s' "$TOKEN" | npx --yes wrangler@4.158.0 secret put             FACTSPORT_COMPETITION_SYNC_TOKEN --config wrangler.factsport-competition-sync.jsonc
+          printf '%s' "$FACTSPORT_FOOTBALL_DATA_KEY" | npx --yes wrangler@4.158.0 secret put             FACTSPORT_FOOTBALL_DATA_KEY --config wrangler.factsport-competition-sync.jsonc
+          echo "FACTSPORT_COMPETITION_SYNC_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          DOMAIN="$(curl -sS --fail-with-body             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" |
+            jq -r '.result.subdomain // empty')"
+          [ -n "$DOMAIN" ] || { echo "::error::Cloudflare Workers subdomain missing."; exit 1; }
+          echo "FACTSPORT_WORKERS_DOMAIN=$DOMAIN" >> "$GITHUB_ENV"
+          sleep 8
+      - name: Verify provider data without writes, then load staging snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://$WORKER_NAME.$FACTSPORT_WORKERS_DOMAIN.workers.dev/__internal/competition-sync"
+          READY=false
+          for attempt in 1 2 3 4 5 6 7 8; do
+            STATUS="$(curl -sS --max-time 150 -o /tmp/factsport-comp-dry-run.json -w '%{http_code}'               -X POST -H "Authorization: Bearer $FACTSPORT_COMPETITION_SYNC_TOKEN"               -H 'Content-Type: application/json'               --data '{"competition":"all","dryRun":true}' "$BASE")"
+            if [ "$STATUS" = 200 ] && jq -e '.ok == true and .dryRun == true'               /tmp/factsport-comp-dry-run.json >/dev/null 2>&1; then READY=true; break; fi
+            echo "Read-only provider validation attempt $attempt returned HTTP $STATUS."
+            jq -c '{ok,competitions}' /tmp/factsport-comp-dry-run.json 2>/dev/null || true
+            sleep 3
+          done
+          [ "$READY" = true ] || {
+            echo "::error::Provider validation did not pass; no competition snapshot write was requested."
+            exit 1
+          }
+          jq -c '{ok,dryRun,competitions}' /tmp/factsport-comp-dry-run.json | tee -a "$GITHUB_STEP_SUMMARY"
+          STATUS="$(curl -sS --max-time 150 -o /tmp/factsport-comp-sync.json -w '%{http_code}'             -X POST -H "Authorization: Bearer $FACTSPORT_COMPETITION_SYNC_TOKEN"             -H 'Content-Type: application/json'             --data '{"competition":"all","dryRun":false}' "$BASE")"
+          [ "$STATUS" = 200 ] && jq -e '.ok == true and .dryRun == false'             /tmp/factsport-comp-sync.json >/dev/null || {
+              jq -c '{ok,error,sqlState,competitions}' /tmp/factsport-comp-sync.json 2>/dev/null || true
+              echo "::error::Staging competition snapshot write failed HTTP $STATUS."
+              exit 1
+            }
+          STATUS="$(curl -sS --max-time 30 -o /tmp/factsport-comp-inventory.json -w '%{http_code}'             -H "Authorization: Bearer $FACTSPORT_COMPETITION_SYNC_TOKEN" "$BASE")"
+          [ "$STATUS" = 200 ] && jq -e '.ok == true and .writerRoleVerified == true'             /tmp/factsport-comp-inventory.json >/dev/null || {
+              echo "::error::Post-write database inventory check failed."
+              exit 1
+            }
+          {
+            echo "## Factsport V2 competition ingestion (staging)"
+            echo "Database: existing factsport_v2 through a dedicated, restricted competition writer."
+            echo "The complete official provider payload was validated before database writes."
+            jq -c '{ok,competitions}' /tmp/factsport-comp-sync.json
+            jq -c '{standingsRows,scorerRows,standingsUpdatedAt,scorersUpdatedAt}'               /tmp/factsport-comp-inventory.json
+            echo "No match results, user data, production routes, or DNS were changed."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Delete temporary admin-backed competition provisioner
+        if: always() && steps.hyperdrive.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl -sS -o /tmp/factsport-comp-provision-delete.json -w '%{http_code}' -X DELETE             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/factsport-v2-competition-provision")"
+          [ "$STATUS" = 200 ] && jq -e '.success == true' /tmp/factsport-comp-provision-delete.json >/dev/null || {
+            echo "::error::Temporary competition provisioner cleanup failed."
+            exit 1
+          }
+          echo "Temporary admin-backed competition provisioner removed."
