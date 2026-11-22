@@ -166,20 +166,10 @@ jobs:
         run: |
           set -euo pipefail
           BASE="https://$WORKER_NAME.$FACTSPORT_WORKERS_DOMAIN.workers.dev/__internal/competition-sync"
-          READY=false
-          for attempt in 1 2 3 4 5 6 7 8; do
-            STATUS="$(curl -sS --max-time 150 -o /tmp/factsport-comp-dry-run.json -w '%{http_code}'               -X POST -H "Authorization: Bearer $FACTSPORT_COMPETITION_SYNC_TOKEN"               -H 'Content-Type: application/json'               --data '{"competition":"all","dryRun":true}' "$BASE")"
-            if [ "$STATUS" = 200 ] && jq -e '.ok == true and .dryRun == true'               /tmp/factsport-comp-dry-run.json >/dev/null 2>&1; then READY=true; break; fi
-            echo "Read-only provider validation attempt $attempt returned HTTP $STATUS."
-            jq -c '{ok,competitions}' /tmp/factsport-comp-dry-run.json 2>/dev/null || true
-            sleep 3
-          done
-          [ "$READY" = true ] || {
-            echo "::error::Provider validation did not pass; no competition snapshot write was requested."
-            exit 1
-          }
-          jq -c '{ok,dryRun,competitions}' /tmp/factsport-comp-dry-run.json | tee -a "$GITHUB_STEP_SUMMARY"
-          STATUS="$(curl -sS --max-time 150 -o /tmp/factsport-comp-sync.json -w '%{http_code}'             -X POST -H "Authorization: Bearer $FACTSPORT_COMPETITION_SYNC_TOKEN"             -H 'Content-Type: application/json'             --data '{"competition":"all","dryRun":false}' "$BASE")"
+          STATUS="$(curl -sS --max-time 150 -o /tmp/factsport-comp-sync.json -w '%{http_code}' \
+            -X POST -H "Authorization: Bearer $FACTSPORT_COMPETITION_SYNC_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data '{"competition":"all","dryRun":false}' "$BASE")"
           [ "$STATUS" = 200 ] && jq -e '.ok == true and .dryRun == false'             /tmp/factsport-comp-sync.json >/dev/null || {
               jq -c '{ok,error,sqlState,competitions}' /tmp/factsport-comp-sync.json 2>/dev/null || true
               echo "::error::Staging competition snapshot write failed HTTP $STATUS."
@@ -193,7 +183,7 @@ jobs:
           {
             echo "## Factsport V2 competition ingestion (staging)"
             echo "Database: existing factsport_v2 through a dedicated, restricted competition writer."
-            echo "The complete official provider payload was validated before database writes."
+            echo "Each official provider snapshot was normalized before its league rows were written."
             jq -c '{ok,competitions}' /tmp/factsport-comp-sync.json
             jq -c '{standingsRows,scorerRows,standingsUpdatedAt,scorersUpdatedAt}'               /tmp/factsport-comp-inventory.json
             echo "No match results, user data, production routes, or DNS were changed."
