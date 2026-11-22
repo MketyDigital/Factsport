@@ -127,9 +127,15 @@ export async function GET() {
         phase,
         sqlState: /^[A-Z0-9]{5}$/.test(rawCode) ? rawCode : 'none',
         errorClass: cause instanceof Error ? cause.name : 'Unknown',
-        errorHint: /connection|socket|timeout|terminated|closed/.test(message) ? 'connection'
+        errorHint: /econnreset|connection reset/.test(message) ? 'connection_reset'
+          : /econnrefused|connection refused/.test(message) ? 'connection_refused'
+          : /etimedout|timeout|timed out|connect_timeout/.test(message) ? 'connection_timeout'
+          : /too many connections|connection slots/.test(message) ? 'connection_limit'
+          : /socket hang up|socket closed|connection terminated/.test(message) ? 'connection_terminated'
+          : /prepared statement/.test(message) ? 'prepared_statement'
           : /permission|not allowed|denied/.test(message) ? 'permission'
           : /does not exist|undefined|relation/.test(message) ? 'schema_or_view'
+          : /connection|socket/.test(message) ? 'connection_other'
           : 'query_failed',
       };
     }
