@@ -93,3 +93,11 @@ test('accepts a valid empty scorer snapshot and rejects invalid or duplicate pla
   ] };
   assert.equal(normalizeFootballDataScorers(duplicate, 'PL'), null);
 });
+
+test('maps provider competition labels to Factsport display names by canonical code', () => {
+  const spanish = standings();
+  spanish.competition = { code: 'PD', name: 'Primera Division' };
+  const normalized = normalizeFootballDataStandings(spanish, 'PD');
+  assert.equal(normalized.leagueCode, 'PD');
+  assert.equal(normalized.leagueName, 'La Liga');
+});
