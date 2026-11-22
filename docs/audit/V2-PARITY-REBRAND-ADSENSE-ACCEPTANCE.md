@@ -81,7 +81,7 @@ No redesign should be rolled out as a replacement until page/feature parity is t
 - `CustomVignette.tsx` displays a timed promotional modal after 10 seconds and promotes VIP / betting-style bonus copy.
 - `StickyAffiliateBanner.tsx` provides floating audio/video media controls. This is a media UX feature, not an AdSense unit; it must not obscure page content or ad units.
 - Footer currently says 18+ and “Gamble Responsibly”, while also describing a free-to-play prediction game and stating that Factsport is not a bookmaker. The How-to-Play page says only VIP members qualify for monthly cash prizes. The commercial/legal nature of VIP and prize eligibility must be reconciled with actual rules and applicable law; a disclaimer alone cannot change the underlying mechanics.
-- `app/robots.ts` currently decides production indexing using `VERCEL_ENV === 'production'`. The target platform is Cloudflare. On a Cloudflare build where that Vercel variable is absent, the current function can return `disallow: '/'`; this is a critical SEO/AdSense discoverability defect to fix and test using an explicit environment-aware production/staging flag.
+- `app/robots.ts` uses the explicit Factsport controls `FACTSPORT_INDEXING_ENABLED`, `FACTSPORT_EDITORIAL_BACKEND`, `FACTSPORT_MATCHES_BACKEND` and `FACTSPORT_SITEMAP_BACKEND`, together with production mode and host checks. Verify the intended Cloudflare production and staging values directly; keep indexing closed until the public content, sitemap and live host are accepted.
 - `app/sitemap.ts` still reads Supabase and includes match/news records plus selected routes. It must be ported to V2 read models, include approved public/legal/editorial routes, exclude private/admin/auth paths and use stable canonical metadata.
 - Existing metadata advertises “Predict & Win” / “win monthly prizes”; all ad-facing descriptions must accurately describe the actual product and not obscure paid eligibility or prize mechanics.
 
@@ -174,7 +174,7 @@ Follow the master roadmap milestones M0–M11 and production workstreams P0–P9
 9. Full browser journeys, accessibility, visual regression, provider failures, load/performance, restore and cutover rehearsal.
 10. Explicit owner production go/no-go; only then production deployment and DNS/route changes.
 
-**Current known blockers:** the v2 staging app currently proves only protected health and matches read paths; most pages/routes/components still depend on legacy Supabase or external services. No AdSense code implementation was found in the inspected source; current betting-affiliate promotions and VIP prize eligibility need policy/legal review. Cloudflare robots logic currently relies on Vercel environment detection and must be corrected before production indexing. No live AdSense approval is evidenced.
+**Current known blockers:** the v2 staging app currently proves only protected health and matches read paths; most pages/routes/components still depend on legacy Supabase or external services. No AdSense code implementation was found in the inspected source; current betting-affiliate promotions and VIP prize eligibility need policy/legal review. Cloudflare robots indexing remains a release gate: verify explicit Factsport environment flags, public content, sitemap and canonical host before enabling indexing. No live AdSense approval is evidenced.
 
 ## 8. Explicit no-change boundary
 
