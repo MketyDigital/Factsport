@@ -143,6 +143,28 @@ jobs:
             [[ "$ID" =~ ^[a-f0-9]{32}$ ]] || { echo "::error::Invalid competition Hyperdrive ID."; exit 1; }
             echo "Created separate Factsport competition Hyperdrive."
           fi
+          if [ -n "$CURRENT" ]; then
+            PASSWORD="$(openssl rand -hex 32)"
+            TOKEN="$(openssl rand -hex 32)"
+            echo "::add-mask::$PASSWORD"
+            echo "::add-mask::$TOKEN"
+            printf '%s' "$PASSWORD" | npx --yes wrangler@4.158.0 secret put               FACTSPORT_COMPETITION_PASSWORD --config wrangler.factsport-competition-provision.jsonc
+            printf '%s' "$TOKEN" | npx --yes wrangler@4.158.0 secret put               FACTSPORT_PROVISION_TOKEN --config wrangler.factsport-competition-provision.jsonc
+            DOMAIN="$(curl -sS --fail-with-body               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" | jq -r '.result.subdomain // empty')"
+            [ -n "$DOMAIN" ] || { echo "::error::Cloudflare Workers subdomain missing."; exit 1; }
+            sleep 8
+            URL="https://factsport-v2-competition-provision.$DOMAIN.workers.dev/__internal/provision-competition-login"
+            STATUS="$(curl -sS --max-time 45 -o /tmp/factsport-comp-role-existing.json -w '%{http_code}'               -X POST -H "Authorization: Bearer $TOKEN" "$URL")"
+            [ "$STATUS" = 200 ] && jq -e               '.ok == true and .database == "factsport_v2" and
+               .capabilityRole == "factsport_v2_competition_writer" and
+               .loginRole == "factsport_v2_competition_app" and
+               .leastPrivilege == true and (.canUpdateMatches | not) and (.canDeleteMatches | not)'               /tmp/factsport-comp-role-existing.json >/dev/null || {
+                jq -c '{ok,error,sqlState}' /tmp/factsport-comp-role-existing.json 2>/dev/null || true
+                echo "::error::Existing competition login grants failed safe revalidation."
+                exit 1
+              }
+            echo "Existing competition login and public-view inventory grants revalidated without rotating its password."
+          fi
           echo "FACTSPORT_COMPETITION_HD_ID=$ID" >> "$GITHUB_ENV"
           echo "HD_ID=$ID" >> "$GITHUB_OUTPUT"
       - name: Deploy scheduled staging sync and install private provider credentials
