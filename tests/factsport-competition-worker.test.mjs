@@ -14,6 +14,8 @@ test('competition snapshots use a separate Hyperdrive login and scheduled stagin
   assert.match(worker, /pg_has_role\(current_user, 'factsport_v2_competition_writer', 'USAGE'\)/);
   assert.match(worker, /can_update_matches === false/);
   assert.match(worker, /can_delete_matches === false/);
+  assert.match(worker, /standings_snapshot_index_ready === true/);
+  assert.match(worker, /scorer_multirow_index_ready === true/);
 });
 
 test('competition sync writes only standings and scorer snapshots, never match results', () => {
