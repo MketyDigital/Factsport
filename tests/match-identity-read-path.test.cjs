@@ -28,9 +28,10 @@ test('PostgreSQL match detail response is a safe public projection', () => {
   }
 });
 
-test('match detail PostgreSQL backend remains independently opt-in and staging-private', () => {
+test('match detail uses the independently gated PostgreSQL reader and has no legacy fallback', () => {
   assert.match(route, /FACTSPORT_MATCH_DETAIL_BACKEND/);
   assert.match(route, /getPostgresMatchById\(params\.id\)/);
   assert.match(route, /private, no-store, max-age=0/);
-  assert.match(route, /const supabase = createClient/);
+  assert.match(route, /!== 'postgres'/);
+  assert.doesNotMatch(route, /supabase|createClient|\.from\(/i);
 });
