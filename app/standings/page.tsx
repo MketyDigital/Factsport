@@ -6,7 +6,6 @@ import { Metadata } from 'next';
 import { ChevronLeft, BarChart2, AlertTriangle } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import { listCurrentCompetitionStandings } from '@/lib/adapters/postgres-homepage';
-import { listPostgresLeagueResults } from '@/lib/adapters/postgres-matches';
 import { serializeJsonLd } from '@/lib/seo/json-ld';
 import LeagueLeaders from '@/app/components/LeagueLeaders'; 
 
@@ -75,13 +74,6 @@ async function getStandings(leagueName: string) {
     try {
         if (process.env.FACTSPORT_COMPETITIONS_BACKEND === 'postgres') {
             dbStandings = await listCurrentCompetitionStandings(leagueCode);
-            if (dbStandings.length > 0) {
-                const currentSeason = String(dbStandings[0].season || '');
-                const sourceLeagueName = String(dbStandings[0].league_name || leagueName);
-                if (currentSeason) {
-                    dbMatches = await listPostgresLeagueResults(sourceLeagueName, currentSeason, 2000);
-                }
-            }
         } else if (process.env.NODE_ENV === 'development') {
             const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
             const [standingsResult, matchesResult] = await Promise.all([
@@ -131,7 +123,10 @@ async function getStandings(leagueName: string) {
 
         const formattedStandings = dbStandings.map((dbEntry: any) => {
             const normalizedTeamName = normalizeName(dbEntry.team_short_name || dbEntry.team_name);
-            const customForm = teamForms[normalizedTeamName] || []; 
+            const providerForm = process.env.FACTSPORT_COMPETITIONS_BACKEND === 'postgres'
+                ? String(dbEntry.form || '').split(',').filter((result: string) => ['W', 'D', 'L'].includes(result))
+                : [];
+            const customForm = providerForm.length > 0 ? providerForm : (teamForms[normalizedTeamName] || []);
             
             return {
                 position: dbEntry.position,
@@ -148,7 +143,7 @@ async function getStandings(leagueName: string) {
                 lost: dbEntry.lost,
                 goalDifference: dbEntry.goal_difference,
                 points: dbEntry.points,
-                form: customForm.reverse().join(',') 
+                form: providerForm.length > 0 ? providerForm.join(',') : customForm.reverse().join(',') 
             };
         });
 
