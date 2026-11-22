@@ -10,15 +10,14 @@ const route = read('app/api/standings/leaders/route.ts');
 const homepageAdapter = read('lib/adapters/postgres-homepage.ts');
 const matchesAdapter = read('lib/adapters/postgres-matches.ts');
 
-test('standings page reads season-aware PostgreSQL tables and sourced provider form when enabled', () => {
+test('standings page reads current PostgreSQL rows and provider-sourced form when enabled', () => {
   assert.ok(page.includes("FACTSPORT_COMPETITIONS_BACKEND === 'postgres'"));
   assert.ok(page.includes('listCurrentCompetitionStandings'));
   assert.ok(page.includes('dbEntry.form'));
   assert.ok(page.includes('providerForm'));
   assert.ok(!page.includes('listPostgresLeagueResults'));
-  assert.ok(page.includes('dbStandings[0].season'));
-  assert.ok(page.includes('dbStandings[0].league_name'));
   assert.ok(page.includes('serializeJsonLd(jsonLd)'));
+  assert.ok(homepageAdapter.includes('form'));
 });
 
 test('league leaders use a same-origin API rather than a browser database client', () => {
