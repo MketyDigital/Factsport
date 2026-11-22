@@ -25,6 +25,9 @@ test('competition sync writes only standings and scorer snapshots, never match r
   assert.match(worker, /sql\.begin\(async tx =>/);
   assert.match(worker, /normalizeFootballDataStandings/);
   assert.match(worker, /normalizeFootballDataScorers/);
+  assert.match(worker, /STANDINGS_COMPETITIONS = new Set\(\['PL', 'PD', 'BL1', 'SA', 'FL1'\]\)/);
+  assert.match(worker, /standings: standings \? 'updated' : 'not_supported'/);
+  assert.doesNotMatch(worker, /__internal\\/competition-sync[\\s\\S]*standings: 'provider_error_404'/);
 });
 
 test('manual sync is authenticated, read-only in dry-run mode, and reports counts only', () => {
