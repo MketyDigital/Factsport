@@ -57,11 +57,16 @@ export default {
         return Response.json({ ok: false, error: 'competition_capability_role_drift' }, { status: 409 });
       }
 
+      let requestBody: { requireExisting?: boolean } = {};
+      try { requestBody = await request.json() as { requireExisting?: boolean }; } catch { /* empty body is allowed for initial provisioning */ }
       const [existing] = await sql`
         SELECT rolcanlogin, rolsuper, rolinherit, rolcreaterole, rolcreatedb,
           rolreplication, rolbypassrls, rolconnlimit
         FROM pg_roles WHERE rolname = 'factsport_v2_competition_app'
       `;
+      if (requestBody.requireExisting === true && !existing) {
+        return Response.json({ ok: false, error: 'competition_login_missing' }, { status: 409 });
+      }
       if (existing && (existing.rolsuper || existing.rolcreaterole || existing.rolcreatedb ||
           existing.rolreplication || existing.rolbypassrls || !existing.rolcanlogin)) {
         return Response.json({ ok: false, error: 'competition_login_role_drift' }, { status: 409 });
