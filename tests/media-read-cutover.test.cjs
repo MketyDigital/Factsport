@@ -67,5 +67,9 @@ test('protected staging preflight verifies every grant needed by PostgreSQL matc
   for (const view of ['public_match_pins', 'public_match_media']) {
     assert.match(preflight, new RegExp(`has_table_privilege\\('factsport_v2_reader', 'public\\.${view}', 'SELECT'\\)`));
   }
-  assert.match(read('.github/workflows/v2-app-staging.yml'), /\.matchDetailReader\.ready == true/);
+  assert.match(preflight, /getPostgresMatchById/);
+  assert.match(preflight, /getPostgresMatchPlaybackById/);
+  assert.match(preflight, /getPostgresTeamForm/);
+  assert.match(preflight, /getExternalData/);
+  assert.match(read('.github/workflows/v2-app-staging.yml'), /\.matchDetailReader\.ready == true and \.matchDetailRuntimeProbe\.ready == true/);
 });
