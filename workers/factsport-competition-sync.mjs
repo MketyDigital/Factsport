@@ -11,6 +11,7 @@ import {
 } from '../lib/ingestion/factsport-competition.mjs';
 
 const COMPETITIONS = Object.keys(FACTSPORT_COMPETITIONS);
+const STANDINGS_COMPETITIONS = new Set(['PL', 'PD', 'BL1', 'SA', 'FL1']);
 const CRON = '0 4,16 * * *';
 
 async function tokenMatches(expected, provided) {
@@ -148,15 +149,18 @@ async function syncCompetition(sql, env, code, dryRun = false) {
   const key = env.FACTSPORT_FOOTBALL_DATA_KEY;
   if (!key) throw new Error('Provider key missing');
   const root = `https://api.football-data.org/v4/competitions/${code}`;
-  const standingsResult = await providerJson(root + '/standings', key);
-  if (!standingsResult.ok) {
-    return { competition: code, standings: 'provider_error_' + standingsResult.status };
+  let standings = null;
+  if (STANDINGS_COMPETITIONS.has(code)) {
+    const standingsResult = await providerJson(root + '/standings', key);
+    if (!standingsResult.ok) {
+      return { competition: code, standings: 'provider_error_' + standingsResult.status };
+    }
+    standings = normalizeFootballDataStandings(standingsResult.payload, code);
+    if (!standings) return { competition: code, standings: 'invalid_or_incomplete' };
   }
-  const standings = normalizeFootballDataStandings(standingsResult.payload, code);
-  if (!standings) return { competition: code, standings: 'invalid_or_incomplete' };
 
-  // Scorer entitlement can differ by competition and plan. Keep a verified
-  // standings snapshot even when this endpoint is not entitled or unavailable.
+  // Scorer entitlement can differ by competition and plan. Unsupported cup
+  // standings do not block league-table updates or an optional scorer snapshot.
   const scorerResult = await providerJson(root + '/scorers', key);
   const scorers = scorerResult.ok
     ? normalizeFootballDataScorers(scorerResult.payload, code)
@@ -165,17 +169,17 @@ async function syncCompetition(sql, env, code, dryRun = false) {
   if (dryRun) {
     return {
       competition: code,
-      standings: 'ready',
-      standingsRows: standings.rows.length,
+      standings: standings ? 'ready' : 'not_supported',
+      standingsRows: standings?.rows.length || 0,
       scorers: scorers?.rows.length ? 'ready' : 'unavailable_or_empty',
       scorerRows: scorers?.rows.length || 0,
     };
   }
-  const standingRows = await saveStandings(sql, standings);
+  const standingRows = standings ? await saveStandings(sql, standings) : 0;
   const scorerRows = scorers?.rows.length ? await saveScorers(sql, scorers) : 0;
   return {
     competition: code,
-    standings: 'updated',
+    standings: standings ? 'updated' : 'not_supported',
     standingsRows: standingRows,
     scorers: scorerRows ? 'updated' : 'unchanged_unavailable_or_empty',
     scorerRows,
@@ -191,7 +195,7 @@ export default {
       for (let index = 0; index < COMPETITIONS.length; index++) {
         const result = await syncCompetition(sql, env, COMPETITIONS[index]);
         console.log('Factsport competition snapshot', JSON.stringify(result));
-        if (result.standings !== 'updated') throw new Error('Competition snapshot rejected: ' + result.competition);
+        if (!['updated', 'not_supported'].includes(result.standings)) throw new Error('Competition snapshot rejected: ' + result.competition);
         if (index < COMPETITIONS.length - 1) await new Promise(resolve => setTimeout(resolve, 7000));
       }
     } finally {
@@ -245,7 +249,7 @@ export default {
         results.push(await syncCompetition(sql, env, selected[index], dryRun));
         if (index < selected.length - 1) await new Promise(resolve => setTimeout(resolve, 7000));
       }
-      const ok = results.every(result => result.standings === 'ready' || result.standings === 'updated');
+      const ok = results.every(result => result.standings === 'ready' || result.standings === 'updated' || result.standings === 'not_supported');
       return Response.json({ ok, dryRun, competitions: results },
         { status: ok ? 200 : 503, headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
