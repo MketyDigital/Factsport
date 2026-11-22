@@ -13,6 +13,8 @@ import {
 const COMPETITIONS = Object.keys(FACTSPORT_COMPETITIONS);
 const STANDINGS_COMPETITIONS = new Set(['PL', 'PD', 'BL1', 'SA', 'FL1']);
 const CRON = '0 4,16 * * *';
+const PROVIDER_REQUEST_SPACING_MS = 8000;
+let lastProviderRequestAt = 0;
 
 async function tokenMatches(expected, provided) {
   if (!expected || !provided || expected.length > 4096 || provided.length > 4096) return false;
@@ -65,6 +67,9 @@ async function verifyWriter(sql) {
 }
 
 async function providerJson(url, key) {
+  const waitMs = Math.max(0, lastProviderRequestAt + PROVIDER_REQUEST_SPACING_MS - Date.now());
+  if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
+  lastProviderRequestAt = Date.now();
   const response = await fetch(url, {
     headers: { 'X-Auth-Token': key, Accept: 'application/json' },
     signal: AbortSignal.timeout(20000),
@@ -196,7 +201,6 @@ export default {
         const result = await syncCompetition(sql, env, COMPETITIONS[index]);
         console.log('Factsport competition snapshot', JSON.stringify(result));
         if (!['updated', 'not_supported'].includes(result.standings)) throw new Error('Competition snapshot rejected: ' + result.competition);
-        if (index < COMPETITIONS.length - 1) await new Promise(resolve => setTimeout(resolve, 7000));
       }
     } finally {
       await sql.end();
@@ -247,7 +251,6 @@ export default {
       const results = [];
       for (let index = 0; index < selected.length; index++) {
         results.push(await syncCompetition(sql, env, selected[index], dryRun));
-        if (index < selected.length - 1) await new Promise(resolve => setTimeout(resolve, 7000));
       }
       const ok = results.every(result => result.standings === 'ready' || result.standings === 'updated' || result.standings === 'not_supported');
       return Response.json({ ok, dryRun, competitions: results },
