@@ -26,7 +26,9 @@ test('match page does not serialize raw stream or VIP analysis data into client 
 });
 
 test('playback endpoint withholds media URLs until the server-side 15-minute unlock', () => {
-  assert.match(playback, /select\('match_date, status, video_url, livestream_url, audio_url'\)/);
+  assert.match(playback, /getPostgresMatchPlaybackById\(id\)/);
+  assert.match(playback, /FACTSPORT_MATCH_DETAIL_BACKEND/);
+  assert.doesNotMatch(playback, /supabase|createClient|\.from\(/i);
   assert.match(playback, /Date\.now\(\) < unlockAt/);
   assert.match(playback, /const isLive = LIVE\.has\(status\)/);
   assert.doesNotMatch(playback, /!SCHEDULED\.has\(status\) && !isFinished/);
