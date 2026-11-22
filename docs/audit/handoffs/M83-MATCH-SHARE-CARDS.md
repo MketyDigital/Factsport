@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-21  
 **Branch:** `refactor/factsport-v2`  
-**Status:** source and staging smoke committed; exact-head workflow/browser acceptance pending. No production change.
+**Status:** source and exact-head staging renderer smoke passed; visual, metadata/crawler and full browser acceptance remain open. No production change.
 
 ## Governing scope
 
@@ -30,3 +30,10 @@ No migrations, roles, runtime secrets, public routes, production DNS, Ads, Logic
 1. Verify the exact-head isolated and protected staging workflows, including result/lineup PNG checks and the callback smoke.
 2. Inspect the cards in an image viewer or authenticated browser, then validate generated page metadata and safe public crawler behavior when permitted.
 3. Continue M74-A/B/C/D page and mobile/accessibility acceptance, editor workflow, ESPN-linked match lifecycle, V2-target recovery rehearsal and P9A route isolation.
+
+
+## 2026-11-22 exact-head staging update
+
+Commit `418edd7400e053e27b6bcb020c00b1e5fe695f5b` passed the isolated verification, native Cloudflare build and protected staging runs [45044116175](https://github.com/MketyDigital/Factsport/actions/runs/45044116175), [45044116156](https://github.com/MketyDigital/Factsport/actions/runs/45044116156), and [45044117315](https://github.com/MketyDigital/Factsport/actions/runs/45044117315). Staging required valid PNG signatures and 1200×630 dimensions for the article, result and lineup card smoke payloads. The result/lineup smoke payloads use synthetic test data and prove renderer behavior only; they do not validate real match metadata or provider data. The earlier “exact-head workflow pending” statement is superseded for this renderer smoke.
+
+Still open: inspect actual generated card visuals; verify metadata emitted by the real match route; test crawler reachability under the eventual public route policy; verify real source values/rights; and complete M74 responsive, keyboard, screen-reader, contrast, reduced-motion and performance acceptance. No production change.
