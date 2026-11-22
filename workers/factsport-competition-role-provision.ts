@@ -87,12 +87,15 @@ export default {
             'factsport_v2_competition_app', '${password}'
           );
         ELSE
+          -- Preserve the password already stored in the dedicated Hyperdrive.
           EXECUTE format(
-            'ALTER ROLE %I WITH LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 3 PASSWORD %L',
-            'factsport_v2_competition_app', '${password}'
+            'ALTER ROLE %I WITH LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 3',
+            'factsport_v2_competition_app'
           );
         END IF;
         GRANT factsport_v2_competition_writer TO factsport_v2_competition_app;
+        GRANT SELECT ON public.public_competition_standings,
+          public.public_competition_player_stats TO factsport_v2_competition_writer;
       END
       $provision$;`);
 
@@ -104,6 +107,8 @@ export default {
           pg_has_role(login.oid, capability.oid, 'USAGE') AS inherits_writer,
           has_table_privilege(login.rolname, 'public.competition_standings', 'INSERT,UPDATE') AS can_write_standings,
           has_table_privilege(login.rolname, 'public.competition_player_stats', 'INSERT,UPDATE') AS can_write_scorers,
+          has_table_privilege(login.rolname, 'public.public_competition_standings', 'SELECT') AS can_read_standings_inventory,
+          has_table_privilege(login.rolname, 'public.public_competition_player_stats', 'SELECT') AS can_read_scorer_inventory,
           has_table_privilege(login.rolname, 'public.matches', 'UPDATE') AS can_update_matches,
           has_table_privilege(login.rolname, 'public.matches', 'DELETE') AS can_delete_matches,
           has_schema_privilege(login.rolname, 'public', 'CREATE') AS can_create_in_public,
@@ -117,7 +122,8 @@ export default {
         result.can_replicate === false && result.bypasses_rls === false &&
         result.inherits_roles === true && Number(result.connection_limit) === 3 &&
         result.inherits_writer === true && result.can_write_standings === true &&
-        result.can_write_scorers === true && result.can_update_matches === false &&
+        result.can_write_scorers === true && result.can_read_standings_inventory === true &&
+        result.can_read_scorer_inventory === true && result.can_update_matches === false &&
         result.can_delete_matches === false && result.can_create_in_public === false &&
         result.can_create_temp === false;
       if (!ok) return Response.json({ ok: false, error: 'competition_login_privilege_check_failed' }, { status: 503 });
