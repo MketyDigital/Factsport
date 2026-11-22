@@ -154,7 +154,7 @@ jobs:
             [ -n "$DOMAIN" ] || { echo "::error::Cloudflare Workers subdomain missing."; exit 1; }
             sleep 8
             URL="https://factsport-v2-competition-provision.$DOMAIN.workers.dev/__internal/provision-competition-login"
-            STATUS="$(curl -sS --max-time 45 -o /tmp/factsport-comp-role-existing.json -w '%{http_code}'               -X POST -H "Authorization: Bearer $TOKEN" "$URL")"
+            STATUS="$(curl -sS --max-time 45 -o /tmp/factsport-comp-role-existing.json -w '%{http_code}'               -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data '{"requireExisting":true}' "$URL")"
             [ "$STATUS" = 200 ] && jq -e               '.ok == true and .database == "factsport_v2" and
                .capabilityRole == "factsport_v2_competition_writer" and
                .loginRole == "factsport_v2_competition_app" and
