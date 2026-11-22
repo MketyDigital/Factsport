@@ -41,3 +41,15 @@ test('competition ingestion adds sourced form and a separate no-login writer cap
   assert.match(sql, /ALTER COLUMN appearances DROP NOT NULL/i);
   assert.match(sql, /ALTER COLUMN minutes_played DROP NOT NULL/i);
 });
+
+test('competition current snapshot indexes allow every team and scorer row', () => {
+  const sql = fs.readFileSync(
+    path.join(__dirname, '../db/migrations/0050_factsport_competition_snapshot_indexes.sql'),
+    'utf8'
+  );
+  assert.match(sql, /DROP INDEX IF EXISTS public\\.competition_one_current_season_idx/i);
+  assert.match(sql, /DROP INDEX IF EXISTS public\\.competition_player_stats_one_current_season_idx/i);
+  assert.match(sql, /CREATE INDEX IF NOT EXISTS competition_standings_current_snapshot_idx/i);
+  assert.match(sql, /CREATE INDEX IF NOT EXISTS competition_player_stats_current_snapshot_idx/i);
+  assert.doesNotMatch(sql, /CREATE UNIQUE INDEX/i);
+});
