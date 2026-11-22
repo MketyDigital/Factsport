@@ -13,7 +13,8 @@ const matchesAdapter = read('lib/adapters/postgres-matches.ts');
 test('standings page reads current PostgreSQL rows and provider-sourced form when enabled', () => {
   assert.ok(page.includes("FACTSPORT_COMPETITIONS_BACKEND !== 'postgres'"));
   assert.ok(!page.toLowerCase().includes('supabase'));
-  assert.ok(!page.includes("'Champions League'"));
+  const leagueMap = page.slice(page.indexOf('const LEAGUE_MAP'), page.indexOf('};', page.indexOf('const LEAGUE_MAP')));
+  assert.doesNotMatch(leagueMap, /Champions League|World Cup|Euros|Copa America|AFCON/);
   assert.ok(page.includes('listCurrentCompetitionStandings'));
   assert.ok(page.includes('entry.form'));
   assert.ok(page.includes("['W', 'D', 'L']"));
@@ -33,7 +34,8 @@ test('leaders API returns an explicit public projection from the PostgreSQL V2 r
   assert.ok(!route.toLowerCase().includes('supabase'));
   assert.ok(route.includes("new Set(['PL', 'PD', 'BL1', 'SA', 'FL1'])"));
   assert.ok(route.includes('public, max-age=0, s-maxage=300'));
-  assert.ok(route.includes("select('player_name, team_name, team_short_name, team_crest, goals, assists')"));
+  assert.ok(route.includes('listCurrentCompetitionPlayerLeaders(league, stat, 5)'));
+  assert.ok(route.includes('row.player_name'));
   assert.ok(!route.includes("select('*')"));
   assert.ok(!route.includes('tournament_scorers'));
   assert.ok(homepageAdapter.includes('FROM public.public_competition_player_stats'));
