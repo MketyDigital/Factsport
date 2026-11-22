@@ -27,7 +27,8 @@ test('competition sync writes only standings and scorer snapshots, never match r
   assert.match(worker, /normalizeFootballDataScorers/);
   assert.match(worker, /STANDINGS_COMPETITIONS = new Set\(\['PL', 'PD', 'BL1', 'SA', 'FL1'\]\)/);
   assert.match(worker, /standings: standings \? 'updated' : 'not_supported'/);
-  assert.match(worker, /STANDINGS_COMPETITIONS\\.has\\(code\\)/);
+  assert.ok(worker.includes('STANDINGS_COMPETITIONS.has(code)'));
+  assert.ok(worker.includes('PROVIDER_REQUEST_SPACING_MS = 8000'));
 });
 
 test('manual sync is authenticated, read-only in dry-run mode, and reports counts only', () => {
