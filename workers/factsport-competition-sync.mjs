@@ -82,8 +82,7 @@ async function providerJson(url, key) {
   return { ok: true, payload };
 }
 
-async function saveStandings(sql, snapshot) {
-  return sql.begin(async tx => {
+async function saveStandings(tx, snapshot) {
     await tx`
       UPDATE public.competition_standings
       SET is_current = false, updated_at = now()
@@ -114,13 +113,11 @@ async function saveStandings(sql, snapshot) {
           source_updated_at = now(), updated_at = now()
       `;
     }
-    return snapshot.rows.length;
-  });
+  return snapshot.rows.length;
 }
 
-async function saveScorers(sql, snapshot) {
-  if (!snapshot.rows.length) return 0;
-  return sql.begin(async tx => {
+async function saveScorers(tx, snapshot) {
+  if (!snapshot?.rows.length) return 0;
     await tx`
       UPDATE public.competition_player_stats
       SET is_current = false, updated_at = now()
@@ -146,11 +143,10 @@ async function saveScorers(sql, snapshot) {
           source = 'football-data', source_updated_at = now(), updated_at = now()
       `;
     }
-    return snapshot.rows.length;
-  });
+  return snapshot.rows.length;
 }
 
-async function syncCompetition(sql, env, code, dryRun = false) {
+async function loadCompetition(env, code) {
   const key = env.FACTSPORT_FOOTBALL_DATA_KEY;
   if (!key) throw new Error('Provider key missing');
   const root = `https://api.football-data.org/v4/competitions/${code}`;
@@ -158,37 +154,59 @@ async function syncCompetition(sql, env, code, dryRun = false) {
   if (STANDINGS_COMPETITIONS.has(code)) {
     const standingsResult = await providerJson(root + '/standings', key);
     if (!standingsResult.ok) {
-      return { competition: code, standings: 'provider_error_' + standingsResult.status };
+      return { snapshot: null, result: { competition: code,
+        standings: 'provider_error_' + standingsResult.status, error: true } };
     }
     standings = normalizeFootballDataStandings(standingsResult.payload, code);
-    if (!standings) return { competition: code, standings: 'invalid_or_incomplete' };
+    if (!standings) return { snapshot: null, result: {
+      competition: code, standings: 'invalid_or_incomplete', error: true,
+    } };
   }
 
-  // Scorer entitlement can differ by competition and plan. Unsupported cup
-  // standings do not block league-table updates or an optional scorer snapshot.
+  // Scorer access varies by competition. Rate limits and server failures abort
+  // the batch before writes; plan-level 403/404 leaves the last good snapshot.
   const scorerResult = await providerJson(root + '/scorers', key);
+  if (!scorerResult.ok && ![403, 404].includes(scorerResult.status)) {
+    return { snapshot: null, result: { competition: code,
+      standings: standings ? 'ready' : 'not_supported',
+      scorers: 'provider_error_' + scorerResult.status, error: true } };
+  }
   const scorers = scorerResult.ok
     ? normalizeFootballDataScorers(scorerResult.payload, code)
     : null;
-
-  if (dryRun) {
-    return {
+  if (scorerResult.ok && !scorers) {
+    return { snapshot: null, result: { competition: code,
+      standings: standings ? 'ready' : 'not_supported',
+      scorers: 'invalid_or_incomplete', error: true } };
+  }
+  return {
+    snapshot: { code, standings, scorers },
+    result: {
       competition: code,
       standings: standings ? 'ready' : 'not_supported',
       standingsRows: standings?.rows.length || 0,
       scorers: scorers?.rows.length ? 'ready' : 'unavailable_or_empty',
       scorerRows: scorers?.rows.length || 0,
-    };
-  }
-  const standingRows = standings ? await saveStandings(sql, standings) : 0;
-  const scorerRows = scorers?.rows.length ? await saveScorers(sql, scorers) : 0;
-  return {
-    competition: code,
-    standings: standings ? 'updated' : 'not_supported',
-    standingsRows: standingRows,
-    scorers: scorerRows ? 'updated' : 'unchanged_unavailable_or_empty',
-    scorerRows,
+    },
   };
+}
+
+async function saveSnapshots(sql, snapshots) {
+  return sql.begin(async tx => {
+    const results = [];
+    for (const { code, standings, scorers } of snapshots) {
+      const standingRows = standings ? await saveStandings(tx, standings) : 0;
+      const scorerRows = scorers?.rows.length ? await saveScorers(tx, scorers) : 0;
+      results.push({
+        competition: code,
+        standings: standings ? 'updated' : 'not_supported',
+        standingsRows: standingRows,
+        scorers: scorerRows ? 'updated' : 'unchanged_unavailable_or_empty',
+        scorerRows,
+      });
+    }
+    return results;
+  });
 }
 
 export default {
@@ -197,11 +215,11 @@ export default {
     const sql = database(env);
     try {
       if (!(await verifyWriter(sql))) throw new Error('Competition writer identity failed');
-      for (let index = 0; index < COMPETITIONS.length; index++) {
-        const result = await syncCompetition(sql, env, COMPETITIONS[index]);
-        console.log('Factsport competition snapshot', JSON.stringify(result));
-        if (!['updated', 'not_supported'].includes(result.standings)) throw new Error('Competition snapshot rejected: ' + result.competition);
-      }
+      const loaded = [];
+      for (const code of COMPETITIONS) loaded.push(await loadCompetition(env, code));
+      if (loaded.some(item => item.result.error)) throw new Error('Competition provider batch rejected before writes');
+      const saved = await saveSnapshots(sql, loaded.map(item => item.snapshot));
+      for (const result of saved) console.log('Factsport competition snapshot', JSON.stringify(result));
     } finally {
       await sql.end();
     }
@@ -248,13 +266,18 @@ export default {
       if (!selected || typeof body.dryRun !== 'boolean') {
         return Response.json({ ok: false, error: 'invalid_sync_request' }, { status: 400 });
       }
-      const results = [];
-      for (let index = 0; index < selected.length; index++) {
-        results.push(await syncCompetition(sql, env, selected[index], dryRun));
+      const loaded = [];
+      for (const code of selected) loaded.push(await loadCompetition(env, code));
+      const valid = loaded.every(item => item.snapshot !== null && !item.result.error);
+      if (!valid) {
+        return Response.json({ ok: false, dryRun, competitions: loaded.map(item => item.result) },
+          { status: 503, headers: { 'Cache-Control': 'no-store' } });
       }
-      const ok = results.every(result => result.standings === 'ready' || result.standings === 'updated' || result.standings === 'not_supported');
-      return Response.json({ ok, dryRun, competitions: results },
-        { status: ok ? 200 : 503, headers: { 'Cache-Control': 'no-store' } });
+      const results = dryRun
+        ? loaded.map(item => item.result)
+        : await saveSnapshots(sql, loaded.map(item => item.snapshot));
+      return Response.json({ ok: true, dryRun, competitions: results },
+        { status: 200, headers: { 'Cache-Control': 'no-store' } });
     } catch (error) {
       const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
       return Response.json({
