@@ -88,7 +88,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       if (hit) {
         const cached = await hit.json() as Record<string, any>;
         const ttl = cacheSeconds(String(cached.status || ''));
-        const publicCached = { ...cached, servedAt,
+        const publicCached: Record<string, any> = { ...cached, servedAt,
           stale: !cached.observedAt || Date.now() - Date.parse(cached.observedAt) > ttl * 1000,
         };
         delete publicCached.predictor;
