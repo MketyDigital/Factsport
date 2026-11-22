@@ -73,3 +73,13 @@ test('protected staging preflight verifies every grant needed by PostgreSQL matc
   assert.match(preflight, /getExternalData/);
   assert.match(read('.github/workflows/v2-app-staging.yml'), /\.matchDetailReader\.ready == true and \.matchDetailRuntimeProbe\.ready == true/);
 });
+
+test('public Media match API strips Prediction output and bounds team-form reads to recent matches', () => {
+  const matchApi = read('app/api/match/[id]/route.ts');
+  assert.match(matchApi, /delete publicMediaData\.predictor/);
+  assert.match(matchApi, /NextResponse\.json\(publicMediaData/);
+  assert.doesNotMatch(matchApi, /NextResponse\.json\(freshData/);
+  const matches = read('lib/adapters/postgres-matches.ts');
+  assert.match(matches, /match_date >= now\(\) - interval '5 years'/);
+  assert.match(matches, /ORDER BY match_date DESC LIMIT 30/);
+});
