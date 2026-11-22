@@ -89,3 +89,10 @@ Selected commits in implementation order:
 - Removed Prediction wording from the public match-page title metadata. This does not close the full route/product separation or Prediction release.
 - Added staging smoke checks requiring non-empty 1200×630 PNG responses for both templates. Source commits: `5663872`, `ab90b16`, `5755f2f`, `5429f86`, `8803c41`.
 - Exact-head staging/build results, image inspection, actual route metadata, public crawler delivery, licensed asset policy, accessibility and mobile acceptance remain unverified. See [M83](./M83-MATCH-SHARE-CARDS.md).
+
+
+## 9. 2026-11-22 follow-up — M88 exact-head staging evidence
+
+The exact source commit `418edd7400e053e27b6bcb020c00b1e5fe695f5b` passed isolated verification [45044116175](https://github.com/MketyDigital/Factsport/actions/runs/45044116175), native Cloudflare build [45044116156](https://github.com/MketyDigital/Factsport/actions/runs/45044116156), and protected Cloudflare staging [45044117315](https://github.com/MketyDigital/Factsport/actions/runs/45044117315). The protected run rendered PostgreSQL-backed `/matches` and a real `/match/{id}`, checked public match-content isolation, and returned 1200×630 PNGs for article, result, and lineup share-card smoke inputs. The read-only database probe and Entra protocol-boundary checks also passed.
+
+This closes the earlier claim that exact-head staging smoke was pending. It does not close visual inspection of generated cards, actual route metadata/crawler delivery, all-tab/mobile/desktop screenshots, accessibility/contrast, Core Web Vitals, editorial rights/provenance, remote-image policy, the complete news/standings/live/match lifecycle, or authenticated Entra editor publish/unpublish/logout. Those remain open M74/P9A acceptance gates. The staging smoke is a renderer/runtime check, not a visual or public-crawler review. No production cutover occurred.
