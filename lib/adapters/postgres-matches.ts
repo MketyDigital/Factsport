@@ -52,18 +52,16 @@ export async function listPostgresMatchesWindow(input: {
 
 export async function getPostgresTeamForm(teamName: string) {
   if (!teamName || teamName.length > 100) throw new Error('Invalid team filter');
-  const teamNames = Array.from(new Set(getTeamSearchVariations(teamName)
-    .map(value => value.trim().toLowerCase())
-    .filter(Boolean)));
-  const variations = getTeamSearchVariations(teamName).map(value => value.toLowerCase());
+  const canonicalTeamName = teamName.trim();
+  const variations = getTeamSearchVariations(canonicalTeamName).map(value => value.toLowerCase());
   return withFactsportPostgres(async sql => {
     const rows = await sql`
       SELECT home_team, away_team, home_score, away_score
       FROM public.matches
       WHERE status IN ('FT','FINISHED','AET','PEN','AWARDED','ABD')
         AND match_date >= now() - interval '2 years' AND match_date < now()
-        AND (lower(home_team) = ANY(${sql.array(teamNames)})
-          OR lower(away_team) = ANY(${sql.array(teamNames)}))
+        AND (home_team = ${canonicalTeamName}
+          OR away_team = ${canonicalTeamName})
       ORDER BY match_date DESC LIMIT 30
     `;
     const form: string[] = [];
