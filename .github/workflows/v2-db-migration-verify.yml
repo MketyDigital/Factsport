@@ -555,6 +555,21 @@ jobs:
               RAISE EXCEPTION 'Competition capability role is not restricted NOLOGIN';
             END IF;
 
+            IF to_regclass('public.competition_one_current_season_idx') IS NOT NULL
+              OR to_regclass('public.competition_player_stats_one_current_season_idx') IS NOT NULL
+              OR NOT EXISTS (
+                SELECT 1 FROM pg_index
+                WHERE indexrelid = 'public.competition_standings_current_snapshot_idx'::regclass
+                  AND indisunique = false
+              )
+              OR NOT EXISTS (
+                SELECT 1 FROM pg_index
+                WHERE indexrelid = 'public.competition_player_stats_current_snapshot_idx'::regclass
+                  AND indisunique = false
+              ) THEN
+              RAISE EXCEPTION 'Current competition snapshot indexes must support multiple rows per league/group';
+            END IF;
+
             IF NOT EXISTS (
               SELECT 1 FROM information_schema.columns
               WHERE table_schema='public' AND table_name='competition_standings'
@@ -574,4 +589,4 @@ jobs:
           END
           $$;
           SQL
-          echo "Disposable PostgreSQL migrations 0000–0049 and Media/competition/VOD/social privilege assertions passed."
+          echo "Disposable PostgreSQL migrations 0000–0050 and Media/competition/VOD/social privilege assertions passed."
