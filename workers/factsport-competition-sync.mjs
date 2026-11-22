@@ -39,6 +39,14 @@ async function verifyWriter(sql) {
     SELECT current_database() = 'factsport_v2' AS correct_database,
       current_user = 'factsport_v2_competition_app' AS correct_role,
       pg_has_role(current_user, 'factsport_v2_competition_writer', 'USAGE') AS has_writer_capability,
+      to_regclass('public.competition_standings_current_snapshot_idx') IS NOT NULL
+        AS standings_snapshot_index_ready,
+      to_regclass('public.competition_player_stats_current_snapshot_idx') IS NOT NULL
+        AS scorer_snapshot_index_ready,
+      to_regclass('public.competition_one_current_season_idx') IS NULL
+        AS standings_multirow_index_ready,
+      to_regclass('public.competition_player_stats_one_current_season_idx') IS NULL
+        AS scorer_multirow_index_ready,
       has_table_privilege(current_user, 'public.competition_standings', 'INSERT,UPDATE') AS can_write_standings,
       has_table_privilege(current_user, 'public.competition_player_stats', 'INSERT,UPDATE') AS can_write_scorers,
       has_table_privilege(current_user, 'public.matches', 'UPDATE') AS can_update_matches,
@@ -48,6 +56,8 @@ async function verifyWriter(sql) {
   `;
   return identity?.correct_database === true &&
     identity.correct_role === true && identity.has_writer_capability === true &&
+    identity.standings_snapshot_index_ready === true && identity.scorer_snapshot_index_ready === true &&
+    identity.standings_multirow_index_ready === true && identity.scorer_multirow_index_ready === true &&
     identity.can_write_standings === true && identity.can_write_scorers === true &&
     identity.can_update_matches === false && identity.can_delete_matches === false &&
     identity.inherits_roles === true && Number(identity.connection_limit) === 3;
