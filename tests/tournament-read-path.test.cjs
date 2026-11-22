@@ -34,8 +34,11 @@ test('live standings obtains matches and standings from same-origin APIs without
 
 test('competition endpoints expose bounded, narrow public projections', () => {
   assert.ok(matchesRoute.includes('listPostgresLeagueMatches'));
-  assert.ok(matchesRoute.includes(".select('id, api_id, home_team"));
+  assert.ok(matchesRoute.includes('listPostgresLeagueMatches(league, 500)'));
+  assert.ok(!matchesRoute.toLowerCase().includes('supabase'));
+  assert.ok(matchesAdapter.includes('SELECT id, api_id, home_team'));
   assert.ok(standingsRoute.includes('listCurrentCompetitionStandings'));
-  assert.ok(standingsRoute.includes("select('league_code, league_name, season"));
-  assert.ok(!standingsRoute.includes(".select('*')"));
+  assert.ok(standingsRoute.includes('listCurrentCompetitionStandings(leagueCode)'));
+  assert.ok(!standingsRoute.toLowerCase().includes('supabase'));
+  assert.ok(standingsRoute.includes("new Set(['PL', 'PD', 'BL1', 'SA', 'FL1'])"));
 });
