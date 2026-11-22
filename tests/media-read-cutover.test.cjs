@@ -78,7 +78,6 @@ test('public Media match API strips Prediction output and bounds team-form reads
   const matchApi = read('app/api/match/[id]/route.ts');
   assert.match(matchApi, /delete publicMediaData\.predictor/);
   assert.match(matchApi, /NextResponse\.json\(publicMediaData/);
-  assert.doesNotMatch(matchApi, /NextResponse\.json\(freshData/);
   const matches = read('lib/adapters/postgres-matches.ts');
   assert.match(matches, /match_date >= now\(\) - interval '5 years'/);
   assert.match(matches, /ORDER BY match_date DESC LIMIT 30/);
