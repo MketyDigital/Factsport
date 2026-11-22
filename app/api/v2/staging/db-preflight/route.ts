@@ -63,6 +63,16 @@ export async function GET() {
           has_table_privilege('factsport_v2_reader', 'public.public_match_pins', 'SELECT') AS public_pins_readable,
           has_table_privilege('factsport_v2_reader', 'public.public_match_media', 'SELECT') AS public_media_readable
       `;
+      phase = 'competition_read_model_inventory';
+      const [competitionReadModel] = await sql`
+        SELECT
+          has_table_privilege('factsport_v2_reader', 'public.public_competition_standings', 'SELECT') AS standings_view_readable,
+          has_table_privilege('factsport_v2_reader', 'public.public_competition_player_stats', 'SELECT') AS player_stats_view_readable,
+          (SELECT count(*)::integer FROM public.public_competition_standings) AS current_standings_rows,
+          (SELECT count(*)::integer FROM public.public_competition_player_stats) AS current_player_stats_rows,
+          (SELECT max(source_updated_at) FROM public.public_competition_standings) AS standings_updated_at,
+          (SELECT max(source_updated_at) FROM public.public_competition_player_stats) AS player_stats_updated_at
+      `;
       phase = 'migration_tracking_inventory';
       const migrationTables = await sql`
         SELECT table_schema, table_name
@@ -81,6 +91,11 @@ export async function GET() {
         matchDetailReader: {
           ...matchDetailReader,
           ready: Object.values(matchDetailReader || {}).every(value => value === true),
+        },
+        competitionReadModel: {
+          ...competitionReadModel,
+          ready: competitionReadModel?.standings_view_readable === true &&
+            competitionReadModel?.player_stats_view_readable === true,
         },
         roleInventory: rolesToCheck.map(name => {
           const role = roles.find(item => item.rolname === name);
