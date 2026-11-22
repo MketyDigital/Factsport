@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "factsport-v2-competition-sync",
+  "main": "workers/factsport-competition-sync.mjs",
+  "compatibility_date": "2026-11-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "triggers": { "crons": ["0 4,16 * * *"] },
+  "hyperdrive": [
+    {
+      "binding": "FACTSPORT_HYPERDRIVE",
+      "id": "00000000000000000000000000000000"
+    }
+  ]
+}
