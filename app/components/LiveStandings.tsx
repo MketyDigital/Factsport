@@ -5,8 +5,7 @@ import Link from 'next/link';
 
 const LEAGUE_MAP: Record<string, string> = {
     'Premier League': 'PL', 'La Liga': 'PD', 'Bundesliga': 'BL1',
-    'Serie A': 'SA', 'Ligue 1': 'FL1', 'Champions League': 'CL',
-    'World Cup': 'WC', 'Euros': 'EC', 'Copa America': 'CLI', 'AFCON': 'AFCON'
+    'Serie A': 'SA', 'Ligue 1': 'FL1'
 };
 
 const STAGE_DISPLAY: Record<string, string> = {
