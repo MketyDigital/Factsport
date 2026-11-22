@@ -4,7 +4,6 @@ export const revalidate = 300;
 import Link from 'next/link';
 import { Metadata } from 'next';
 import { ChevronLeft, BarChart2, AlertTriangle } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
 import { listCurrentCompetitionStandings } from '@/lib/adapters/postgres-homepage';
 import { serializeJsonLd } from '@/lib/seo/json-ld';
 import LeagueLeaders from '@/app/components/LeagueLeaders'; 
@@ -14,12 +13,7 @@ const LEAGUE_MAP: Record<string, string> = {
     'La Liga': 'PD',
     'Bundesliga': 'BL1',
     'Serie A': 'SA',
-    'Ligue 1': 'FL1',
-    'Champions League': 'CL',
-    'World Cup': 'WC',       // 🟢 ADDED TOURNAMENTS
-    'Euros': 'EC',
-    'Copa America': 'CLI',
-    'AFCON': 'AFCON'
+    'Ligue 1': 'FL1'
 };
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<any> }): Promise<Metadata> {
@@ -57,98 +51,36 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
     }
 }
 
-const normalizeName = (name: string) => {
-    if (!name) return "";
-    return name.toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
-        .replace(/[^a-z0-9 ]/g, '') 
-        .replace(/\b(fc|cf|afc|sc|sv|rc|fk|vfl|fsv|tsg|ssc|bayer|rcd|ud|as|us|osc|cfa|aja|ca|bc|ac|sk|de)\b/g, '') 
-        .replace(/\s+/g, ' ') 
-        .trim();
-};
-
 async function getStandings(leagueName: string) {
-    const leagueCode = LEAGUE_MAP[leagueName] || 'PL'; 
-    let dbStandings: any[] = [];
-    let dbMatches: any[] = [];
+    const leagueCode = LEAGUE_MAP[leagueName];
+    if (!leagueCode || process.env.FACTSPORT_COMPETITIONS_BACKEND !== 'postgres') {
+        return { error: 'V2 competition standings are not provisioned.', data: [] };
+    }
     try {
-        if (process.env.FACTSPORT_COMPETITIONS_BACKEND === 'postgres') {
-            dbStandings = await listCurrentCompetitionStandings(leagueCode);
-        } else if (process.env.NODE_ENV === 'development') {
-            const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-            const [standingsResult, matchesResult] = await Promise.all([
-                supabase.from('standings').select('*').eq('league_code', leagueCode)
-                    .order('match_group', { ascending: true }).order('position', { ascending: true }),
-                supabase.from('matches').select('home_team, away_team, home_score, away_score')
-                    .eq('league', leagueName)
-                    .in('status', ['FT', 'FINISHED', 'AWARDED', 'AET', 'PEN'])
-                    .order('match_date', { ascending: false }),
-            ]);
-            if (standingsResult.error) throw standingsResult.error;
-            dbStandings = standingsResult.data || [];
-            dbMatches = matchesResult.data || [];
-        } else {
-            return { error: 'V2 competition standings are not provisioned.', data: [] };
-        }
-
-        if (dbStandings.length === 0) {
-            return { error: 'No standings data available yet.', data: [] };
-        }
-
-        const teamForms: Record<string, string[]> = {};
-
-        if (dbMatches) {
-            dbMatches.forEach((m: any) => {
-                const home = normalizeName(m.home_team);
-                const away = normalizeName(m.away_team);
-                const homeScore = m.home_score;
-                const awayScore = m.away_score;
-
-                if (!teamForms[home]) teamForms[home] = [];
-                if (!teamForms[away]) teamForms[away] = [];
-
-                if (teamForms[home].length < 5 && homeScore !== null && awayScore !== null) {
-                    if (homeScore > awayScore) teamForms[home].push('W');
-                    else if (homeScore === awayScore) teamForms[home].push('D');
-                    else teamForms[home].push('L');
-                }
-
-                if (teamForms[away].length < 5 && homeScore !== null && awayScore !== null) {
-                    if (awayScore > homeScore) teamForms[away].push('W');
-                    else if (awayScore === homeScore) teamForms[away].push('D');
-                    else teamForms[away].push('L');
-                }
-            });
-        }
-
-        const formattedStandings = dbStandings.map((dbEntry: any) => {
-            const normalizedTeamName = normalizeName(dbEntry.team_short_name || dbEntry.team_name);
-            const providerForm = process.env.FACTSPORT_COMPETITIONS_BACKEND === 'postgres'
-                ? String(dbEntry.form || '').split(',').filter((result: string) => ['W', 'D', 'L'].includes(result))
-                : [];
-            const customForm = providerForm.length > 0 ? providerForm : (teamForms[normalizedTeamName] || []);
-            
+        const dbStandings = await listCurrentCompetitionStandings(leagueCode);
+        if (dbStandings.length === 0) return { error: 'No standings data available yet.', data: [] };
+        const data = dbStandings.map((entry: any) => {
+            const form = String(entry.form || '').split(',').filter((result: string) =>
+                ['W', 'D', 'L'].includes(result));
             return {
-                position: dbEntry.position,
-                match_group: dbEntry.match_group, // 🟢 PASS GROUP
+                position: entry.position,
+                match_group: entry.match_group,
                 team: {
-                    id: dbEntry.team_id,
-                    name: dbEntry.team_name,
-                    shortName: dbEntry.team_short_name || dbEntry.team_name,
-                    crest: dbEntry.team_crest
+                    id: entry.team_id,
+                    name: entry.team_name,
+                    shortName: entry.team_short_name || entry.team_name,
+                    crest: entry.team_crest,
                 },
-                playedGames: dbEntry.played_games,
-                won: dbEntry.won,
-                draw: dbEntry.draw,
-                lost: dbEntry.lost,
-                goalDifference: dbEntry.goal_difference,
-                points: dbEntry.points,
-                form: providerForm.length > 0 ? providerForm.join(',') : customForm.reverse().join(',') 
+                playedGames: entry.played_games,
+                won: entry.won,
+                draw: entry.draw,
+                lost: entry.lost,
+                goalDifference: entry.goal_difference,
+                points: entry.points,
+                form: form.join(','),
             };
         });
-
-        return { error: null, data: formattedStandings };
-
+        return { error: null, data };
     } catch {
         return { error: 'Standings are temporarily unavailable.', data: [] };
     }
@@ -156,9 +88,9 @@ async function getStandings(leagueName: string) {
 
 export default async function StandingsPage({ searchParams }: { searchParams: Promise<any> }) {
     const resolvedParams = await searchParams;
-    const currentLeague = resolvedParams?.league || 'Premier League';
-    
-    const validLeague = LEAGUE_MAP[currentLeague] ? currentLeague : 'Premier League';
+    const requestedLeague = typeof resolvedParams?.league === 'string' ? resolvedParams.league : '';
+    const validLeague = Object.prototype.hasOwnProperty.call(LEAGUE_MAP, requestedLeague)
+      ? requestedLeague : 'Premier League';
     const { error, data: standings } = await getStandings(validLeague);
 
     const hasFormData = standings.some((entry: any) => entry.form && entry.form.length > 0);
