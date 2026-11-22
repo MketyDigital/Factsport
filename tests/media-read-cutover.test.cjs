@@ -18,8 +18,8 @@ test('Media match detail, live data, widget, pins and playback have explicit Pos
     const source = read(path);
     assert.match(source, /FACTSPORT_MATCH_DETAIL_BACKEND/);
     assert.match(source, /cloudflare:workers/);
-    assert.match(source, /FACTSPORT_ENVIRONMENT !== 'development'/);
     assert.match(source, /status: 503/);
+    assert.doesNotMatch(source, /supabase|createClient|\.from\(/i);
   }
   assert.match(read('app/api/match/[id]/playback/route.ts'), /getPostgresMatchPlaybackById/);
   assert.match(read('lib/adapters/postgres-matches.ts'), /export async function getPostgresMatchPlaybackById/);
