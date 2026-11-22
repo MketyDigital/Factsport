@@ -76,7 +76,7 @@ export async function listCurrentCompetitionStandings(leagueCode: string) {
     SELECT league_code, league_name, season, match_group, team_id,
            team_name, team_short_name, team_crest, position,
            played_games, won, draw, lost, goals_for, goals_against,
-           goal_difference, points, source_updated_at
+           goal_difference, points, form, source_updated_at
     FROM public.public_competition_standings
     WHERE league_code = ${leagueCode}
     ORDER BY match_group ASC, position ASC, team_id ASC
