@@ -61,7 +61,8 @@ jobs:
               'factsport_v2_media_broadcast_admin',
               'factsport_v2_broadcast_token_issuer',
               'factsport_v2_media_access_admin',
-              'factsport_v2_prediction_api'
+              'factsport_v2_prediction_api',
+              'factsport_v2_competition_writer'
             ] LOOP
               IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
                 EXECUTE format('CREATE ROLE %I NOLOGIN', role_name);
@@ -514,7 +515,63 @@ jobs:
             ) THEN
               RAISE EXCEPTION 'VOD public-read rights constraint is missing';
             END IF;
+
+            IF NOT has_table_privilege(
+              'factsport_v2_competition_writer',
+              'public.competition_standings',
+              'INSERT'
+            ) OR NOT has_table_privilege(
+              'factsport_v2_competition_writer',
+              'public.competition_player_stats',
+              'UPDATE'
+            ) THEN
+              RAISE EXCEPTION 'Competition writer lacks its narrow snapshot permissions';
+            END IF;
+
+            IF has_table_privilege(
+              'factsport_v2_competition_writer',
+              'public.matches',
+              'UPDATE'
+            ) OR has_table_privilege(
+              'factsport_v2_competition_writer',
+              'public.competition_standings',
+              'DELETE'
+            ) OR has_table_privilege(
+              'factsport_v2_competition_writer',
+              'public.competition_player_stats',
+              'DELETE'
+            ) THEN
+              RAISE EXCEPTION 'Competition writer exceeds its restricted role';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_roles
+              WHERE rolname='factsport_v2_competition_writer'
+                AND rolcanlogin=false AND rolsuper=false
+                AND rolcreatedb=false AND rolcreaterole=false
+                AND rolreplication=false AND rolbypassrls=false
+                AND rolinherit=false
+            ) THEN
+              RAISE EXCEPTION 'Competition capability role is not restricted NOLOGIN';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema='public' AND table_name='competition_standings'
+                AND column_name='form'
+            ) THEN
+              RAISE EXCEPTION 'Provider-sourced standings form column is missing';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema='public' AND table_name='competition_player_stats'
+                AND column_name='assists' AND is_nullable='YES'
+            ) THEN
+              RAISE EXCEPTION 'Unknown provider assists must remain nullable';
+            END IF;
+
           END
           $$;
           SQL
-          echo "Disposable PostgreSQL migrations 0001–0043 and Media/VOD/social privilege assertions passed."
+          echo "Disposable PostgreSQL migrations 0000–0049 and Media/competition/VOD/social privilege assertions passed."
