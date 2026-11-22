@@ -57,7 +57,8 @@ export async function getPostgresTeamForm(teamName: string) {
     const rows = await sql`
       SELECT home_team, away_team, home_score, away_score
       FROM public.matches
-      WHERE status IN ('FT','FINISHED','AET','PEN','AWARDED','ABD') AND match_date < now()
+      WHERE status IN ('FT','FINISHED','AET','PEN','AWARDED','ABD')
+        AND match_date >= now() - interval '5 years' AND match_date < now()
         AND (home_team ILIKE ANY(${sql.array(patterns)})
           OR away_team ILIKE ANY(${sql.array(patterns)}))
       ORDER BY match_date DESC LIMIT 30
