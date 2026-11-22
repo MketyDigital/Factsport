@@ -107,6 +107,8 @@ export async function GET() {
         if (!match) throw new Error('match_adapter_empty');
         phase = 'match_detail_playback_query';
         await getPostgresMatchPlaybackById(matchId);
+        phase = 'match_detail_home_form_connection';
+        await withFactsportPostgres(sql => sql`SELECT 1 AS connection_ok`);
         phase = 'match_detail_home_form_query';
         await getPostgresTeamForm(String(match.home_team || ''));
         phase = 'match_detail_away_form_query';
