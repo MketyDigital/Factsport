@@ -20,7 +20,9 @@ test('tournaments root is a directory rather than a route expecting a missing le
 
 test('tournament detail uses the base PostgreSQL match reader when enabled', () => {
   assert.ok(detail.includes('listPostgresLeagueMatches'));
-  assert.ok(detail.includes("FACTSPORT_MATCHES_BACKEND === 'postgres'"));
+  assert.ok(detail.includes("FACTSPORT_MATCHES_BACKEND !== 'postgres'"));
+  assert.ok(!detail.toLowerCase().includes('supabase'));
+  assert.ok(detail.includes('notFound()'));
   assert.ok(matchesAdapter.includes('export async function listPostgresLeagueMatches'));
 });
 
