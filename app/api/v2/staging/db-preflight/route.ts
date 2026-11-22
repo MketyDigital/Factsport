@@ -98,7 +98,7 @@ export async function GET() {
     phase = 'match_detail_runtime_probe';
     let matchDetailRuntimeProbe: Record<string, unknown> = { ready: false, matchAvailable: false };
     try {
-      const [candidate] = await withFactsportPostgres(sql`
+      const [candidate] = await withFactsportPostgres(sql => sql`
         SELECT id FROM public.matches ORDER BY match_date ASC, id ASC LIMIT 1
       `);
       if (candidate?.id) {
