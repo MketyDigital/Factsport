@@ -51,6 +51,16 @@ export async function GET() {
         WHERE rolname::text IN ${sql(rolesToCheck)}
         ORDER BY rolname
       `;
+      phase = 'match_detail_reader_grants';
+      const [matchDetailReader] = await sql`
+        SELECT
+          has_table_privilege('factsport_v2_reader', 'public.matches', 'SELECT') AS matches_readable,
+          has_column_privilege('factsport_v2_reader', 'public.matches', 'legacy_match_id', 'SELECT') AS legacy_match_id_readable,
+          has_column_privilege('factsport_v2_reader', 'public.matches', 'display_clock', 'SELECT') AS display_clock_readable,
+          has_column_privilege('factsport_v2_reader', 'public.matches', 'provider_widget_id', 'SELECT') AS provider_widget_id_readable,
+          has_table_privilege('factsport_v2_reader', 'public.public_match_pins', 'SELECT') AS public_pins_readable,
+          has_table_privilege('factsport_v2_reader', 'public.public_match_media', 'SELECT') AS public_media_readable
+      `;
       phase = 'migration_tracking_inventory';
       const migrationTables = await sql`
         SELECT table_schema, table_name
@@ -66,6 +76,10 @@ export async function GET() {
         targetDatabaseMatches: server.database_name === 'factsport_v2',
         requiredMediaTables: tables,
         discoveredMigrationTrackingTables: migrationTables,
+        matchDetailReader: {
+          ...matchDetailReader,
+          ready: Object.values(matchDetailReader || {}).every(value => value === true),
+        },
         roleInventory: rolesToCheck.map(name => {
           const role = roles.find(item => item.rolname === name);
           return role ? {
