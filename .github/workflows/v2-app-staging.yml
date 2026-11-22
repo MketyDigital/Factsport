@@ -289,6 +289,15 @@ jobs:
             echo "Factsport staging Entra start: skipped because Entra app secrets are not configured."
           fi
 
+          HOME_PAGE_STATUS="$(curl --silent --show-error --max-time 30 \
+            -o /tmp/factsport-staging-home.html -w '%{http_code}' \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" "$BASE/")"
+          [ "$HOME_PAGE_STATUS" = "200" ] && grep -q 'href="/matches"' /tmp/factsport-staging-home.html || {
+            echo "::error::PostgreSQL-backed public homepage did not render its Matches navigation (HTTP $HOME_PAGE_STATUS)."
+            exit 1
+          }
+          echo "Factsport staging / page: PostgreSQL-backed homepage initial render passed."
+
           MATCH_PAGE_STATUS="$(curl --silent --show-error --max-time 30 \
             -o /tmp/factsport-staging-match-page.html -w '%{http_code}' \
             -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" "$BASE/matches")"
