@@ -298,6 +298,19 @@ jobs:
           }
           echo "Factsport staging /matches page: PostgreSQL-backed initial render passed"
 
+          NEWS_PAGE_STATUS="$(curl --silent --show-error --max-time 30 \
+            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+            -o /tmp/factsport-staging-news.html -w '%{http_code}' "$BASE/news")"
+          [ "$NEWS_PAGE_STATUS" = "200" ] || {
+            echo "::error::PostgreSQL-backed public newsroom page did not render (HTTP $NEWS_PAGE_STATUS)."
+            exit 1
+          }
+          grep -q 'The Newsroom' /tmp/factsport-staging-news.html || {
+            echo "::error::Newsroom response did not contain the expected Media page heading."
+            exit 1
+          }
+          echo "Factsport staging /news page: PostgreSQL editorial initial render passed."
+
           ARTICLE_OG_DATA="$(node -e 'process.stdout.write(Buffer.from(JSON.stringify({type:"article",title:"Factsport staging article preview",summary:"A safe editorial share-card smoke check.",category:"Football"})).toString("base64url"))')"
           ARTICLE_OG_STATUS="$(curl --silent --show-error --max-time 25 \
             -D /tmp/factsport-article-og.headers \
