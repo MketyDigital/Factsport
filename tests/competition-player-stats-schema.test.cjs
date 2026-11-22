@@ -25,3 +25,19 @@ test('player stats constrain negative values and expose only a safe public view'
   assert.match(sql, /GRANT SELECT ON public\.public_competition_player_stats TO factsport_v2_reader/i);
   assert.doesNotMatch(sql, /\b(DROP TABLE|TRUNCATE|DELETE FROM|INSERT INTO)\b/i);
 });
+
+
+test('competition ingestion adds sourced form and a separate no-login writer capability', () => {
+  const sql = fs.readFileSync(
+    path.join(__dirname, '../db/migrations/0049_factsport_competition_ingestion_writer.sql'),
+    'utf8'
+  );
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS form text NOT NULL DEFAULT ''/i);
+  assert.match(sql, /CREATE ROLE factsport_v2_competition_writer/i);
+  assert.match(sql, /GRANT SELECT, INSERT, UPDATE ON[\s\S]*competition_standings[\s\S]*competition_player_stats/i);
+  assert.match(sql, /REVOKE ALL ON[\s\S]*competition_standings[\s\S]*competition_player_stats[\s\S]*factsport_v2_reader/i);
+  assert.doesNotMatch(sql, /GRANT[^;]*(?:matches|DELETE|TRUNCATE)/i);
+  assert.match(sql, /ALTER COLUMN assists DROP NOT NULL/i);
+  assert.match(sql, /ALTER COLUMN appearances DROP NOT NULL/i);
+  assert.match(sql, /ALTER COLUMN minutes_played DROP NOT NULL/i);
+});
