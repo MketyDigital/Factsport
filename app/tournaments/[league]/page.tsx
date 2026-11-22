@@ -64,7 +64,8 @@ export default async function TournamentDetailsPage({ params }: { params: Promis
         'Champions League', 'World Cup', 'Euros', 'Copa America', 'AFCON',
     ]);
     if (!supportedMatches.has(leagueName) || process.env.FACTSPORT_MATCHES_BACKEND !== 'postgres') notFound();
-    const matches = await listPostgresLeagueMatches(leagueName, 500);
+    // The adapter selects this exact public match projection; bind the inferred driver rows to the client component contract.
+    const matches = await listPostgresLeagueMatches(leagueName, 500) as unknown as Parameters<typeof LeagueMatchGroup>[0]['matches'];
 
     const style = LEAGUE_STYLES[leagueName] || {
         themeClass: 'from-[#1e293b] to-[#0f172a]',
