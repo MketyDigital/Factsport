@@ -14,11 +14,19 @@ async function withConnection<T>(connectionString: string | undefined, operation
   const sql = postgres(connectionString, {
     max: 1, fetch_types: false, prepare: true, connect_timeout: 10, idle_timeout: 5,
   });
+  let result: T;
   try {
-    return await operation(sql);
-  } finally {
-    await sql.end({ timeout: 1 });
+    result = await operation(sql);
+  } catch (error) {
+    // Preserve the query failure if shutdown also fails. Never expose connection
+    // details through the request error response.
+    try { await sql.end({ timeout: 1 }); } catch { /* preserve original error */ }
+    throw error;
   }
+  // A successful database read is complete before the pool/client shutdown.
+  // Cleanup failure must not discard that result and turn a valid page into 500.
+  try { await sql.end({ timeout: 1 }); } catch { /* Hyperdrive owns pooled connection recovery */ }
+  return result;
 }
 
 export function withFactsportPostgres<T>(operation: (sql: FactsportSql) => Promise<T> | T): Promise<T> {
