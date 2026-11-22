@@ -61,7 +61,7 @@ export async function getPostgresTeamForm(teamName: string) {
       SELECT home_team, away_team, home_score, away_score
       FROM public.matches
       WHERE status IN ('FT','FINISHED','AET','PEN','AWARDED','ABD')
-        AND match_date >= now() - interval '5 years' AND match_date < now()
+        AND match_date >= now() - interval '2 years' AND match_date < now()
         AND (lower(home_team) = ANY(${sql.array(teamNames)})
           OR lower(away_team) = ANY(${sql.array(teamNames)}))
       ORDER BY match_date DESC LIMIT 30
