@@ -67,6 +67,9 @@ jobs:
           node --test tests/factsport-competition-ingestion.test.mjs tests/factsport-competition-worker.test.mjs
           node --check workers/factsport-competition-sync.mjs
           npm run typecheck
+      - name: Deploy temporary admin-backed competition role provisioner
+        id: bootstrap
+        run: npx --yes wrangler@4.158.0 deploy --config wrangler.factsport-competition-provision.jsonc
       - name: Resolve or create the dedicated competition Hyperdrive
         id: hyperdrive
         shell: bash
@@ -85,7 +88,6 @@ jobs:
             ID="$(jq -r '.id' <<<"$CURRENT")"
             echo "Existing dedicated Factsport competition Hyperdrive verified."
           else
-            npx --yes wrangler@4.158.0 deploy --config wrangler.factsport-competition-provision.jsonc
             PASSWORD="$(openssl rand -hex 32)"
             TOKEN="$(openssl rand -hex 32)"
             echo "::add-mask::$PASSWORD"
@@ -192,7 +194,7 @@ jobs:
             echo "No match results, user data, production routes, or DNS were changed."
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Delete temporary admin-backed competition provisioner
-        if: always() && steps.hyperdrive.outcome == 'success'
+        if: always() && steps.bootstrap.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
