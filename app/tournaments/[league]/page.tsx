@@ -1,7 +1,6 @@
 export const runtime = 'edge';
 export const revalidate = 60;
 
-import { createClient } from '@supabase/supabase-js';
 import { listPostgresLeagueMatches } from '@/lib/adapters/postgres-matches';
 import Link from 'next/link';
 import { Metadata, ResolvingMetadata } from 'next';
@@ -60,21 +59,12 @@ export default async function TournamentDetailsPage({ params }: { params: Promis
     const resolvedParams = await params;
     const leagueName = decodeURIComponent(resolvedParams.league);
 
-    let matches: any[] = [];
-    if (process.env.FACTSPORT_MATCHES_BACKEND === 'postgres') {
-        matches = await listPostgresLeagueMatches(leagueName, 500);
-    } else {
-        if (process.env.NODE_ENV !== 'development') return notFound();
-        const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-        const { data, error } = await supabase
-            .from('matches')
-            .select('id, api_id, home_team, away_team, home_score, away_score, match_date, status, home_logo, away_logo, stage, match_group, venue')
-            .eq('league', leagueName)
-            .order('match_date', { ascending: true })
-            .limit(500);
-        if (error) throw error;
-        matches = data || [];
-    }
+    const supportedMatches = new Set([
+        'Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Ligue 1',
+        'Champions League', 'World Cup', 'Euros', 'Copa America', 'AFCON',
+    ]);
+    if (!supportedMatches.has(leagueName) || process.env.FACTSPORT_MATCHES_BACKEND !== 'postgres') notFound();
+    const matches = await listPostgresLeagueMatches(leagueName, 500);
 
     const style = LEAGUE_STYLES[leagueName] || {
         themeClass: 'from-[#1e293b] to-[#0f172a]',
