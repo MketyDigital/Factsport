@@ -161,7 +161,7 @@ jobs:
           [ -n "$DOMAIN" ] || { echo "::error::Cloudflare Workers subdomain missing."; exit 1; }
           echo "FACTSPORT_WORKERS_DOMAIN=$DOMAIN" >> "$GITHUB_ENV"
           sleep 8
-      - name: Verify provider data without writes, then load staging snapshots
+      - name: Validate provider snapshots, then atomically load staging
         shell: bash
         run: |
           set -euo pipefail
@@ -183,7 +183,7 @@ jobs:
           {
             echo "## Factsport V2 competition ingestion (staging)"
             echo "Database: existing factsport_v2 through a dedicated, restricted competition writer."
-            echo "Each official provider snapshot was normalized before its league rows were written."
+            echo "All official provider snapshots passed validation before a single staging transaction wrote the batch."
             jq -c '{ok,competitions}' /tmp/factsport-comp-sync.json
             jq -c '{standingsRows,scorerRows,standingsUpdatedAt,scorersUpdatedAt}'               /tmp/factsport-comp-inventory.json
             echo "No match results, user data, production routes, or DNS were changed."
