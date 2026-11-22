@@ -105,12 +105,14 @@ export async function GET() {
         const matchId = String(candidate.id);
         const match = await getPostgresMatchById(matchId);
         if (!match) throw new Error('match_adapter_empty');
-        await Promise.all([
-          getPostgresMatchPlaybackById(matchId),
-          getPostgresTeamForm(String(match.home_team || '')),
-          getPostgresTeamForm(String(match.away_team || '')),
-          getExternalData(match),
-        ]);
+        phase = 'match_detail_playback_query';
+        await getPostgresMatchPlaybackById(matchId);
+        phase = 'match_detail_home_form_query';
+        await getPostgresTeamForm(String(match.home_team || ''));
+        phase = 'match_detail_away_form_query';
+        await getPostgresTeamForm(String(match.away_team || ''));
+        phase = 'match_detail_external_enrichment';
+        await getExternalData(match);
         matchDetailRuntimeProbe = { ready: true, matchAvailable: true };
       }
     } catch (cause: unknown) {
