@@ -31,8 +31,12 @@ export async function GET(
       const dbData = await getPostgresMatchById(params.id);
       if (!dbData) return NextResponse.json({ error: 'Match not found' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
       const freshData = await getExternalData(dbData);
+      const publicMediaData = { ...freshData };
+      // ESPN detail responses can include its predictor projection. This route
+      // belongs to public Media and must never serialize Prediction model data.
+      delete publicMediaData.predictor;
       const staging = env.FACTSPORT_ENVIRONMENT === 'staging';
-      return NextResponse.json(freshData, {
+      return NextResponse.json(publicMediaData, {
         headers: { 'Cache-Control': staging ? 'private, no-store, max-age=0' : 'public, max-age=0, s-maxage=5, stale-while-revalidate=10' },
       });
     } catch {
