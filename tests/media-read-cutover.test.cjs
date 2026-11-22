@@ -83,3 +83,10 @@ test('public Media match API strips Prediction output and bounds team-form reads
   assert.match(matches, /lower\(home_team\) = ANY\(\$\{sql\.array\(teamNames\)\}\)/);
   assert.match(matches, /ORDER BY match_date DESC LIMIT 30/);
 });
+
+test('successful Hyperdrive reads survive client cleanup errors', () => {
+  const client = read('lib/adapters/postgres-client.ts');
+  assert.match(client, /result = await operation\(sql\)/);
+  assert.match(client, /catch \{ \/\* Hyperdrive owns pooled connection recovery \*\/ \}/);
+  assert.match(client, /return result;/);
+});
