@@ -125,7 +125,8 @@ test('public Media pages use V2 read adapters in production and never fall back 
   assert.match(live, /getPublicMediaStudioSettings/);
   assert.match(matches, /process\.env\.NODE_ENV !== 'development'/);
   assert.match(news, /process\.env\.NODE_ENV !== 'development'/);
-  assert.match(standings, /else if \(process\.env\.NODE_ENV === 'development'\)/);
+  assert.match(standings, /listCurrentCompetitionStandings/);
+  assert.doesNotMatch(standings, /supabase|createClient/i);
 });
 
 test('social embed uses secure playback without timed redirects or forced Telegram popups', () => {
