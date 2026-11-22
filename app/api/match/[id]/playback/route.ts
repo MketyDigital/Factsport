@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { env } from 'cloudflare:workers';
 import { getPostgresMatchPlaybackById } from '@/lib/adapters/postgres-matches';
 
@@ -79,56 +78,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       });
     }
   }
-  if (env.FACTSPORT_ENVIRONMENT !== 'development') {
-    return NextResponse.json({ error: 'V2 playback reader is not provisioned.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
-  }
-
-  try {
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    const { data: match, error } = await supabase
-      .from('matches')
-      .select('match_date, status, video_url, livestream_url, audio_url')
-      .eq('id', id)
-      .maybeSingle();
-    if (error) throw error;
-    if (!match) return NextResponse.json({ status: 'unavailable' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
-
-    const status = String(match.status || '').toUpperCase();
-    const isFinished = FINISHED.has(status);
-    const isLive = LIVE.has(status);
-    if (UNAVAILABLE.has(status)) return NextResponse.json({ status: 'unavailable' }, { headers: { 'Cache-Control': 'private, no-store, max-age=0', Vary: 'Cookie' } });
-    const matchTime = new Date(match.match_date).getTime();
-    if (!Number.isFinite(matchTime)) return NextResponse.json({ status: 'unavailable' }, { status: 422, headers: { 'Cache-Control': 'no-store' } });
-
-    const unlockAt = matchTime - 15 * 60 * 1000;
-    if (!isFinished && !isLive && Date.now() < unlockAt) {
-      return NextResponse.json({
-        status: 'locked',
-        unlockAt: new Date(unlockAt).toISOString(),
-        mode: match.audio_url && !match.livestream_url ? 'audio' : 'video',
-      }, { headers: { 'Cache-Control': 'private, no-store, max-age=0', Vary: 'Cookie' } });
-    }
-
-    const videoSource = isFinished ? match.video_url : match.livestream_url;
-    const audioSource = isFinished ? null : match.audio_url;
-    const videoUrl = safePlaybackUrl(videoSource);
-    const audioUrl = safePlaybackUrl(audioSource);
-    const mediaUrl = videoUrl || audioUrl;
-    if (!mediaUrl) {
-      return NextResponse.json({ status: 'unavailable' }, { headers: { 'Cache-Control': 'private, no-store, max-age=0', Vary: 'Cookie' } });
-    }
-
-    return NextResponse.json({
-      status: 'ready',
-      mediaUrl,
-      audioUrl: videoUrl ? audioUrl : null,
-      mode: videoUrl ? 'video' : 'audio',
-      isFinished,
-    }, { headers: { 'Cache-Control': 'private, no-store, max-age=0', Vary: 'Cookie' } });
-  } catch {
-    return NextResponse.json({ error: 'Playback availability temporarily unavailable' }, {
-      status: 503,
-      headers: { 'Cache-Control': 'no-store' },
-    });
-  }
+  return NextResponse.json({ error: 'V2 playback reader is not provisioned.' }, {
+    status: 503, headers: { 'Cache-Control': 'no-store' },
+  });
 }
