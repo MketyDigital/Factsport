@@ -26,7 +26,9 @@ test('competition sync writes only standings and scorer snapshots, never match r
   assert.match(worker, /normalizeFootballDataStandings/);
   assert.match(worker, /normalizeFootballDataScorers/);
   assert.match(worker, /STANDINGS_COMPETITIONS = new Set\(\['PL', 'PD', 'BL1', 'SA', 'FL1'\]\)/);
-  assert.match(worker, /standings: standings \? 'updated' : 'not_supported'/);
+  assert.ok(worker.includes('async function saveSnapshots(sql, snapshots)'));
+  assert.ok(worker.includes('const saved = await saveSnapshots(sql, loaded.map(item => item.snapshot))'));
+  assert.ok(worker.includes('const valid = loaded.every(item => item.snapshot !== null && !item.result.error)'));
   assert.ok(worker.includes('STANDINGS_COMPETITIONS.has(code)'));
   assert.ok(worker.includes('PROVIDER_REQUEST_SPACING_MS = 8000'));
 });
@@ -35,7 +37,8 @@ test('manual sync is authenticated, read-only in dry-run mode, and reports count
   assert.match(worker, /__internal\/competition-sync/);
   assert.match(worker, /tokenMatches/);
   assert.match(worker, /body\.dryRun === true/);
-  assert.match(worker, /if \(dryRun\)/);
+  assert.ok(worker.includes('dryRun\n        ? loaded.map(item => item.result)'));
+  assert.ok(worker.includes('PROVIDER_REQUEST_SPACING_MS = 8000'));
   assert.match(worker, /standingsRows: Number\(counts\.standings_rows\)/);
   assert.doesNotMatch(worker, /player_name:\s*row|team_name:\s*row/);
 });
