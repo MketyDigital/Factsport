@@ -51,4 +51,7 @@ test('role provisioner validates exact admin database and grants only isolated w
   assert.match(provisioner, /can_update_matches === false/);
   assert.match(provisioner, /can_delete_matches === false/);
   assert.match(provisioner, /CONNECTION LIMIT 3/);
+  assert.ok(provisioner.includes('Preserve the password already stored in the dedicated Hyperdrive.'));
+  assert.ok(provisioner.includes('GRANT SELECT ON public.public_competition_standings'));
+  assert.ok(provisioner.includes('can_read_standings_inventory === true'));
 });
