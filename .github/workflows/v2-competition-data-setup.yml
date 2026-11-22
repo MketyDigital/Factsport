@@ -123,7 +123,7 @@ jobs:
               },
               mtls: {sslmode: "require"},
               caching: {disabled: true},
-              origin_connection_limit: 3
+              origin_connection_limit: 5
             }' > /tmp/factsport-comp-hd-create.json
             STATUS="$(curl -sS --max-time 60 -o /tmp/factsport-comp-hd-created.json -w '%{http_code}'               -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               -H 'Content-Type: application/json'               --data-binary @/tmp/factsport-comp-hd-create.json               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs")"
             rm -f /tmp/factsport-comp-hd-create.json
