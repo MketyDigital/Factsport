@@ -5,6 +5,11 @@ name: Factsport v2 competition data setup (staging)
 # deploys the scheduled staging Worker. No production routes or DNS are changed.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - refactor/factsport-v2
+    paths:
+      - 'ops/provision-competition.trigger'
 
 permissions:
   contents: read
