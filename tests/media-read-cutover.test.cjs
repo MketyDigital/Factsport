@@ -80,7 +80,8 @@ test('public Media match API strips Prediction output and bounds team-form reads
   assert.match(matchApi, /NextResponse\.json\(publicMediaData/);
   const matches = read('lib/adapters/postgres-matches.ts');
   assert.match(matches, /match_date >= now\(\) - interval '2 years'/);
-  assert.match(matches, /lower\(home_team\) = ANY\(\$\{sql\.array\(teamNames\)\}\)/);
+  assert.match(matches, /home_team = \$\{canonicalTeamName\}/);
+  assert.match(matches, /away_team = \$\{canonicalTeamName\}/);
   assert.match(matches, /ORDER BY match_date DESC LIMIT 30/);
 });
 
