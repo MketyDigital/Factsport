@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { env } from 'cloudflare:workers';
 import { getFactsportEditorialPostgresReadiness, withFactsportPostgres } from '@/lib/adapters/postgres-client';
+import { getPostgresMatchById, getPostgresMatchPlaybackById, getPostgresTeamForm } from '@/lib/adapters/postgres-matches';
+import { getExternalData } from '@/app/lib/matchService';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -93,12 +95,46 @@ export async function GET() {
       };
     });
 
+    phase = 'match_detail_runtime_probe';
+    let matchDetailRuntimeProbe: Record<string, unknown> = { ready: false, matchAvailable: false };
+    try {
+      const [candidate] = await withFactsportPostgres(sql`
+        SELECT id FROM public.matches ORDER BY match_date ASC, id ASC LIMIT 1
+      `);
+      if (candidate?.id) {
+        const matchId = String(candidate.id);
+        const match = await getPostgresMatchById(matchId);
+        if (!match) throw new Error('match_adapter_empty');
+        await Promise.all([
+          getPostgresMatchPlaybackById(matchId),
+          getPostgresTeamForm(String(match.home_team || '')),
+          getPostgresTeamForm(String(match.away_team || '')),
+          getExternalData(match),
+        ]);
+        matchDetailRuntimeProbe = { ready: true, matchAvailable: true };
+      }
+    } catch (cause: unknown) {
+      const rawCode = cause && typeof cause === 'object' && 'code' in cause
+        ? String((cause as { code?: unknown }).code || '') : '';
+      const message = cause instanceof Error ? cause.message.toLowerCase() : '';
+      matchDetailRuntimeProbe = {
+        ready: false,
+        matchAvailable: false,
+        phase,
+        sqlState: /^[A-Z0-9]{5}$/.test(rawCode) ? rawCode : 'none',
+        errorClass: cause instanceof Error ? cause.name : 'Unknown',
+        errorHint: /connection|socket|timeout|terminated|closed/.test(message) ? 'connection'
+          : /permission|not allowed|denied/.test(message) ? 'permission'
+          : /does not exist|undefined|relation/.test(message) ? 'schema_or_view'
+          : 'query_failed',
+      };
+    }
     const editorialRuntime = await getFactsportEditorialPostgresReadiness();
     const ok = inventory.targetDatabaseMatches && inventory.tlsEnabled;
     const error = !ok
       ? inventory.targetDatabaseMatches ? 'tls_not_verified' : 'unexpected_database'
       : undefined;
-    return NextResponse.json({ ...inventory, editorialRuntime, ok, error }, {
+    return NextResponse.json({ ...inventory, matchDetailRuntimeProbe, editorialRuntime, ok, error }, {
       status: ok ? 200 : 503,
       headers: { 'Cache-Control': 'no-store' },
     });
