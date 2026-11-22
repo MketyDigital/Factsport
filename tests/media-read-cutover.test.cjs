@@ -57,3 +57,15 @@ test('only the migration-verified PostgreSQL match-detail reader is enabled in C
   assert.match(config, /FACTSPORT_HOMEPAGE_BACKEND: bindings\.text\("disabled"\)/);
   assert.match(config, /FACTSPORT_PREDICTION_SETTINGS_BACKEND: bindings\.text\("disabled"\)/);
 });
+
+
+test('protected staging preflight verifies every grant needed by PostgreSQL match detail', () => {
+  const preflight = read('app/api/v2/staging/db-preflight/route.ts');
+  for (const column of ['legacy_match_id', 'display_clock', 'provider_widget_id']) {
+    assert.match(preflight, new RegExp(`has_column_privilege\\('factsport_v2_reader', 'public\\.matches', '${column}', 'SELECT'\\)`));
+  }
+  for (const view of ['public_match_pins', 'public_match_media']) {
+    assert.match(preflight, new RegExp(`has_table_privilege\\('factsport_v2_reader', 'public\\.${view}', 'SELECT'\\)`));
+  }
+  assert.match(read('.github/workflows/v2-app-staging.yml'), /\.matchDetailReader\.ready == true/);
+});
