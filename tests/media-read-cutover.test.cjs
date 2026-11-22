@@ -92,3 +92,16 @@ test('successful Hyperdrive reads survive client cleanup errors', () => {
   assert.match(client, /catch \{ \/\* Hyperdrive owns pooled connection recovery \*\/ \}/);
   assert.match(client, /return result;/);
 });
+
+
+test('staging preflight inventories competition grants and freshness without returning rows', () => {
+  const preflight = read('app/api/v2/staging/db-preflight/route.ts');
+  assert.match(preflight, /competitionReadModel/);
+  assert.match(preflight, /public\.public_competition_standings/);
+  assert.match(preflight, /public\.public_competition_player_stats/);
+  assert.match(preflight, /current_standings_rows/);
+  assert.match(preflight, /current_player_stats_rows/);
+  assert.match(preflight, /standings_updated_at/);
+  assert.match(preflight, /player_stats_updated_at/);
+  assert.match(read('.github/workflows/v2-app-staging.yml'), /\.competitionReadModel\.ready == true/);
+});
