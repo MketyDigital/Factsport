@@ -7,6 +7,7 @@ export const revalidate = 15;
 
 const ALLOWED_LEAGUES = new Set([
   'Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Ligue 1',
+  'Champions League', 'World Cup', 'Euros', 'Copa America', 'AFCON',
 ]);
 
 export async function GET(request: Request) {
