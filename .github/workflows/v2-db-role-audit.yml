@@ -66,7 +66,11 @@ jobs:
       - name: Deploy temporary read-only catalog audit Worker
         id: deploy
         shell: bash
-        run: npx --yes wrangler@4.158.0 deploy --config wrangler.factsport-db-role-audit.jsonc
+        run: |
+          set -euo pipefail
+          WORKER="factsport-v2-db-role-audit-${GITHUB_RUN_ID}"
+          printf 'FACTSPORT_AUDIT_WORKER=%s\n' "$WORKER" >> "$GITHUB_ENV"
+          npx --yes wrangler@4.158.0 deploy --config wrangler.factsport-db-role-audit.jsonc --name "$WORKER"
       - name: Install ephemeral audit token
         shell: bash
         run: |
@@ -75,7 +79,7 @@ jobs:
           echo "::add-mask::$TOKEN"
           printf 'FACTSPORT_AUDIT_TOKEN=%s\n' "$TOKEN" >> "$GITHUB_ENV"
           printf '%s' "$TOKEN" | npx --yes wrangler@4.158.0 secret put FACTSPORT_AUDIT_TOKEN \
-            --config wrangler.factsport-db-role-audit.jsonc
+            --config wrangler.factsport-db-role-audit.jsonc --name "$FACTSPORT_AUDIT_WORKER"
       - name: Collect sanitized effective privilege inventory
         shell: bash
         run: |
@@ -86,7 +90,7 @@ jobs:
           [ "$HTTP" = "200" ] || { echo "::error::Unable to resolve Cloudflare Worker subdomain"; exit 1; }
           DOMAIN="$(jq -r '.result.subdomain // empty' /tmp/factsport-domain.json)"
           [ -n "$DOMAIN" ] || { echo "::error::Workers subdomain is missing"; exit 1; }
-          URL="https://factsport-v2-db-role-audit.$DOMAIN.workers.dev/__internal/db-role-audit"
+          URL="https://$FACTSPORT_AUDIT_WORKER.$DOMAIN.workers.dev/__internal/db-role-audit"
           READY=false
           for attempt in 1 2 3 4 5 6 7 8; do
             HTTP="$(curl -sS --max-time 30 -o /tmp/factsport-db-role-audit.json -w '%{http_code}' \
@@ -114,15 +118,20 @@ jobs:
               /tmp/factsport-db-role-audit.json
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Delete temporary role audit Worker
-        if: always() && steps.deploy.outcome == 'success'
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
+          [ -n "${FACTSPORT_AUDIT_WORKER:-}" ] || { echo "No run-scoped audit Worker was created."; exit 0; }
           HTTP="$(curl -sS -o /tmp/factsport-audit-delete.json -w '%{http_code}' -X DELETE \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/factsport-v2-db-role-audit")"
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$FACTSPORT_AUDIT_WORKER")"
+          if [ "$HTTP" = "404" ]; then
+            echo "Run-scoped audit Worker is already absent."
+            exit 0
+          fi
           [ "$HTTP" = "200" ] && jq -e '.success == true' /tmp/factsport-audit-delete.json >/dev/null || {
-            echo "::error::Temporary audit Worker cleanup failed; delete only factsport-v2-db-role-audit."
+            echo "::error::Temporary audit Worker cleanup failed for this run's scoped Worker."
             exit 1
           }
-          echo "Temporary role audit Worker deleted."
+          echo "Run-scoped temporary role audit Worker deleted."
