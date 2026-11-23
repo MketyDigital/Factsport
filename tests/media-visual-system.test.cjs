@@ -118,3 +118,14 @@ test('match scoreboard uses a decorative 2D pitch and reduced-motion-safe stadiu
   assert.match(css, /@keyframes fs-stadium-glow/);
   assert.match(css, /prefers-reduced-motion: reduce[\s\S]*?\.fs-match-light \{\s*animation: none/);
 });
+
+test('match timeline adds motion-safe 2.5D event cards without changing event data', () => {
+  const timeline = read('app/components/MatchTimeline.tsx');
+  const css = read('app/globals.css');
+  assert.match(timeline, /fs-match-timeline-rail/);
+  assert.match(timeline, /fs-match-timeline-entry/);
+  assert.match(timeline, /fs-match-timeline-card/);
+  assert.match(timeline, /events\.map/);
+  assert.match(css, /\.fs-match-timeline-entry:hover \.fs-match-timeline-card/);
+  assert.match(css, /prefers-reduced-motion: reduce[\s\S]*?\.fs-match-timeline-entry \{ animation: none/);
+});
