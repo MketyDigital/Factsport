@@ -94,6 +94,7 @@ export async function planMatchStory(input: MatchStoryInput): Promise<MatchStory
 
   return {
     status: !input.rights.dataCleared || !input.rights.assetsCleared ? 'blocked_rights' : dataComplete ? 'draft' : 'needs_data',
+    rights: { ...input.rights },
     matchId: input.matchId,
     title: `${input.homeTeam} vs ${input.awayTeam} | Factsport Match Story`,
     score: verifiedScore ? `${input.finalScore.home}–${input.finalScore.away}` : null,

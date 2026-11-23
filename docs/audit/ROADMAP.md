@@ -371,3 +371,14 @@ This only improves reproducibility and verifies the current staging database. It
 - TV preview UI increment: protected `/admin/tv` now exposes a read-only, noindex storyboard prototype for 2D lineups, an abstract 2.5D field, unknown-safe stats and explicitly illustrative 3D direction. It is not connected to feeds, rendering, storage or social accounts; it is not a renderer or publish control. Exact-head CI/build/staging pass; editor-role browser review remains open.
 - Exact head `e86690f8488dbf25534eda60864e49a12929852c` passed isolated verification [45220923630](https://github.com/MketyDigital/Factsport/actions/runs/45220923630), native Cloudflare build [45220923394](https://github.com/MketyDigital/Factsport/actions/runs/45220923394), and protected staging [45220923298](https://github.com/MketyDigital/Factsport/actions/runs/45220923298). This verifies deploy and protected checks, not a real TV editor browser session or social publish.
 - No production host, DNS, Worker, database, social credential or schedule changed in this checkpoint.
+
+## M94 — Media and TV first release sequence (2026-11-23)
+
+The owner has clarified release order: finish Media and TV, prepare a scoped `factsport.com` cutover, then continue the broader Predict product and monetization work. Preserve the existing free-prediction experience on `predict.factsport.com` during the Media/TV release. Its production Worker, DNS, cookies, routes and free-play behavior must remain unchanged; the broader Predict migration has a separate later P9B gate. This supersedes M93's combined Media/Predict/TV release ordering, not the Media/TV quality, rights, recovery, rollback or owner go/no-go requirements.
+
+Source work in this increment:
+- The homepage headline carousel now has manual previous/next and pause/play controls, pauses on hover/focus, and disables automatic rotation for reduced-motion users by default.
+- Factsport TV now has a rights-gated offline SVG scene-frame compiler for 2D data scenes and clearly disclosed abstract 2.5D illustrative scenes. It does not create a final animated video, rely on match footage, or post to a social account. Human review, rights evidence, MP4 encoding, durable jobs/storage, OAuth and social publishing acceptance remain open.
+- The production plan now defines two release windows: Media/TV first with an explicit unchanged Predict route check; full Predict later. It does not authorize or perform a production switch.
+
+Local verification: engine suite 308/308 and native Vinext build passed. Local `tsc --noEmit` still reports existing broad typing/configuration errors across Media/Admin APIs and Worker `Env` declarations (including `unknown` payload types); no error points to the touched carousel or TV planner. Exact-head CI/staging and browser visual/accessibility acceptance remain required. No production route, DNS, credential, social post, database or schedule changed.

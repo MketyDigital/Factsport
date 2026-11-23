@@ -187,22 +187,23 @@ The staging app's `/api/matches` response previously used `Cache-Control: public
 
 ### P9 — Phased production rehearsal and cutover
 
-#### P9A — Public Media boundary readiness (no production cutover yet)
+#### P9A — Public Media and TV readiness, then scoped production cutover
 - [ ] Create a complete route/table/feature/provider/job map. Mark each route as Media, Prediction, shared, or legacy-only; verify actual DNS, Worker routes, redirects, cookies and production integrations.
-- [ ] Prove an exact boundary: `factsport.com` Media routes are prediction-free and free Prediction/account flows are isolated to `predict.factsport.com`. No production route changes until Predict and TV are also accepted under P9B/P10.
+- [ ] Prove an exact boundary: `factsport.com` Media routes are prediction-free. Keep `predict.factsport.com` on its current production service and preserve its existing free-play behavior throughout the Media/TV release. No wildcard, redirect, cookie, API, Worker or DNS change may move or disable Predict in this phase.
 - [ ] Complete P0/P2 sports data gates and P3 public site/CMS/media/editor operations, plus the relevant P4 editor identity/RBAC and P8 privacy/security/restore gates. Features that fail staging acceptance stay disabled and must not lose a legacy journey.
+- [ ] Complete P10 TV staging acceptance for the initial human-reviewed episode and social delivery workflow. Automated/public schedules stay disabled unless separately accepted.
 - [ ] Take immutable protected backups; prove restore. Populate only approved operational fixtures and reviewed authored/rights-cleared content. Compare Media pages and data through shadow reads; do not write both systems.
-- [ ] Prepare and rehearse the Media route/DNS switch, cache purge, Worker rollback, incident response and legacy Media read-only/fallback window. Verify production bindings/secrets, monitoring and no staging credentials; keep this as a staging rehearsal until the overall V2 gate.
-- [ ] Record Media-only readiness evidence and rollback thresholds. Do not deploy or switch production DNS in P9A; include the completed Media boundary in the final V2 cutover review after P9B and P10 exit.
+- [ ] Prepare and rehearse a scoped `factsport.com` Media/TV route/DNS switch, cache purge, Worker rollback, incident response and legacy Media read-only/fallback window. Verify production bindings/secrets, monitoring and no staging credentials. Record the exact unchanged Predict route and validate it before and after the Media switch.
+- [ ] Record Media/TV readiness evidence and rollback thresholds. Production cutover is allowed only for `factsport.com` after all P9A/P10 gates pass, the Predict route-preservation check passes, restore/rollback is rehearsed, and the owner records a final go/no-go. Do not wait for the broader Predict product migration to release Media/TV.
 
-**P9A exit:** public Media, identity, rights, provider and route-isolation acceptance are complete in isolated staging with rollback rehearsed. This is not production deployment approval.
+**P9A exit:** public Media, identity, rights, provider and route-isolation acceptance plus P10 TV staging acceptance are complete, with backup/restore, scoped route rollback and the unchanged Predict route evidenced. This is readiness for a separately recorded `factsport.com` Media/TV go/no-go.
 
-#### P9B — Prediction/business boundary readiness (concurrent implementation)
+#### P9B — Prediction/business boundary readiness (later product phase)
 - [ ] Complete P4/P5/P6 Prediction identity, registration, privacy, VIP/payments/prizes, free prediction, settlement, audit, chat/MOTM and account migration gates; resolve legal/financial obligations and rule conflicts.
 - [ ] Compare accounts/entitlements and permitted prediction state; preserve paid/legal records, start generated operational gameplay history clean, and never dual-write settlements.
-- [ ] Complete the Predict-host staging journeys, rehearse rollback and document monitoring. Do not switch production host/routes in P9B; include Predict in the combined final V2 go/no-go after P10 exit.
+- [ ] Complete the Predict-host staging journeys, rehearse rollback and document monitoring. After the separate Media/TV release, switch `predict.factsport.com` only under its own tested route plan and owner go/no-go; preserve free play while adding the approved account/business features.
 
-**P9B exit:** all approved account/free-prediction/gameplay/money journeys pass on the dedicated Predict host in isolated staging with correct identity/ledger semantics and rollback evidence.
+**P9B exit:** all approved account/free-prediction/gameplay/money journeys pass on the dedicated Predict host in isolated staging with correct identity/ledger semantics and rollback evidence; Predict is ready for a separate later cutover.
 
 #### P9C — Final legacy retirement
 - [ ] Retire legacy GitHub Actions, cron-job.org, external Workers, Supabase service keys/projects and remaining production routes only after Media and Prediction are separately stable, all owners approve retained records/obligations, and backups/restore remain available.
@@ -210,9 +211,9 @@ The staging app's `/api/matches` response previously used `Cache-Control: public
 
 **P9C exit:** legacy retirement is explicit, reversible where possible, and supported by retained backups and owner sign-off.
 
-### P10 — Factsport TV (concurrent required V2 workstream)
+### P10 — Factsport TV (required Media-phase workstream)
 
-Governing spec: [`docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md`](../product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md); implementation staging checklist: [`docs/implementation/TV-001-factsport-tv-engine.md`](../implementation/TV-001-factsport-tv-engine.md). TV is a modular V2 subsystem and a required concurrent delivery track. The final Factsport V2 cutover stays blocked until Media, Predict and TV exit criteria are complete. TV can be developed and staged independently while Media and Predict proceed.
+Governing spec: [`docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md`](../product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md); implementation staging checklist: [`docs/implementation/TV-001-factsport-tv-engine.md`](../implementation/TV-001-factsport-tv-engine.md). TV is a modular V2 subsystem delivered with the Media phase. The scoped `factsport.com` Media/TV release may leave `predict.factsport.com` on its current service; the later Predict product cutover remains independently gated under P9B. Neither phase retires legacy systems without its own stability, records, backup and owner approval.
 
 - [ ] Close data-reuse, editorial, AI, asset, likeness, voice/music and YouTube licensing/policy questions before any production content.
 - [ ] Prototype offline on original or rights-cleared fixture assets, beginning with the deterministic 4-minute Match Story; verify 3D illustrative labels, evidence-linked narration, 2D fallback, captions, audio/video quality and no fabricated play.
@@ -221,9 +222,9 @@ Governing spec: [`docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md`](../product/FA
 - [ ] Test representative data gaps/corrections/VAR/extra time/penalty/abandonment, script originality, retries, QA, permissions, retention/deletion, cost and rights revocation.
 - [ ] Prepare platform-specific video packages and a reviewable publishing outbox for YouTube and other selected socials; begin human-reviewed content publishing as soon as OAuth, rights, assets, policy, and owner/channel permission are available. No automatic posting or production credential until those gates are evidenced.
 - [ ] Implement platform-specific draft delivery to TikTok's creator inbox (human finishes the post in TikTok) only after the content is rights-cleared, approved, explicitly authorized for upload, and served from an ownership-verified domain. Require the approved `video.upload` scope and record provider receipts.
-- [ ] Require human approval for every first-release episode and platform upload. TV is not postponed until after V2 cutover; finish its staging and publishing acceptance alongside Media and Predict.
+- [ ] Require human approval for every first-release episode and platform upload. TV staging and human-reviewed posting acceptance are required for the Media/TV release; production schedules and automated publication remain separately gated.
 
-**Exit:** staging TV engine, editor and human-reviewed social publishing workflow pass factual/rights/security/cost acceptance. TV readiness is part of the final V2 cutover decision; production schedules and automated publication remain separately gated.
+**Exit:** staging TV engine, editor and human-reviewed social publishing workflow pass factual/rights/security/cost acceptance. TV readiness is required for the scoped Media/TV release decision; production schedules and automated publication remain separately gated.
 
 
 ## 4. Current blockers and owner decisions
@@ -243,7 +244,7 @@ Governing spec: [`docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md`](../product/FA
 - No app Worker uses the admin Hyperdrive. Runtime and job identities remain separate.
 - No new product capability is declared complete because a health endpoint returns 200.
 - A feature is complete only when its data model, authorization, user journey, error/retry behavior, observability, tests, and rollback are all complete.
-- P9A is readiness only under the 2026-11-23 owner direction. Do not cut over any production Factsport route until Media, Predict and TV all pass their acceptance gates, the combined rollback is rehearsed, and the explicit final owner go/no-go is recorded. Preserve all old production boundaries and backups until P9C approves retirement.
+- P9A/P10 govern a scoped `factsport.com` Media/TV release only; `predict.factsport.com` stays on its unchanged existing route with free play preserved. The broader Predict route/product switch has its own later P9B acceptance and go/no-go. Do not cut over Media/TV without the exact route map, staging acceptance, backup/restore and rollback rehearsal, Predict-preservation check, and written owner go/no-go. Preserve legacy boundaries and backups until P9C separately approves retirement.
 
 
 ### Latest staging infrastructure verification
@@ -423,7 +424,7 @@ The current V2 completion and non-use inventory is recorded in [M77](./handoffs/
 
 ### M78 TV integration and phased release update — 2026-11-16
 
-Factsport TV design spec `docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md` is integrated into P10 and implementation plan TV-001. TV implementation is now concurrent with Media and Prediction under the 2026-11-23 owner direction. P9 is split into Media readiness, Prediction readiness and final legacy-retirement gates. The 2026-11-23 owner direction supersedes any earlier phased production route switch: do not change production DNS/routes until Media, Predict and TV all pass and the combined rollback/go-no-go is recorded. Each phase requires separate explicit owner go/no-go. See ROADMAP M78.
+Factsport TV design spec `docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md` is integrated into P10 and implementation plan TV-001. Per the 2026-11-23 owner direction, P9A/P10 deliver Media and TV first while `predict.factsport.com` remains on its current service with free play preserved; P9B prepares and later cuts over the broader Predict product separately. This supersedes the earlier combined-gate sequence only for release order; the scoped Media/TV switch still requires route proof, staging acceptance, backup/restore, rollback and a written owner go/no-go. No Predict cutover or legacy retirement is implied. See ROADMAP M78/M94.
 
 
 ### M79 Azure inventory reconciliation — 2026-11-16

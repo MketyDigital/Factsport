@@ -2,7 +2,7 @@
 
 Date: 2026-11-16  
 Branch: `refactor/factsport-v2`  
-Status: active concurrent V2 implementation track, owner-directed 2026-11-23. Evidence-backed planner, server-only YouTube resumable-upload adapter, and protected read-only storyboard prototype are implemented; renderer, durable studio/outbox, non-YouTube dispatch and staging acceptance remain open. Production uploads still require rights, OAuth, platform and editorial gates.
+Status: active concurrent V2 implementation track, owner-directed 2026-11-23. Evidence-backed planner, rights-gated self-contained SVG scene-frame renderer, server-only YouTube resumable-upload adapter, and protected read-only storyboard prototype are implemented. Full video encoding, durable studio/outbox, non-YouTube dispatch and staging acceptance remain open. Production uploads still require rights, OAuth, platform and editorial gates.
 
 ## Source of truth
 
@@ -28,6 +28,13 @@ Factsport TV is an internal modular subsystem of Factsport V2. It is a required 
 - Use Blender + Three.js + FFmpeg as the proposed free/open-source default subject to license review; alternative Remotion is optional and requires eligibility/licensing review.
 - Trace every narration fact to snapshot data or a human assertion; no copied ESPN prose, invented passes/locations/assists, fabricated stats, or realistic replay presented as footage. Label illustrative actions clearly.
 - Gate unsupported interpretation to human editor; 2D is used when 3D would mislead or not improve clarity.
+
+#### Implemented renderer slice (2026-11-23)
+
+- `lib/tv/svg-scene-renderer.mjs` compiles a `draft` `MatchStoryPlan` into self-contained 1920×1080 SVG frames for opening, lineup, clearly disclosed illustrative event, verified-statistics and closing scenes. It consumes the planner's verified facts; it does not fetch feeds, create match evidence, copy footage, or publish content.
+- The renderer rejects plans without a draft state, cleared data/assets rights, verified timestamped facts, known fact references, valid score text and required illustration disclosure. All dynamic text is XML-escaped and frame output contains no remote asset references.
+- This is an offline 2.5D/2D scene-frame compiler, not the proposed complete Blender/Three.js renderer, animation pipeline, voiceover, caption mux, MP4 encoder, R2 pipeline or social publisher. A generated frame is not a publishable episode. The real render/QC and human approval gates in TV4–TV5 stay open.
+- `tests/tv-svg-scene-renderer.test.mjs` covers output dimensions, source-digest labeling, escaping, disclosures, rights and missing/unverified facts. The full local engine suite passed 308/308 after this slice; exact-head typecheck, native build, CI and staging remain separate checks.
 
 ### TV3 — data and episode contracts
 
