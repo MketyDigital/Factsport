@@ -2,7 +2,7 @@
 
 Date: 2026-11-16  
 Branch: `refactor/factsport-v2`  
-Status: active concurrent V2 implementation track, owner-directed 2026-11-23. Evidence-backed planner, rights-gated self-contained SVG scene-frame renderer, server-only YouTube resumable-upload adapter, and protected read-only storyboard prototype are implemented. Full video encoding, durable studio/outbox, non-YouTube dispatch and staging acceptance remain open. Production uploads still require rights, OAuth, platform and editorial gates.
+Status: active Media-phase V2 workstream, owner-directed 2026-11-23. Evidence-backed planner, rights-gated self-contained SVG scene-frame renderer, 15-second synthetic H.264 preview compiler, server-only YouTube resumable-upload adapter, and protected read-only storyboard prototype are implemented. Full episode rendering/audio, durable studio/outbox, non-YouTube dispatch and staging acceptance remain open. Production uploads still require rights, OAuth, platform and editorial gates.
 
 ## Source of truth
 
@@ -10,7 +10,7 @@ The full product contract is [`docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md`](
 
 ## Product boundary and order
 
-Factsport TV is an internal modular subsystem of Factsport V2. It is a required concurrent workstream tracked alongside public Media and the Predict product; it is not a post-cutover afterthought or standalone app/company. The final V2 cutover waits for Media, Predict and TV acceptance plus rollback evidence. Keep existing V2 architecture, canonical match IDs, Azure PostgreSQL via Hyperdrive, R2, replaceable adapters, and Media ownership boundaries.
+Factsport TV is an internal modular subsystem of Factsport V2, delivered in the Media phase. The scoped `factsport.com` Media/TV release may preserve the current `predict.factsport.com` service and free-play flow; the broader Predict product migration has a separate later P9B gate. No release changes the Predict route, cookies or API without its own staging acceptance and go/no-go. Keep existing V2 architecture, canonical match IDs, Azure PostgreSQL via Hyperdrive, R2, replaceable adapters, and Media ownership boundaries.
 
 ## Implementation stages
 
@@ -33,8 +33,8 @@ Factsport TV is an internal modular subsystem of Factsport V2. It is a required 
 
 - `lib/tv/svg-scene-renderer.mjs` compiles a `draft` `MatchStoryPlan` into self-contained 1920×1080 SVG frames for opening, lineup, clearly disclosed illustrative event, verified-statistics and closing scenes. It consumes the planner's verified facts; it does not fetch feeds, create match evidence, copy footage, or publish content.
 - The renderer rejects plans without a draft state, cleared data/assets rights, verified timestamped facts, known fact references, valid score text and required illustration disclosure. All dynamic text is XML-escaped and frame output contains no remote asset references.
-- This is an offline 2.5D/2D scene-frame compiler, not the proposed complete Blender/Three.js renderer, animation pipeline, voiceover, caption mux, MP4 encoder, R2 pipeline or social publisher. A generated frame is not a publishable episode. The real render/QC and human approval gates in TV4–TV5 stay open.
-- `tests/tv-svg-scene-renderer.test.mjs` covers output dimensions, source-digest labeling, escaping, disclosures, rights and missing/unverified facts. The protected `/admin/tv` storyboard now embeds these generated frames beside its synthetic visual concept samples; it remains a read-only preview and was not browser-accepted as a real editor journey. Exact head `dbe8cfdd46af46e7b90d8d4fd54bf2d7d9ddd712` passed 308 regression tests, TypeScript, native build and protected staging (runs 45265807625, 45265807706, 45265807572).
+- `scripts/render-tv-preview.mjs` composes the synthetic plan through SVG frames, Resvg PNG rasterization, gentle FFmpeg zoom/fade motion and H.264 encoding. It produced a local 15-second 1920×1080, 25fps sample with explicit synthetic/nonpublishable labels. The sample has no audio and is not a real match episode. This remains a prototype, not the proposed full Blender/Three.js render pipeline, four-minute director, narration/audio/captions, durable R2/job pipeline or social publisher. The output still needs visual/audio QC and human approval; TV4–TV5 gates remain open.
+- `tests/tv-svg-scene-renderer.test.mjs` covers output dimensions, source-digest labeling, escaping, disclosures, rights, missing/unverified facts and the offline video script boundary. The protected `/admin/tv` storyboard embeds generated SVG frames beside its synthetic visual samples; it remains a read-only preview and was not browser-accepted as a real editor journey. Exact head `e89103f4a7c3b21395ddc49aeb1106e1ac942a8b` passed the 309-test regression suite, TypeScript, native build and protected staging (runs 45271817408, 45271817531, 45271817645).
 
 ### TV3 — data and episode contracts
 
