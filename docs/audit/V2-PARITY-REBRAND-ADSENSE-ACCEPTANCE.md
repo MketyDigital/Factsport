@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 12216)
-Total output lines: 377
-
 # Factsport V2 — feature parity, frontend rebrand and AdSense acceptance contract
 
 **Branch:** `refactor/factsport-v2`  
@@ -177,7 +174,76 @@ Follow the master roadmap milestones M0–M11 and production workstreams P0–P9
 9. Full browser journeys, accessibility, visual regression, provider failures, load/performance, restore and cutover rehearsal.
 10. Explicit owner production go/no-go; only then production deployment and DNS/route changes.
 
-**Current known blockers:** the v2 staging app currently proves only protected health and matches read paths; most pages/routes/components still depend on legacy Supabase or external services. No AdSense code implementation was found in the inspected sourc…2216 tokens truncated…mo, odds/accumulator content, cash-prize inducement or VIP purchase CTA leaks into public routes, metadata, feeds, structured data or server-rendered HTML.
+**Current known blockers:** the v2 staging app currently proves only protected health and matches read paths; most pages/routes/components still depend on legacy Supabase or external services. No AdSense code implementation was found in the inspected source; current betting-affiliate promotions and VIP prize eligibility need policy/legal review. Cloudflare robots indexing remains a release gate: verify explicit Factsport environment flags, public content, sitemap and canonical host before enabling indexing. No live AdSense approval is evidenced.
+
+## 8. Explicit no-change boundary
+
+This contract does not authorize:
+- production DNS/Worker/routes/database/legacy Supabase changes;
+- destructive data resets or source database deletion;
+- production secret rotations or external worker retirement;
+- unreviewed changes to betting/VIP/payment/prize mechanics;
+- removal of Facebook/Telegram, external live data, chat, MOTM, PWA or other existing functionality;
+- replacement of current logo, favicon, app icon, brand colors or icon language;
+- publishing AI content or importing unreviewed legacy editorial assets;
+- enabling AdSense before owner account status and Google policy readiness are confirmed.
+
+All such work remains staging-only or requires explicit owner approval as stated in the governing roadmap.
+
+
+## 10. Owner-confirmed Day 1 adapters and AdSense-first product decision (2026-11-07)
+
+### Day 1 platform adapters
+
+- **Identity:** Microsoft Entra ID is the Day 1 identity adapter. Keep the provider-neutral auth port, and prove real staging sign-in, callback validation, session lifecycle, logout, role/privilege mapping, recovery and failure behavior before declaring auth complete.
+- **Automation:** Azure Logic Apps is the Day 1 durable-job adapter. Preserve durable execution, idempotency keys, bounded retries, dead-letter/failed-run visibility, and exactly one owner for each scheduled job. Test actual staging runs, retries and duplicate delivery; a configured workflow alone is not completion evidence.
+- **Social:** Preserve direct Facebook and Telegram integrations. Support Logic Apps as the Day 1 orchestration adapter and Mkety/Cloudflare workflows as the platform-native integration path. Keep credentials server-side and verify retries, rate limits, deduplication and audit trails.
+- **Brand:** Green is not part of the core Factsport brand palette. The current affiliate green is confined to affiliate promotional treatment and must not be promoted into the rebrand's primary design tokens.
+
+### AdSense-first public product decision
+
+The owner has chosen to prioritize a clean AdSense-eligible public football-media experience. This is a risk-reduction target, not a promise of Google approval.
+
+1. Remove betting operator banners, bookmaker bonus codes, betting affiliate calls-to-action and associated promotional widgets from the public V2 experience. Do not reintroduce them in metadata, feeds, structured data, editorial templates, navigation or public landing pages.
+2. Remove unsolicited timed promotional popups and pop-under behavior from the public experience.
+3. Retain the underlying affiliate integration capability only as dormant/non-public capability; no betting campaign is enabled on the AdSense-first public site.
+4. Suspend public promotion of VIP cash prizes, paid-entry competitions and betting-slip benefits until the actual financial, eligibility, prize funding, chance/skill, legal and Google policy mechanics have been audited. A disclaimer or a noindex tag is not a substitute for changing underlying behavior.
+5. Free, non-monetary football predictions, points, statistics and editorial analysis may remain, provided they do not direct users to wagering, quote bookmaker odds, encourage staking or imply cash rewards.
+6. A paid VIP subscription may return to public promotion only after it is a clearly described subscription for non-gambling benefits and has no paid-entry contest, wagering or cash-prize dependency. Preserve records and existing obligations; do not erase or silently cancel them.
+7. No AdSense code until Google site/account approval is confirmed and the site-wide audit, consent/privacy requirements, ads.txt and crawlability checks pass. Eligible ad units must be clearly labelled and separated from navigation, buttons, match controls and other interactive content. Never place units in chat, email, account, payment, admin or private communications.
+8. Current V2 source changes remove the betting promotion from the homepage and remove the timed global vignette. The legacy how-to-play page is marked noindex and removed from the sitemap pending redesign; the VIP upgrade route also requires a noindex layout and policy review before it can be considered public editorial inventory.
+9. The explicit Cloudflare production indexing gate is FACTSPORT_INDEXING_ENABLED=true, additionally conditioned on NODE_ENV=production; unset/false means disallow crawling. Do not enable it until sitemap data is migrated from legacy Supabase to the V2 PostgreSQL read model and live robots/sitemap/ads.txt responses are verified.
+10. Remaining mandatory work: audit all betting/promo components and their call sites, campaign/prize settlement and payout code, VIP checkout/renewal/entitlements, affiliate links in content and feeds, page metadata/OG/schema, privacy/consent, editorial provenance, and live Cloudflare responses. This decision does not declare those audits complete.
+
+
+## 11. Owner-confirmed two-experience product separation (2026-11-07)
+
+The owner has clarified that VIP, premium prediction, betting-related and existing prize/business workflows must remain functional. The AdSense decision is therefore a separation of products and advertising surfaces, not deletion of the business system.
+
+### Public Factsport — AdSense-first experience (`factsport.com`)
+
+- Public football editorial, news, fixtures, live scores, match centre, standings, tournaments, highlights and original analysis.
+- Prediction entry, gameplay and Prediction account actions are excluded from the public Media experience by the later M84 product-boundary decision. Keep them in the separate Prediction product/P9B.
+- Public navigation and metadata must accurately describe this editorial/free experience.
+- AdSense is considered only on approved public editorial/informational content pages, after site and account approval, privacy/consent review and live technical checks.
+- No AdSense on authentication, account, private messages, chat, payment, admin, match controls or non-content pages.
+
+### Private Factsport product — preserve existing business functionality
+
+- Preserve VIP membership, premium prediction logic, betting-slip features, affiliate integrations, campaign configuration, existing prize eligibility/settlement workflows and associated admin capabilities as a separate product capability.
+- Preferred isolation is a dedicated private product hostname and independently controlled deployment boundary (ideally a separate registrable domain), e.g. a future `Factsport Club` service. It must not share AdSense code, publisher IDs, ad slots, ads.txt declarations, crawler login credentials or ad-serving configuration.
+- Do not expose betting/promo widgets, bookmaker links, betting odds, cash-prize inducements or premium betting claims in public editorial templates, public metadata, public feeds, public structured data, public sitemap or public landing pages.
+- Access must be enforced server-side using the approved identity adapter and authoritative V2 entitlements/roles. Client-only VIP checks, hidden UI, `noindex`, robots exclusions or obscured content are not authorization controls.
+- Keep private product routes out of public sitemaps and apply noindex where appropriate, but do not treat noindex as a policy workaround or as a substitute for a distinct product boundary.
+- The private product receives no AdSense. Do not configure Google's login-protected crawler access for it. Users and crawlers must not be served different content to conceal the product.
+- Preserve transactional records, active memberships, outstanding obligations, campaign and prize audit trails. No destructive migration or silent cancellation.
+- The business must receive a separate legal and payment-provider review. Paid VIP + cash-prize eligibility and any betting-related functionality may fall within online gambling restrictions or applicable local licensing rules depending on actual mechanics. A separate hostname does not legalize the product or guarantee AdSense approval for the public property.
+
+### Separation architecture and acceptance gates
+
+1. Keep one source repository and shared domain contracts where useful, but split public and private route manifests, app shells, navigation, content queries, deployment configuration and ad configuration.
+2. Create a private product host/deployment only after the owner confirms its hostname/domain and the Cloudflare DNS/Worker ownership boundary. Do not invent or change production DNS as part of this work.
+3. Public route tests must prove that no betting affiliate URL, bookmaker promo, odds/accumulator content, cash-prize inducement or VIP purchase CTA leaks into public routes, metadata, feeds, structured data or server-rendered HTML.
 4. Private route tests must prove unauthenticated access is denied server-side, non-VIP users cannot access VIP entitlements, role checks are server authoritative, and existing prediction/settlement/admin workflows remain functional.
 5. Ad tests must prove zero AdSense script/ad-unit requests on private routes and zero ad placements on private/account/payment/admin/chat/interactive control surfaces.
 6. Cross-surface links must be factual, clearly labelled and reviewed; no affiliate or betting promotion may be routed through a nominally editorial page to evade publisher review.
