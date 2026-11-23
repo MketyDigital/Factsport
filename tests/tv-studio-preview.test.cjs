@@ -15,7 +15,9 @@ test('Factsport TV preview is private, read-only and discoverable from Media ope
   assert.match(layout, /href="\/admin\/tv"/);
   assert.match(home, /href="\/admin\/tv"/);
   assert.match(preview, /Preview only · not publishable/);
-  assert.match(preview, /disconnected from match feeds, rendering jobs and social accounts/);
+  assert.match(preview, /disconnected from real match feeds, durable render jobs and social accounts/);
+  assert.match(preview, /renderMatchStorySvgScenes/);
+  assert.match(preview, /Synthetic demo data · no real fixture, footage or player likeness/);
   assert.doesNotMatch(preview, /fetch\(|use server|formAction=/);
 });
 
@@ -28,6 +30,7 @@ test('TV preview uses distinct 2D/3D sample scenes and discloses illustrative ma
   assert.match(preview, /Not footage · not a real goal/);
   assert.match(preview, /Missing values stay unknown/);
   assert.match(preview, /aria-selected=/);
+  assert.match(preview, /Offline scene renderer output/);
   assert.match(css, /\.fs-tv-field\s*\{\s*transform: perspective/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.fs-tv-light, \.fs-tv-orbit, \.fs-tv-ball \{ animation: none/);
 });

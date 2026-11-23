@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Activity, CircleDot, ListVideo, ShieldCheck, Users } from 'lucide-react';
+import { renderMatchStorySvgScenes } from '@/lib/tv/svg-scene-renderer.mjs';
 
 const scenes = [
   { id: 'opening', label: '3D opening', eyebrow: 'MATCH STORY', type: 'stadium', Icon: ListVideo },
@@ -10,6 +11,30 @@ const scenes = [
   { id: 'statistics', label: '2D statistics', eyebrow: 'MATCH NUMBERS', type: 'stats', Icon: Activity },
   { id: 'closing', label: '2D closing', eyebrow: 'FULL TIME', type: 'closing', Icon: ShieldCheck },
 ] as const;
+
+const previewFacts = [
+  { id: 'demo-score', kind: 'score', text: 'Sample final score: 2–1', source: 'Synthetic local demo — not a real fixture', observedAt: '2026-11-23T20:00:00.000Z', verified: true, homeScore: 2, awayScore: 1 },
+  { id: 'demo-lineup', kind: 'lineup', text: 'Starting XI sample · 11 names supplied', source: 'Synthetic local demo — not a real fixture', observedAt: '2026-11-23T20:00:00.000Z', verified: true },
+  { id: 'demo-goal', kind: 'goal', text: 'Sample goal event · 68th minute', source: 'Synthetic local demo — not a real fixture', observedAt: '2026-11-23T19:22:00.000Z', verified: true, minute: 68 },
+  { id: 'demo-stat', kind: 'stat', text: 'Sample possession · 54%–46%', source: 'Synthetic local demo — not a real fixture', observedAt: '2026-11-23T20:00:00.000Z', verified: true },
+];
+
+const previewFrames = renderMatchStorySvgScenes({
+  status: 'draft',
+  rights: { dataCleared: true, assetsCleared: true },
+  matchId: '123e4567-e89b-42d3-a456-426614174000',
+  title: 'Sample City vs Demo United',
+  score: '2–1',
+  sourceDigest: 'd'.repeat(64),
+  facts: previewFacts,
+  scenes: [
+    { id: 'opening', kind: 'opening_3d', label: 'Sample City vs Demo United', factIds: [] },
+    { id: 'lineups', kind: 'lineups_2d', label: 'Sample starting XI list', factIds: ['demo-lineup'] },
+    { id: 'event', kind: 'event_illustration_3d', label: 'Sample goal event', factIds: ['demo-goal'], disclosure: 'Synthetic demo visualization — not a real match.' },
+    { id: 'statistics', kind: 'statistics_2d', label: 'Sample verified statistic layout', factIds: ['demo-stat'] },
+    { id: 'closing', kind: 'closing_2d', label: 'Sample 2–1 full-time', factIds: ['demo-score'] },
+  ],
+});
 
 function StadiumScene() {
   return (
@@ -88,7 +113,7 @@ export default function TVStoryboardPreview() {
     <div className="space-y-6">
       <header className="rounded-3xl border border-slate-800 bg-[radial-gradient(ellipse_at_85%_0%,rgba(37,99,235,.35),transparent_42%),linear-gradient(145deg,#0f172a,#020617)] p-6 text-white shadow-2xl md:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div><p className="text-[10px] font-black uppercase tracking-[.24em] text-cyan-200">Factsport TV · Match Story</p><h1 className="mt-2 text-2xl font-black tracking-tight md:text-3xl">Storyboard preview</h1><p className="mt-2 max-w-2xl text-xs leading-5 text-slate-300">A visual prototype for the 2D data scenes and disclosed illustrative 3D direction. It is disconnected from match feeds, rendering jobs and social accounts.</p></div>
+          <div><p className="text-[10px] font-black uppercase tracking-[.24em] text-cyan-200">Factsport TV · Match Story</p><h1 className="mt-2 text-2xl font-black tracking-tight md:text-3xl">Storyboard preview</h1><p className="mt-2 max-w-2xl text-xs leading-5 text-slate-300">Renderer-generated SVG sample frames for 2D data scenes and disclosed illustrative 2.5D direction. This fictional demo is disconnected from real match feeds, durable render jobs and social accounts.</p></div>
           <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[.15em] text-amber-100">Preview only · not publishable</span>
         </div>
       </header>
@@ -97,6 +122,11 @@ export default function TVStoryboardPreview() {
         <section aria-label="Storyboard scene preview" className="min-w-0 rounded-3xl border border-slate-200 bg-slate-900 p-3 shadow-xl md:p-5">
           <div className="mb-3 flex items-center justify-between gap-3 px-1 text-[10px] font-black uppercase tracking-[.16em] text-slate-300"><span>{scene.eyebrow}</span><span>Scene {active + 1} / {scenes.length}</span></div>
           <SceneView type={scene.type} />
+          <figure className="mt-4 rounded-2xl border border-cyan-200/15 bg-slate-950 p-3">
+            <figcaption className="mb-2 text-[9px] font-black uppercase tracking-[.16em] text-cyan-100">Offline scene renderer output · SVG frame {active + 1}</figcaption>
+            <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(previewFrames[active].svg)}`} alt={`${previewFrames[active].kind.replaceAll('_', ' ')} frame generated from fictional demo facts`} className="aspect-video w-full rounded-xl border border-white/10 bg-slate-950 object-contain" />
+          </figure>
+          <p className="mt-2 text-center text-[9px] font-bold uppercase tracking-[.15em] text-amber-100">Synthetic demo data · no real fixture, footage or player likeness</p>
           <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Storyboard scenes">
             {scenes.map(({ id, label, Icon }, index) => <button key={id} type="button" role="tab" aria-selected={index === active} onClick={() => setActive(index)} className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${index === active ? 'border-cyan-300/50 bg-cyan-300/15 text-cyan-100' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}><Icon size={14}/>{label}</button>)}
           </div>
