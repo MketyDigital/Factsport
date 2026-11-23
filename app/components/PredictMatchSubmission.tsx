@@ -11,20 +11,23 @@ export default async function PredictMatchSubmission(props: {
   matchStatus: string;
 }) {
   const rawConfiguredHost = (process.env.FACTSPORT_PRIVATE_PRODUCT_HOST || '').trim();
+  const bindings = env as unknown as Record<string, unknown>;
+  const environment = typeof bindings.FACTSPORT_ENVIRONMENT === 'string' ? bindings.FACTSPORT_ENVIRONMENT : '';
   let configuredHost = '';
   try {
     configuredHost = new URL(rawConfiguredHost.includes('://') ? rawConfiguredHost : `https://${rawConfiguredHost}`).hostname.toLowerCase();
   } catch {
     return null;
   }
-  if (configuredHost !== 'predict.factsport.com') return null;
-  const bindings = env as unknown as Record<string, unknown>;
   if (bindings.FACTSPORT_PREDICTION_SUBMISSION_READY !== 'true') return null;
   const requestHeaders = await headers();
   const requestHost = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '')
     .split(',')[0].trim().toLowerCase().split(':')[0];
+  const isProductionPredictHost = environment === 'production' && configuredHost === 'predict.factsport.com' && requestHost === configuredHost;
+  const isStagingPreviewHost = environment === 'staging' && /^factsport-v2-staging\.[a-z0-9-]+\.workers\.dev$/i.test(requestHost);
+  if (!isProductionPredictHost && !isStagingPreviewHost) return null;
   const status = props.matchStatus.toUpperCase();
-  if (requestHost !== configuredHost || !['SCHEDULED', 'PRE_MATCH', 'NOT STARTED', 'NS'].includes(status)) return null;
+  if (!['SCHEDULED', 'PRE_MATCH', 'NOT STARTED', 'NS'].includes(status)) return null;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(props.matchId)) return null;
 
   return (

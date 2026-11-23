@@ -20,7 +20,9 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
   const requestHeaders = await headers();
   const requestHost = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '')
     .split(',')[0].trim().toLowerCase().split(':')[0];
-  const isPredictionHost = !!configuredHost && requestHost === configuredHost;
+  const bindings = env as unknown as Record<string, unknown>;
+  const isStagingHost = bindings.FACTSPORT_ENVIRONMENT === 'staging' && /^factsport-v2-staging\.[a-z0-9-]+\.workers\.dev$/i.test(requestHost);
+  const isPredictionHost = (!!configuredHost && requestHost === configuredHost) || isStagingHost;
   const resolvedParams = await searchParams;
   const teamFilter = resolvedParams?.team || null;
   let validMatches: any[] = [];

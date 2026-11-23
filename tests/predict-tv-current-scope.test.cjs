@@ -9,12 +9,17 @@ test('free prediction UI and submission API are bound to the dedicated Predict s
   const helper = read('lib/prediction/public-submission.ts');
   const route = read('app/api/prediction/submit/route.ts');
   const gate = read('app/components/PredictMatchSubmission.tsx');
+  const preview = read('app/predict-preview/page.tsx');
   const mediaMatchPage = read('app/match/[id]/page.tsx');
   assert.match(helper, /predictionHost === 'predict\.factsport\.com'/);
   assert.match(helper, /host === predictionHost/);
   assert.match(route, /FACTSPORT_PRIVATE_PRODUCT_HOST/);
-  assert.match(gate, /requestHost !== configuredHost/);
+  assert.match(gate, /configuredHost === 'predict\.factsport\.com' && requestHost === configuredHost/);
   assert.match(gate, /FACTSPORT_PREDICTION_SUBMISSION_READY/);
+  assert.match(gate, /isStagingPreviewHost/);
+  assert.match(preview, /FACTSPORT_ENVIRONMENT !== 'staging'/);
+  assert.match(preview, /factsport-v2-staging/);
+  assert.match(preview, /robots: \{ index: false/);
   assert.match(mediaMatchPage, /PredictMatchSubmission/);
   assert.doesNotMatch(mediaMatchPage, /PublicPredictionSubmit|PredictionBoard|WinProbability/);
 });
