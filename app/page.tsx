@@ -7,6 +7,7 @@ import { listPostgresMatchesWindow } from '@/lib/adapters/postgres-matches';
 import { listPublicFeaturedMatches, listPublicMatchHighlights } from '@/lib/adapters/postgres-homepage';
 import Link from "next/link";
 import { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { ArrowRight, Youtube, Newspaper, Award, Trophy } from "lucide-react";
 
 import HeadlinesSlider from '@/app/components/HeadlinesSlider';
@@ -17,10 +18,34 @@ import HighlightsSlider from '@/app/components/HighlightsSlider';
 import MiniStandings from '@/app/components/MiniStandings'; 
 import HomeDashboardClient from '@/app/components/HomeDashboardClient'; 
 
-export const metadata: Metadata = {
-  title: 'FactSport | Football News, Live Scores & Match Analysis',
-  description: 'Football news, live scores, fixtures, match analysis and highlights from leagues around the world.',
-};
+async function isPrivateProductRequest(): Promise<boolean> {
+  const rawPrivateHost = (process.env.FACTSPORT_PRIVATE_PRODUCT_HOST || '').trim();
+  if (!rawPrivateHost) return false;
+  let privateHost = '';
+  try {
+    privateHost = new URL(rawPrivateHost.includes('://') ? rawPrivateHost : `https://${rawPrivateHost}`).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  const requestHeaders = await headers();
+  const requestHost = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '')
+    .split(',')[0].trim().toLowerCase().split(':')[0];
+  return Boolean(privateHost && requestHost && requestHost === privateHost);
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  if (await isPrivateProductRequest()) {
+    return {
+      title: 'FactSport Predict | Match Predictions',
+      description: 'Sign in to your FactSport Predict account.',
+      robots: { index: false, follow: false, noarchive: true, nosnippet: true },
+    };
+  }
+  return {
+    title: 'FactSport | Football News, Live Scores & Match Analysis',
+    description: 'Football news, live scores, fixtures, match analysis and highlights from leagues around the world.',
+  };
+}
 
 const LIVE_STATUSES = ['LIVE', 'IN_PLAY', 'IN', '1H', '2H', 'HT', 'HALFTIME', 'ET', 'EXTRA TIME', 'P', 'PENALTIES'];
 const FINISHED_STATUSES = ['FT', 'FINISHED', 'POST', 'ENDED', 'FULL TIME', 'AET', 'PEN', 'AWARDED', 'ABD'];
@@ -142,6 +167,7 @@ async function getHomepageData(leagueFilter: string | undefined) {
 
 export default async function Home({ searchParams }: { searchParams: { league?: string } }) {
   const resolvedParams = await searchParams;
+  if (await isPrivateProductRequest()) return <PredictionEntryPage />;
   const selectedLeague = resolvedParams.league;
     
   const { matches, news, highlights, featuredMatches } = await getHomepageData(selectedLeague);
@@ -201,5 +227,27 @@ export default async function Home({ searchParams }: { searchParams: { league?: 
           </a>
       </div>
     </div>
+  );
+}
+
+function PredictionEntryPage() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#0a1428] px-5 py-12 text-white">
+      <section className="w-full max-w-xl rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl backdrop-blur-sm md:p-10">
+        <p className="text-xs font-black uppercase tracking-[.22em] text-blue-300">FactSport Predict</p>
+        <h1 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">Your predictions, in one place.</h1>
+        <p className="mt-4 max-w-lg text-sm leading-6 text-slate-300 md:text-base">
+          Sign in to continue to your Prediction account, or create an account to get started.
+        </p>
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-blue-600 px-6 text-sm font-extrabold text-white transition hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200">
+            Sign in
+          </Link>
+          <Link href="/register" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/20 bg-white/5 px-6 text-sm font-extrabold text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+            Create account
+          </Link>
+        </div>
+      </section>
+    </main>
   );
 }
