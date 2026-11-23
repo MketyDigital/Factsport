@@ -1,0 +1,125 @@
+'use client';
+
+import { useState } from 'react';
+import { Activity, CircleDot, ListVideo, ShieldCheck, Users } from 'lucide-react';
+
+const scenes = [
+  { id: 'opening', label: '3D opening', eyebrow: 'MATCH STORY', type: 'stadium', Icon: ListVideo },
+  { id: 'lineups', label: '2D lineups', eyebrow: 'TEAM SHAPE', type: 'lineup', Icon: Users },
+  { id: 'event', label: 'Illustrative 3D', eyebrow: 'KEY MOMENT', type: 'illustration', Icon: CircleDot },
+  { id: 'statistics', label: '2D statistics', eyebrow: 'MATCH NUMBERS', type: 'stats', Icon: Activity },
+  { id: 'closing', label: '2D closing', eyebrow: 'FULL TIME', type: 'closing', Icon: ShieldCheck },
+] as const;
+
+function StadiumScene() {
+  return (
+    <div className="fs-tv-stage fs-tv-stadium relative flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 p-5 md:p-8">
+      <div className="fs-tv-light absolute inset-0" />
+      <div className="fs-tv-stands absolute inset-x-[8%] top-[12%] h-[22%] rounded-[50%] border border-cyan-100/25 bg-[repeating-linear-gradient(90deg,rgba(147,197,253,.11)_0_2px,transparent_2px_10px)] shadow-[0_0_50px_rgba(34,211,238,.14)]" />
+      <div className="fs-tv-field relative z-10 aspect-[16/7] w-full max-w-3xl overflow-hidden rounded-[45%] border border-emerald-100/60 bg-[linear-gradient(90deg,#16734f_0_12.5%,#198159_12.5%_25%,#16734f_25%_37.5%,#198159_37.5%_50%,#16734f_50%_62.5%,#198159_62.5%_75%,#16734f_75%_87.5%,#198159_87.5%)] shadow-[0_25px_65px_rgba(2,6,23,.5)]">
+        <div className="absolute inset-[8%] rounded-[42%] border border-white/60" />
+        <div className="absolute left-1/2 top-0 h-full border-l border-white/60" />
+        <div className="absolute left-1/2 top-1/2 aspect-square w-[23%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60" />
+        <div className="absolute left-[8%] top-[27%] h-[46%] w-[12%] border border-white/60" />
+        <div className="absolute right-[8%] top-[27%] h-[46%] w-[12%] border border-white/60" />
+        <div className="fs-tv-orbit absolute left-[39%] top-[45%] h-3 w-3 rounded-full bg-white shadow-[0_0_18px_white] md:h-4 md:w-4" />
+      </div>
+      <span className="absolute bottom-3 left-4 z-20 rounded-full border border-cyan-100/20 bg-slate-950/70 px-3 py-1 text-[9px] font-black uppercase tracking-[.18em] text-cyan-100">Abstract scene · no match data</span>
+    </div>
+  );
+}
+
+function LineupScene() {
+  const points = ['18% 28%', '18% 50%', '18% 72%', '37% 20%', '37% 40%', '37% 60%', '37% 80%', '60% 30%', '60% 50%', '60% 70%', '82% 50%'];
+  return (
+    <div className="fs-tv-stage flex flex-col justify-center gap-4 rounded-2xl border border-white/10 bg-slate-950/80 p-5 md:p-8">
+      <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[.2em] text-emerald-100"><span>2D tactical board</span><span>Example shape · 4-3-3</span></div>
+      <div className="relative mx-auto aspect-[16/8] w-full max-w-3xl overflow-hidden rounded-xl border border-white/50 bg-[linear-gradient(90deg,#166534,#15803d)] shadow-2xl">
+        <div className="absolute inset-[5%] rounded-lg border border-white/35" />
+        <div className="absolute left-1/2 top-0 h-full border-l border-white/35" />
+        <div className="absolute left-1/2 top-1/2 aspect-square w-[22%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/35" />
+        {points.map((point, i) => {
+          const [left, top] = point.split(' ');
+          return <span key={i} className="absolute grid h-6 w-6 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-white/80 bg-cyan-400 text-[9px] font-black text-slate-950 shadow-[0_3px_12px_rgba(2,6,23,.4)] md:h-8 md:w-8 md:text-[10px]" style={{ left, top }}>{i + 1}</span>;
+        })}
+      </div>
+      <p className="text-center text-[10px] text-slate-300">Position markers are a layout sample; player identities and formations require verified lineup data.</p>
+    </div>
+  );
+}
+
+function IllustrationScene() {
+  return (
+    <div className="fs-tv-stage relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border border-amber-200/20 bg-[radial-gradient(ellipse_at_50%_110%,rgba(6,95,70,.55),transparent_55%),linear-gradient(145deg,#0f172a,#020617)] p-8 text-center">
+      <div className="absolute inset-x-[12%] bottom-[16%] h-[2px] bg-gradient-to-r from-transparent via-amber-200/50 to-transparent" />
+      <span className="fs-tv-ball relative grid h-16 w-16 place-items-center rounded-full border border-white/30 bg-[radial-gradient(circle_at_30%_25%,white,#cbd5e1_55%,#475569)] text-3xl shadow-[0_0_35px_rgba(255,255,255,.2)]" aria-hidden="true">⚽</span>
+      <p className="relative mt-6 text-sm font-black text-white">Illustrative match scene</p>
+      <p className="relative mt-2 max-w-md text-xs leading-5 text-slate-300">Any reconstructed action will be disclosed as a visualization and linked to verified source facts before an episode can be approved.</p>
+      <span className="relative mt-4 rounded-full border border-amber-200/30 bg-amber-300/10 px-3 py-1 text-[9px] font-black uppercase tracking-[.17em] text-amber-100">Not footage · not a real goal</span>
+    </div>
+  );
+}
+
+function StatsScene() {
+  return (
+    <div className="fs-tv-stage flex flex-col justify-center rounded-2xl border border-white/10 bg-slate-950/85 p-6 md:p-10">
+      <p className="text-center text-[10px] font-black uppercase tracking-[.22em] text-cyan-100">Verified match statistics</p>
+      <div className="mx-auto mt-7 grid w-full max-w-2xl grid-cols-[1fr_auto_1fr] items-center gap-3">
+        <div className="space-y-4 text-right text-xs font-bold text-white"><div>Home team</div><div>Possession</div><div>Total shots</div><div>Corners</div></div>
+        <div className="space-y-4 text-center text-xs font-black tabular-nums text-slate-300"><div>—</div><div>—</div><div>—</div><div>—</div></div>
+        <div className="space-y-4 text-left text-xs font-bold text-white"><div>Away team</div><div>Unknown</div><div>Unknown</div><div>Unknown</div></div>
+      </div>
+      <p className="mt-7 text-center text-[10px] text-slate-400">Missing values stay unknown; this preview does not invent statistics.</p>
+    </div>
+  );
+}
+
+function SceneView({ type }: { type: (typeof scenes)[number]['type'] }) {
+  if (type === 'stadium') return <StadiumScene />;
+  if (type === 'lineup') return <LineupScene />;
+  if (type === 'illustration') return <IllustrationScene />;
+  return <StatsScene />;
+}
+
+export default function TVStoryboardPreview() {
+  const [active, setActive] = useState(0);
+  const scene = scenes[active];
+  return (
+    <div className="space-y-6">
+      <header className="rounded-3xl border border-slate-800 bg-[radial-gradient(ellipse_at_85%_0%,rgba(37,99,235,.35),transparent_42%),linear-gradient(145deg,#0f172a,#020617)] p-6 text-white shadow-2xl md:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div><p className="text-[10px] font-black uppercase tracking-[.24em] text-cyan-200">Factsport TV · Match Story</p><h1 className="mt-2 text-2xl font-black tracking-tight md:text-3xl">Storyboard preview</h1><p className="mt-2 max-w-2xl text-xs leading-5 text-slate-300">A visual prototype for the 2D data scenes and disclosed illustrative 3D direction. It is disconnected from match feeds, rendering jobs and social accounts.</p></div>
+          <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[.15em] text-amber-100">Preview only · not publishable</span>
+        </div>
+      </header>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(290px,.7fr)]">
+        <section aria-label="Storyboard scene preview" className="min-w-0 rounded-3xl border border-slate-200 bg-slate-900 p-3 shadow-xl md:p-5">
+          <div className="mb-3 flex items-center justify-between gap-3 px-1 text-[10px] font-black uppercase tracking-[.16em] text-slate-300"><span>{scene.eyebrow}</span><span>Scene {active + 1} / {scenes.length}</span></div>
+          <SceneView type={scene.type} />
+          <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Storyboard scenes">
+            {scenes.map(({ id, label, Icon }, index) => <button key={id} type="button" role="tab" aria-selected={index === active} onClick={() => setActive(index)} className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${index === active ? 'border-cyan-300/50 bg-cyan-300/15 text-cyan-100' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}><Icon size={14}/>{label}</button>)}
+          </div>
+        </section>
+
+        <aside className="space-y-4">
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="font-black text-slate-900">Production readiness</h2>
+            <ul className="mt-4 space-y-3 text-xs">
+              <li className="flex items-start justify-between gap-3"><span className="text-slate-600">Evidence-linked scene planner</span><span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 font-bold text-emerald-700">Implemented</span></li>
+              <li className="flex items-start justify-between gap-3"><span className="text-slate-600">Video renderer and durable jobs</span><span className="shrink-0 rounded-full bg-amber-50 px-2 py-1 font-bold text-amber-800">In progress</span></li>
+              <li className="flex items-start justify-between gap-3"><span className="text-slate-600">Rights-cleared match assets</span><span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 font-bold text-slate-700">Required</span></li>
+              <li className="flex items-start justify-between gap-3"><span className="text-slate-600">YouTube private-first adapter</span><span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 font-bold text-emerald-700">Implemented</span></li>
+              <li className="flex items-start justify-between gap-3"><span className="text-slate-600">YouTube channel authorization</span><span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 font-bold text-slate-700">Not connected</span></li>
+              <li className="flex items-start justify-between gap-3"><span className="text-slate-600">Other social dispatch and review outbox</span><span className="shrink-0 rounded-full bg-amber-50 px-2 py-1 font-bold text-amber-800">In progress</span></li>
+            </ul>
+          </section>
+          <section className="rounded-2xl border border-cyan-200 bg-cyan-50 p-5">
+            <h2 className="text-sm font-black text-cyan-950">Publishing stays human-reviewed</h2>
+            <p className="mt-2 text-xs leading-5 text-cyan-900">The YouTube adapter uploads privately first. No public post can be sent from this preview. Each episode still needs cleared sources/assets, an approved edit and channel authorization.</p>
+          </section>
+        </aside>
+      </div>
+    </div>
+  );
+}

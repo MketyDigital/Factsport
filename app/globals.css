@@ -105,6 +105,39 @@ body {
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
 
+.fs-tv-stage {
+  min-height: 250px;
+  perspective: 1100px;
+}
+
+.fs-tv-field {
+  transform: perspective(1100px) rotateX(22deg) rotateY(-2deg);
+  transform-origin: center bottom;
+}
+
+.fs-tv-light {
+  background: radial-gradient(ellipse at 50% 0%, rgb(34 211 238 / 18%), transparent 55%);
+  animation: fs-stadium-glow 8s ease-in-out infinite alternate;
+}
+
+.fs-tv-orbit {
+  animation: fs-tv-ball-drift 5s ease-in-out infinite alternate;
+}
+
+.fs-tv-ball {
+  animation: fs-tv-ball-float 2.8s ease-in-out infinite alternate;
+}
+
+@keyframes fs-tv-ball-drift {
+  from { translate: -6px 4px; }
+  to { translate: 6px -4px; }
+}
+
+@keyframes fs-tv-ball-float {
+  from { transform: translateY(2px) rotate(-4deg); }
+  to { transform: translateY(-5px) rotate(4deg); }
+}
+
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .fs-match-timeline-entry:hover .fs-match-timeline-card {
     transform: perspective(600px) translateZ(5px);
@@ -126,4 +159,5 @@ body {
   .fs-match-light { animation: none; }
   .fs-match-timeline-entry { animation: none; }
   .fs-match-timeline-card { transition: none; }
+  .fs-tv-light, .fs-tv-orbit, .fs-tv-ball { animation: none; }
 }
