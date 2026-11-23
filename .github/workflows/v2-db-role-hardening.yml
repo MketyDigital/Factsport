@@ -65,7 +65,7 @@ jobs:
             }
       - name: Deploy temporary role-hardening Worker
         id: deploy
-        run: npx --yes wrangler@4 deploy --config wrangler.factsport-db-role-hardening.jsonc
+        run: npx --yes wrangler@4.158.0 deploy --config wrangler.factsport-db-role-hardening.jsonc
       - name: Install ephemeral hardening token
         shell: bash
         run: |
@@ -73,7 +73,7 @@ jobs:
           TOKEN="$(openssl rand -hex 32)"
           echo "::add-mask::$TOKEN"
           printf 'FACTSPORT_HARDEN_TOKEN=%s\n' "$TOKEN" >> "$GITHUB_ENV"
-          printf '%s' "$TOKEN" | npx --yes wrangler@4 secret put FACTSPORT_HARDEN_TOKEN \
+          printf '%s' "$TOKEN" | npx --yes wrangler@4.158.0 secret put FACTSPORT_HARDEN_TOKEN \
             --config wrangler.factsport-db-role-hardening.jsonc
           sleep 10
       - name: Apply and verify least-privilege staging roles
