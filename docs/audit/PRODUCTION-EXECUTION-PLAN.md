@@ -501,3 +501,10 @@ Staging verified the read-only match-detail runtime probe, PostgreSQL-backed `/m
 Migrations 0006, 0007 and 0024/0025 were reviewed for least-privilege public read views. The V2 Cloudflare staging Worker now enables PostgreSQL editorial and homepage read gates with the existing dedicated editorial and reader Hyperdrive bindings. The one-click workflow checks protected `/` and `/news` rendering in addition to the established match/detail/share-card/Entra boundary checks.
 
 Exact-head isolated verification [45045456878](https://github.com/MketyDigital/Factsport/actions/runs/45045456878) and staging build/deploy [45045456852](https://github.com/MketyDigital/Factsport/actions/runs/45045456852) passed on `2c79d0fec4072c57654be8d8b4aebb16fa5e7e6c`. This validates the server render paths, not that new editorial/highlight/featured data has been ingested or that visual, mobile, accessibility, crawler, rights, provider and editor-authorization acceptance is complete. Competition standings remain disabled pending data verification. No production routes or DNS, legacy system, or Logic App changed.
+
+
+## 2026-11-23 progress addendum — M91
+
+The V2 branch now has deterministic npm installs (`package-lock.json`, 16 V2 workflows using `npm ci`). Local tests, TypeScript, and Vinext build passed; exact-commit staging app/build/migration/import/R2/ESPN-preview checks passed. Staging role hardening and a post-hardening read-only catalog audit passed on the current V2 head. The audit now verifies the full 51-entry, checksummed migration ledger (versions 0–50) and fails closed if incomplete. Evidence and exact links are in [M91](./handoffs/M91-DETERMINISTIC-CI-STAGING-LEDGER.md).
+
+This does not close P9A. Real Entra editor membership/RBAC/publish acceptance, complete public Media parity and visual/accessibility/rights/SEO/CWV review, provider-fed lifecycle/standings, V2 backup/PITR/restore, route/DNS rollback rehearsal, load/security, and owner legal/AdSense decisions remain open. Keep production cutover blocked until all P9A evidence is complete and the written Media-only go/no-go is recorded. Prediction P9B and TV P10 remain separate.
