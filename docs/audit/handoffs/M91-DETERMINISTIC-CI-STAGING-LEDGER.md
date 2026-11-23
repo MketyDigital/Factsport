@@ -16,7 +16,7 @@ Audited the current V2 handoff, roadmap, production execution plan, acceptance c
 
 ## Still open — production is not cutover-ready
 
-- Real Entra editor sign-in, issuer+subject membership, effective RBAC, and authorized draft/review/publish/unpublish/logout with denial tests.
+- Entra sign-up is already complete; the owner confirms the account is visible in both the main Microsoft directory and the Factsport directory. Still required: the same account must complete the Factsport callback/session, resolve its exact issuer+subject in `external_identities`, have an active publisher-capable `media_editorial_memberships` role, and pass CMS draft/review/publish/unpublish/logout plus denial checks. M82 recorded a browser callback blocked by middleware; the later synthetic staging check is not the real account round trip. Do not ask the owner to register again.
 - Complete public Media route/feed/content/lifecycle parity and desktop/mobile visual, accessibility, SEO/crawler, rights, and Core Web Vitals acceptance; populated newsroom/highlight/featured content and provider-fed standings remain unproven.
 - Full ESPN-linked match lifecycle, correction behavior, and schedule/score/settlement separation under runtime checks.
 - V2-target backup/PITR/restore and route/DNS/rollback rehearsal; load and security acceptance.
@@ -27,7 +27,7 @@ No production Worker/domain/DNS/database, main branch, legacy deployment, AdSens
 
 ## Next sequence
 
-1. Complete the real staging Entra editor membership/RBAC/publish journey and its negative cases.
+1. Re-test the owner's already-registered Entra account through the corrected staging callback, verify exact identity mapping and active publisher role, then complete the CMS lifecycle and denial cases.
 2. Finish the public Media route, data, rights, responsive, accessibility, crawler, and live-provider acceptance matrix.
 3. Execute staging backup/PITR/restore and route/DNS rollback rehearsal, then load/security checks.
 4. Reconcile each remaining P9A acceptance row with a run/page/result reference; prepare the exact Cloudflare release and rollback package.
