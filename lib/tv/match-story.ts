@@ -34,6 +34,7 @@ export type MatchStoryScene = {
 
 export type MatchStoryPlan = {
   status: 'draft' | 'blocked_rights' | 'needs_data';
+  rights: { dataCleared: boolean; assetsCleared: boolean };
   matchId: string;
   title: string;
   score: string | null;
