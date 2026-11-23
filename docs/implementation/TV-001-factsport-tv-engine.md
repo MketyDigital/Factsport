@@ -76,13 +76,14 @@ Factsport TV is an internal modular subsystem of Factsport V2. It is a required 
 - Do not mass-generate repetitive videos or publish automatically before separate written approval.
 - Do not treat open-source software as free compute/bandwidth, or assume commercial license for data, assets, voices or models.
 
-## Related gates
-
 ## 2026-11-23 — protected storyboard prototype
 
 - Added `/admin/tv` inside the existing authenticated Media workspace. It is noindex and read-only; the preview makes no match-feed, rendering-job, storage, or social-account requests.
 - Added selectable abstract scenes: CSS-perspective stadium opener, a clearly marked example 2D formation, an illustrative action disclosure, unknown-safe statistics, and an outro. The page explicitly says it is not publishable and includes the current renderer, rights, OAuth, and outbox readiness gaps.
 - This is a visual design prototype, not a video renderer or publishing outbox. It does not establish source licensing or authorize a social post.
+- Exact head `e86690f8488dbf25534eda60864e49a12929852c` passed isolated verification [45220923630](https://github.com/MketyDigital/Factsport/actions/runs/45220923630), native Cloudflare build [45220923394](https://github.com/MketyDigital/Factsport/actions/runs/45220923394), and protected staging [45220923298](https://github.com/MketyDigital/Factsport/actions/runs/45220923298). The TV page is deployed but not yet browser-reviewed with an authorized editor session.
+
+## Related gates
 
 - Roadmap: `docs/audit/ROADMAP.md` M78
 - Release plan: `docs/audit/PRODUCTION-EXECUTION-PLAN.md` P9A/P9B/P9C/P10
