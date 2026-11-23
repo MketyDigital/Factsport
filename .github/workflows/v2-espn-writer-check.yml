@@ -51,7 +51,7 @@ jobs:
         with:
           node-version: '22'
       - name: Install Worker dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Deploy temporary private connection verifier
         id: deploy
         run: npx --yes wrangler@4 deploy --config wrangler.factsport-espn-writer-check.jsonc

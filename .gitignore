@@ -12,7 +12,6 @@
 
 # Production
 /build
-package-lock.json
 
 
 # Misc

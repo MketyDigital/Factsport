@@ -49,7 +49,7 @@ jobs:
       - name: Install dependencies and generate the checked-in migration bundle
         run: |
           set -euo pipefail
-          npm install --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
           node scripts/generate-factsport-migration-chain.cjs
           npm run typecheck
       - name: Verify exact Azure PostgreSQL admin Hyperdrive

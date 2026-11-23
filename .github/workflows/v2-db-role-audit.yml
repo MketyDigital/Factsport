@@ -46,7 +46,7 @@ jobs:
           node-version: '22'
       - name: Install Worker dependencies and typecheck
         run: |
-          npm install --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
           npm run typecheck
       - name: Verify the exact administrator Hyperdrive identity
         shell: bash

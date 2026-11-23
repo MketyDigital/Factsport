@@ -52,7 +52,7 @@ jobs:
         with:
           node-version: '22'
       - name: Install dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Run Factsport regression suite
         run: npm run test:engine
       - name: Check Typescript

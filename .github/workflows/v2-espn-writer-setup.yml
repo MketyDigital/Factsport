@@ -63,7 +63,7 @@ jobs:
           node-version: '22'
       - name: Validate bootstrap Worker syntax and dependencies
         run: |
-          npm install --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
           npx tsc --noEmit
       - name: Refuse existing ESPN role Hyperdrive name
         shell: bash

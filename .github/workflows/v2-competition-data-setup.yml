@@ -68,7 +68,7 @@ jobs:
       - name: Install dependencies and verify competition contracts
         run: |
           set -euo pipefail
-          npm install --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
           node --test tests/factsport-competition-ingestion.test.mjs tests/factsport-competition-worker.test.mjs
           node --check workers/factsport-competition-sync.mjs
           npm run typecheck

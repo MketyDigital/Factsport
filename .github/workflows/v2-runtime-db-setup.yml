@@ -67,7 +67,7 @@ jobs:
         with:
           node-version: '22'
       - name: Install minimal dependencies for temporary Workers
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Refuse duplicate runtime Hyperdrive configuration
         shell: bash
         run: |

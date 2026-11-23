@@ -42,7 +42,7 @@ jobs:
         with:
           node-version: '22'
       - name: Install committed dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Existing engine regression tests
         run: npm run test:engine
       - name: Isolated ingestion regression tests

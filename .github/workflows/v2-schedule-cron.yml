@@ -59,7 +59,7 @@ jobs:
           node --check workers/factsport-schedule-sync.mjs
           node --test tests/factsport-schedule.test.mjs
       - name: Install dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Deploy staging schedule-only Worker with UTC Cron
         shell: bash
         run: |

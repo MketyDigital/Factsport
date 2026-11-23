@@ -51,7 +51,7 @@ jobs:
       - name: Run schedule normalizer regression tests
         run: node --test tests/factsport-schedule.test.mjs
       - name: Install Wrangler in disposable runner
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Rotate one-time staging access token
         shell: bash
         run: |

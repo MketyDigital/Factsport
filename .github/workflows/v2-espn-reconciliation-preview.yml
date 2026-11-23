@@ -47,7 +47,7 @@ jobs:
       - name: Check reconciliation Worker syntax
         run: node --check workers/factsport-espn-reconciliation-preview.mjs
       - name: Install Worker dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Deploy temporary protected reconciliation preview
         id: deploy
         run: npx --yes wrangler@4 deploy --config wrangler.factsport-espn-reconciliation-preview.jsonc
