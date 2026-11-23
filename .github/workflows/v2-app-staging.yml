@@ -223,12 +223,24 @@ jobs:
           }
           echo "Factsport native vinext app: authorized Hyperdrive and R2 dependency check passed"
 
-          DB_PREFLIGHT_STATUS="$(curl --silent --show-error --max-time 30 \
-            -o /tmp/factsport-staging-db-preflight.json -w '%{http_code}' \
-            -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
-            "$BASE/api/v2/staging/db-preflight")"
-          if [ "$DB_PREFLIGHT_STATUS" != "200" ] || ! jq -e '.ok == true and .targetDatabaseMatches == true and .tlsEnabled == true and .editorialRuntime.ready == true and .matchDetailReader.ready == true and .matchDetailRuntimeProbe.ready == true and .competitionReadModel.ready == true' \
-            /tmp/factsport-staging-db-preflight.json >/dev/null 2>&1; then
+          DB_PREFLIGHT_READY=false
+          DB_PREFLIGHT_STATUS=000
+          for attempt in 1 2 3 4 5; do
+            DB_PREFLIGHT_STATUS="$(curl --silent --show-error --max-time 30 \
+              -o /tmp/factsport-staging-db-preflight.json -w '%{http_code}' \
+              -H "x-factsport-staging-token: $FACTSPORT_STAGING_TOKEN" \
+              "$BASE/api/v2/staging/db-preflight" || true)"
+            if [ "$DB_PREFLIGHT_STATUS" = "200" ] && jq -e '.ok == true and .targetDatabaseMatches == true and .tlsEnabled == true and .editorialRuntime.ready == true and .matchDetailReader.ready == true and .matchDetailRuntimeProbe.ready == true and .competitionReadModel.ready == true' \
+              /tmp/factsport-staging-db-preflight.json >/dev/null 2>&1; then
+              DB_PREFLIGHT_READY=true
+              break
+            fi
+            BODY_CLASS="$(head -c 120 /tmp/factsport-staging-db-preflight.json 2>/dev/null | tr '\\n' ' ' | tr -cd '[:print:]' || true)"
+            CODE="$(jq -r '.error // "non-json"' /tmp/factsport-staging-db-preflight.json 2>/dev/null || echo non-json)"
+            echo "Authorized staging database preflight $attempt: HTTP $DB_PREFLIGHT_STATUS; code $CODE; body=$BODY_CLASS"
+            sleep 4
+          done
+          if [ "$DB_PREFLIGHT_READY" != "true" ]; then
             DB_DIAGNOSTICS="$(jq -c '{ok,error,phase,sqlState,errorClass,errorHint,targetDatabaseMatches,tlsEnabled,editorialRuntime,matchDetailReader,matchDetailRuntimeProbe,competitionReadModel}' \
               /tmp/factsport-staging-db-preflight.json 2>/dev/null || echo '{}')"
             echo "::error::Read-only database preflight failed through staging Hyperdrive (HTTP $DB_PREFLIGHT_STATUS; $DB_DIAGNOSTICS)."

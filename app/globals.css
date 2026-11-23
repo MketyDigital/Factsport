@@ -61,3 +61,36 @@ body {
     transform: none;
   }
 }
+
+/* Decorative pitch perspective keeps match information as the visual focus. */
+.fs-match-pitch {
+  color: rgb(186 230 253 / 20%);
+  mask-image: linear-gradient(to top, #000 0%, rgb(0 0 0 / 68%) 55%, transparent 100%);
+  perspective: 900px;
+}
+
+.fs-match-pitch svg {
+  max-width: 1000px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  transform: perspective(900px) rotateX(34deg) scale(1.12);
+}
+
+.fs-match-light {
+  background: radial-gradient(ellipse at 50% 115%, rgb(34 211 238 / 11%), transparent 58%);
+  animation: fs-stadium-glow 9s ease-in-out infinite alternate;
+}
+
+.fs-match-score {
+  transform: perspective(700px) translateZ(0);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%), 0 14px 35px rgb(2 6 23 / 24%);
+}
+
+@keyframes fs-stadium-glow {
+  from { opacity: .48; transform: scaleX(.92); }
+  to { opacity: 1; transform: scaleX(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fs-match-light { animation: none; }
+}

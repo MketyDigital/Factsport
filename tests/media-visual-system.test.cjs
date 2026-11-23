@@ -107,3 +107,14 @@ test('existing 2D pitch gains gentle depth without losing starters or substitute
   assert.match(pitch, /role="group"/);
   assert.doesNotMatch(pitch, /cursor-pointer animate-in zoom-in/);
 });
+
+test('match scoreboard uses a decorative 2D pitch and reduced-motion-safe stadium lighting', () => {
+  const header = read('app/components/MatchHeaderClient.tsx');
+  const css = read('app/globals.css');
+  assert.match(header, /fs-match-pitch/);
+  assert.match(header, /aria-hidden="true"/);
+  assert.match(header, /fs-match-score/);
+  assert.match(css, /\.fs-match-pitch svg/);
+  assert.match(css, /@keyframes fs-stadium-glow/);
+  assert.match(css, /prefers-reduced-motion: reduce[\s\S]*?\.fs-match-light \{\s*animation: none/);
+});

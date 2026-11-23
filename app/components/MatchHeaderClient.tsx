@@ -86,6 +86,13 @@ export default function MatchHeaderClient({ dbData }: any) {
           <div className="absolute inset-0 z-0 pointer-events-none" aria-hidden="true">
               <img src={leagueData.bg} alt="" decoding="async" fetchPriority="high" loading="eager" className="absolute inset-0 w-full h-full object-cover opacity-25" />
               <div className="absolute inset-0 bg-gradient-to-b from-[#0a1428]/60 via-[#0a1428]/50 to-[#0a1428]/90" />
+              <div className="fs-match-pitch absolute inset-x-0 bottom-0 flex items-center justify-center overflow-hidden" aria-hidden="true">
+                  <svg viewBox="0 0 900 260" preserveAspectRatio="xMidYMid slice" className="h-full w-full" fill="none">
+                      <path d="M-40 20h980v310H-40zM450 20v310M450 102a73 73 0 1 0 0 146 73 73 0 0 0 0-146ZM-40 70h145v210H-40zM795 70h145v210H795zM105 112h62v126h-62zM733 112h62v126h-62z" />
+                      <circle cx="450" cy="175" r="4" fill="currentColor" />
+                  </svg>
+              </div>
+              <div className="fs-match-light absolute inset-0" />
           </div>
 
           <div className="relative z-10 px-3 py-5 md:px-6 md:py-8">
@@ -131,7 +138,7 @@ export default function MatchHeaderClient({ dbData }: any) {
                            <div className="py-2 text-2xl font-black italic tracking-widest text-white/45 md:text-4xl">VS</div>
                       ) : (
                           <div className="mt-1 flex flex-col items-center">
-                              <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-4 py-1 text-4xl font-black tracking-tight text-white shadow-inner md:gap-4 md:px-7 md:py-2 md:text-6xl" aria-label={`${homeTeamName} ${homeScore ?? 'score unavailable'} to ${awayScore ?? 'score unavailable'} ${awayTeamName}`} aria-live="polite">
+                              <div className="fs-match-score flex items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-4 py-1 text-4xl font-black tracking-tight text-white shadow-inner md:gap-4 md:px-7 md:py-2 md:text-6xl" aria-label={`${homeTeamName} ${homeScore ?? 'score unavailable'} to ${awayScore ?? 'score unavailable'} ${awayTeamName}`} aria-live="polite">
                                   <span className={`tabular-nums transition-all duration-300 ${homeFlash ? 'scale-110 text-green-400' : 'text-white'}`}>{homeScore ?? '–'}</span>
                                   <span className="text-2xl font-semibold text-white/35 md:text-4xl">:</span>
                                   <span className={`tabular-nums transition-all duration-300 ${awayFlash ? 'scale-110 text-green-400' : 'text-white'}`}>{awayScore ?? '–'}</span>

@@ -73,7 +73,11 @@ test('protected staging preflight verifies every grant needed by PostgreSQL matc
   assert.match(preflight, /getPostgresMatchPlaybackById/);
   assert.match(preflight, /getPostgresTeamForm/);
   assert.match(preflight, /getExternalData/);
-  assert.match(read('.github/workflows/v2-app-staging.yml'), /\.matchDetailReader\.ready == true and \.matchDetailRuntimeProbe\.ready == true/);
+  const workflow = read('.github/workflows/v2-app-staging.yml');
+  assert.match(workflow, /\.matchDetailReader\.ready == true and \.matchDetailRuntimeProbe\.ready == true/);
+  assert.match(workflow, /DB_PREFLIGHT_READY=false[\s\S]*for attempt in 1 2 3 4 5/);
+  assert.match(workflow, /Authorized staging database preflight \$attempt/);
+  assert.match(workflow, /DB_PREFLIGHT_READY/);
 });
 
 test('public Media match API strips Prediction output and bounds team-form reads to recent matches', () => {
