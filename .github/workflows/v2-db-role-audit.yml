@@ -1,6 +1,6 @@
 name: Factsport v2 staging PostgreSQL role audit (read-only)
 
-# Temporary Cloudflare Worker; admin Hyperdrive is used only for SELECT catalog introspection.
+# Post-hardening verification uses a temporary Cloudflare Worker; admin Hyperdrive is read-only SELECT catalog introspection.
 # Does not modify roles, grants, data, migrations, or production resources.
 on:
   workflow_dispatch:
