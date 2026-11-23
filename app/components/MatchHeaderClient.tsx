@@ -55,6 +55,8 @@ export default function MatchHeaderClient({ dbData }: any) {
 
   const homeTeamName = dbData?.home_team || '';
   const awayTeamName = dbData?.away_team || '';
+  const homeScore = liveData?.home_score ?? dbData?.home_score ?? null;
+  const awayScore = liveData?.away_score ?? dbData?.away_score ?? null;
   const formattedDate = dbData?.match_date ? new Date(dbData.match_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
   
   let refName = null;
@@ -81,72 +83,72 @@ export default function MatchHeaderClient({ dbData }: any) {
   return (
     <>
       <div className="relative z-10 w-full overflow-hidden bg-[#0a1428]">
-          <div className="absolute inset-0 z-0 pointer-events-none">
-              <img src={leagueData.bg} alt="Stadium" decoding="async" fetchPriority="high" loading="eager" className="absolute inset-0 w-full h-full object-cover opacity-20" />
+          <div className="absolute inset-0 z-0 pointer-events-none" aria-hidden="true">
+              <img src={leagueData.bg} alt="" decoding="async" fetchPriority="high" loading="eager" className="absolute inset-0 w-full h-full object-cover opacity-25" />
               <div className="absolute inset-0 bg-gradient-to-b from-[#0a1428]/60 via-[#0a1428]/50 to-[#0a1428]/90" />
           </div>
 
-          <div className="relative z-10 px-2 py-2 md:py-3">
-              <div className="flex justify-between items-start max-w-lg mx-auto">
-                  <div className="flex flex-col items-center w-[30%]">
-                      <Link href={`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center group active:scale-95 transition-transform w-full">
-                          <div className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
-                              {dbData?.home_logo && <img src={dbData.home_logo} className="w-full h-full object-contain" alt="" />}
+          <div className="relative z-10 px-3 py-5 md:px-6 md:py-8">
+              <div className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2 md:gap-8">
+                  <div className="flex min-w-0 flex-col items-center">
+                      <Link href={`/matches?team=${encodeURIComponent(homeTeamName.replace(/['"]/g, ''))}`} className="group flex w-full flex-col items-center rounded-2xl p-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 active:scale-[.98]">
+                          <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/15 bg-white/10 p-2 shadow-lg backdrop-blur-sm md:h-20 md:w-20 md:p-3">
+                              {dbData?.home_logo && <img src={dbData.home_logo} className="h-full w-full object-contain drop-shadow-md" alt={`${homeTeamName} crest`} />}
                           </div>
-                          <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{homeTeamName}</h2>
+                          <h2 className="line-clamp-2 min-h-10 text-center text-sm font-extrabold leading-tight text-white drop-shadow-md md:min-h-12 md:text-lg">{homeTeamName}</h2>
                           {homeForm.length > 0 && (
-                              <div className="flex items-center gap-[2px] mt-1 drop-shadow-md">
+                              <div className="mt-2 flex items-center gap-1 drop-shadow-md" aria-label="Recent form">
                                   {homeForm.map((f: string, i: number) => (
-                                      <span key={i} className={`w-2 h-2 flex items-center justify-center text-[5px] font-black text-white rounded-sm ${f === 'W' ? 'bg-green-500' : f === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>{f}</span>
+                                      <span key={i} className={`flex h-4 w-4 items-center justify-center rounded text-[9px] font-black text-white ${f === 'W' ? 'bg-green-600' : f === 'L' ? 'bg-red-600' : 'bg-slate-500'}`}>{f}</span>
                                   ))}
                               </div>
                           )}
                       </Link>
                       {(isFinished || isLive) && homeGoals.length > 0 && (
-                          <div className="mt-2 flex flex-col items-center gap-0.5 max-w-full px-1">
+                          <div className="mt-2 flex max-w-full flex-col items-center gap-1 px-1">
                               {formatGoals(homeGoals).map((txt, i) => (
-                                  <span key={i} className="text-[6.5px] md:text-[7.5px] text-slate-300 font-bold leading-tight flex items-center gap-0.5 text-center drop-shadow-md break-words max-w-full">
-                                      <Zap size={6} className="text-yellow-400 fill-yellow-400 shrink-0"/> {txt}
+                                  <span key={i} className="flex max-w-full items-center gap-1 break-words text-center text-[10px] font-semibold leading-tight text-slate-200 drop-shadow-md md:text-xs">
+                                      <Zap size={12} className="shrink-0 fill-yellow-400 text-yellow-400"/> {txt}
                                   </span>
                               ))}
                           </div>
                       )}
                   </div>
                   
-                  <div className="flex flex-col items-center justify-start pt-2 w-[40%] drop-shadow-lg">
+                  <div className="flex min-w-[112px] flex-col items-center justify-start pt-1 drop-shadow-lg md:min-w-[190px]">
                       {isLive && (
-                          <div className="flex items-center gap-1 bg-red-600/90 text-white text-[8px] md:text-[9px] font-black px-2 py-0.5 rounded-sm animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.5)] mb-1">
-                              <span className="w-1 h-1 bg-white rounded-full"></span> {isHT ? 'HT' : 'LIVE'} {liveData?.displayClock && !isHT && <span className="text-red-200 ml-0.5">{liveData.displayClock}</span>}
+                          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-red-300/30 bg-red-600 px-3 py-1 text-[10px] font-black tracking-wider text-white shadow-[0_0_18px_rgba(220,38,38,0.3)] md:text-xs">
+                              <span className="h-2 w-2 animate-pulse rounded-full bg-white"></span> {isHT ? 'HALF TIME' : 'LIVE'} {liveData?.displayClock && !isHT && <span className="text-red-100">{liveData.displayClock}</span>}
                           </div>
                       )}
                       {!isLive && (
-                           <span className={`text-[8px] md:text-[9px] font-bold px-2 py-0.5 rounded-sm mb-1 shadow-md ${isFinished ? 'bg-slate-800/80 backdrop-blur text-slate-300' : 'bg-white/20 backdrop-blur text-white'}`}>
-                              {isFinished ? 'FT' : <MatchTime date={dbData?.match_date} />}
+                           <span className={`mb-2 rounded-full border px-3 py-1 text-[10px] font-extrabold tracking-wide shadow-md md:text-xs ${isFinished ? 'border-white/10 bg-slate-800/90 text-slate-200' : 'border-white/15 bg-white/15 text-white backdrop-blur'}`}>
+                              {isFinished ? 'FULL TIME' : isUpcoming ? <MatchTime date={dbData?.match_date} /> : currentStatus || 'MATCH'}
                            </span>
                       )}
 
                       {isUpcoming ? (
-                           <div className="text-xl md:text-2xl font-black text-white/30 italic">VS</div>
+                           <div className="py-2 text-2xl font-black italic tracking-widest text-white/45 md:text-4xl">VS</div>
                       ) : (
-                          <div className="flex flex-col items-center mt-1">
-                              <div className="text-2xl md:text-3xl font-black tracking-tighter flex gap-1 items-center drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
-                                  <span className={`transition-all duration-300 ${homeFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{liveData?.home_score ?? 0}</span>
-                                  <span className="text-white/40 text-xl md:text-2xl pb-1">-</span>
-                                  <span className={`transition-all duration-300 ${awayFlash ? 'text-green-400 scale-110' : 'text-white'}`}>{liveData?.away_score ?? 0}</span>
+                          <div className="mt-1 flex flex-col items-center">
+                              <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-4 py-1 text-4xl font-black tracking-tight text-white shadow-inner md:gap-4 md:px-7 md:py-2 md:text-6xl" aria-label={`${homeTeamName} ${homeScore ?? 'score unavailable'} to ${awayScore ?? 'score unavailable'} ${awayTeamName}`} aria-live="polite">
+                                  <span className={`tabular-nums transition-all duration-300 ${homeFlash ? 'scale-110 text-green-400' : 'text-white'}`}>{homeScore ?? '–'}</span>
+                                  <span className="text-2xl font-semibold text-white/35 md:text-4xl">:</span>
+                                  <span className={`tabular-nums transition-all duration-300 ${awayFlash ? 'scale-110 text-green-400' : 'text-white'}`}>{awayScore ?? '–'}</span>
                               </div>
                               
                               {hasHT && (
-                                  <span className="text-[9px] md:text-[10px] font-bold text-slate-400 drop-shadow-md mt-0.5">
+                                  <span className="mt-2 text-[10px] font-bold text-slate-300 drop-shadow-md md:text-xs">
                                       (HT: {homeHT}-{awayHT})
                                   </span>
                               )}
                               {hasPens && (
-                                  <span className="text-[10px] md:text-xs font-black text-amber-400 tracking-widest drop-shadow-md mt-0.5">
+                                  <span className="mt-2 text-[10px] font-black tracking-widest text-amber-300 drop-shadow-md md:text-xs">
                                       PENS: {homePens}-{awayPens}
                                   </span>
                               )}
                               {aggregateText && (
-                                  <span className="text-[8px] md:text-[9px] font-bold text-slate-300 uppercase tracking-widest mt-1 bg-white/10 px-2 py-0.5 rounded-sm">
+                                  <span className="mt-2 rounded-full bg-white/10 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-slate-200 md:text-[10px]">
                                       {aggregateText}
                                   </span>
                               )}
@@ -154,25 +156,25 @@ export default function MatchHeaderClient({ dbData }: any) {
                       )}
                   </div>
 
-                  <div className="flex flex-col items-center w-[30%]">
-                      <Link href={`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g, ''))}`} className="flex flex-col items-center group active:scale-95 transition-transform w-full">
-                          <div className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
-                              {dbData?.away_logo && <img src={dbData.away_logo} className="w-full h-full object-contain" alt="" />}
+                  <div className="flex min-w-0 flex-col items-center">
+                      <Link href={`/matches?team=${encodeURIComponent(awayTeamName.replace(/['"]/g, ''))}`} className="group flex w-full flex-col items-center rounded-2xl p-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 active:scale-[.98]">
+                          <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/15 bg-white/10 p-2 shadow-lg backdrop-blur-sm md:h-20 md:w-20 md:p-3">
+                              {dbData?.away_logo && <img src={dbData.away_logo} className="h-full w-full object-contain drop-shadow-md" alt={`${awayTeamName} crest`} />}
                           </div>
-                          <h2 className="font-bold text-center text-[9px] md:text-[11px] text-white leading-tight line-clamp-2 drop-shadow-md">{awayTeamName}</h2>
+                          <h2 className="line-clamp-2 min-h-10 text-center text-sm font-extrabold leading-tight text-white drop-shadow-md md:min-h-12 md:text-lg">{awayTeamName}</h2>
                           {awayForm.length > 0 && (
-                              <div className="flex items-center gap-[2px] mt-1 drop-shadow-md">
+                              <div className="mt-2 flex items-center gap-1 drop-shadow-md" aria-label="Recent form">
                                   {awayForm.map((f: string, i: number) => (
-                                      <span key={i} className={`w-2 h-2 flex items-center justify-center text-[5px] font-black text-white rounded-sm ${f === 'W' ? 'bg-green-500' : f === 'L' ? 'bg-red-500' : 'bg-slate-400'}`}>{f}</span>
+                                      <span key={i} className={`flex h-4 w-4 items-center justify-center rounded text-[9px] font-black text-white ${f === 'W' ? 'bg-green-600' : f === 'L' ? 'bg-red-600' : 'bg-slate-500'}`}>{f}</span>
                                   ))}
                               </div>
                           )}
                       </Link>
                       {(isFinished || isLive) && awayGoals.length > 0 && (
-                          <div className="mt-2 flex flex-col items-center gap-0.5 max-w-full px-1">
+                          <div className="mt-2 flex max-w-full flex-col items-center gap-1 px-1">
                               {formatGoals(awayGoals).map((txt, i) => (
-                                  <span key={i} className="text-[6.5px] md:text-[7.5px] text-slate-300 font-bold leading-tight flex items-center gap-0.5 text-center drop-shadow-md break-words max-w-full">
-                                      <Zap size={6} className="text-yellow-400 fill-yellow-400 shrink-0"/> {txt}
+                                  <span key={i} className="flex max-w-full items-center gap-1 break-words text-center text-[10px] font-semibold leading-tight text-slate-200 drop-shadow-md md:text-xs">
+                                      <Zap size={12} className="shrink-0 fill-yellow-400 text-yellow-400"/> {txt}
                                   </span>
                               ))}
                           </div>
@@ -181,12 +183,12 @@ export default function MatchHeaderClient({ dbData }: any) {
               </div>
           </div>
 
-          <div className="relative z-10 w-full bg-black/40 backdrop-blur-sm border-t border-white/5 py-1.5 px-2 flex justify-between items-center drop-shadow-md">
-              <div className="flex items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide text-[7px] md:text-[8px] font-bold text-slate-300 uppercase tracking-widest whitespace-nowrap">
-                  {formattedDate && <span className="flex items-center gap-1"><Calendar size={9} className="text-blue-400"/> {formattedDate}</span>}
-                  {dbData?.venue && <span className="flex items-center gap-1"><MapPin size={9} className="text-red-400"/> {dbData.venue}</span>}
-                  {dbData?.stage && <span className="flex items-center gap-1"><Trophy size={9} className="text-yellow-500"/> {dbData.stage.replace(/_/g, ' ')}</span>}
-                  {refName && <span className="flex items-center gap-1"><Flag size={9} className="text-slate-400"/> {refName}</span>}
+          <div className="relative z-10 w-full border-t border-white/10 bg-black/30 px-4 py-3 backdrop-blur-sm">
+              <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[10px] font-bold uppercase tracking-wide text-slate-200 md:text-xs">
+                  {formattedDate && <span className="flex items-center gap-1.5"><Calendar size={13} className="text-blue-300"/> {formattedDate}</span>}
+                  {dbData?.venue && <span className="flex items-center gap-1.5"><MapPin size={13} className="text-red-300"/> {dbData.venue}</span>}
+                  {dbData?.stage && <span className="flex items-center gap-1.5"><Trophy size={13} className="text-yellow-300"/> {dbData.stage.replace(/_/g, ' ')}</span>}
+                  {refName && <span className="flex items-center gap-1.5"><Flag size={13} className="text-slate-300"/> {refName}</span>}
               </div>
           </div>
       </div>

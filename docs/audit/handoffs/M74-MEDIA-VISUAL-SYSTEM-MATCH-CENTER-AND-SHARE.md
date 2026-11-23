@@ -54,7 +54,7 @@ Selected commits in implementation order:
 **NOT** claiming the full visual redesign of the entire site is complete:
 - News/editorial hero, article cards/search and highlights, match-header scoreboard, team form/H2H, league hubs and deeper standings cards remain to be applied consistently.
 - Tactical pitch improvements, shot location and momentum require provider-sourced positions/events; no fictitious shot maps or invented metrics.
-- Match tabs (overview, chat/MOTM, predictions, H2H, live table, video) need coordinated mobile/desktop UI review. Prediction registration/consent is NOT to be pulled into Media community.
+- Match tabs (overview, chat/MOTM, H2H, live table and video) need coordinated mobile/desktop UI review. The later M84 owner-approved boundary removes Prediction entry and probability UI from the public Media match page; Prediction remains separate under P9B. Do not restore a Prediction tab to Media without a new owner decision.
 - The article social card is now source-implemented and authorized-staging-smoke-verified (2026-11-20). FT, lineups and verified MOTM templates remain, as do production OG crawler, rights and expiry validation. The article card uses bounded editorial text and does not fetch remote images. The generic OG renderer is not an authorization mechanism for external image URLs; inspect and harden remote image-fetch policy before using rights-sensitive artwork.
 - No real browser screenshots, mobile interaction testing, contrast audit, Core Web Vitals measurement, semantic screen reader audit or Cloudflare ImageResponse/preview crawl have been executed.
 - At M74 handoff time, no code had been deployed. On 2026-11-20 the current branch was rebuilt and deployed to the separate staging Worker only; production DNS, routes and data were not changed. No chat/MOTM enablement, D1, AdSense, paid Cloudflare Stream or Stream.io rooms were changed.
@@ -69,6 +69,13 @@ Selected commits in implementation order:
 6. Rollback individual M74 source commits or restore previous components/OG template; no migration or data rollback is required for this UI slice.
 
 **Next actions:** finish remaining M74-A/B/C/D source integrations, run real test/build/staging checks, then review all Media/Predict feature parity and production cutover with explicit owner approval.
+
+## 10. 2026-11-23 — match-center visual continuation
+
+- Owner reports the Entra callback issue is addressed; this is not by itself evidence of the full editor draft/review/publish/unpublish/logout journey.
+- Began the remaining M74-A scoreboard work in `app/components/MatchHeaderClient.tsx`: larger responsive team and score panels, clearer status and match metadata, keyboard-focus visibility, decorative-image semantics, and null-safe score display that does not invent a 0–0 result. Existing match data, live updates, status logic, canonical navigation and media behavior are retained.
+- Added a source regression assertion for responsive/focus behavior and unknown-score preservation. Local engine suite (292/292), TypeScript and Vinext build passed on the working tree. No exact-head CI, protected staging visual inspection or mobile/desktop screenshots have yet run for this change.
+- This is one M74-A visual increment, not completion of M74 or the full frontend repositioning. News, highlights, match tabs/lineups/timeline, standings/league pages, accessibility and browser visual review remain open. Public Media stays separate from Prediction (M84/P9B); Factsport TV remains later P10.
 
 
 ## 7. 2026-11-20 follow-up — article share card

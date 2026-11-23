@@ -10,6 +10,18 @@ const playback = read('app/api/match/[id]/playback/route.ts');
 const analysis = read('app/api/match/[id]/analysis/route.ts');
 const proCard = read('app/components/ProBettingSlipLock.tsx');
 const mobileHub = read('app/components/MatchMobileHub.tsx');
+const matchHeader = read('app/components/MatchHeaderClient.tsx');
+
+test('match center scoreboard scales responsively and preserves unknown scores', () => {
+  assert.match(matchHeader, /const homeScore = liveData\?\.home_score \?\? dbData\?\.home_score \?\? null/);
+  assert.match(matchHeader, /const awayScore = liveData\?\.away_score \?\? dbData\?\.away_score \?\? null/);
+  assert.match(matchHeader, /\{homeScore \?\? '–'\}/);
+  assert.match(matchHeader, /\{awayScore \?\? '–'\}/);
+  assert.doesNotMatch(matchHeader, /home_score \?\? 0|away_score \?\? 0/);
+  assert.match(matchHeader, /md:text-6xl/);
+  assert.match(matchHeader, /focus-visible:ring-2/);
+  assert.match(matchHeader, /aria-live="polite"/);
+});
 
 test('match page does not serialize raw stream or VIP analysis data into client props', () => {
   assert.match(page, /const clientMatchData = \{/);

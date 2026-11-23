@@ -1,6 +1,6 @@
 # Factsport v2 page and product-surface migration matrix
 
-**Updated:** 2026-11-06  
+**Updated:** 2026-11-23 (status reconciliation; route-by-route acceptance remains open)
 **Branch:** `refactor/factsport-v2`  
 **Scope:** App Router pages/layouts and the primary product journeys.
 
@@ -63,6 +63,13 @@ The v2 Worker currently proves only the protected health and matches read path. 
 ## Completion rule
 
 A page is not complete merely because it renders. It must be exercised with real v2 adapters, role-correct test identities, staging database records, external integration sandboxes, mobile/browser coverage, provider failures and rollback. The route/API mapping is in [ROUTE-MIGRATION-MATRIX.md](./ROUTE-MIGRATION-MATRIX.md).
+
+## 2026-11-23 product and visual status reconciliation
+
+- This matrix is a source/dependency inventory, not proof of current runtime behavior. Its 2026-11-06 per-page descriptions are historical until re-verified against current source and staging; in particular, later M74/M84/M88/M89 work added PostgreSQL readers, match detail, newsroom and homepage staging checks without closing whole-page parity.
+- The later M84 release boundary supersedes any older matrix or parity wording that places Prediction entry on public Media. Public Media match pages have no prediction submit/board action; Prediction UI and business journeys are retained for separate P9B.
+- Current frontend status: the M74 visual system is incomplete. M92 begins the remaining match-center scoreboard work. News/highlights, fixture browse, league/standings, all-tab match details, responsive/browser/accessibility/crawler and performance acceptance remain open.
+- Release order remains Media P9A, separate Prediction P9B, then Factsport TV P10. TV is a later module and does not belong in the Media or Prediction frontend cutover.
 
 
 ## 2026-11-07 implementation checkpoint — editorial V2 vertical slice
