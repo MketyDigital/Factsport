@@ -74,8 +74,8 @@ export default {
         SELECT count(*)::integer AS applied_count,
           min(version)::integer AS first_version,
           max(version)::integer AS last_version,
-          count(*) = 49 AND min(version) = 0 AND max(version) = 48
-            AND count(DISTINCT filename) = 49
+          count(*) = 51 AND min(version) = 0 AND max(version) = 50
+            AND count(DISTINCT filename) = 51
             AND bool_and(checksum_sha256 ~ '^[a-f0-9]{64}$'
               AND filename ~ '^[0-9]{4}_[a-z0-9_]+[.]sql$') AS complete_and_checksummed
         FROM public.factsport_schema_migrations

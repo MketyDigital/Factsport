@@ -92,7 +92,7 @@ jobs:
             HTTP="$(curl -sS --max-time 30 -o /tmp/factsport-db-role-audit.json -w '%{http_code}' \
               -H "Authorization: Bearer $FACTSPORT_AUDIT_TOKEN" "$URL")"
             if [ "$HTTP" = "200" ] && jq -e \
-              '.ok == true and .database == "factsport_v2" and .connectedAs == "mketydbadmin" and (.roles | length) == 11' \
+              '.ok == true and .database == "factsport_v2" and .connectedAs == "mketydbadmin" and (.roles | length) == 11 and .migrationLedger.complete_and_checksummed == true' \
               /tmp/factsport-db-role-audit.json >/dev/null 2>&1; then
               READY=true
               break
