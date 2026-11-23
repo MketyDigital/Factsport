@@ -75,6 +75,7 @@ jobs:
           printf 'FACTSPORT_HARDEN_TOKEN=%s\n' "$TOKEN" >> "$GITHUB_ENV"
           printf '%s' "$TOKEN" | npx --yes wrangler@4 secret put FACTSPORT_HARDEN_TOKEN \
             --config wrangler.factsport-db-role-hardening.jsonc
+          sleep 10
       - name: Apply and verify least-privilege staging roles
         shell: bash
         run: |
