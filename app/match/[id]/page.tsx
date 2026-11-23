@@ -22,6 +22,7 @@ import { getExternalData } from '@/app/lib/matchService';
 import { getTeamForm } from '@/app/lib/teamForm';
 import { MatchLiveProvider } from '@/app/providers/MatchLiveProvider';
 import GoalRushTicker from '@/app/components/GoalRushTicker';
+import PredictMatchSubmission from '@/app/components/PredictMatchSubmission';
 
 const sanitizeUrl = (url: string | null | undefined) => {
     if (!url) return null;
@@ -395,6 +396,8 @@ export default async function MatchDetailsPage({ params, searchParams }: Props) 
               ) : (
                   <ScoreAxisWidget matchId={dbData.widget_id} />
               )}
+
+              <PredictMatchSubmission matchId={dbData.id} matchDate={dbData.match_date} homeTeam={dbData.home_team} awayTeam={dbData.away_team} matchStatus={dbData.status || ''} />
 
 
           </div>

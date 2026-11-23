@@ -47,3 +47,8 @@ A route inventory must prove that `factsport.com` Media can move without breakin
 ## 6. Current release position
 
 The latest protected app-staging pass `43888294900` verifies only the protected Worker, Hyperdrive/R2 health and a PostgreSQL `/matches` read path with pagination/cache/auth isolation. It does not satisfy the full P0/P3 Media requirements or P9A. Therefore no Media production cutover is ready now. Prediction staging/cutover and Factsport TV remain later phases. Production DNS, legacy services, bills, credentials and schedules remain unchanged by M78.
+
+
+## 7. Owner direction update — 2026-11-23
+
+The original sequence above is historical and superseded. Factsport TV is a concurrent required workstream with Media and Predict. Free anonymous prediction remains required on `predict.factsport.com`; M84 only keeps it off the AdSense Media host. Do not cut over production until Media, Predict and TV acceptance and combined rollback gates pass. Current status is tracked in ROADMAP M93 and production-plan P10.

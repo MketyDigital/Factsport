@@ -5,6 +5,7 @@ import { env } from 'cloudflare:workers';
 import Link from 'next/link';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 import { ChevronLeft } from 'lucide-react';
 import MatchesClientView from '@/app/components/MatchesClientView';
 import { listPostgresMatchesWindow, getPostgresTeamForm } from '@/lib/adapters/postgres-matches';
@@ -15,6 +16,11 @@ export const metadata: Metadata = {
 };
 
 export default async function AllMatchesPage({ searchParams }: { searchParams: { team?: string } }) {
+  const configuredHost = (process.env.FACTSPORT_PRIVATE_PRODUCT_HOST || '').trim().toLowerCase();
+  const requestHeaders = await headers();
+  const requestHost = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '')
+    .split(',')[0].trim().toLowerCase().split(':')[0];
+  const isPredictionHost = !!configuredHost && requestHost === configuredHost;
   const resolvedParams = await searchParams;
   const teamFilter = resolvedParams?.team || null;
   let validMatches: any[] = [];
@@ -84,7 +90,7 @@ export default async function AllMatchesPage({ searchParams }: { searchParams: {
           <p className="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Fixtures, Results & Tables</p>
         </div>
       </div>
-      <MatchesClientView initialMatches={validMatches} teamFilter={teamFilter} teamFormArray={teamFormArray} />
+      <MatchesClientView initialMatches={validMatches} teamFilter={teamFilter} teamFormArray={teamFormArray} showAds={!isPredictionHost} />
     </div>
   );
 }

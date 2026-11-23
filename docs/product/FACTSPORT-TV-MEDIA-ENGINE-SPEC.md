@@ -1,10 +1,10 @@
 # Factsport TV — Media Engine and Match Story Specification
-Status: DESIGN APPROVED IN PRINCIPLE / IMPLEMENTATION NOT STARTED
+Status: DESIGN APPROVED IN PRINCIPLE / initial deterministic planner and server-side YouTube upload primitives implemented on the V2 branch; full renderer, orchestration, rights and staging acceptance remain open
 Date: 2026-11-16
 Repository: MketyDigital/Factsport
 Working branch: refactor/factsport-v2
 Owner intent: Factsport TV as a modular subsystem *inside* Factsport V2, like Sports, Media, Editorial, and Predict; not a standalone company/application.
-Authority: product proposal reflecting owner direction. Does not modify approved V2 parity, migration, release, licensing, identity, or cutover gates.
+Authority: product proposal reflecting owner direction. The 2026-11-23 owner clarification makes TV a required concurrent V2 workstream; production activation still follows licensing, identity and publishing gates.
 
 ## 1. Product vision and binding decisions
 - One reusable Factsport TV production engine, four pluggable show directors: **Match Story**, **Factsport Daily**, **Weekend Football Review**, **Monday Team of the Week / Table Changes**.
@@ -12,7 +12,7 @@ Authority: product proposal reflecting owner direction. Does not modify approved
 - Fully data-backed storytelling rather than repetitive scoreboard slides. A human editor can always override scripts, scenes, player selection, voice, music, timing, graphics and publish decision.
 - Default to **free/open-source software** for the core; avoid requiring paid SaaS. Free software does NOT mean free compute, GPU, storage, CDN or AI models. Paid optional integrations behind adapters only.
 - Use canonical Factsport match IDs and existing sports database and ESPN/fixture adapters through reviewed read-only contracts. Do not introduce an independent match database or direct ESPN fetch in each render worker.
-- Work may be designed and prototyped on an isolated V2 staging/test boundary before V2 production cutover; production ingest automation, public pages, YouTube uploads, new schedules and production credentials remain OFF pending separate gates/approval. Do not deploy production or mutate legacy systems.
+- Work is to be implemented/prototyped on an isolated V2 staging/test boundary alongside Media and Predict before final V2 cutover. Production ingest automation, public pages, social platform uploads, new schedules and production credentials require rights, platform and editorial gates. Do not mutate legacy systems.
 - This document is a product/architecture contract, **not evidence of a finished implementation**.
 
 ## 2. Four show directors
@@ -109,15 +109,15 @@ These tool terms must be rechecked at implementation. References: https://www.bl
 - Store provider timestamps, generated text versions, AI prompt/model version (no secrets), approvals, source references, render logs, QC and linked YouTube IDs; admin RBAC and signed previews.
 - Upload initially as private/unlisted if platform permits; require YouTube API authorization/audit and explicit publishing permission.
 
-## 9. Prototyping before V2 cutover vs activation afterward
-**Recommended:** implement an isolated, OFF-by-default subsystem in `refactor/factsport-v2` *after* a controlled design review, using synthetic/licensed fixture data and no upstream publishing. This allows video engine development without slowing/altering active sports cutover.
+## 9. Concurrent implementation and production activation
+**Required:** implement an isolated subsystem in `refactor/factsport-v2` alongside Media and Predict, using synthetic/licensed fixture data. This advances video development without altering the live sports cutover. The first video/social posts should start as soon as required rights, channel authorization and human review are in place.
 1. Documentation, design, license checks, no new production secrets.
 2. Offline golden fixture + four-minute 3D-first MP4 prototype (original assets), 16:9 and short 9:16, human narration fallback; verify audio/timing, fact traceability, watermarks and failures.
 3. Implement read-only snapshot integration against isolated **staging** only after migration availability, with no direct Supabase/ESPN scraping from renderer.
 4. Add Factsport TV isolated schema, admin UI, durable jobs and R2 media under separate reviewed migrations/least-privilege roles. Do not apply migrations to prod.
 5. Complete staging tests, human editorial review, rights/licensing check, performance/cost benchmark, creator/platform API permissions.
-6. After independent V2 production cutover authorization, require a **separate owner go/no-go** for Factsport TV schedules, uploads, production video rendering and public website integration.
-The Factsport TV feature may ship later than V2; it must not be a blocking dependency for core live scores, editorial, payments or cutover.
+6. Complete the staging TV engine and human-reviewed social publishing workflow with Media and Predict. Production schedules and automated publication still require a separate go/no-go after source/asset rights, platform permissions and operational controls pass.
+Factsport TV is required for final V2 completion/cutover, even though core Media and Predict can be independently built and tested.
 
 ## 10. Acceptance tests
 - Render deterministic 4-minute fixture with opening, both lineups if supplied, ordered halves, HT, substitutions, cards, 3D *illustrative* goals, stats, tactical review and final outro.
@@ -147,4 +147,4 @@ The Factsport TV feature may ship later than V2; it must not be a blocking depen
 - `docs/audit/FULL-SYSTEM-2026-11-06.md`
 - GitHub tracking: https://github.com/MketyDigital/Factsport/issues/288
 
-**Implementation state at time of writing: DESIGN SPECIFICATION ONLY; no TV code, migrations, workers, schedules, renderer, deployment or YouTube credentials created.**
+**Implementation checkpoint (2026-11-23):** an offline deterministic Match Story planner, server-only YouTube resumable-upload primitives and consent/rights/approval-gated TikTok inbox-draft primitive now exist. YouTube uploads start private and carry the synthetic-media disclosure field; TikTok creators finish posts in TikTok. The TV renderer, studio UI, durable episode/outbox persistence, platform OAuth setup, verified asset source, Meta/other-social dispatch, rights acceptance and staging end-to-end journey are not implemented. No production credentials, uploads, routes, workers or schedules were created.

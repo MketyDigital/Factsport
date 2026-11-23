@@ -253,29 +253,29 @@ The owner has clarified that VIP, premium prediction, betting-related and existi
 
 - The first AdSense-first changes already removed the homepage betting banner and global timed promo modal, revised the public metadata, and restricted legacy VIP/prize pages from indexing.
 - The VIP upgrade copy was changed to remove betting-slip, odds and cash-prize sales claims while retaining the underlying route and membership workflow. This is a temporary presentation step, not the final private product separation.
-- The next implementation milestone is to map every public/private route and component call site and keep Prediction entry/account/business flows behind the separate product boundary. The later M84 decision supersedes the earlier proposal to preserve free prediction entry on Media; see `docs/audit/handoffs/M84-PUBLIC-MEDIA-PREDICTION-ISOLATION.md`.
+- The next implementation milestone is to map every public/private route and component call site. Prediction account/business features and free prediction play stay on the dedicated `predict.factsport.com` boundary; the main Media host remains prediction-free. M84 governs the Media boundary and does not cancel AUTH-005.
 - No private business workflow is approved for deletion. No production host/DNS/Worker change is authorized by this separation decision alone.
 
 
-## 12. Historical identity and anonymous prediction proposal (AUTH-005; superseded for Media by M84)
+## 12. Active identity and anonymous prediction proposal (AUTH-005; host clarified 2026-11-23)
 
-AUTH-005 records an earlier anonymous public-prediction proposal. The later M84 owner-approved release boundary supersedes that proposal for the public Media host: Media pages and public match details do not render Prediction entry, account, VIP, prize or betting actions. Prediction APIs, schemas and gameplay remain allocated to the separate Prediction product/P9B. Do not restore a Prediction tab or submission flow to Media unless the owner explicitly reopens that boundary.
+AUTH-005 remains active. M84 sets the public Media host boundary: Media pages and public match details do not render Prediction entry, account, VIP, prize or betting actions. The owner clarified that free prediction remains part of the product and belongs on `predict.factsport.com`, alongside the central Predict account. Prediction APIs, schemas and gameplay remain allocated to this separate product host/P9B. Do not render prediction UI or expose its submission API from `factsport.com`.
 
-The historical anonymous participant-cookie, email/marketing-consent and claim design remains reference material only; it does not authorize a public Media prediction flow. Registered Prediction identity and gameplay requirements belong to P9B.
+The anonymous participant-cookie, email/marketing-consent and claim design remains binding for the Predict-host free flow. Registered Prediction identity and gameplay requirements also belong to P9B.
 
-Legacy `PredictionBoard` and public-prediction schema work must not be reattached to public Media. Preserve existing business records and gameplay mechanics while P9B is designed and accepted.
+Legacy `PredictionBoard` and public-prediction schema work must not be reattached to public Media. Preserve existing business records and gameplay mechanics while P9B is implemented and accepted on its own host.
 
 
-## 13. Historical anonymous prediction schema checkpoint (not a public Media release)
+## 13. Anonymous prediction schema checkpoint (not a public Media release)
 
 The first staging-code slice is committed: `db/migrations/0003_factsport_public_predictions.sql` adds pseudonymous visitor participants, predictions, account-claim audit events and same-match conflict records. It contains no email/marketing identity and grants no direct public access. Prediction rows default to prize-ineligible and enforce participant/match uniqueness, registered-user/match uniqueness, valid outcomes and paired nonnegative scores. `tests/prediction-schema.test.cjs` is included in V2 verification.
 
-This migration is **not applied** to Azure PostgreSQL. It does not override the M84 public-surface boundary and is not a prerequisite to P9A. Reassess it only as part of P9B; do not connect it to the Media host.
+This migration is **not applied** to Azure PostgreSQL. It does not override the M84 public-surface boundary and is not a prerequisite to P9A. Continue its implementation only on the Predict host as part of P9B; do not connect it to the Media host.
 
 
-## 14. Historical owner clarification — free prediction email capture and marketing consent (superseded for Media by M84)
+## 14. Owner clarification — free prediction email capture and marketing consent (applies on Predict host)
 
-This earlier public-flow description is retained as source history only. M84 subsequently set the P9A boundary: public Media does not expose the prediction form or submission. Future Prediction enrollment, contact capture and gameplay belong to the separate P9B surface.
+The public Media host does not expose the prediction form or submission. Free Prediction enrollment, contact capture and gameplay belong to the separate `predict.factsport.com` surface under P9B.
 
 Any future marketing consent remains subject to separate legal review and must not be bundled into a Media feature. Verify current schema and migration status before P9B work.
 

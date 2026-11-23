@@ -27,5 +27,6 @@ test('private Prediction hostname gets its own root and does not query Media hom
   assert.match(home, /robots: \{ index: false, follow: false/);
   assert.match(home, /href="\/login"/);
   assert.match(home, /href="\/register"/);
-  assert.doesNotMatch(home.slice(privateBranch, mediaRead), /href="\/(news|matches|live|standings|highlights)/);
+  assert.match(home, /href="\/matches"/);
+  assert.match(home, /Play free predictions without an account/);
 });

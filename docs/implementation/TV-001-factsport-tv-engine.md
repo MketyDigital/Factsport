@@ -2,7 +2,7 @@
 
 Date: 2026-11-16  
 Branch: `refactor/factsport-v2`  
-Status: integrated design plan; **implementation intentionally deferred until public Media and Prediction cutover phases are complete and stable**.
+Status: active concurrent V2 implementation track, owner-directed 2026-11-23. Initial evidence-backed planner and server-only YouTube resumable upload adapter are implemented; renderer, durable studio/outbox, non-YouTube dispatch and staging acceptance remain open. Production uploads still require rights, OAuth, platform and editorial gates.
 
 ## Source of truth
 
@@ -10,7 +10,7 @@ The full product contract is [`docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md`](
 
 ## Product boundary and order
 
-Factsport TV is an internal modular subsystem of Factsport V2. It follows the public Media release and the separate Prediction/business release, and must not block either. It does not become a standalone app or a new company. The current release order is: public Media → eligible Media-only cutover → Prediction/business → Factsport TV. Keep existing V2 architecture, canonical match IDs, Azure PostgreSQL via Hyperdrive, R2, replaceable adapters, and Media ownership boundaries.
+Factsport TV is an internal modular subsystem of Factsport V2. It is a required concurrent workstream tracked alongside public Media and the Predict product; it is not a post-cutover afterthought or standalone app/company. The final V2 cutover waits for Media, Predict and TV acceptance plus rollback evidence. Keep existing V2 architecture, canonical match IDs, Azure PostgreSQL via Hyperdrive, R2, replaceable adapters, and Media ownership boundaries.
 
 ## Implementation stages
 
@@ -31,7 +31,7 @@ Factsport TV is an internal modular subsystem of Factsport V2. It follows the pu
 
 ### TV3 — data and episode contracts
 
-- Define typed `MatchVideoSnapshot`, canonical event identity, freshness/rights qualifiers, frozen source digest and `EpisodePlan`/scene schema in `app/lib/tv` only after design review.
+- Define typed `MatchVideoSnapshot`, canonical event identity, freshness/rights qualifiers, frozen source digest and `EpisodePlan`/scene schema under `lib/tv` as the current offline implementation slice.
 - Build a read-only SportsReadAdapter over canonical V2 read models. No renderer direct ESPN calls, legacy DB, Supabase or duplicate match store.
 - Add RightsAndProvenanceGate, original-language/narrative check, source-freshness checks, data conflict handling and deterministic quality state.
 - Add table-driven golden tests for gaps, late/duplicate/corrected events, own goals, VAR, extra time, penalties, status changes, provider outages and match ambiguity.
@@ -49,6 +49,14 @@ Factsport TV is an internal modular subsystem of Factsport V2. It follows the pu
 - Run security, roles, privacy, output QC, accessibility, provenance, factual integrity, cost, resilience, retry/reconciliation, deletion and performance tests.
 - Independently review scripts/video and licensing for each show format. Match Story ships first; Daily, Weekend and Monday directors are separately gated based on complete sources and human staffing.
 - Keep trigger schedules off. No automatic public uploads, YouTube publishing, public TV page, production ingest or new recurring provider calls without a separate TV production go/no-go.
+
+### TV7 — human-reviewed social publishing path
+
+- Build draft packages for YouTube landscape and vertical social derivatives, including original title/description/captions, provenance and disclosure fields, and a review state.
+- Record explicit per-platform approval and publish receipt/idempotency references in a durable outbox before connecting dispatchers.
+- Start publishing as soon as the owner-selected channel OAuth, cleared episode rights/assets, channel policy checks, and human review are available. Never auto-mass-post or expose credentials in browser code.
+- YouTube adapter primitives use the resumable `videos.insert` flow, request private visibility first, and carry the synthetic-media disclosure flag when applicable. OAuth refresh token and client credentials are runtime-only inputs; resumable session URLs are secret and must stay server-side. No dispatcher or production OAuth connection is currently enabled.
+- TikTok adapter can request an inbox draft by verified-domain pull transfer only after explicit upload consent, rights clearance and human episode approval; the creator completes publishing in TikTok. TikTok developer registration, scope approval, OAuth, verified Factsport URL prefix and a TV MediaStore signed-asset endpoint are still required.
 
 ## Acceptance for initial staging build
 
@@ -73,4 +81,4 @@ Factsport TV is an internal modular subsystem of Factsport V2. It follows the pu
 - Roadmap: `docs/audit/ROADMAP.md` M78
 - Release plan: `docs/audit/PRODUCTION-EXECUTION-PLAN.md` P9A/P9B/P9C/P10
 - Product spec: `docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md`
-- Core public Media acceptance remains P0–P3 and M74/M75; Prediction remains P4–P6. TV code does not begin until those preceding phases are released and stable.
+- Core public Media acceptance remains P0–P3 and M74/M75; Prediction remains P4–P6. TV is developed concurrently; final cutover waits for all three tracks.

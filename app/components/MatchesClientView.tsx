@@ -14,7 +14,7 @@ const getLocalYMD = (dateInput: string | Date | number) => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-export default function MatchesClientView({ initialMatches, teamFilter, teamFormArray }: { initialMatches: any[], teamFilter?: string | null, teamFormArray?: string[] }) {
+export default function MatchesClientView({ initialMatches, teamFilter, teamFormArray, showAds = true }: { initialMatches: any[], teamFilter?: string | null, teamFormArray?: string[], showAds?: boolean }) {
     const [liveMatches, setLiveMatches] = useState(initialMatches);
     const [selectedLeague, setSelectedLeague] = useState<string>('All'); 
     const [activeTab, setActiveTab] = useState<'fixtures' | 'results'>('fixtures');
@@ -263,7 +263,7 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                             );
                         })
                     )}
-                    <AdsterraStandardBanner />
+                    {showAds && <AdsterraStandardBanner />}
                 </div>
             </div>
         );
@@ -341,7 +341,7 @@ export default function MatchesClientView({ initialMatches, teamFilter, teamForm
                         </div>
                     )}
                 </div>
-                <AdsterraStandardBanner />
+                {showAds && <AdsterraStandardBanner />}
             </div>
         );
     };

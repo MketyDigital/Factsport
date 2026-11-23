@@ -6,7 +6,7 @@
 
 ## Governing decisions
 
-Reconciles ROADMAP M1/M8/M10, the parity/AdSense acceptance contract, P9A/P9B in the production execution plan, and M74/M77. Public Factsport Media and the private Prediction/business product have distinct release boundaries. P9A must not expose Prediction registration, VIP, bookmaker or betting actions on Media pages. Prediction source, schema, and future private-host functionality are retained for P9B; this handoff does not migrate or cut over those systems.
+Reconciles ROADMAP M1/M8/M10, the parity/AdSense acceptance contract, P9A/P9B in the production execution plan, and M74/M77. Public Factsport Media and the separate Prediction/business product have distinct release boundaries. P9A must not expose Prediction registration, VIP, bookmaker or betting actions on Media pages. Prediction source, schema, and separate-host functionality are retained for P9B; this handoff does not migrate or cut over those systems. Owner clarification on 2026-11-23 confirms anonymous free predictions remain required on `predict.factsport.com`; M84 is strictly the `factsport.com` Media boundary, not cancellation of free play.
 
 ## Implemented
 
@@ -39,5 +39,5 @@ Production routes, domains, databases, jobs, secrets, Logic Apps, AdSense, and l
 ## Next
 
 1. Verify exact-head isolated build and protected staging, including the new match list/detail assertion and M82/M83 checks.
-2. Audit all public pages, metadata, feeds, structured data, manifest and navigation for Prediction/VIP/bookmaker leakage; keep any product actions behind the private host in a later phase.
-3. Continue Media editorial and sports lifecycle acceptance, then V2 recovery/rollback and P9A route-isolation/go-no-go. Continue P9B and only later P10 TV.
+2. Audit all `factsport.com` pages, metadata, feeds, structured data, manifest and navigation for Prediction/VIP/bookmaker leakage; implement AUTH-005 free-play actions only on the configured Predict host.
+3. Continue Media editorial and sports lifecycle acceptance, V2 recovery/rollback and P9A route-isolation gates. Implement and accept P9B and P10 TV in parallel; the final V2 cutover waits for all three workstreams.

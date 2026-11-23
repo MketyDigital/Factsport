@@ -2,15 +2,16 @@
 
 **Date:** 2026-11-07  
 **Status:** owner-approved architecture; first V2 schema slice committed; API/runtime integration remains in progress.  
-**Public host:** `https://factsport.com`  
+**Public Media host:** `https://factsport.com`
 **Registered account host:** `https://predict.factsport.com`  
+**Free prediction host:** `https://predict.factsport.com` (owner clarification, 2026-11-23)
 **Scope:** staging/code only. No production DNS, database cutover, identity-provider changes or destructive data migration.
 
 ## 1. Owner decision
 
-Factsport has exactly two user states:
+Factsport has exactly two user states. Public Media and Predict are separate host experiences:
 
-1. **Public visitor / free participant:** may browse the public media product without registration. Only after choosing **Submit Prediction** does the site reveal a form requiring an email address, prediction details and acceptance of the free-prediction rules/privacy notice. This creates no account and invokes no authentication provider.
+1. **Public visitor / free participant:** may browse public Media without registration. Free fixtures and prediction play are on `predict.factsport.com`; only after choosing **Submit Prediction** does Predict reveal a form requiring an email address, prediction details and acceptance of the free-prediction rules/privacy notice. This creates no account and invokes no authentication provider.
 2. **Registered Predict member:** has one central Factsport account, registered and managed through `predict.factsport.com`. The same account/identity is used for any authenticated Factsport experience.
 
 There is no intermediate email-only account. Email is a contact detail for the free-prediction/leaderboard workflow, not a login credential or account. The form is hidden until the visitor clicks Submit Prediction.
@@ -19,7 +20,8 @@ The email-marketing purpose is separate from the email needed to administer a pr
 
 ## 2. Public prediction experience
 
-- Public match pages, fixtures and free prediction viewing work without authentication or an email prompt.
+- Public Media pages and match pages on `factsport.com` contain no prediction entry, board, action, or account flow.
+- Free fixtures and prediction viewing are available without authentication or an email prompt on `predict.factsport.com`.
 - The prediction submission form appears only after an explicit click on **Submit Prediction**.
 - Email is required on that form and is used to identify the free-prediction contact/leaderboard participant; it does not create an account and is never used as a password or authentication factor.
 - Use a cryptographically random, opaque visitor token in a Secure, HttpOnly cookie scoped to `.factsport.com` when cross-subdomain continuity is required. Store only a one-way hash of the token in PostgreSQL. Never trust a client-supplied participant ID.
@@ -85,7 +87,7 @@ Do not implement browser-side direct writes, trust a client clock, or use an ema
 6. Implement the Predict-host Entra flow and shared authenticated session; test subdomain CSRF, callback, cookie scope, logout and authorization.
 7. Preserve/migrate existing Supabase user, prediction, VIP, subscription and prize records only under the separately approved migration plan. Do not change or delete production data.
 8. Run browser journeys: anonymous prediction, repeat/duplicate, kickoff race, invalid input, rate limit, cookie loss, signup/login, account claim, multi-device, existing-account conflict, campaign lock, settlement and admin audit.
-9. Verify that public editorial and anonymous prediction pages do not load login prompts or AdSense-ineligible private promotions; verify private Predict host has no AdSense code.
+9. Verify that public editorial pages on `factsport.com` do not load prediction actions; verify free prediction pages and the central account run on `predict.factsport.com`, which has no AdSense code.
 
 ## 8. Explicit non-goals and safety gates
 

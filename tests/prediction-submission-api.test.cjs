@@ -22,9 +22,10 @@ test('Prediction visitor cookie is opaque, cryptographically random and HttpOnly
   assert.match(helper, /maxAge: 60 \* 60 \* 24 \* 180/);
   assert.ok(helper.includes("options.domain = '.factsport.com'"));
   assert.match(helper, /SHA-256/);
-  assert.match(helper, /configuredHost\.trim\(\)\.toLowerCase\(\) === 'factsport\.com'/);
-  assert.match(helper, /host === 'factsport\.com'/);
-  assert.doesNotMatch(helper, /host === 'predict\.factsport\.com'/);
+  assert.match(helper, /predictionHost === 'predict\.factsport\.com'/);
+  assert.match(helper, /host === predictionHost/);
+  assert.match(route, /FACTSPORT_PRIVATE_PRODUCT_HOST/);
+  assert.doesNotMatch(route, /FACTSPORT_PUBLIC_MEDIA_HOST/);
 });
 
 test('Prediction public API is host-gated, same-origin, bounded and no-store', () => {

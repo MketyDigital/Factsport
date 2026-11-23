@@ -42,8 +42,8 @@ function runtimeConfig() {
   const bindings = env as unknown as Record<string, unknown>;
   const environment = typeof bindings.FACTSPORT_ENVIRONMENT === 'string'
     ? bindings.FACTSPORT_ENVIRONMENT : '';
-  const publicHost = typeof bindings.FACTSPORT_PUBLIC_MEDIA_HOST === 'string'
-    ? bindings.FACTSPORT_PUBLIC_MEDIA_HOST.trim().toLowerCase() : '';
+  const publicHost = typeof bindings.FACTSPORT_PRIVATE_PRODUCT_HOST === 'string'
+    ? bindings.FACTSPORT_PRIVATE_PRODUCT_HOST.trim().toLowerCase() : '';
   const rateLimitSecret = typeof bindings.FACTSPORT_PREDICTION_RATE_LIMIT_SECRET === 'string'
     ? bindings.FACTSPORT_PREDICTION_RATE_LIMIT_SECRET : '';
   const ready = bindings.FACTSPORT_PREDICTION_SUBMISSION_READY === 'true';

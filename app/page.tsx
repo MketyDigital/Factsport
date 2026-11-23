@@ -237,8 +237,12 @@ function PredictionEntryPage() {
         <p className="text-xs font-black uppercase tracking-[.22em] text-blue-300">FactSport Predict</p>
         <h1 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">Your predictions, in one place.</h1>
         <p className="mt-4 max-w-lg text-sm leading-6 text-slate-300 md:text-base">
-          Sign in to continue to your Prediction account, or create an account to get started.
+          Play free predictions without an account, or sign in to your central Predict account for member features.
         </p>
+        <Link href="/matches" className="group mt-8 flex min-h-24 items-center justify-between overflow-hidden rounded-2xl border border-cyan-300/25 bg-gradient-to-r from-blue-700/70 to-cyan-500/20 p-5 shadow-[0_12px_50px_rgba(0,180,255,.14)] transition duration-300 hover:-translate-y-1 hover:border-cyan-200/70 hover:shadow-[0_18px_55px_rgba(0,180,255,.24)]">
+          <span><span className="block text-lg font-black">Explore free predictions</span><span className="mt-1 block text-xs text-blue-100">Pick a fixture and submit when you’re ready.</span></span>
+          <span aria-hidden="true" className="text-3xl transition-transform duration-300 group-hover:translate-x-1">⚽</span>
+        </Link>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-blue-600 px-6 text-sm font-extrabold text-white transition hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200">
             Sign in

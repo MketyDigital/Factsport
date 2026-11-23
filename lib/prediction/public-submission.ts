@@ -53,10 +53,12 @@ export function isAllowedPredictionPublicHost(url: URL, environment: string, con
   if (environment === 'staging') {
     return /^factsport-v2-staging\.[a-z0-9-]+\.workers\.dev$/i.test(host);
   }
-  // Never serve the public submit API from the private Predict subdomain.
+  // Free anonymous participation belongs to the dedicated Predict product
+  // host. The AdSense Media host must never serve this API.
+  const predictionHost = configuredHost.trim().toLowerCase();
   return environment === 'production' &&
-    configuredHost.trim().toLowerCase() === 'factsport.com' &&
-    host === 'factsport.com';
+    predictionHost === 'predict.factsport.com' &&
+    host === predictionHost;
 }
 
 export function predictionVisitorCookieOptions(host: string, environment: string) {
