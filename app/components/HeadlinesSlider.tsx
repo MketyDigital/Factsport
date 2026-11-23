@@ -22,7 +22,7 @@ export default function HeadlinesSlider({ headlines }: { headlines: any[] }) {
   }, []);
 
   useEffect(() => {
-    if (!headlines.length || paused || reducedMotion) return;
+    if (!headlines.length || paused) return;
 
     const id = window.setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % headlines.length);
