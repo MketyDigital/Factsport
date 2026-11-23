@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { renderMatchStorySvgScenes } from '../lib/tv/svg-scene-renderer.mjs';
 
 function validPlan() {
@@ -58,4 +60,15 @@ test('requires a disclosure for each illustrative event scene', () => {
   const plan = validPlan();
   delete plan.scenes[1].disclosure;
   assert.throws(() => renderMatchStorySvgScenes(plan), /illustration_disclosure_required/);
+});
+
+test('offline sample MP4 renderer parses and contains no network publishing path', () => {
+  const script = new URL('../scripts/render-tv-preview.mjs', import.meta.url);
+  execFileSync(process.execPath, ['--check', script.pathname]);
+  const source = readFileSync(script, 'utf8');
+  assert.match(source, /planMatchStory/);
+  assert.match(source, /ffmpeg/);
+  assert.match(source, /ffprobe/);
+  assert.match(source, /NOT PUBLISHABLE/);
+  assert.doesNotMatch(source, /\bfetch\s*\(|youtube-resumable-upload|tiktok-draft-upload/);
 });
