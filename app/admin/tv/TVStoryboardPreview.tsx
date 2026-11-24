@@ -22,6 +22,7 @@ type TVMatch = {
   away_team: string;
   home_score: number;
   away_score: number;
+  status: string;
   match_date: string;
   source: string;
   version: number;
