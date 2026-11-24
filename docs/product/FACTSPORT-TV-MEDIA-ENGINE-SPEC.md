@@ -148,3 +148,8 @@ Factsport TV is required for final V2 completion/cutover, even though core Media
 - GitHub tracking: https://github.com/MketyDigital/Factsport/issues/288
 
 **Implementation checkpoint (2026-11-23):** an offline deterministic Match Story planner, server-only YouTube resumable-upload primitives, consent/rights/approval-gated TikTok inbox-draft primitive, and protected read-only `/admin/tv` storyboard prototype now exist. The preview uses abstract CSS 2.5D and data-safe 2D scenes; it is not a renderer or publish control. YouTube uploads start private and carry the synthetic-media disclosure field; TikTok creators finish posts in TikTok. The production TV renderer, editor workflow, durable episode/outbox persistence, platform OAuth setup, verified asset source, Meta/other-social dispatch, rights acceptance and staging end-to-end journey are not implemented. No production credentials, uploads, routes, workers or schedules were created.
+
+
+## 2026-11-24 implementation follow-up — editorial planning
+
+The `/admin/tv` draft workflow now includes persisted episodes, evidence-linked narration, independent script approval and a stored text-only storyboard built from one 2D fact-card scene per approved narration block. This is a planning layer, not video production: it generates no media assets, audio, render jobs or uploads. Data and asset rights remain uncleared, so the episode remains blocked from rendering and publishing. Exact-head isolated verification, native build and protected staging are pending for source `681e1ff`; the earlier 2026-11-23 checkpoint above describes the state at that time.
