@@ -4,7 +4,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 
 type Fact = { id: string; text: string; source: string; observedAt: string; verified: boolean };
 type Block = { id: string; text: string; factIds: string[] };
-type Scene = { id: string; position: number; label: string; startSeconds: number; durationSeconds: number; narrationText: string; factCards: Array<{ id: string; text: string; source: string; observedAt: string }>; visualTreatment: string; renderable: boolean };\ntype ModelAsset = { id: string; asset_kind: string; byte_size: number; sha256: string; rights_status: string; provenance: { sourceName?: string; sourceUrl?: string | null; licenseName?: string; licenseUrl?: string | null; attribution?: string | null } };
+type Scene = { id: string; position: number; label: string; startSeconds: number; durationSeconds: number; narrationText: string; factCards: Array<{ id: string; text: string; source: string; observedAt: string }>; visualTreatment: string; renderable: boolean };
+type ModelAsset = { id: string; asset_kind: string; byte_size: number; sha256: string; rights_status: string; provenance: { sourceName?: string; sourceUrl?: string | null; licenseName?: string; licenseUrl?: string | null; attribution?: string | null } };
 type EpisodeDetail = {
   id: string;
   title: string;
@@ -32,7 +33,10 @@ export default function TVEpisodeScriptEditor({
   const [state, setState] = useState<'loading' | 'ready' | 'saving' | 'denied' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [reviewNotes, setReviewNotes] = useState('');
-  const [activeSceneIndex, setActiveSceneIndex] = useState(0);\n  const [modelAssets, setModelAssets] = useState<ModelAsset[]>([]);\n  const [modelUploading, setModelUploading] = useState(false);\n  const [modelUploadMessage, setModelUploadMessage] = useState('');
+  const [activeSceneIndex, setActiveSceneIndex] = useState(0);
+  const [modelAssets, setModelAssets] = useState<ModelAsset[]>([]);
+  const [modelUploading, setModelUploading] = useState(false);
+  const [modelUploadMessage, setModelUploadMessage] = useState('');
   const activeStoryboardScene = episode?.scenes[Math.min(activeSceneIndex, Math.max(0, (episode?.scenes.length ?? 1) - 1))] ?? null;
 
   useEffect(() => {
