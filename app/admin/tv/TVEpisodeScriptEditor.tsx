@@ -12,8 +12,9 @@ type EpisodeDetail = {
   updatedAt: string;
   facts: Fact[];
   rights: { dataCleared?: boolean; assetsCleared?: boolean } | null;
-  scriptDraft: { blocks?: Block[] } | null;
-  scriptReview: { decision?: string; notes?: string; reviewedAt?: string } | null;
+  scriptDraft: { blocks?: Block[]; digest?: string } | null;
+  scriptReview: { decision?: string; notes?: string; reviewedAt?: string; scriptDigest?: string } | null;
+  scenes: Scene[];
   canReview: boolean;
 };
 
