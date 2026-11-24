@@ -37,7 +37,7 @@ function safeCaptionText(value: string): string {
   const text = value.trim().replace(/\s+/g, ' ');
   if (!text || text.length > MAX_CAPTION_CHARS) throw new Error('tv_caption_text_invalid');
   // Keep VTT payloads plain text; prevent cue injection, markup and hidden controls.
-  if (/[<>\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(text) || /-->/u.test(text)) {
+  if (/[<>\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(text) || /-->/.test(text)) {
     throw new Error('tv_caption_text_unsafe');
   }
   return text;
@@ -71,7 +71,7 @@ export function buildNarrationCaptionPackage(
     }
     const body = safeCaptionText(cue.text);
     previousEnd = cue.endMs;
-    provenance.push({ cueId: cue.id, factIds: [...new Set(cue.factIds)] });
+    provenance.push({ cueId: cue.id, factIds: Array.from(new Set(cue.factIds)) });
     return `${cue.id}\n${timestamp(cue.startMs)} --> ${timestamp(cue.endMs)}\n${body}`;
   });
 
