@@ -539,3 +539,8 @@ Exact source head `aa0a5e9` passed isolated verification [45324494210](https://g
 ### 2026-11-24 — M101 private storyboard visual acceptance
 
 Exact source head `454c932` passed isolated verification [45342942972](https://github.com/MketyDigital/Factsport/actions/runs/45342942972), native Cloudflare build [45342942964](https://github.com/MketyDigital/Factsport/actions/runs/45342942964), and protected staging deploy plus deny-by-default check [45342943031](https://github.com/MketyDigital/Factsport/actions/runs/45342943031). The new visual layer is a private concept preview only. It does not satisfy video rendering, asset-rights, audio/captions, output QA, OAuth, social dispatch or authenticated owner-editor acceptance. No production cutover or social post occurred; the existing free Prediction domain remains unchanged.
+
+
+### 2026-11-24 — M102 TV evidence display
+
+Exact source head `3f0d6c6` passed isolated verification [45343476559](https://github.com/MketyDigital/Factsport/actions/runs/45343476559), native Cloudflare build [45343476547](https://github.com/MketyDigital/Factsport/actions/runs/45343476547), and protected staging [45343476525](https://github.com/MketyDigital/Factsport/actions/runs/45343476525). The Studio preview shows fact sources and observation timestamps alongside narration. This improves human review only; source/asset rights, render/audio/caption QA, OAuth, social publishing acceptance, and real editor browser verification remain open. No production routing or social content changed.
