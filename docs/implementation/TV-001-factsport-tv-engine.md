@@ -96,3 +96,10 @@ Factsport TV is an internal modular subsystem of Factsport V2, delivered in the 
 - Release plan: `docs/audit/PRODUCTION-EXECUTION-PLAN.md` P9A/P9B/P9C/P10
 - Product spec: `docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md`
 - Core public Media acceptance remains P0–P3 and M74/M75; Prediction remains P4–P6. TV is developed concurrently; final cutover waits for all three tracks.
+
+
+## 2026-11-24 — caption provenance primitive
+
+- Added `lib/tv/captions.ts` to package human-authored narration as plain-text WebVTT with a cue-to-verified-fact provenance map.
+- The builder rejects missing/unverified evidence, malformed or overlapping cue timing, duplicate IDs, unsafe VTT markup/control text, empty captions, and cues beyond the episode duration. It does not generate narration from events.
+- This is an offline library primitive only. It is not wired to the Studio or persisted in R2/outbox yet, and it does not establish audio generation, subtitle synchronization or production acceptance. Verification remains open.
