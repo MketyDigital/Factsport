@@ -106,7 +106,7 @@ jobs:
           fi
           jq -e \
             '.ok == true and .database == "factsport_v2" and .connectedAs == "mketydbadmin" and
-             .totalMigrations == 54 and .firstVersion == 0 and .lastVersion == 53' \
+             .totalMigrations == 55 and .firstVersion == 0 and .lastVersion == 54' \
             /tmp/factsport-v2-migrate-result.json >/dev/null || {
               echo "::error::Migration Worker returned an incomplete or unexpected ledger."
               jq -c '{ok,error,appliedCount,totalMigrations,firstVersion,lastVersion}' /tmp/factsport-v2-migrate-result.json

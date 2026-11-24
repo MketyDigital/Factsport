@@ -596,4 +596,7 @@ jobs:
           grep -q "CREATE TABLE IF NOT EXISTS public.factsport_tv_asset_library" db/migrations/0053_factsport_tv_model_asset_library.sql
           grep -q "asset_kind IN ('stadium_environment', 'generic_player', 'football')" db/migrations/0053_factsport_tv_model_asset_library.sql
           grep -q "rights_status text NOT NULL DEFAULT 'pending'" db/migrations/0053_factsport_tv_model_asset_library.sql
-          echo "Disposable PostgreSQL migrations 0000–0053 and Media/competition/VOD/social/TV privilege assertions passed."
+          test -s db/migrations/0054_factsport_tv_resumable_model_uploads.sql
+          grep -q "CREATE TABLE IF NOT EXISTS public.factsport_tv_model_upload_sessions" db/migrations/0054_factsport_tv_resumable_model_uploads.sql
+          grep -q "expected_part_count BETWEEN 1 AND 32" db/migrations/0054_factsport_tv_resumable_model_uploads.sql
+          echo "Disposable PostgreSQL migrations 0000–0054 and Media/competition/VOD/social/TV privilege assertions passed."

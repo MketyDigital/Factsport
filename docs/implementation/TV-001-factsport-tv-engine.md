@@ -180,3 +180,10 @@ Factsport TV is an internal modular subsystem of Factsport V2, delivered in the 
 - The clip labels itself fictional and illustrative, includes no real team/player likeness or footage, and is not publishable. It has no narration, music or captions and is only a look-dev proof, not the target 3–5 minute render pipeline.
 - The owner's stadium `.glb` still must be uploaded with its source and license evidence. The active Studio upload limit is 32 MiB; the next renderer work must replace/augment this procedural bowl only after that model is independently cleared.
 - Exact head `2639d84a83d817f6ae7968afce8f2377a5df1357` passed isolated verification [45358005169](https://github.com/MketyDigital/Factsport/actions/runs/45358005169), native build [45358005177](https://github.com/MketyDigital/Factsport/actions/runs/45358005177), and protected staging [45358005256](https://github.com/MketyDigital/Factsport/actions/runs/45358005256). Staging deployment/preflight is not a substitute for a signed-in studio browser session or episode-level asset review.
+
+## 2026-11-24 — resumable large-model intake (working tree; not yet staging-accepted)
+
+- Extends private model intake to 512 MiB through Cloudflare R2 multipart upload, using 16 MiB parts and owner-bound resumable sessions. The editor reuses completed parts after interruption, retries each part, verifies the GLB header and stores the model privately. The digest is explicitly scoped to the ordered part manifest, not misrepresented as a full-file SHA-256.
+- The upload remains rights-pending, has no rendering integration and cannot publish content. The 300–400 MB owner stadium fits this size limit; the model has not yet been received or reviewed.
+- Local TypeScript typecheck passed for this working-tree change. Disposable PostgreSQL migration verification, Cloudflare build, migration 0054 staging application, and signed-in editor acceptance are still required before relying on this workflow in the deployed studio.
+- Factsport TV's role and current-vs-planned capabilities are documented in `docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md` under “What Factsport TV is for, and how an editor uses it.”

@@ -23,9 +23,20 @@ export function factsportPostgres() {
 export function factsportMediaBucket() {
   const bucket = env.FACTSPORT_MEDIA_BUCKET as {
     head: (key: string) => Promise<unknown | null>;
-    get: (key: string) => Promise<{ size: number; arrayBuffer: () => Promise<ArrayBuffer> } | null>;
+    get: (key: string, options?: { range?: { offset?: number; length?: number } }) => Promise<{ size: number; arrayBuffer: () => Promise<ArrayBuffer> } | null>;
     put: (key: string, data: ArrayBuffer | string, options?: object) => Promise<unknown>;
     delete: (key: string) => Promise<void>;
+    createMultipartUpload: (key: string, options?: object) => Promise<{
+      uploadId: string;
+      uploadPart: (partNumber: number, data: ArrayBuffer) => Promise<{ partNumber: number; etag: string }>;
+      complete: (parts: Array<{ partNumber: number; etag: string }>) => Promise<{ size: number; etag: string }>;
+      abort: () => Promise<void>;
+    }>;
+    resumeMultipartUpload: (key: string, uploadId: string) => {
+      uploadPart: (partNumber: number, data: ArrayBuffer) => Promise<{ partNumber: number; etag: string }>;
+      complete: (parts: Array<{ partNumber: number; etag: string }>) => Promise<{ size: number; etag: string }>;
+      abort: () => Promise<void>;
+    };
   };
   if (!bucket?.head) throw new Error('FACTSPORT_MEDIA_BUCKET binding missing');
   return bucket;

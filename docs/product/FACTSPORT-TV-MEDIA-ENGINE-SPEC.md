@@ -149,6 +149,18 @@ Factsport TV is required for final V2 completion/cutover, even though core Media
 
 **Implementation checkpoint (2026-11-23):** an offline deterministic Match Story planner, server-only YouTube resumable-upload primitives, consent/rights/approval-gated TikTok inbox-draft primitive, and protected read-only `/admin/tv` storyboard prototype now exist. The preview uses abstract CSS 2.5D and data-safe 2D scenes; it is not a renderer or publish control. YouTube uploads start private and carry the synthetic-media disclosure field; TikTok creators finish posts in TikTok. The production TV renderer, editor workflow, durable episode/outbox persistence, platform OAuth setup, verified asset source, Meta/other-social dispatch, rights acceptance and staging end-to-end journey are not implemented. No production credentials, uploads, routes, workers or schedules were created.
 
+## What Factsport TV is for, and how an editor uses it
+
+Factsport TV is the internal production desk for making original football videos for Factsport's YouTube and social accounts. It is not a live match broadcaster, streaming channel, or automatic public-posting bot. The planned shows are Match Story, Factsport Daily, Weekend Football Review and Monday Team of the Week / Table Changes. Match Story is the first production target.
+
+The intended editor journey is: choose a final eligible match or reviewed editorial; generate an evidence-backed narration and storyboard draft; correct the wording and scenes; attach only licensed assets; render landscape and vertical versions with audio and captions; review factual accuracy, rights, disclosures and video quality; approve the package; then send it privately to the connected platform or to a creator inbox. A person approves the first publication and controls public release. Automatic steps prepare repeatable drafts; they do not waive human approval, platform authorization or licensing checks.
+
+Current source-tree capabilities are an authenticated private studio, match/episode draft, evidence-linked script editor and review, saved storyboard with 2D/2.5D scene previews, private pending-rights 3D model intake, deterministic short render proofs, and server-side upload adapters. These pieces do not yet combine into a complete episode-making workflow. The full 3–5 minute renderer, integrated voice/music/captions, durable render queue, operational editor acceptance, and end-to-end authorized social publishing remain incomplete. No social post is published automatically today.
+
+The owner reports their stadium GLB is 300–400 MB and commercially usable without credit. The planned private intake limit is 512 MiB with resumable 16 MiB parts, so that file fits without requiring one huge request. The owner-provided license statement is recorded as a claim until a separate rights reviewer checks the actual asset/source/license evidence. “No attribution required” can be recorded and honored if that evidence supports it; it does not mean the model is already approved or currently used in renders.
+
+The 3D stadium is an environment for cinematic openings, transitions and stylized scenes. It does not create actual match footage. Player and ball motion inferred from event data must be clearly illustrative; real player likenesses, club marks, match footage, narration and music each need their own rights decision. 2D graphics remain the preferred clear option for exact statistics, lineups and timelines.
+
 
 ## 2026-11-24 implementation follow-up — editorial planning
 

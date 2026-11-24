@@ -83,6 +83,16 @@ export default function TVEpisodeScriptEditor({
     setModelUploading(true);
     setModelUploadMessage('');
     try {
+      const file = formData.get('file');
+      if (!(file instanceof File)) throw new Error('Choose a .glb model file first.');
+      if (file.size > 512 * 1024 * 1024) throw new Error('The private TV model intake limit is 512 MiB.');
+      if (file.size > 32 * 1024 * 1024) {
+        const asset = await uploadLargeModel(formData, file);
+        setModelAssets(current => [asset, ...current.filter(item => item.id !== asset.id)]);
+        setModelUploadMessage('Large model stored privately. Independent rights review is still required before render use.');
+        form.reset();
+        return;
+      }
       const response = await fetch('/api/admin/tv/assets', {
         method: 'POST',
         credentials: 'same-origin',
@@ -98,6 +108,89 @@ export default function TVEpisodeScriptEditor({
     } finally {
       setModelUploading(false);
     }
+  }
+
+  async function uploadLargeModel(formData: FormData, file: File): Promise<ModelAsset> {
+    const resumeKey = `factsport-tv-model:${episodeId}:${file.name}:${file.size}:${file.lastModified}`;
+    const savedSessionId = sessionStorage.getItem(resumeKey);
+    let sessionId: string | null = savedSessionId;
+    let uploadedParts = new Set<number>();
+    let partSize = 16 * 1024 * 1024;
+    let partCount = 0;
+
+    if (sessionId) {
+      const statusResponse = await fetch(`/api/admin/tv/assets/uploads/${sessionId}`, { cache: 'no-store', credentials: 'same-origin' });
+      if (statusResponse.ok) {
+        const statusPayload = await statusResponse.json() as { session?: { status?: string; uploaded_parts?: Array<{ partNumber: number }> }; asset?: ModelAsset };
+        const session = statusPayload.session;
+        if (session?.status === 'completed') {
+          sessionStorage.removeItem(resumeKey);
+          if (statusPayload.asset) return statusPayload.asset;
+          throw new Error('This upload already completed. Refresh the model list before uploading it again.');
+        }
+        if (session?.status === 'uploading' || session?.status === 'completing') uploadedParts = new Set((session.uploaded_parts || []).map(part => Number(part.partNumber)));
+        else sessionId = null;
+      } else sessionId = null;
+    }
+
+    if (!sessionId) {
+      const startResponse = await fetch('/api/admin/tv/assets/uploads', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          episodeId, assetKind: formData.get('assetKind'), originalFilename: file.name, fileSize: file.size,
+          sourceName: formData.get('sourceName'), sourceUrl: formData.get('sourceUrl'),
+          licenseName: formData.get('licenseName'), licenseUrl: formData.get('licenseUrl'), attribution: formData.get('attribution'),
+        }),
+      });
+      const startPayload = await startResponse.json() as { sessionId?: string; partSize?: number; partCount?: number; error?: string };
+      if (!startResponse.ok || !startPayload.sessionId) throw new Error(startPayload.error || 'Could not start the resumable model upload.');
+      sessionId = startPayload.sessionId;
+      partSize = Number(startPayload.partSize) || partSize;
+      partCount = Number(startPayload.partCount) || 0;
+      sessionStorage.setItem(resumeKey, sessionId);
+    } else {
+      const statusResponse = await fetch(`/api/admin/tv/assets/uploads/${sessionId}`, { cache: 'no-store', credentials: 'same-origin' });
+      if (statusResponse.ok) {
+      const statusPayload = await statusResponse.json() as { session?: { part_size?: number; expected_part_count?: number; status?: string; uploaded_parts?: Array<{ partNumber: number }> } };
+        partSize = Number(statusPayload.session?.part_size) || partSize;
+        partCount = Number(statusPayload.session?.expected_part_count) || 0;
+        uploadedParts = new Set((statusPayload.session?.uploaded_parts || []).map(part => Number(part.partNumber)));
+        if (statusPayload.session?.status === 'completing') uploadedParts = new Set(Array.from({ length: partCount }, (_, index) => index + 1));
+      }
+    }
+    if (!partCount) partCount = Math.ceil(file.size / partSize);
+
+    for (let partNumber = 1; partNumber <= partCount; partNumber += 1) {
+      if (uploadedParts.has(partNumber)) continue;
+      const start = (partNumber - 1) * partSize;
+      const part = file.slice(start, Math.min(start + partSize, file.size));
+      let lastError: Error | null = null;
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        try {
+          const response = await fetch(`/api/admin/tv/assets/uploads/${sessionId}/parts/${partNumber}`, {
+            method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/octet-stream' }, body: part,
+          });
+          const payload = await response.json() as { error?: string };
+          if (!response.ok) throw new Error(payload.error || `Model part ${partNumber} could not be uploaded.`);
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error('Model upload interrupted.');
+          if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 500 * (2 ** attempt)));
+        }
+      }
+      if (lastError) throw new Error(`${lastError.message} Resume by selecting this same file again; completed parts will be kept for six days.`);
+      setModelUploadMessage(`Uploading securely: ${Math.min(partNumber, partCount)} of ${partCount} parts complete…`);
+    }
+
+    setModelUploadMessage('Verifying the GLB and saving it privately…');
+    const completeResponse = await fetch(`/api/admin/tv/assets/uploads/${sessionId}/complete`, {
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    const completePayload = await completeResponse.json() as { asset?: ModelAsset; error?: string; message?: string };
+    if (!completeResponse.ok || !completePayload.asset) throw new Error(completePayload.error || 'The model upload could not be completed. You can retry with the same file.');
+    sessionStorage.removeItem(resumeKey);
+    return completePayload.asset;
   }
 
   async function reviewModelRights(event: FormEvent<HTMLFormElement>, asset: ModelAsset) {
@@ -217,7 +310,7 @@ export default function TVEpisodeScriptEditor({
         </div>
         <details className="mt-4 rounded-2xl border border-violet-200 bg-violet-50 p-4">
           <summary className="cursor-pointer text-sm font-black text-violet-950">Add a 3D stadium, generic player, or football model</summary>
-          <p className="mt-2 text-xs leading-5 text-violet-900">Private .glb upload only · 32 MB maximum. License/source entries are owner-submitted claims and remain pending until a Factsport rights-admin review. Models are not used in the storyboard preview or any render until cleared.</p>
+          <p className="mt-2 text-xs leading-5 text-violet-900">Private self-contained .glb upload · up to 512 MiB. Files over 32 MiB upload in resumable 16 MiB parts and can continue if interrupted. Enter the original source and exact license evidence; rights remain pending until independent admin review. Models are not yet connected to a render pipeline and cannot appear in the storyboard preview.</p>
           <form onSubmit={event => void uploadModel(event)} className="mt-4 grid gap-3 sm:grid-cols-2">
             <label className="text-xs font-bold text-slate-700">Model type<select name="assetKind" defaultValue="stadium_environment" className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="stadium_environment">Stadium environment</option><option value="generic_player">Generic player</option><option value="football">Football</option></select></label>
             <label className="text-xs font-bold text-slate-700">GLB model file<input required name="file" type="file" accept=".glb,model/gltf-binary,application/octet-stream" className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white p-2 text-xs file:mr-3 file:rounded-md file:border-0 file:bg-violet-100 file:px-2 file:py-1 file:text-xs file:font-bold" /></label>
