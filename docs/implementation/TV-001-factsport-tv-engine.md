@@ -166,3 +166,9 @@ Factsport TV is an internal modular subsystem of Factsport V2, delivered in the 
 - Exact source head `cb2d13a` passed isolated verification [45354250796](https://github.com/MketyDigital/Factsport/actions/runs/45354250796), native Cloudflare build [45354250921](https://github.com/MketyDigital/Factsport/actions/runs/45354250921), and staging [45354251013](https://github.com/MketyDigital/Factsport/actions/runs/45354251013).
 - License review identified Quaternius' [Universal Base Characters](https://quaternius.com/packs/universalbasecharacters.html) (CC0, glTF) and [Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html) (CC0, GLB) as options for clearly generic, non-identifiable players and locomotion. Use only individual assets whose included license file agrees with the source page; do not imitate a real player. The owner's stadium is not attached and its source page is not yet known, so it remains pending and is not cleared for a public render.
 - Limitation: the upload is currently capped at 32 MiB; larger models need optimization/export to GLB or a resumable multipart upload increment before intake.
+
+## 2026-11-24 — independent model rights review
+
+- Added a separate `rights_admin` capability for GLB review. The uploader cannot review their own asset; clearing requires a named license, an HTTPS source or license evidence URL, and a written review note. Evidence links are recorded but not fetched by the application.
+- Decisions (`cleared`, `restricted`, `revoked`) are persisted with reviewer, timestamp, evidence and an audit event. Revocation is terminal for that asset version. A cleared model does not bypass episode, render-QC or publication approval.
+- The Studio presents the review form only to media admins. Staging acceptance still needs a different authorized reviewer and actual source/license evidence.

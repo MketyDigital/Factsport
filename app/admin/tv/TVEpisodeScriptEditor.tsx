@@ -5,7 +5,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 type Fact = { id: string; text: string; source: string; observedAt: string; verified: boolean };
 type Block = { id: string; text: string; factIds: string[] };
 type Scene = { id: string; position: number; label: string; startSeconds: number; durationSeconds: number; narrationText: string; factCards: Array<{ id: string; text: string; source: string; observedAt: string }>; visualTreatment: string; renderable: boolean };
-type ModelAsset = { id: string; asset_kind: string; byte_size: number; sha256: string; rights_status: string; provenance: { sourceName?: string; sourceUrl?: string | null; licenseName?: string; licenseUrl?: string | null; attribution?: string | null } };
+type ModelAsset = { id: string; asset_kind: string; byte_size: number; sha256: string; rights_status: string; provenance: { sourceName?: string; sourceUrl?: string | null; licenseName?: string; licenseUrl?: string | null; attribution?: string | null; rightsReview?: { notes?: string; reviewerUserId?: string; reviewedAt?: string; sourceUrl?: string | null; licenseName?: string | null; licenseUrl?: string | null } } };
 type EpisodeDetail = {
   id: string;
   title: string;
@@ -37,6 +37,9 @@ export default function TVEpisodeScriptEditor({
   const [modelAssets, setModelAssets] = useState<ModelAsset[]>([]);
   const [modelUploading, setModelUploading] = useState(false);
   const [modelUploadMessage, setModelUploadMessage] = useState('');
+  const [canReviewModelRights, setCanReviewModelRights] = useState(false);
+  const [modelRightsBusy, setModelRightsBusy] = useState<string | null>(null);
+  const [modelRightsMessage, setModelRightsMessage] = useState('');
   const activeStoryboardScene = episode?.scenes[Math.min(activeSceneIndex, Math.max(0, (episode?.scenes.length ?? 1) - 1))] ?? null;
 
   useEffect(() => {
@@ -52,8 +55,13 @@ export default function TVEpisodeScriptEditor({
           ? payload.episode.scriptDraft.blocks
           : [{ id: 'narration-1', text: '', factIds: [] }]);
         void fetch('/api/admin/tv/assets?episodeId=' + encodeURIComponent(episodeId), { cache: 'no-store', signal: controller.signal })
-          .then(async assetResponse => assetResponse.ok ? await assetResponse.json() as { assets?: ModelAsset[] } : null)
-          .then(assetPayload => { if (assetPayload?.assets && !controller.signal.aborted) setModelAssets(assetPayload.assets); })
+          .then(async assetResponse => assetResponse.ok ? await assetResponse.json() as { assets?: ModelAsset[]; canReviewRights?: boolean } : null)
+          .then(assetPayload => {
+            if (assetPayload && !controller.signal.aborted) {
+              if (assetPayload.assets) setModelAssets(assetPayload.assets);
+              setCanReviewModelRights(Boolean(assetPayload.canReviewRights));
+            }
+          })
           .catch(() => undefined);
         setState('ready');
       })
@@ -89,6 +97,35 @@ export default function TVEpisodeScriptEditor({
       setModelUploadMessage(error instanceof Error ? error.message : '3D model upload failed.');
     } finally {
       setModelUploading(false);
+    }
+  }
+
+  async function reviewModelRights(event: FormEvent<HTMLFormElement>, asset: ModelAsset) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    setModelRightsBusy(asset.id);
+    setModelRightsMessage('');
+    try {
+      const response = await fetch(`/api/admin/tv/assets/${asset.id}/rights`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          decision: formData.get('decision'),
+          sourceUrl: formData.get('sourceUrl'),
+          licenseName: formData.get('licenseName'),
+          licenseUrl: formData.get('licenseUrl'),
+          notes: formData.get('notes'),
+        }),
+      });
+      const payload = await response.json() as { asset?: ModelAsset; error?: string };
+      if (!response.ok || !payload.asset) throw new Error(payload.error || 'Model rights review could not be saved.');
+      setModelAssets(current => current.map(item => item.id === asset.id ? payload.asset! : item));
+      setModelRightsMessage('Independent rights decision recorded. A cleared model is eligible for later render review; this does not publish it.');
+    } catch (error) {
+      setModelRightsMessage(error instanceof Error ? error.message : 'Model rights review could not be saved.');
+    } finally {
+      setModelRightsBusy(null);
     }
   }
 
@@ -191,7 +228,18 @@ export default function TVEpisodeScriptEditor({
             <label className="text-xs font-bold text-slate-700 sm:col-span-2">Attribution or rights notes<textarea name="attribution" maxLength={1000} rows={2} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-3 text-sm" placeholder="Credit requirements, commercial-use wording, or owner statement" /></label>
             <div className="sm:col-span-2"><button type="submit" disabled={modelUploading} className="min-h-10 rounded-xl bg-violet-800 px-4 text-xs font-bold text-white disabled:opacity-50">{modelUploading ? 'Uploading private model…' : 'Upload and link model'}</button>{modelUploadMessage && <p className="mt-2 text-xs text-violet-950" role="status">{modelUploadMessage}</p>}</div>
           </form>
-          {modelAssets.length > 0 && <ul className="mt-4 space-y-2">{modelAssets.map(asset => <li key={asset.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-100 bg-white p-3"><div><p className="text-xs font-bold text-slate-900">{asset.asset_kind.replaceAll('_', ' ')} · {(asset.byte_size / (1024 * 1024)).toFixed(1)} MB</p><p className="mt-1 text-[10px] text-slate-600">{asset.provenance.licenseName || 'License not provided'} · rights {asset.rights_status}</p><p className="text-[10px] text-slate-500">{asset.provenance.sourceName || 'Source not provided'}</p></div><a href={'/api/admin/tv/assets/' + asset.id} className="rounded-lg border border-violet-200 px-3 py-2 text-[10px] font-bold text-violet-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">Download private original</a></li>)}</ul>}
+          {modelRightsMessage && <p className="mt-3 text-xs text-violet-950" role="status">{modelRightsMessage}</p>}
+          {modelAssets.length > 0 && <ul className="mt-4 space-y-3">{modelAssets.map(asset => <li key={asset.id} className="rounded-xl border border-violet-100 bg-white p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold text-slate-900">{asset.asset_kind.replaceAll('_', ' ')} · {(asset.byte_size / (1024 * 1024)).toFixed(1)} MB</p><p className="mt-1 text-[10px] text-slate-600">{asset.provenance.licenseName || 'License not provided'} · rights {asset.rights_status}</p><p className="text-[10px] text-slate-500">{asset.provenance.sourceName || 'Source not provided'}</p>{asset.provenance.rightsReview?.reviewedAt && <p className="mt-1 text-[10px] text-slate-600">Reviewed {new Date(asset.provenance.rightsReview.reviewedAt).toLocaleString()} · {asset.provenance.rightsReview.notes}</p>}</div><a href={'/api/admin/tv/assets/' + asset.id} className="rounded-lg border border-violet-200 px-3 py-2 text-[10px] font-bold text-violet-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">Download private original</a></div>
+            {canReviewModelRights && asset.rights_status !== 'revoked' && <form onSubmit={event => void reviewModelRights(event, asset)} className="mt-3 grid gap-2 rounded-xl bg-violet-50 p-3 sm:grid-cols-2">
+              <label className="text-[10px] font-bold text-violet-950">Decision<select name="decision" defaultValue={asset.rights_status === 'cleared' ? 'cleared' : 'restricted'} className="mt-1 min-h-9 w-full rounded-lg border border-violet-200 bg-white px-2 text-xs text-slate-900"><option value="cleared">Clear for use</option><option value="restricted">Restrict use</option><option value="revoked">Revoke use</option></select></label>
+              <label className="text-[10px] font-bold text-violet-950">License name<input name="licenseName" defaultValue={asset.provenance.rightsReview?.licenseName || asset.provenance.licenseName || ''} maxLength={240} className="mt-1 min-h-9 w-full rounded-lg border border-violet-200 bg-white px-2 text-xs text-slate-900" placeholder="CC0 1.0, Quaternius Asset License…" /></label>
+              <label className="text-[10px] font-bold text-violet-950">Original source URL<input name="sourceUrl" type="url" defaultValue={asset.provenance.rightsReview?.sourceUrl || asset.provenance.sourceUrl || ''} maxLength={1000} className="mt-1 min-h-9 w-full rounded-lg border border-violet-200 bg-white px-2 text-xs text-slate-900" placeholder="https://…" /></label>
+              <label className="text-[10px] font-bold text-violet-950">License evidence URL<input name="licenseUrl" type="url" defaultValue={asset.provenance.rightsReview?.licenseUrl || asset.provenance.licenseUrl || ''} maxLength={1000} className="mt-1 min-h-9 w-full rounded-lg border border-violet-200 bg-white px-2 text-xs text-slate-900" placeholder="https://…" /></label>
+              <label className="text-[10px] font-bold text-violet-950 sm:col-span-2">Independent review note<textarea name="notes" required minLength={asset.rights_status === 'revoked' ? 8 : 12} maxLength={2000} rows={2} className="mt-1 w-full rounded-lg border border-violet-200 bg-white p-2 text-xs text-slate-900" placeholder="Record which license terms and intended use you checked." /></label>
+              <div className="sm:col-span-2"><button type="submit" disabled={modelRightsBusy !== null} className="min-h-9 rounded-lg bg-violet-800 px-3 text-[10px] font-bold text-white disabled:opacity-50">{modelRightsBusy === asset.id ? 'Recording review…' : 'Save independent rights decision'}</button></div>
+            </form>}
+          </li>)}</ul>}
         </details>
         <div className="mt-4 space-y-4">
           {blocks.map((block, index) => <fieldset key={block.id} className="rounded-xl border border-slate-200 p-4">

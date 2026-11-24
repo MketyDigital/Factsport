@@ -114,7 +114,11 @@ export async function GET(request: Request) {
           ORDER BY library.created_at DESC
           LIMIT 100
         `);
-    return NextResponse.json({ success: true, assets }, { headers: PRIVATE_HEADERS });
+    return NextResponse.json({
+      success: true,
+      canReviewRights: authorization.user.roles.includes('media_admin'),
+      assets,
+    }, { headers: PRIVATE_HEADERS });
   } catch (error) {
     console.error('Factsport TV model library unavailable', error);
     return NextResponse.json({ error: 'TV model library is not available.' }, { status: 503, headers: PRIVATE_HEADERS });
