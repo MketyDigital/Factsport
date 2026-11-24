@@ -179,7 +179,7 @@ export default function TVEpisodeScriptEditor({
                 <div className="w-full rounded-2xl border border-white/15 bg-slate-950/65 p-5 shadow-[0_22px_60px_rgba(0,0,0,.35)] backdrop-blur-sm sm:p-7 motion-safe:animate-[fs-match-event-in_.45s_ease-out]">
                   <p className="text-[9px] font-black uppercase tracking-[.24em] text-cyan-200">Evidence-led narration</p>
                   <p className="mx-auto mt-3 max-w-xl text-base font-bold leading-7 text-white sm:text-xl">{activeStoryboardScene.narrationText}</p>
-                  <div className="mt-4 flex flex-wrap justify-center gap-2">{activeStoryboardScene.factCards.map(fact => <span key={fact.id} className="rounded-full border border-cyan-200/20 bg-cyan-300/10 px-3 py-1.5 text-[10px] font-semibold text-cyan-50">{fact.text}</span>)}</div>
+                  <div className="mt-4 flex flex-wrap justify-center gap-2">{activeStoryboardScene.factCards.map(fact => <span key={fact.id} className="rounded-xl border border-cyan-200/20 bg-cyan-300/10 px-3 py-2 text-left text-[10px] font-semibold text-cyan-50"><strong>{fact.text}</strong><span className="mt-1 block text-[8px] font-medium text-cyan-100/70">{fact.source} · {new Date(fact.observedAt).toLocaleString()}</span></span>)}</div>
                   <p className="mt-4 text-[9px] uppercase tracking-[.16em] text-slate-400">Illustrative 2D/2.5D layout · no footage or player likeness</p>
                 </div>
               </div>
