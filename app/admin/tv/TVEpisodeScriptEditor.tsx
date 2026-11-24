@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 
 type Fact = { id: string; text: string; source: string; observedAt: string; verified: boolean };
 type Block = { id: string; text: string; factIds: string[] };
-type Scene = { id: string; position: number; label: string; startSeconds: number; durationSeconds: number; narrationText: string; factCards: Array<{ id: string; text: string; source: string; observedAt: string }>; visualTreatment: string; renderable: boolean };
+type Scene = { id: string; position: number; label: string; startSeconds: number; durationSeconds: number; narrationText: string; factCards: Array<{ id: string; text: string; source: string; observedAt: string }>; visualTreatment: string; renderable: boolean };\ntype ModelAsset = { id: string; asset_kind: string; byte_size: number; sha256: string; rights_status: string; provenance: { sourceName?: string; sourceUrl?: string | null; licenseName?: string; licenseUrl?: string | null; attribution?: string | null } };
 type EpisodeDetail = {
   id: string;
   title: string;
@@ -32,7 +32,7 @@ export default function TVEpisodeScriptEditor({
   const [state, setState] = useState<'loading' | 'ready' | 'saving' | 'denied' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [reviewNotes, setReviewNotes] = useState('');
-  const [activeSceneIndex, setActiveSceneIndex] = useState(0);
+  const [activeSceneIndex, setActiveSceneIndex] = useState(0);\n  const [modelAssets, setModelAssets] = useState<ModelAsset[]>([]);\n  const [modelUploading, setModelUploading] = useState(false);\n  const [modelUploadMessage, setModelUploadMessage] = useState('');
   const activeStoryboardScene = episode?.scenes[Math.min(activeSceneIndex, Math.max(0, (episode?.scenes.length ?? 1) - 1))] ?? null;
 
   useEffect(() => {
@@ -47,6 +47,10 @@ export default function TVEpisodeScriptEditor({
         setBlocks(payload.episode.scriptDraft?.blocks?.length
           ? payload.episode.scriptDraft.blocks
           : [{ id: 'narration-1', text: '', factIds: [] }]);
+        void fetch('/api/admin/tv/assets?episodeId=' + encodeURIComponent(episodeId), { cache: 'no-store', signal: controller.signal })
+          .then(async assetResponse => assetResponse.ok ? await assetResponse.json() as { assets?: ModelAsset[] } : null)
+          .then(assetPayload => { if (assetPayload?.assets && !controller.signal.aborted) setModelAssets(assetPayload.assets); })
+          .catch(() => undefined);
         setState('ready');
       })
       .catch(error => {
@@ -57,6 +61,31 @@ export default function TVEpisodeScriptEditor({
 
   function updateBlock(index: number, update: Partial<Block>) {
     setBlocks(current => current.map((block, i) => i === index ? { ...block, ...update } : block));
+  }
+
+  async function uploadModel(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    formData.set('episodeId', episodeId);
+    setModelUploading(true);
+    setModelUploadMessage('');
+    try {
+      const response = await fetch('/api/admin/tv/assets', {
+        method: 'POST',
+        credentials: 'same-origin',
+        body: formData,
+      });
+      const payload = await response.json() as { asset?: ModelAsset; error?: string; message?: string };
+      if (!response.ok || !payload.asset) throw new Error(payload.error || '3D model upload failed.');
+      setModelAssets(current => [payload.asset!, ...current.filter(asset => asset.id !== payload.asset!.id)]);
+      setModelUploadMessage(payload.message || 'Model stored privately; rights review is still required.');
+      form.reset();
+    } catch (error) {
+      setModelUploadMessage(error instanceof Error ? error.message : '3D model upload failed.');
+    } finally {
+      setModelUploading(false);
+    }
   }
 
   async function review(decision: 'approved' | 'changes_requested') {
@@ -145,6 +174,21 @@ export default function TVEpisodeScriptEditor({
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
           Rights state: data {episode.rights?.dataCleared ? 'cleared' : 'not cleared'}, assets {episode.rights?.assetsCleared ? 'cleared' : 'not cleared'}. Saving script text does not change either decision or make the episode publishable.
         </div>
+        <details className="mt-4 rounded-2xl border border-violet-200 bg-violet-50 p-4">
+          <summary className="cursor-pointer text-sm font-black text-violet-950">Add a 3D stadium, generic player, or football model</summary>
+          <p className="mt-2 text-xs leading-5 text-violet-900">Private .glb upload only · 32 MB maximum. License/source entries are owner-submitted claims and remain pending until a Factsport rights-admin review. Models are not used in the storyboard preview or any render until cleared.</p>
+          <form onSubmit={event => void uploadModel(event)} className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="text-xs font-bold text-slate-700">Model type<select name="assetKind" defaultValue="stadium_environment" className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="stadium_environment">Stadium environment</option><option value="generic_player">Generic player</option><option value="football">Football</option></select></label>
+            <label className="text-xs font-bold text-slate-700">GLB model file<input required name="file" type="file" accept=".glb,model/gltf-binary,application/octet-stream" className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white p-2 text-xs file:mr-3 file:rounded-md file:border-0 file:bg-violet-100 file:px-2 file:py-1 file:text-xs file:font-bold" /></label>
+            <label className="text-xs font-bold text-slate-700">Where it came from<input name="sourceName" maxLength={240} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" placeholder="Site, creator, or your own work" /></label>
+            <label className="text-xs font-bold text-slate-700">Source link (optional)<input name="sourceUrl" type="url" maxLength={1000} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" placeholder="https://…" /></label>
+            <label className="text-xs font-bold text-slate-700">License shown<input name="licenseName" maxLength={240} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" placeholder="Exact license name or “unknown”" /></label>
+            <label className="text-xs font-bold text-slate-700">License evidence link (optional)<input name="licenseUrl" type="url" maxLength={1000} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" placeholder="https://…" /></label>
+            <label className="text-xs font-bold text-slate-700 sm:col-span-2">Attribution or rights notes<textarea name="attribution" maxLength={1000} rows={2} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-3 text-sm" placeholder="Credit requirements, commercial-use wording, or owner statement" /></label>
+            <div className="sm:col-span-2"><button type="submit" disabled={modelUploading} className="min-h-10 rounded-xl bg-violet-800 px-4 text-xs font-bold text-white disabled:opacity-50">{modelUploading ? 'Uploading private model…' : 'Upload and link model'}</button>{modelUploadMessage && <p className="mt-2 text-xs text-violet-950" role="status">{modelUploadMessage}</p>}</div>
+          </form>
+          {modelAssets.length > 0 && <ul className="mt-4 space-y-2">{modelAssets.map(asset => <li key={asset.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-100 bg-white p-3"><div><p className="text-xs font-bold text-slate-900">{asset.asset_kind.replaceAll('_', ' ')} · {(asset.byte_size / (1024 * 1024)).toFixed(1)} MB</p><p className="mt-1 text-[10px] text-slate-600">{asset.provenance.licenseName || 'License not provided'} · rights {asset.rights_status}</p><p className="text-[10px] text-slate-500">{asset.provenance.sourceName || 'Source not provided'}</p></div><a href={'/api/admin/tv/assets/' + asset.id} className="rounded-lg border border-violet-200 px-3 py-2 text-[10px] font-bold text-violet-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500">Download private original</a></li>)}</ul>}
+        </details>
         <div className="mt-4 space-y-4">
           {blocks.map((block, index) => <fieldset key={block.id} className="rounded-xl border border-slate-200 p-4">
             <legend className="px-1 text-xs font-black text-slate-800">Narration block {index + 1}</legend>
