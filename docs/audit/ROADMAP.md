@@ -424,3 +424,11 @@ The owner-directed Media/TV-first release sequence continues to preserve the cur
 - Saving narration keeps the episode rights-blocked and does not advance review status, clear rights, enqueue a render, generate audio, or post to any platform.
 - Exact-head isolated verification `3c3b110` passed [45323117266](https://github.com/MketyDigital/Factsport/actions/runs/45323117266). Native build and protected staging preflight remain in progress; authenticated owner browser acceptance remains open.
 - The existing free Prediction host remains outside this workstream.
+
+
+## M100 — independent TV script review and storyboard draft (2026-11-24)
+
+- Added a self-review-resistant editorial approval bound to the current script digest and episode revision. Script edits clear that approval and remove saved storyboard scenes.
+- Added a persisted, protected storyboard draft: one source-linked 2D fact-card scene per approved narration block, with estimated timings and no external assets. The Studio displays scene text and fact references.
+- This advances the episode from script draft into editorial planning only. It does not clear source or asset rights, advance status, create audio/video/render jobs, or publish. Rights evidence, real editor browser acceptance, 4-minute renderer/audio/caption QA, durable asset storage, channel OAuth, publisher journey and human-reviewed platform dispatch remain open.
+- Exact head `681e1ff` checks are pending: isolated verification [45324009688](https://github.com/MketyDigital/Factsport/actions/runs/45324009688), native build [45324009518](https://github.com/MketyDigital/Factsport/actions/runs/45324009518), staging preflight [45324009600](https://github.com/MketyDigital/Factsport/actions/runs/45324009600). The free Prediction service and current production routing remain untouched.
