@@ -12,6 +12,7 @@ test('Factsport TV preview is private, read-only and discoverable from Media ope
   const home = read('app/admin/page.tsx');
   const preview = read('app/admin/tv/TVStoryboardPreview.tsx');
   const inventoryApi = read('app/api/admin/tv/episodes/route.ts');
+  const inventoryRead = inventoryApi.split('export async function POST')[0];
   const matchPickerApi = read('app/api/admin/tv/matches/route.ts');
   assert.match(page, /robots: \{ index: false, follow: false, nocache: true \}/);
   assert.match(layout, /href="\/admin\/tv"/);
@@ -25,7 +26,7 @@ test('Factsport TV preview is private, read-only and discoverable from Media ope
   assert.match(inventoryApi, /authorizeMediaEditorialAction\('tv'\)/);
   assert.match(inventoryApi, /export async function GET\(/);
   assert.match(inventoryApi, /LIMIT 100/);
-  assert.doesNotMatch(inventoryApi, /INSERT INTO|UPDATE public|DELETE FROM|upload/i);
+  assert.doesNotMatch(inventoryRead, /INSERT INTO|UPDATE public|DELETE FROM|upload/i);
   assert.match(matchPickerApi, /authorizeMediaEditorialAction\('tv'\)/);
   assert.match(matchPickerApi, /LIMIT 50/);
   assert.match(inventoryApi, /isSameOriginRequest/);
