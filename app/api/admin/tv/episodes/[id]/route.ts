@@ -77,6 +77,7 @@ function publicEpisode(row: Record<string, unknown>) {
     rights: (row.snapshot as { storyPlan?: { rights?: unknown } } | null)?.storyPlan?.rights ?? null,
     facts,
     scriptDraft: content.scriptDraft ?? null,
+    scriptReview: content.scriptReview ?? null,
   };
 }
 
@@ -147,7 +148,7 @@ export async function PATCH(request: Request, context: { params: { id: string } 
       };
       const updated = await tx`
         UPDATE public.factsport_tv_episodes
-        SET editorial_content = ${JSON.stringify({ ...content, scriptDraft })}::jsonb,
+        SET editorial_content = ${JSON.stringify({ ...content, scriptDraft, scriptReview: null })}::jsonb,
             updated_by = ${authorization.user.domainUserId}::uuid,
             updated_at = now()
         WHERE id = ${context.params.id}::uuid
