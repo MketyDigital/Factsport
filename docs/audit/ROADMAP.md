@@ -439,3 +439,9 @@ The owner-directed Media/TV-first release sequence continues to preserve the cur
 - Added a scene-by-scene private Studio preview for persisted, independently approved storyboards: animated broadcast framing, an abstract 2.5D pitch, source-linked fact cards, approximate timing, accessible scene selection and previous/next controls.
 - The preview observes reduced-motion settings and labels the abstract visual as illustrative. It does not render or upload media, depict real match events, use player likenesses, or change rights/status.
 - Exact source head `454c932` passed isolated verification [45342942972](https://github.com/MketyDigital/Factsport/actions/runs/45342942972), native build [45342942964](https://github.com/MketyDigital/Factsport/actions/runs/45342942964), and protected staging [45342943031](https://github.com/MketyDigital/Factsport/actions/runs/45342943031). TV acceptance still needs the real Entra editor browser journey, rights, production renderer/audio/caption QA, durable private assets, OAuth and human-reviewed social publication. The free Prediction subdomain and production routes are unchanged.
+
+
+## M102 — visible fact provenance in TV scene preview (2026-11-24)
+
+- Added the underlying source and observation time to each fact card in the private TV storyboard preview and scene list, keeping evidence visible during editorial review.
+- Exact head `3f0d6c6` passed isolated verification [45343476559](https://github.com/MketyDigital/Factsport/actions/runs/45343476559), native build [45343476547](https://github.com/MketyDigital/Factsport/actions/runs/45343476547), and protected staging [45343476525](https://github.com/MketyDigital/Factsport/actions/runs/45343476525). No rights, status, rendering, OAuth or publication gate changed. Prediction routing remains unchanged.
