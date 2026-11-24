@@ -23,11 +23,24 @@ Factsport TV is an internal modular subsystem of Factsport V2, delivered in the 
 
 ### TV2 — offline Match Story prototype
 
-- Use deterministic sanitized fixture JSON and original or explicitly rights-cleared artwork/voice only. Do not connect production ESPN, legacy Supabase, YouTube upload or public website.
-- Generate nominal four-minute 16:9 Match Story, responsive down to a shorter 3–5 minute story without padding; produce 9:16 derivative only after landscape QA.
-- Use Blender + Three.js + FFmpeg as the proposed free/open-source default subject to license review; alternative Remotion is optional and requires eligibility/licensing review.
+- Implement all three production modes over the same `EpisodePlan`/scene/render/QC/approval/publish contracts. Mode B (licensed highlight-assisted) is the primary Match Story requirement; Mode A (data-only) is the full fallback and must remain useful without any uploaded clip; Mode C (tracking-based 3D reconstruction) is experimental until its quality benchmark passes.
+- First use deterministic sanitized fixtures and original/licensed media only. Do not connect production ESPN, legacy Supabase, production channels or public website. Mode B footage must be supplied under a documented commercial derivative and platform grant; a public URL alone is insufficient.
+- Generate a nominal four-minute 16:9 Match Story and adapt to a truthful 3–5 minute runtime without padding; produce a 9:16 derivative only after landscape QA. The first integrated golden example should use a short rights-cleared Mode B clip, with a Mode A episode from the same match snapshot as a comparison/fallback.
+- Use Blender (3D scene rendering), FFmpeg (transcoding, compositing, audio/caption mux and format derivatives), Three.js (interactive studio preview), OpenCV (video probe/geometry utilities), and CVAT (manual keyframe/track correction) as the initial tool candidates, all subject to runtime and license review. Optional SAM 2 can propagate user-prompted video masks for editorial assistance, not identify a player, prove a goal, or decide rights. Pick any player/ball detector or tracker only after model-weight, training-data and commercial-use review plus a representative-footage benchmark. Remotion remains optional and requires license eligibility review.
 - Trace every narration fact to snapshot data or a human assertion; no copied ESPN prose, invented passes/locations/assists, fabricated stats, or realistic replay presented as footage. Label illustrative actions clearly.
 - Gate unsupported interpretation to human editor; 2D is used when 3D would mislead or not improve clarity.
+
+#### Three-mode feature and manual-tool acceptance plan
+
+1. **Mode A:** given only a frozen, verified match snapshot, the director creates an original narration/rundown, accurate 2D data cards and clearly illustrative 3D scenes; it must render without a highlight upload. Missing stats/lineups are omitted or qualified.
+2. **Mode B:** accept a private licensed source file and grant record; show media metadata and timeline in/out editing; link candidate moments to canonical events only after editor confirmation; preserve the uploaded original; produce a separate clip/graphics/narration derivative. Ship a manual cut/annotation path first. Add AI keyframe, shot-boundary, segmentation and player/ball suggestions as optional editor assists with visible confidence and correction controls.
+3. **Mode C:** add a versioned `TrackingTake` with frame time, camera calibration/pitch transform, tracked object identity class, coordinates, confidence, source frame and reviewer correction. Prefer licensed tracking-feed input. If derived from video, benchmark camera calibration, player/ball detection, tracking continuity, team/identity assignment and event alignment separately. Block low-confidence scenes; never silently substitute inferred paths.
+4. Create and inspect the same golden match in A and B, then compare provenance, scene ordering, clip attribution, timing, output quality and fallback behavior. C has its own acceptance fixtures and can be disabled independently without breaking A or B.
+5. Manual production stays possible throughout: editors can trim/approve the selected clip ranges, keyframe player/ball/pitch annotations in CVAT, adjust the storyboard/camera paths in Blender, record narration, and assemble/inspect the package in the render worker or an approved desktop editor before importing the finished asset back into the TV episode for QC and publishing.
+
+**Suggested tool boundaries:** the TV Studio is the workflow/control plane; PostgreSQL stores episode revisions, source grants, clip ranges, track revisions, QC, approvals and outbox; R2 stores immutable source and output media; a separate container/GPU worker runs probes, models, Blender and FFmpeg. Cloudflare Workers handle authenticated APIs, job orchestration and media access, not long video inference/render jobs. Tool choices remain adapters so a manual editor or another model can replace any candidate.
+
+**Tool references checked 2026-11-24:** [CVAT video track mode](https://docs.cvat.ai/docs/annotation/tools/track-mode-advanced/) supports editable keyframes/interpolation; [Meta SAM 2](https://github.com/facebookresearch/sam2) supports promptable video masks propagated across frames and lists Apache-2.0 for its code and checkpoints; [FFmpeg filtergraphs](https://ffmpeg.org/ffmpeg.html#Complex-filtergraphs) combine video/audio/graphic layers; [SoccerNet Game State Reconstruction](https://arxiv.org/abs/2504.06357) describes a broadcast-video pipeline needing camera parameter estimation, pitch-keypoint refinement and tracklet post-processing. These are candidate components, not turnkey match understanding; each selected detector/checkpoint/dataset needs its own accuracy and commercial-rights review.
 
 #### Implemented renderer slice (2026-11-23)
 
@@ -39,6 +52,7 @@ Factsport TV is an internal modular subsystem of Factsport V2, delivered in the 
 ### TV3 — data and episode contracts
 
 - Define typed `MatchVideoSnapshot`, canonical event identity, freshness/rights qualifiers, frozen source digest and `EpisodePlan`/scene schema under `lib/tv` as the current offline implementation slice.
+- Extend the common scene contract with mode, source asset/grant, source clip timecodes, match-time offset/confidence, visual-truth label, and optional versioned tracking revision; keep the frozen match snapshot immutable and independently version user annotations.
 - Build a read-only SportsReadAdapter over canonical V2 read models. No renderer direct ESPN calls, legacy DB, Supabase or duplicate match store.
 - Add RightsAndProvenanceGate, original-language/narrative check, source-freshness checks, data conflict handling and deterministic quality state.
 - Add table-driven golden tests for gaps, late/duplicate/corrected events, own goals, VAR, extra time, penalties, status changes, provider outages and match ambiguity.
@@ -48,13 +62,14 @@ Factsport TV is an internal modular subsystem of Factsport V2, delivered in the 
 - Add reviewed migrations for TV-specific episode, scene, asset lineage, render-job, QC, approval and publish-outbox state. Add distinct least-privilege API/worker roles; no admin DB credential in the app. Do not apply to production.
 - Add human editor-only Studio routes, audit log, script/scene/timing/narration/music overrides, signed previews, QA review and cancellation/retraction workflow. Require human approval for every initial episode.
 - Store snapshots, drafts, outputs, captions, posters and manifests in private R2 through MediaStore; define retention and safe deletion.
+- Add resumable licensed video-source ingest and an immutable grant record; expose clip-trim controls, frame-accurate preview, tracker confidence/correction and rights provenance in the editor. Keep model inference and rendering on external, isolated worker compute.
 - Use durable job lease/idempotency/retries and external render compute (local/self-hosted by default). Cloudflare Worker handles orchestration and delivery, not GPU rendering or long encoding requests.
 - Keep YouTube and other publishing credentials out of scope until explicit owner approval; validate private/unlisted upload only with test account after channel OAuth, policy and licensing review.
 
 ### TV5 — staging acceptance and later activation gate
 
 - Run security, roles, privacy, output QC, accessibility, provenance, factual integrity, cost, resilience, retry/reconciliation, deletion and performance tests.
-- Independently review scripts/video and licensing for each show format. Match Story ships first; Daily, Weekend and Monday directors are separately gated based on complete sources and human staffing.
+- Independently review scripts/video and licensing for each mode and show format. Mode B is the primary Match Story pilot; Mode A is the required no-highlight fallback; Mode C remains disabled until its own tracking/calibration quality and rights acceptance pass. Daily, Weekend and Monday directors are separately gated based on complete sources and human staffing.
 - Keep trigger schedules off. No automatic public uploads, YouTube publishing, public TV page, production ingest or new recurring provider calls without a separate TV production go/no-go.
 
 ### TV7 — human-reviewed social publishing path
