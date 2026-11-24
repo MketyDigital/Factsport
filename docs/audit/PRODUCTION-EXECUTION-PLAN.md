@@ -227,6 +227,9 @@ Governing spec: [`docs/product/FACTSPORT-TV-MEDIA-ENGINE-SPEC.md`](../product/FA
 **Exit:** staging TV engine, editor and human-reviewed social publishing workflow pass factual/rights/security/cost acceptance. TV readiness is required for the scoped Media/TV release decision; production schedules and automated publication remain separately gated.
 
 
+**2026-11-24 TV implementation checkpoint:** migrations 0051–0052 define private episode/snapshot/scene/asset/render-job/approval/outbox/audit records and a database guard requiring an approved episode revision, explicit publish approval, current rights approval and cleared video asset before outbox enqueue. The staging migration workflow ledger check was advanced through version 52. This is schema work only; the exact staging workflow result, API/Studio integration, R2 signed asset path, render worker, platform dispatch, four-minute media QA and rights acceptance remain open. No production data, routes, credentials, schedules or social accounts were changed.
+
+
 ## 4. Current blockers and owner decisions
 
 1. **Customer identity:** Entra External ID in a dedicated external tenant is selected for customer sign-in. The tenant resource exists; app registrations/secrets, exact redirect/session configuration and real staging sign-in/recovery tests remain unverified. Keep editor OIDC separate; do not use a workforce tenant for customers or silently link accounts by email.
