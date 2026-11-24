@@ -589,4 +589,11 @@ jobs:
           END
           $$;
           SQL
-          echo "Disposable PostgreSQL migrations 0000–0050 and Media/competition/VOD/social privilege assertions passed."
+          test -s db/migrations/0051_factsport_tv_episode_workflow.sql
+          grep -q "CREATE TABLE IF NOT EXISTS public.factsport_tv_episodes" db/migrations/0051_factsport_tv_episode_workflow.sql
+          grep -q "factsport_tv_enforce_publish_guard" db/migrations/0052_factsport_tv_publish_approval_guard.sql
+          test -s db/migrations/0053_factsport_tv_model_asset_library.sql
+          grep -q "CREATE TABLE IF NOT EXISTS public.factsport_tv_asset_library" db/migrations/0053_factsport_tv_model_asset_library.sql
+          grep -q "asset_kind IN ('stadium_environment', 'generic_player', 'football')" db/migrations/0053_factsport_tv_model_asset_library.sql
+          grep -q "rights_status text NOT NULL DEFAULT 'pending'" db/migrations/0053_factsport_tv_model_asset_library.sql
+          echo "Disposable PostgreSQL migrations 0000–0053 and Media/competition/VOD/social/TV privilege assertions passed."
