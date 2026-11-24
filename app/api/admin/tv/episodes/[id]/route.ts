@@ -168,6 +168,7 @@ export async function PATCH(request: Request, context: { params: { id: string } 
       const updated = await tx`
         UPDATE public.factsport_tv_episodes
         SET editorial_content = ${JSON.stringify({ ...content, scriptDraft, scriptReview: null })}::jsonb,
+            revision = revision + 1,
             updated_by = ${authorization.user.domainUserId}::uuid,
             updated_at = now()
         WHERE id = ${context.params.id}::uuid
@@ -177,7 +178,7 @@ export async function PATCH(request: Request, context: { params: { id: string } 
         INSERT INTO public.factsport_tv_audit_events (episode_id, actor_user_id, action, details)
         VALUES (
           ${context.params.id}::uuid, ${authorization.user.domainUserId}::uuid,
-          'script_saved', ${JSON.stringify({ scriptDigest, blockCount: blocks.length })}::jsonb
+          'script_saved', ${JSON.stringify({ scriptDigest, blockCount: blocks.length, revision: updated[0].revision })}::jsonb
         )
       `;
       return { kind: 'ok' as const, episode: publicEpisode(updated[0], authorization.user.domainUserId) };
