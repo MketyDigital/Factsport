@@ -15,6 +15,18 @@ type TVEpisode = {
   updated_at: string;
 };
 
+type TVMatch = {
+  id: string;
+  league: string;
+  home_team: string;
+  away_team: string;
+  home_score: number;
+  away_score: number;
+  match_date: string;
+  source: string;
+  version: number;
+};
+
 const scenes = [
   { id: 'opening', label: '3D opening', eyebrow: 'MATCH STORY', type: 'stadium', Icon: ListVideo },
   { id: 'lineups', label: '2D lineups', eyebrow: 'TEAM SHAPE', type: 'lineup', Icon: Users },
@@ -121,6 +133,10 @@ export default function TVStoryboardPreview() {
   const [active, setActive] = useState(0);
   const [episodes, setEpisodes] = useState<TVEpisode[]>([]);
   const [episodeState, setEpisodeState] = useState<'loading' | 'ready' | 'denied' | 'unavailable'>('loading');
+  const [matches, setMatches] = useState<TVMatch[]>([]);
+  const [matchState, setMatchState] = useState<'loading' | 'ready' | 'denied' | 'unavailable'>('loading');
+  const [creatingMatch, setCreatingMatch] = useState<string | null>(null);
+  const [draftMessage, setDraftMessage] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -139,6 +155,49 @@ export default function TVStoryboardPreview() {
       });
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/admin/tv/matches', { cache: 'no-store', signal: controller.signal })
+      .then(async response => {
+        if (response.status === 401 || response.status === 403) throw new Error('denied');
+        if (!response.ok) throw new Error('unavailable');
+        const payload = await response.json() as { matches?: TVMatch[] };
+        if (!Array.isArray(payload.matches)) throw new Error('unavailable');
+        setMatches(payload.matches);
+        setMatchState('ready');
+      })
+      .catch(error => {
+        if (controller.signal.aborted) return;
+        setMatchState(error instanceof Error && error.message === 'denied' ? 'denied' : 'unavailable');
+      });
+    return () => controller.abort();
+  }, []);
+
+  async function createDraft(match: TVMatch) {
+    setCreatingMatch(match.id);
+    setDraftMessage('');
+    try {
+      const response = await fetch('/api/admin/tv/episodes', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matchId: match.id }),
+      });
+      const payload = await response.json() as { episode?: TVEpisode; error?: string };
+      if (!response.ok || !payload.episode) throw new Error(payload.error || 'Unable to create the draft.');
+      setEpisodes(current => [payload.episode!, ...current.filter(item => item.id !== payload.episode!.id)]);
+      setEpisodeState('ready');
+      setMatches(current => current.filter(item => item.id !== match.id));
+      setDraftMessage(payload.episode.status === 'blocked_rights'
+        ? 'Draft created and blocked until data and asset rights are reviewed. No video was rendered or published.'
+        : 'Draft created.');
+    } catch (error) {
+      setDraftMessage(error instanceof Error ? error.message : 'Unable to create the draft.');
+    } finally {
+      setCreatingMatch(null);
+    }
+  }
 
   const scene = scenes[active];
   return (
@@ -160,6 +219,16 @@ export default function TVStoryboardPreview() {
         {episodeState === 'unavailable' && <p className="mt-4 text-xs text-amber-900" role="status">The private episode inventory is temporarily unavailable. The synthetic storyboard below remains a disconnected preview.</p>}
         {episodeState === 'ready' && episodes.length === 0 && <p className="mt-4 rounded-xl bg-slate-50 p-4 text-xs leading-5 text-slate-600">No episode records yet. The sample storyboard below uses fictional data and is not a production episode.</p>}
         {episodeState === 'ready' && episodes.length > 0 && <ul className="mt-4 divide-y divide-slate-100">{episodes.map(episode => <li key={episode.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="text-sm font-bold text-slate-900">{episode.title}</p><p className="mt-1 text-[10px] uppercase tracking-wide text-slate-500">{episode.show_format.replaceAll('_', ' ')} · revision {episode.revision} · {episode.duration_seconds ? Math.round(episode.duration_seconds / 60) + ' min' : 'duration pending'}</p></div><span className="rounded-full bg-cyan-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-cyan-900">{episode.status.replaceAll('_', ' ')}</span></li>)}</ul>}
+      </section>
+
+      <section aria-labelledby="tv-match-picker" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div><h2 id="tv-match-picker" className="font-black text-slate-900">Start a Match Story draft</h2><p className="mt-1 text-xs leading-5 text-slate-600">Choose a verified final V2 match. The first draft freezes score evidence and stays rights-blocked; this action never renders or publishes.</p></div>
+        {draftMessage && <p className="mt-3 rounded-xl bg-cyan-50 p-3 text-xs text-cyan-950" role="status">{draftMessage}</p>}
+        {matchState === 'loading' && <p className="mt-4 text-xs text-slate-600" role="status">Loading final matches…</p>}
+        {matchState === 'denied' && <p className="mt-4 text-xs text-amber-900" role="status">An active Factsport TV editor, publisher or media-admin membership is required.</p>}
+        {matchState === 'unavailable' && <p className="mt-4 text-xs text-amber-900" role="status">The canonical V2 match list is not available right now.</p>}
+        {matchState === 'ready' && matches.length === 0 && <p className="mt-4 rounded-xl bg-slate-50 p-4 text-xs text-slate-600">No verified final matches are available to start a draft.</p>}
+        {matchState === 'ready' && matches.length > 0 && <ul className="mt-4 divide-y divide-slate-100">{matches.map(match => <li key={match.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="text-sm font-bold text-slate-900">{match.home_team} {match.home_score}–{match.away_score} {match.away_team}</p><p className="mt-1 text-[10px] uppercase tracking-wide text-slate-500">{match.league} · {match.status} · {match.source}</p></div><button type="button" onClick={() => void createDraft(match)} disabled={creatingMatch !== null} className="min-h-10 rounded-xl bg-slate-900 px-4 text-xs font-bold text-white transition hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-wait disabled:opacity-60">{creatingMatch === match.id ? 'Creating…' : 'Create rights-gated draft'}</button></li>)}</ul>}
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(290px,.7fr)]">
