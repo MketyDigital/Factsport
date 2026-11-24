@@ -153,3 +153,8 @@ Factsport TV is required for final V2 completion/cutover, even though core Media
 ## 2026-11-24 implementation follow-up — editorial planning
 
 The `/admin/tv` draft workflow now includes persisted episodes, evidence-linked narration, independent script approval and a stored text-only storyboard built from one 2D fact-card scene per approved narration block. This is a planning layer, not video production: it generates no media assets, audio, render jobs or uploads. Data and asset rights remain uncleared, so the episode remains blocked from rendering and publishing. Exact source head `aa0a5e9` passed isolated verification [45324494210](https://github.com/MketyDigital/Factsport/actions/runs/45324494210), native build [45324494239](https://github.com/MketyDigital/Factsport/actions/runs/45324494239), and protected staging preflight [45324494220](https://github.com/MketyDigital/Factsport/actions/runs/45324494220). The earlier 2026-11-23 checkpoint above describes the state at that time.
+
+
+## 2026-11-24 implementation follow-up — private scene preview
+
+The Studio now previews each persisted storyboard scene in an animated, responsive broadcast-style 2D/2.5D panel, with cited facts, timing and accessible scene controls. Reduced-motion preferences are honored. Visuals remain abstract and explicitly illustrative; this is not generated footage or a publishable episode. Exact head `454c932` passed isolated verification [45342942972](https://github.com/MketyDigital/Factsport/actions/runs/45342942972), native Cloudflare build [45342942964](https://github.com/MketyDigital/Factsport/actions/runs/45342942964), and staging [45342943031](https://github.com/MketyDigital/Factsport/actions/runs/45342943031).
