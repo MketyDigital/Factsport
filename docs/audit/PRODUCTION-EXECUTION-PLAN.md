@@ -529,3 +529,8 @@ Free anonymous Predictions remain a required feature on `predict.factsport.com`;
 ### M93 implementation update — 2026-11-23
 
 The Predict landing now exposes free fixtures without registration and the match-detail submit UI is guarded by the exact configured subdomain and submission-ready flag; match-list advertisements are suppressed on the Predict host. The submission API uses the same host boundary. TV has an offline planner, reviewable social package, server-only YouTube resumable-upload primitives, and a read-only `/admin/tv` storyboard prototype. Rendering, storage/outbox, OAuth connection, rights and end-to-end acceptance remain open. No production posting has occurred.
+
+
+### 2026-11-24 — M100 TV editorial planning accepted in staging
+
+Exact source head `aa0a5e9` passed isolated verification [45324494210](https://github.com/MketyDigital/Factsport/actions/runs/45324494210), the native Cloudflare build [45324494239](https://github.com/MketyDigital/Factsport/actions/runs/45324494239), and protected staging preflight [45324494220](https://github.com/MketyDigital/Factsport/actions/runs/45324494220). TV now supports persisted episode drafts, evidence-linked narration, independent script review and a stored text-only storyboard. Staging verification confirms deployment and deny-by-default boundary only; it does not verify the authenticated TV editor journey or real content review. Rights evidence, production-quality render/audio/caption QA, private asset storage, OAuth and human-reviewed social delivery remain required before TV launch. The current free Prediction subdomain and production routing are unchanged.
