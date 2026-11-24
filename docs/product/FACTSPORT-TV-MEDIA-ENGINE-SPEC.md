@@ -158,3 +158,8 @@ The `/admin/tv` draft workflow now includes persisted episodes, evidence-linked 
 ## 2026-11-24 implementation follow-up — private scene preview
 
 The Studio now previews each persisted storyboard scene in an animated, responsive broadcast-style 2D/2.5D panel, with cited facts, timing and accessible scene controls. Reduced-motion preferences are honored. Visuals remain abstract and explicitly illustrative; this is not generated footage or a publishable episode. Exact head `454c932` passed isolated verification [45342942972](https://github.com/MketyDigital/Factsport/actions/runs/45342942972), native Cloudflare build [45342942964](https://github.com/MketyDigital/Factsport/actions/runs/45342942964), and staging [45342943031](https://github.com/MketyDigital/Factsport/actions/runs/45342943031).
+
+
+## 2026-11-24 implementation follow-up — fact provenance display
+
+Source and observation timestamps now appear directly with each cited fact in the interactive storyboard preview, improving claim traceability during human review. Exact source head `3f0d6c6` passed isolated verification [45343476559](https://github.com/MketyDigital/Factsport/actions/runs/45343476559), native build [45343476547](https://github.com/MketyDigital/Factsport/actions/runs/45343476547), and staging [45343476525](https://github.com/MketyDigital/Factsport/actions/runs/45343476525). This remains a private planning preview and does not authorize media publication.
