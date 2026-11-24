@@ -416,3 +416,11 @@ The owner-directed Media/TV-first release sequence continues to preserve the cur
 - Every newly created episode remains `blocked_rights`; provider/data and asset rights are false, script/audio are unstarted, and there is no render job, upload or publish action. Missing scores and non-final matches are rejected. No third-party event prose is copied.
 - The workspace now shows final match options, creates the blocked draft, and refreshes the private episode inventory. Existing Entra registration is reused; active TV role membership is still required and the owner’s browser journey remains open.
 - Exact-head isolated verification `1b83e87` passed [45321681478](https://github.com/MketyDigital/Factsport/actions/runs/45321681478); native build/protected staging are pending. The scoped Media/TV release still preserves the existing free Prediction host.
+
+
+## M99 — evidence-linked narration draft editor (2026-11-24)
+
+- Added a protected episode-detail API and a script-draft editor in the TV workspace. Narration blocks must cite verified facts from the frozen episode plan; text is bounded, optimistic-concurrency checked and audit logged.
+- Saving narration keeps the episode rights-blocked and does not advance review status, clear rights, enqueue a render, generate audio, or post to any platform.
+- Exact-head isolated verification `3c3b110` passed [45323117266](https://github.com/MketyDigital/Factsport/actions/runs/45323117266). Native build and protected staging preflight remain in progress; authenticated owner browser acceptance remains open.
+- The existing free Prediction host remains outside this workstream.
