@@ -62,11 +62,17 @@ function cleanBlocks(value: unknown, facts: EvidenceFact[]): ScriptBlock[] {
   });
 }
 
-function publicEpisode(row: Record<string, unknown>) {
+function publicEpisode(row: Record<string, unknown>, currentUserId: string) {
   const facts = factsFromSnapshot(row.snapshot);
   const content = row.editorial_content && typeof row.editorial_content === 'object'
     ? row.editorial_content as Record<string, unknown>
     : {};
+  const savedDraft = content.scriptDraft && typeof content.scriptDraft === 'object'
+    ? content.scriptDraft as Record<string, unknown>
+    : null;
+  const savedReview = content.scriptReview && typeof content.scriptReview === 'object'
+    ? content.scriptReview as Record<string, unknown>
+    : null;
   return {
     id: row.id,
     title: row.title,
@@ -76,8 +82,9 @@ function publicEpisode(row: Record<string, unknown>) {
     updatedAt: iso(row.updated_at),
     rights: (row.snapshot as { storyPlan?: { rights?: unknown } } | null)?.storyPlan?.rights ?? null,
     facts,
-    scriptDraft: content.scriptDraft ?? null,
-    scriptReview: content.scriptReview ?? null,
+    scriptDraft: savedDraft ? { blocks: savedDraft.blocks ?? [], digest: savedDraft.digest, savedAt: savedDraft.savedAt } : null,
+    scriptReview: savedReview ? { decision: savedReview.decision, notes: savedReview.notes, reviewedAt: savedReview.reviewedAt } : null,
+    canReview: Boolean(savedDraft && savedDraft.savedBy !== currentUserId),
   };
 }
 
@@ -92,7 +99,7 @@ export async function GET(_request: Request, context: { params: { id: string } }
       FROM public.factsport_tv_episodes WHERE id = ${context.params.id}::uuid LIMIT 1
     `);
     if (!rows[0]) return NextResponse.json({ error: 'Episode not found.' }, { status: 404, headers: PRIVATE_HEADERS });
-    return NextResponse.json({ success: true, episode: publicEpisode(rows[0]) }, { headers: PRIVATE_HEADERS });
+    return NextResponse.json({ success: true, episode: publicEpisode(rows[0], authorization.user.domainUserId) }, { headers: PRIVATE_HEADERS });
   } catch (error) {
     console.error('Factsport TV episode detail unavailable', error);
     return NextResponse.json({ error: 'TV episode details are not available.' }, { status: 503, headers: PRIVATE_HEADERS });
@@ -161,7 +168,7 @@ export async function PATCH(request: Request, context: { params: { id: string } 
           'script_saved', ${JSON.stringify({ scriptDigest, blockCount: blocks.length })}::jsonb
         )
       `;
-      return { kind: 'ok' as const, episode: publicEpisode(updated[0]) };
+      return { kind: 'ok' as const, episode: publicEpisode(updated[0], authorization.user.domainUserId) };
     }));
 
     if (saved.kind === 'not_found') return NextResponse.json({ error: 'Episode not found.' }, { status: 404, headers: PRIVATE_HEADERS });
