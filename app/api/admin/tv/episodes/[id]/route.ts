@@ -110,7 +110,9 @@ export async function PATCH(request: Request, context: { params: { id: string } 
 
   let body: { expectedUpdatedAt?: unknown; blocks?: unknown };
   try {
-    body = await request.json() as { expectedUpdatedAt?: unknown; blocks?: unknown };
+    const parsed = await request.json();
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid_body');
+    body = parsed as { expectedUpdatedAt?: unknown; blocks?: unknown };
   } catch {
     return NextResponse.json({ error: 'Valid script data is required.' }, { status: 400, headers: PRIVATE_HEADERS });
   }
