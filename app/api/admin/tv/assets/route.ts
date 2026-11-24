@@ -90,22 +90,30 @@ export async function GET(request: Request) {
   const episodeId = url.searchParams.get('episodeId') || '';
   if (episodeId && !UUID.test(episodeId)) return NextResponse.json({ error: 'Episode not found.' }, { status: 404, headers: PRIVATE_HEADERS });
   try {
-    const assets = await withFactsportEditorialPostgres(sql => sql`
-      SELECT library.id, library.asset_kind, library.content_type, library.byte_size,
-             library.sha256, library.rights_status, library.provenance, library.created_at,
-             EXISTS (
-               SELECT 1 FROM public.factsport_tv_episode_asset_links link
-               WHERE link.asset_id = library.id
-                 AND (${episodeId} = '' OR link.episode_id = ${episodeId}::uuid)
-             ) AS linked_to_episode
-      FROM public.factsport_tv_asset_library library
-      WHERE (${episodeId} = '' OR EXISTS (
-        SELECT 1 FROM public.factsport_tv_episode_asset_links link
-        WHERE link.asset_id = library.id AND link.episode_id = ${episodeId}::uuid
-      ))
-      ORDER BY library.created_at DESC
-      LIMIT 100
-    `);
+    const assets = await withFactsportEditorialPostgres(sql => episodeId
+      ? sql`
+          SELECT library.id, library.asset_kind, library.content_type, library.byte_size,
+                 library.sha256, library.rights_status, library.provenance, library.created_at,
+                 true AS linked_to_episode
+          FROM public.factsport_tv_asset_library library
+          WHERE EXISTS (
+            SELECT 1 FROM public.factsport_tv_episode_asset_links link
+            WHERE link.asset_id = library.id AND link.episode_id = ${episodeId}::uuid
+          )
+          ORDER BY library.created_at DESC
+          LIMIT 100
+        `
+      : sql`
+          SELECT library.id, library.asset_kind, library.content_type, library.byte_size,
+                 library.sha256, library.rights_status, library.provenance, library.created_at,
+                 EXISTS (
+                   SELECT 1 FROM public.factsport_tv_episode_asset_links link
+                   WHERE link.asset_id = library.id
+                 ) AS linked_to_episode
+          FROM public.factsport_tv_asset_library library
+          ORDER BY library.created_at DESC
+          LIMIT 100
+        `);
     return NextResponse.json({ success: true, assets }, { headers: PRIVATE_HEADERS });
   } catch (error) {
     console.error('Factsport TV model library unavailable', error);
