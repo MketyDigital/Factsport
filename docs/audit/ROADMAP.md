@@ -391,3 +391,12 @@ The owner-directed Media/TV-first release sequence continues to preserve the cur
 - Added `@resvg/resvg-wasm` as a direct, version-pinned dependency and a regression check for script syntax and the absence of a network publishing path. Review its MPL-2.0 license as part of production render-host approval.
 - Exact source head `e89103f4a7c3b21395ddc49aeb1106e1ac942a8b` passed isolated verification [45271817408](https://github.com/MketyDigital/Factsport/actions/runs/45271817408), native Cloudflare/Vinext build [45271817531](https://github.com/MketyDigital/Factsport/actions/runs/45271817531), and protected staging [45271817645](https://github.com/MketyDigital/Factsport/actions/runs/45271817645).
 - The current staging workflow did not play this local MP4 or review `/admin/tv` in an authenticated browser. Full Media visual/accessibility/rights/restore acceptance; TV four-minute rendering, sound/captions, durable render/storage/outbox, OAuth and human-reviewed social acceptance; Entra editor membership/publish; and route rollback remain open. No production route, DNS, content, credential or post changed.
+
+
+## M96 — TV episode workflow schema and publish approval guard (2026-11-24)
+
+- Added isolated V2 TV migrations for durable episode revisions, frozen snapshots, scenes, private-media asset lineage, render jobs, human approvals, a platform outbox, delivery attempts and audit records.
+- Added a database-side publish guard: enqueue requires the approved episode revision, a matching human publish approval, an active rights approval and a cleared video asset. Package/approval fields remain immutable to the dispatcher, whose grants are limited to delivery state and receipts.
+- Advanced the guarded staging migration workflow's expected ledger through version 52. Source/schema is committed; staging migration and exact-head CI results must be inspected before calling this active or accepted.
+- Still open: read-only sports snapshot API, TV Studio CRUD, signed R2 asset flow, external renderer/leases, caption/audio muxing, output QA, rights evidence, OAuth and platform dispatch, editor browser acceptance. The existing free Prediction host remains outside this release.
+- No production route, DNS, database, credentials, schedules or social posts changed.
