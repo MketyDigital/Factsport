@@ -154,7 +154,7 @@ export default function TVEpisodeScriptEditor({
       });
       const payload = await response.json() as { episode?: EpisodeDetail; error?: string };
       if (!response.ok || !payload.episode) throw new Error(payload.error || 'Script draft could not be saved.');
-      setEpisode(payload.episode);
+      setEpisode({ ...payload.episode, scenes: [] });
       setBlocks(payload.episode.scriptDraft?.blocks || blocks);
       onSaved(payload.episode.id, payload.episode.updatedAt);
       setMessage('Narration draft saved with source references. Rights remain blocked; no render or upload was started.');
