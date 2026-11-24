@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 type Fact = { id: string; text: string; source: string; observedAt: string; verified: boolean };
-type Block = { id: string; text: string; factIds: string[] };
+type Block = { id: string; text: string; factIds: string[] };\ntype Scene = { id: string; position: number; label: string; startSeconds: number; durationSeconds: number; narrationText: string; factCards: Array<{ id: string; text: string; source: string; observedAt: string }>; visualTreatment: string; renderable: boolean };
 type EpisodeDetail = {
   id: string;
   title: string;
@@ -80,6 +80,29 @@ export default function TVEpisodeScriptEditor({
     }
   }
 
+  async function buildStoryboard() {
+    if (!episode) return;
+    setState('saving');
+    setMessage('');
+    try {
+      const response = await fetch('/api/admin/tv/episodes/' + episodeId + '/storyboard', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedUpdatedAt: episode.updatedAt }),
+      });
+      const payload = await response.json() as { scenes?: Scene[]; episode?: { id: string; updatedAt: string }; error?: string };
+      if (!response.ok || !payload.episode || !payload.scenes) throw new Error(payload.error || 'Storyboard could not be saved.');
+      setEpisode(current => current ? { ...current, updatedAt: payload.episode!.updatedAt, scenes: payload.scenes! } : current);
+      onSaved(payload.episode.id, payload.episode.updatedAt);
+      setMessage('Text-only storyboard saved. Scene timing is an estimate; no footage, audio, render, or upload was created. Rights remain blocked.');
+      setState('ready');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Storyboard could not be saved.');
+      setState('error');
+    }
+  }
+
   async function save() {
     if (!episode) return;
     setState('saving');
@@ -137,6 +160,11 @@ export default function TVEpisodeScriptEditor({
         {episode.scriptReview && <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-700" role="status">Latest editorial decision: <strong>{episode.scriptReview.decision?.replaceAll('_', ' ')}</strong>{episode.scriptReview.notes ? ' · ' + episode.scriptReview.notes : ''}</p>}
         {episode.scriptDraft?.blocks?.length && episode.canReview && <div className="mt-5 rounded-xl border border-violet-200 bg-violet-50 p-4"><h4 className="text-xs font-black uppercase tracking-wide text-violet-950">Independent editorial review</h4><p className="mt-1 text-xs leading-5 text-violet-900">A different editor can approve this script or request changes. This review does not clear data/asset rights or permit rendering or publication.</p><label htmlFor="tv-script-review-notes" className="mt-3 block text-xs font-bold text-violet-950">Review note (optional)</label><textarea id="tv-script-review-notes" value={reviewNotes} maxLength={2000} rows={3} onChange={event => setReviewNotes(event.target.value)} className="mt-2 w-full rounded-lg border border-violet-200 bg-white p-3 text-xs text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"/><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => void review('approved')} disabled={state === 'saving'} className="min-h-10 rounded-xl bg-violet-800 px-4 text-xs font-bold text-white disabled:opacity-50">Approve script</button><button type="button" onClick={() => void review('changes_requested')} disabled={state === 'saving'} className="min-h-10 rounded-xl border border-violet-300 px-4 text-xs font-bold text-violet-950 disabled:opacity-50">Request changes</button></div></div>}
         {episode.scriptDraft?.blocks?.length && !episode.canReview && <p className="mt-3 text-xs text-slate-600">A different editor must review this script draft.</p>}
+        {episode.scriptReview?.decision === 'approved' && episode.scriptReview.scriptDigest === episode.scriptDraft?.digest && <div className="mt-5 rounded-xl border border-cyan-200 bg-cyan-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3"><div><h4 className="text-xs font-black uppercase tracking-wide text-cyan-950">Storyboard draft</h4><p className="mt-1 text-xs text-cyan-900">Builds one evidence-backed 2D fact-card scene per approved narration block. This is not a video render.</p></div>
+            <button type="button" onClick={() => void buildStoryboard()} disabled={state === 'saving'} className="min-h-10 rounded-xl bg-cyan-800 px-4 text-xs font-bold text-white disabled:opacity-50">{state === 'saving' ? 'Saving…' : episode.scenes.length ? 'Refresh storyboard' : 'Build storyboard'}</button></div>
+          {episode.scenes.length > 0 && <ol className="mt-4 space-y-2">{episode.scenes.map(scene => <li key={scene.id} className="rounded-lg border border-cyan-100 bg-white p-3"><div className="flex flex-wrap justify-between gap-2 text-[10px] font-bold uppercase tracking-wide text-slate-500"><span>{scene.label}</span><span>Approx. {scene.startSeconds}s–{scene.startSeconds + scene.durationSeconds}s</span></div><p className="mt-2 text-sm leading-6 text-slate-900">{scene.narrationText}</p><div className="mt-2 flex flex-wrap gap-1">{scene.factCards.map(fact => <span key={fact.id} className="rounded-full bg-cyan-100 px-2 py-1 text-[10px] text-cyan-950">{fact.text}</span>)}</div><p className="mt-2 text-[10px] text-slate-500">2D fact card · source-linked · render disabled</p></li>)}</ol>}
+        </div>}
         {message && <p className="mt-3 text-xs text-slate-700" role="status">{message}</p>}
       </>}
     </section>
