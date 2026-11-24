@@ -408,3 +408,11 @@ The owner-directed Media/TV-first release sequence continues to preserve the cur
 - Connected the TV workspace to show inventory, access-denied and unavailable states while keeping the synthetic scene preview visibly separate from publishable episodes.
 - This establishes the first persisted Studio read path only. No episode create/edit, snapshot build, render worker, signed R2 link or social dispatch is implemented. Authenticated owner browser acceptance and exact-head staging deployment remain pending.
 - Preserves the current `predict.factsport.com` free-play service and the Media/TV release boundary.
+
+
+## M98 — rights-gated Match Story draft entry (2026-11-24)
+
+- Added Entra-protected final-match listing and same-origin draft creation from canonical V2 match rows. The API validates final status and non-null scores, freezes a deterministic score-only source plan, and writes an idempotent private episode/audit record.
+- Every newly created episode remains `blocked_rights`; provider/data and asset rights are false, script/audio are unstarted, and there is no render job, upload or publish action. Missing scores and non-final matches are rejected. No third-party event prose is copied.
+- The workspace now shows final match options, creates the blocked draft, and refreshes the private episode inventory. Existing Entra registration is reused; active TV role membership is still required and the owner’s browser journey remains open.
+- Exact-head isolated verification `1b83e87` passed [45321681478](https://github.com/MketyDigital/Factsport/actions/runs/45321681478); native build/protected staging are pending. The scoped Media/TV release still preserves the existing free Prediction host.
