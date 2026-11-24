@@ -93,12 +93,16 @@ export async function GET(request: Request) {
     const assets = await withFactsportEditorialPostgres(sql => sql`
       SELECT library.id, library.asset_kind, library.content_type, library.byte_size,
              library.sha256, library.rights_status, library.provenance, library.created_at,
-             (link.episode_id IS NOT NULL) AS linked_to_episode
+             EXISTS (
+               SELECT 1 FROM public.factsport_tv_episode_asset_links link
+               WHERE link.asset_id = library.id
+                 AND (${episodeId} = '' OR link.episode_id = ${episodeId}::uuid)
+             ) AS linked_to_episode
       FROM public.factsport_tv_asset_library library
-      LEFT JOIN public.factsport_tv_episode_asset_links link
-        ON link.asset_id = library.id
-        AND (${episodeId} = '' OR link.episode_id = ${episodeId}::uuid)
-      WHERE (${episodeId} = '' OR link.episode_id = ${episodeId}::uuid)
+      WHERE (${episodeId} = '' OR EXISTS (
+        SELECT 1 FROM public.factsport_tv_episode_asset_links link
+        WHERE link.asset_id = library.id AND link.episode_id = ${episodeId}::uuid
+      ))
       ORDER BY library.created_at DESC
       LIMIT 100
     `);
