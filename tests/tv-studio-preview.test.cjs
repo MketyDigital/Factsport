@@ -12,6 +12,7 @@ test('Factsport TV preview is private, read-only and discoverable from Media ope
   const home = read('app/admin/page.tsx');
   const preview = read('app/admin/tv/TVStoryboardPreview.tsx');
   const inventoryApi = read('app/api/admin/tv/episodes/route.ts');
+  const matchPickerApi = read('app/api/admin/tv/matches/route.ts');
   assert.match(page, /robots: \{ index: false, follow: false, nocache: true \}/);
   assert.match(layout, /href="\/admin\/tv"/);
   assert.match(home, /href="\/admin\/tv"/);
@@ -25,6 +26,14 @@ test('Factsport TV preview is private, read-only and discoverable from Media ope
   assert.match(inventoryApi, /export async function GET\(/);
   assert.match(inventoryApi, /LIMIT 100/);
   assert.doesNotMatch(inventoryApi, /INSERT INTO|UPDATE public|DELETE FROM|upload/i);
+  assert.match(matchPickerApi, /authorizeMediaEditorialAction\('tv'\)/);
+  assert.match(matchPickerApi, /LIMIT 50/);
+  assert.match(inventoryApi, /isSameOriginRequest/);
+  assert.match(inventoryApi, /planMatchStory/);
+  assert.match(inventoryApi, /rights: \{ dataCleared: false, assetsCleared: false \}/);
+  assert.match(inventoryApi, /'blocked_rights'/);
+  assert.match(inventoryApi, /ON CONFLICT DO NOTHING/);
+  assert.doesNotMatch(inventoryApi + matchPickerApi, /youtube-resumable-upload|tiktok-draft-upload|espn\.com|fetch\(/i);
   assert.doesNotMatch(preview, /use server|formAction=|youtube-resumable-upload|tiktok-draft-upload/);
 });
 
