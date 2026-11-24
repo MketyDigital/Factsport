@@ -32,6 +32,8 @@ export default function TVEpisodeScriptEditor({
   const [state, setState] = useState<'loading' | 'ready' | 'saving' | 'denied' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [reviewNotes, setReviewNotes] = useState('');
+  const [activeSceneIndex, setActiveSceneIndex] = useState(0);
+  const activeStoryboardScene = episode?.scenes[Math.min(activeSceneIndex, Math.max(0, (episode?.scenes.length ?? 1) - 1))] ?? null;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -95,7 +97,7 @@ export default function TVEpisodeScriptEditor({
       });
       const payload = await response.json() as { scenes?: Scene[]; episode?: { id: string; updatedAt: string }; error?: string };
       if (!response.ok || !payload.episode || !payload.scenes) throw new Error(payload.error || 'Storyboard could not be saved.');
-      setEpisode(current => current ? { ...current, updatedAt: payload.episode!.updatedAt, scenes: payload.scenes! } : current);
+      setActiveSceneIndex(0);\n      setEpisode(current => current ? { ...current, updatedAt: payload.episode!.updatedAt, scenes: payload.scenes! } : current);
       onSaved(payload.episode.id, payload.episode.updatedAt);
       setMessage('Text-only storyboard saved. Scene timing is an estimate; no footage, audio, render, or upload was created. Rights remain blocked.');
       setState('ready');
@@ -165,7 +167,26 @@ export default function TVEpisodeScriptEditor({
         {episode.scriptReview?.decision === 'approved' && episode.scriptReview.scriptDigest === episode.scriptDraft?.digest && <div className="mt-5 rounded-xl border border-cyan-200 bg-cyan-50 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3"><div><h4 className="text-xs font-black uppercase tracking-wide text-cyan-950">Storyboard draft</h4><p className="mt-1 text-xs text-cyan-900">Builds one evidence-backed 2D fact-card scene per approved narration block. This is not a video render.</p></div>
             <button type="button" onClick={() => void buildStoryboard()} disabled={state === 'saving'} className="min-h-10 rounded-xl bg-cyan-800 px-4 text-xs font-bold text-white disabled:opacity-50">{state === 'saving' ? 'Saving…' : episode.scenes.length ? 'Refresh storyboard' : 'Build storyboard'}</button></div>
-          {episode.scenes.length > 0 && <ol className="mt-4 space-y-2">{episode.scenes.map(scene => <li key={scene.id} className="rounded-lg border border-cyan-100 bg-white p-3"><div className="flex flex-wrap justify-between gap-2 text-[10px] font-bold uppercase tracking-wide text-slate-500"><span>{scene.label}</span><span>Approx. {scene.startSeconds}s–{scene.startSeconds + scene.durationSeconds}s</span></div><p className="mt-2 text-sm leading-6 text-slate-900">{scene.narrationText}</p><div className="mt-2 flex flex-wrap gap-1">{scene.factCards.map(fact => <span key={fact.id} className="rounded-full bg-cyan-100 px-2 py-1 text-[10px] text-cyan-950">{fact.text}</span>)}</div><p className="mt-2 text-[10px] text-slate-500">2D fact card · source-linked · render disabled</p></li>)}</ol>}
+          {activeStoryboardScene && <div className="mt-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-xl">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3"><div><p className="text-[9px] font-black uppercase tracking-[.2em] text-cyan-300">Storyboard preview · concept only</p><p className="mt-1 text-xs font-bold text-white">{activeStoryboardScene.label} <span className="font-normal text-slate-400">· approx. {activeStoryboardScene.startSeconds}s–{activeStoryboardScene.startSeconds + activeStoryboardScene.durationSeconds}s</span></p></div>
+              <div className="flex gap-2"><button type="button" aria-label="Previous storyboard scene" onClick={() => setActiveSceneIndex(index => (index - 1 + episode.scenes.length) % episode.scenes.length)} className="min-h-9 rounded-lg border border-white/20 px-3 text-xs font-bold text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Previous</button><button type="button" aria-label="Next storyboard scene" onClick={() => setActiveSceneIndex(index => (index + 1) % episode.scenes.length)} className="min-h-9 rounded-lg border border-white/20 px-3 text-xs font-bold text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Next</button></div>
+            </div>
+            <div className="relative isolate min-h-64 overflow-hidden bg-[radial-gradient(ellipse_at_50%_110%,rgba(16,185,129,.24),transparent_48%),linear-gradient(135deg,#020617,#0f172a_55%,#082f49)] p-5 sm:p-8" aria-live="polite" aria-atomic="true">
+              <div aria-hidden="true" className="absolute inset-x-8 bottom-6 h-24 -skew-y-3 rounded-[50%] border border-emerald-200/20 bg-[repeating-linear-gradient(90deg,rgba(16,185,129,.10)_0_12.5%,rgba(34,197,94,.05)_12.5%_25%)] shadow-[0_0_50px_rgba(34,211,238,.12)] [transform:perspective(700px)_rotateX(38deg)] motion-reduce:transform-none" />
+              <div aria-hidden="true" className="absolute right-8 top-8 h-24 w-24 rounded-full bg-cyan-300/10 blur-2xl" style={{ animation: 'fs-stadium-glow 5s ease-in-out infinite alternate' }} />
+              <div className="relative z-10 mx-auto grid min-h-48 max-w-2xl place-items-center text-center">
+                <div className="w-full rounded-2xl border border-white/15 bg-slate-950/65 p-5 shadow-[0_22px_60px_rgba(0,0,0,.35)] backdrop-blur-sm sm:p-7 motion-safe:animate-[fs-match-event-in_.45s_ease-out]">
+                  <p className="text-[9px] font-black uppercase tracking-[.24em] text-cyan-200">Evidence-led narration</p>
+                  <p className="mx-auto mt-3 max-w-xl text-base font-bold leading-7 text-white sm:text-xl">{activeStoryboardScene.narrationText}</p>
+                  <div className="mt-4 flex flex-wrap justify-center gap-2">{activeStoryboardScene.factCards.map(fact => <span key={fact.id} className="rounded-full border border-cyan-200/20 bg-cyan-300/10 px-3 py-1.5 text-[10px] font-semibold text-cyan-50">{fact.text}</span>)}</div>
+                  <p className="mt-4 text-[9px] uppercase tracking-[.16em] text-slate-400">Illustrative 2D/2.5D layout · no footage or player likeness</p>
+                </div>
+              </div>
+            </div>
+            <div className="h-1 bg-white/10"><div className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-[width] duration-500" style={{ width: episode.scenes.length > 1 ? ((activeSceneIndex + 1) / episode.scenes.length) * 100 + '%' : '100%' }} /></div>
+            <p className="px-4 py-2 text-[9px] text-slate-400">Private editorial preview only. Rights remain blocked; this concept cannot be rendered or published.</p>
+          </div>}
+          {episode.scenes.length > 0 && <ol className="mt-4 space-y-2">{episode.scenes.map((scene, index) => <li key={scene.id}><button type="button" aria-current={index === activeSceneIndex ? 'step' : undefined} onClick={() => setActiveSceneIndex(index)} className={`w-full rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${index === activeSceneIndex ? 'border-cyan-400 bg-cyan-50' : 'border-cyan-100 bg-white hover:bg-cyan-50'}`}><div className="flex flex-wrap justify-between gap-2 text-[10px] font-bold uppercase tracking-wide text-slate-500"><span>Scene {index + 1} · {scene.label}</span><span>Approx. {scene.startSeconds}s–{scene.startSeconds + scene.durationSeconds}s</span></div><p className="mt-2 text-sm leading-6 text-slate-900">{scene.narrationText}</p><div className="mt-2 flex flex-wrap gap-1">{scene.factCards.map(fact => <span key={fact.id} className="rounded-full bg-cyan-100 px-2 py-1 text-[10px] text-cyan-950">{fact.text}</span>)}</div><p className="mt-2 text-[10px] text-slate-500">2D fact card · source-linked · render disabled</p></button></li>)}</ol>}
         </div>}
         {message && <p className="mt-3 text-xs text-slate-700" role="status">{message}</p>}
       </>}
