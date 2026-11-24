@@ -103,3 +103,11 @@ Factsport TV is an internal modular subsystem of Factsport V2, delivered in the 
 - Added `lib/tv/captions.ts` to package human-authored narration as plain-text WebVTT with a cue-to-verified-fact provenance map.
 - The builder rejects missing/unverified evidence, malformed or overlapping cue timing, duplicate IDs, unsafe VTT markup/control text, empty captions, and cues beyond the episode duration. It does not generate narration from events.
 - This is an offline library primitive only. It is not wired to the Studio or persisted in R2/outbox yet, and it does not establish audio generation, subtitle synchronization or production acceptance. Verification remains open.
+
+
+## 2026-11-24 — durable episode schema and publish guard
+
+- Added migration `0051_factsport_tv_episode_workflow.sql` for private episodes, snapshots, scenes, R2 asset lineage, leased render jobs, human approvals, publish outbox, attempt records and audit events.
+- Added migration `0052_factsport_tv_publish_approval_guard.sql`. The outbox refuses enqueue unless the episode revision is approved, the same actor has a publish approval, a current rights approval exists, and a cleared video asset is recorded. It makes approved package fields immutable and narrows dispatcher updates to delivery state/receipts.
+- The staging migration workflow ledger expectation now includes versions 0–52. The workflow applies only to the isolated `factsport_v2` database through its guarded temporary migration Worker; successful application still needs its run result. No production database, renderer worker, social account, schedule, or post was changed.
+- Schema is not yet integrated with API routes, R2 signed assets, job workers, editor screens or provider dispatch. The source and SQL still need CI/type/SQL verification and the staging run must be inspected before claiming the schema is active.
