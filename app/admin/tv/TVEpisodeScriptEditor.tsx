@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 
 type Fact = { id: string; text: string; source: string; observedAt: string; verified: boolean };
-type Block = { id: string; text: string; factIds: string[] };\ntype Scene = { id: string; position: number; label: string; startSeconds: number; durationSeconds: number; narrationText: string; factCards: Array<{ id: string; text: string; source: string; observedAt: string }>; visualTreatment: string; renderable: boolean };
+type Block = { id: string; text: string; factIds: string[] };
+type Scene = { id: string; position: number; label: string; startSeconds: number; durationSeconds: number; narrationText: string; factCards: Array<{ id: string; text: string; source: string; observedAt: string }>; visualTreatment: string; renderable: boolean };
 type EpisodeDetail = {
   id: string;
   title: string;
