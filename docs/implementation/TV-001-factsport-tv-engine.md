@@ -151,3 +151,9 @@ Factsport TV is an internal modular subsystem of Factsport V2, delivered in the 
 - The Studio now presents the selected persisted scene in an animated, responsive 2D/2.5D broadcast-style concept panel with source-backed fact cards, approximate timeline, scene selection and previous/next controls.
 - Motion respects reduced-motion preferences. Abstract pitch styling is explicitly labeled as illustrative; there is no match footage, player likeness or event recreation. The view remains a private editorial preview and does not create an asset, render job, media file, or publishable output.
 - Exact source head `454c932` passed isolated verification [45342942972](https://github.com/MketyDigital/Factsport/actions/runs/45342942972), native Cloudflare build [45342942964](https://github.com/MketyDigital/Factsport/actions/runs/45342942964), and staging deploy/deny-by-default checks [45342943031](https://github.com/MketyDigital/Factsport/actions/runs/45342943031). The real authenticated browser review and rights/render/publishing gates remain open.
+
+
+## 2026-11-24 — fact provenance in scene preview
+
+- Each storyboard preview fact now shows its source and observation timestamp beside the fact text, in the private concept scene and persisted scene list. Reviewers can inspect claims and provenance together.
+- Exact source head `3f0d6c6` passed isolated verification [45343476559](https://github.com/MketyDigital/Factsport/actions/runs/45343476559), native Cloudflare build [45343476547](https://github.com/MketyDigital/Factsport/actions/runs/45343476547), and protected staging [45343476525](https://github.com/MketyDigital/Factsport/actions/runs/45343476525). This remains an editorial preview, not a final video or publishing approval.
