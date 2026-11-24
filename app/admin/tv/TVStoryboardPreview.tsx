@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Activity, CircleDot, ListVideo, ShieldCheck, Users } from 'lucide-react';
 import { renderMatchStorySvgScenes } from '@/lib/tv/svg-scene-renderer.mjs';
+import TVEpisodeScriptEditor from './TVEpisodeScriptEditor';
 
 type TVEpisode = {
   id: string;
@@ -138,6 +139,7 @@ export default function TVStoryboardPreview() {
   const [matchState, setMatchState] = useState<'loading' | 'ready' | 'denied' | 'unavailable'>('loading');
   const [creatingMatch, setCreatingMatch] = useState<string | null>(null);
   const [draftMessage, setDraftMessage] = useState('');
+  const [editingEpisodeId, setEditingEpisodeId] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -219,8 +221,10 @@ export default function TVStoryboardPreview() {
         {episodeState === 'denied' && <p className="mt-4 text-xs text-amber-900" role="status">Your signed-in account needs an active Factsport TV editor, publisher or media-admin membership to view episodes.</p>}
         {episodeState === 'unavailable' && <p className="mt-4 text-xs text-amber-900" role="status">The private episode inventory is temporarily unavailable. The synthetic storyboard below remains a disconnected preview.</p>}
         {episodeState === 'ready' && episodes.length === 0 && <p className="mt-4 rounded-xl bg-slate-50 p-4 text-xs leading-5 text-slate-600">No episode records yet. The sample storyboard below uses fictional data and is not a production episode.</p>}
-        {episodeState === 'ready' && episodes.length > 0 && <ul className="mt-4 divide-y divide-slate-100">{episodes.map(episode => <li key={episode.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="text-sm font-bold text-slate-900">{episode.title}</p><p className="mt-1 text-[10px] uppercase tracking-wide text-slate-500">{episode.show_format.replaceAll('_', ' ')} · revision {episode.revision} · {episode.duration_seconds ? Math.round(episode.duration_seconds / 60) + ' min' : 'duration pending'}</p></div><span className="rounded-full bg-cyan-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-cyan-900">{episode.status.replaceAll('_', ' ')}</span></li>)}</ul>}
+        {episodeState === 'ready' && episodes.length > 0 && <ul className="mt-4 divide-y divide-slate-100">{episodes.map(episode => <li key={episode.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="text-sm font-bold text-slate-900">{episode.title}</p><p className="mt-1 text-[10px] uppercase tracking-wide text-slate-500">{episode.show_format.replaceAll('_', ' ')} · revision {episode.revision} · {episode.duration_seconds ? Math.round(episode.duration_seconds / 60) + ' min' : 'duration pending'}</p></div><div className="flex items-center gap-2"><span className="rounded-full bg-cyan-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-cyan-900">{episode.status.replaceAll('_', ' ')}</span><button type="button" onClick={() => setEditingEpisodeId(episode.id)} className="min-h-9 rounded-lg border border-slate-300 px-3 text-[10px] font-bold text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">Edit script</button></div></li>)}</ul>}
       </section>
+
+      {editingEpisodeId && <TVEpisodeScriptEditor episodeId={editingEpisodeId} onClose={() => setEditingEpisodeId(null)} onSaved={(id, updatedAt) => setEpisodes(current => current.map(item => item.id === id ? { ...item, updated_at: updatedAt } : item))} />}
 
       <section aria-labelledby="tv-match-picker" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div><h2 id="tv-match-picker" className="font-black text-slate-900">Start a Match Story draft</h2><p className="mt-1 text-xs leading-5 text-slate-600">Choose a verified final V2 match. The first draft freezes score evidence and stays rights-blocked; this action never renders or publishes.</p></div>
