@@ -70,6 +70,10 @@ export async function POST(request: Request) {
       if (!match) return { kind: 'not_found' as const };
 
       const finalStatus = String(match.status || '').trim().toUpperCase();
+      if (match.home_score === null || match.home_score === undefined ||
+          match.away_score === null || match.away_score === undefined) {
+        return { kind: 'needs_data' as const };
+      }
       const homeScore = Number(match.home_score);
       const awayScore = Number(match.away_score);
       if (!FINAL_STATUSES.has(finalStatus) || !Number.isSafeInteger(homeScore) || homeScore < 0 ||
