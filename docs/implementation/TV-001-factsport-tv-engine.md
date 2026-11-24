@@ -113,3 +113,10 @@ Factsport TV is an internal modular subsystem of Factsport V2, delivered in the 
 - Schema is not yet integrated with API routes, R2 signed assets, job workers, editor screens or provider dispatch. The migration chain passed disposable PostgreSQL verification on run [45319638874](https://github.com/MketyDigital/Factsport/actions/runs/45319638874); isolated verification at source `3e5f742` passed on run [45320132831](https://github.com/MketyDigital/Factsport/actions/runs/45320132831). Native build and protected staging preflight at that exact source are still running; no app/API integration is claimed.
 
 - Added a dedicated `tv` capability to the existing Entra-backed Media editorial authorization map for editor, publisher and media-admin roles. TV APIs/screens still need to call it; this does not grant membership or complete the owner’s editor journey.
+
+
+## 2026-11-24 — private episode inventory slice
+
+- Added `GET /api/admin/tv/episodes`, protected by the dedicated Entra-backed `tv` capability and the V2 editorial PostgreSQL binding. It returns at most 100 private episode summaries with `Cache-Control: private, no-store`; it performs no match-feed, write, render or publishing action.
+- Connected the storyboard workspace to this endpoint with explicit loading, denied, unavailable and empty states. The fictional SVG sample remains labeled as a disconnected, nonpublishable preview.
+- This is inventory-only: episode creation/editing, frozen canonical match snapshot reads, R2 signing, render orchestration and authenticated browser acceptance remain open.
