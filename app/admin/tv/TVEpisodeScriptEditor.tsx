@@ -12,6 +12,8 @@ type EpisodeDetail = {
   facts: Fact[];
   rights: { dataCleared?: boolean; assetsCleared?: boolean } | null;
   scriptDraft: { blocks?: Block[] } | null;
+  scriptReview: { decision?: string; notes?: string; reviewedAt?: string } | null;
+  canReview: boolean;
 };
 
 export default function TVEpisodeScriptEditor({
@@ -27,6 +29,7 @@ export default function TVEpisodeScriptEditor({
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'saving' | 'denied' | 'error'>('loading');
   const [message, setMessage] = useState('');
+  const [reviewNotes, setReviewNotes] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -50,6 +53,31 @@ export default function TVEpisodeScriptEditor({
 
   function updateBlock(index: number, update: Partial<Block>) {
     setBlocks(current => current.map((block, i) => i === index ? { ...block, ...update } : block));
+  }
+
+  async function review(decision: 'approved' | 'changes_requested') {
+    if (!episode) return;
+    setState('saving');
+    setMessage('');
+    try {
+      const response = await fetch('/api/admin/tv/episodes/' + episodeId + '/review', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedUpdatedAt: episode.updatedAt, decision, notes: reviewNotes }),
+      });
+      const payload = await response.json() as { review?: { decision?: string; notes?: string; reviewedAt?: string }; episode?: { id: string; updatedAt: string }; error?: string };
+      if (!response.ok || !payload.review || !payload.episode) throw new Error(payload.error || 'Script review could not be saved.');
+      setEpisode(current => current ? { ...current, updatedAt: payload.episode!.updatedAt, scriptReview: payload.review!, canReview: false } : current);
+      onSaved(payload.episode.id, payload.episode.updatedAt);
+      setMessage(decision === 'approved'
+        ? 'Editorial script review recorded. Rights remain blocked; this is not a render or publish approval.'
+        : 'Changes requested. The episode remains rights-blocked.');
+      setState('ready');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Script review could not be saved.');
+      setState('error');
+    }
   }
 
   async function save() {
@@ -106,6 +134,9 @@ export default function TVEpisodeScriptEditor({
           <button type="button" onClick={() => setBlocks(current => [...current, { id: `narration-${current.length + 1}`, text: '', factIds: [] }])} disabled={blocks.length >= 40 || state === 'saving'} className="min-h-10 rounded-xl border border-slate-300 px-3 text-xs font-bold text-slate-700 disabled:opacity-50">Add narration block</button>
           <button type="button" onClick={() => void save()} disabled={state === 'saving' || blocks.some(block => !block.text.trim() || block.factIds.length === 0)} className="min-h-10 rounded-xl bg-slate-900 px-4 text-xs font-bold text-white hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50">{state === 'saving' ? 'Saving…' : 'Save script draft'}</button>
         </div>
+        {episode.scriptReview && <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-700" role="status">Latest editorial decision: <strong>{episode.scriptReview.decision?.replaceAll('_', ' ')}</strong>{episode.scriptReview.notes ? ' · ' + episode.scriptReview.notes : ''}</p>}
+        {episode.scriptDraft?.blocks?.length && episode.canReview && <div className="mt-5 rounded-xl border border-violet-200 bg-violet-50 p-4"><h4 className="text-xs font-black uppercase tracking-wide text-violet-950">Independent editorial review</h4><p className="mt-1 text-xs leading-5 text-violet-900">A different editor can approve this script or request changes. This review does not clear data/asset rights or permit rendering or publication.</p><label htmlFor="tv-script-review-notes" className="mt-3 block text-xs font-bold text-violet-950">Review note (optional)</label><textarea id="tv-script-review-notes" value={reviewNotes} maxLength={2000} rows={3} onChange={event => setReviewNotes(event.target.value)} className="mt-2 w-full rounded-lg border border-violet-200 bg-white p-3 text-xs text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"/><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => void review('approved')} disabled={state === 'saving'} className="min-h-10 rounded-xl bg-violet-800 px-4 text-xs font-bold text-white disabled:opacity-50">Approve script</button><button type="button" onClick={() => void review('changes_requested')} disabled={state === 'saving'} className="min-h-10 rounded-xl border border-violet-300 px-4 text-xs font-bold text-violet-950 disabled:opacity-50">Request changes</button></div></div>}
+        {episode.scriptDraft?.blocks?.length && !episode.canReview && <p className="mt-3 text-xs text-slate-600">A different editor must review this script draft.</p>}
         {message && <p className="mt-3 text-xs text-slate-700" role="status">{message}</p>}
       </>}
     </section>
