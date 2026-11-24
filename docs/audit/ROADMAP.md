@@ -400,3 +400,11 @@ The owner-directed Media/TV-first release sequence continues to preserve the cur
 - Advanced the guarded staging migration workflow's expected ledger through version 52. Guarded run [45319655896, attempt 2](https://github.com/MketyDigital/Factsport/actions/runs/45319655896) applied versions 51–52 to isolated `factsport_v2`; disposable PostgreSQL migration verification passed [45319638874](https://github.com/MketyDigital/Factsport/actions/runs/45319638874). Isolated verification at source `3e5f742` passed [45320132831](https://github.com/MketyDigital/Factsport/actions/runs/45320132831); native build and protected staging preflight remain in progress.
 - Still open: read-only sports snapshot API, TV Studio CRUD, signed R2 asset flow, external renderer/leases, caption/audio muxing, output QA, rights evidence, OAuth and platform dispatch, editor browser acceptance. The existing free Prediction host remains outside this release.
 - No production route, DNS, database, credentials, schedules or social posts changed.
+
+
+## M97 — Entra-protected TV episode inventory (2026-11-24)
+
+- Added a read-only `GET /api/admin/tv/episodes` endpoint under the Entra-backed TV capability and existing V2 editorial DB writer binding. It returns bounded private episode summaries with no-store caching.
+- Connected the TV workspace to show inventory, access-denied and unavailable states while keeping the synthetic scene preview visibly separate from publishable episodes.
+- This establishes the first persisted Studio read path only. No episode create/edit, snapshot build, render worker, signed R2 link or social dispatch is implemented. Authenticated owner browser acceptance and exact-head staging deployment remain pending.
+- Preserves the current `predict.factsport.com` free-play service and the Media/TV release boundary.
