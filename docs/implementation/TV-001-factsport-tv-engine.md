@@ -120,3 +120,11 @@ Factsport TV is an internal modular subsystem of Factsport V2, delivered in the 
 - Added `GET /api/admin/tv/episodes`, protected by the dedicated Entra-backed `tv` capability and the V2 editorial PostgreSQL binding. It returns at most 100 private episode summaries with `Cache-Control: private, no-store`; it performs no match-feed, write, render or publishing action.
 - Connected the storyboard workspace to this endpoint with explicit loading, denied, unavailable and empty states. The fictional SVG sample remains labeled as a disconnected, nonpublishable preview.
 - This is inventory-only: episode creation/editing, frozen canonical match snapshot reads, R2 signing, render orchestration and authenticated browser acceptance remain open.
+
+
+## 2026-11-24 — rights-gated Match Story draft entry
+
+- Added a bounded, Entra-protected final-match picker over canonical V2 `matches` and a same-origin episode-create action. The server re-reads and locks the match, rejects non-final or missing-score data, generates a deterministic source-linked score plan, and idempotently stores a private episode plus audit event.
+- New drafts always start `blocked_rights`, with data and asset rights set uncleared, script/audio not started, and no render job or publishing action. The route stores no provider event prose, calls no upstream provider, and never invokes social upload code.
+- The TV workspace now has final-match selection, draft creation, and persisted episode inventory. It still needs active TV membership on the already registered Entra identity; no new signup is part of this work.
+- Exact-head isolated verification `1b83e87` passed [45321681478](https://github.com/MketyDigital/Factsport/actions/runs/45321681478). Native build and protected staging preflight are still running. Authenticated owner browser acceptance remains open.
