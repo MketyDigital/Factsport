@@ -128,3 +128,11 @@ Factsport TV is an internal modular subsystem of Factsport V2, delivered in the 
 - New drafts always start `blocked_rights`, with data and asset rights set uncleared, script/audio not started, and no render job or publishing action. The route stores no provider event prose, calls no upstream provider, and never invokes social upload code.
 - The TV workspace now has final-match selection, draft creation, and persisted episode inventory. It still needs active TV membership on the already registered Entra identity; no new signup is part of this work.
 - Exact-head isolated verification `1b83e87` passed [45321681478](https://github.com/MketyDigital/Factsport/actions/runs/45321681478). Native build and protected staging preflight are still running. Authenticated owner browser acceptance remains open.
+
+
+## 2026-11-24 — evidence-linked script draft editor
+
+- Added private episode-detail GET and same-origin PATCH routes. The editor loads only verified facts and rights state, then saves original narration blocks only when each block references at least one verified fact from that frozen episode.
+- Script text is plain text, bounded to 40 blocks/10,000 characters, version-checked against `updated_at`, and recorded in the audit log with a content digest. The save does not advance episode status, clear rights, enqueue rendering, generate audio or publish.
+- Added a workspace editor with per-block source selection and explicit rights-blocked state. It remains a draft editor; review approvals, rights evidence decisions, narration QA, captions/audio sync, rendering and publishing remain separate gates.
+- Exact-head isolated verification `3c3b110` passed [45323117266](https://github.com/MketyDigital/Factsport/actions/runs/45323117266). Native build and protected staging preflight are still in progress.
