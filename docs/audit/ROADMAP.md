@@ -290,4 +290,12 @@ The owner-directed Media/TV-first release sequence continues to preserve the cur
 - Added a `rights_admin`-protected model review API and Studio decision form. Only a media admin can clear, restrict or revoke a model; the uploader cannot review their own asset.
 - A clear decision requires a license name, source/license evidence URL and written review note. Evidence is recorded with the reviewer and timestamp and audited; the API does not fetch or attest to external URLs. Revoked versions cannot be re-cleared.
 - This resolves the rights-decision workflow in code, but not the actual stadium-model rights evidence, real editor-session acceptance, renderer integration, final video QC, OAuth or human-reviewed social delivery. The 32 MiB upload limit remains.
-- Exact-head isolated verification, native build and protected staging status will be recorded after this change lands. No production route, database, credential or social account was changed.
+- Exact head `f002be521e6013a022adb25a5a090c55678225b6` passed isolated verification [45356633949](https://github.com/MketyDigital/Factsport/actions/runs/45356633949), native Cloudflare build [45356633844](https://github.com/MketyDigital/Factsport/actions/runs/45356633844), and protected staging [45356633825](https://github.com/MketyDigital/Factsport/actions/runs/45356633825). Staging verifies the protected deploy/preflight, not the authenticated media-admin review journey. No production route, database, credential or social account changed.
+
+
+## M105 — original procedural 3D look-dev proof (2026-11-24)
+
+- Added an offline Blender look-dev scene built from original procedural geometry: stadium bowl, pitch markings, goal frames, animated camera path and rolling football. It uses no external models, real teams, player likenesses, logos, provider data or footage.
+- Generated and visually inspected a 3-second 960×540 H.264 proof at 24 fps. The clip carries visible “fictional / illustrative / not match footage” disclosure and has no audio or social delivery.
+- This demonstrates a true 3D visual direction alongside the private 2D/2.5D storyboard. It is not the required 3–5 minute episode renderer, does not load the owner’s stadium model, and does not satisfy audio, captions, QC, durable render-job or publishing acceptance.
+- The owner's `.glb` and source/license evidence are still needed before model-based rendering. No production route, R2 public access, social OAuth or post changed.

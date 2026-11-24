@@ -172,3 +172,10 @@ Factsport TV is an internal modular subsystem of Factsport V2, delivered in the 
 - Added a separate `rights_admin` capability for GLB review. The uploader cannot review their own asset; clearing requires a named license, an HTTPS source or license evidence URL, and a written review note. Evidence links are recorded but not fetched by the application.
 - Decisions (`cleared`, `restricted`, `revoked`) are persisted with reviewer, timestamp, evidence and an audit event. Revocation is terminal for that asset version. A cleared model does not bypass episode, render-QC or publication approval.
 - The Studio presents the review form only to media admins. Staging acceptance still needs a different authorized reviewer and actual source/license evidence.
+
+
+## 2026-11-24 — procedural 3D look-dev proof
+
+- Added `scripts/render-tv-blender-proof.py` and rendered a visually inspected, 3-second 960×540 H.264 proof with Blender 4.3.2 and FFmpeg. The scene has an original procedural stadium, pitch, goal frames, rolling generic football and cinematic camera movement; no downloaded models or real-match inputs are used.
+- The clip labels itself fictional and illustrative, includes no real team/player likeness or footage, and is not publishable. It has no narration, music or captions and is only a look-dev proof, not the target 3–5 minute render pipeline.
+- The owner's stadium `.glb` still must be uploaded with its source and license evidence. The active Studio upload limit is 32 MiB; the next renderer work must replace/augment this procedural bowl only after that model is independently cleared.

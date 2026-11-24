@@ -297,3 +297,10 @@ Migration 0053 established the TV model library and episode links; guarded stagi
 ### 2026-11-24 — M104 TV asset rights-review workflow
 
 Added a media-admin-only rights decision path for private model assets. It records the reviewer, timestamp, evidence links and rationale in provenance and the TV audit log. Clearing is blocked without a license name, HTTPS evidence URL and meaningful note; the uploader cannot clear their own asset, and revoked versions cannot be restored. This code path does not verify the truth of an external license page, render the model, or authorize publication. Exact-head CI/staging evidence remains pending.
+
+Exact head `f002be521e6013a022adb25a5a090c55678225b6` passed isolated verification [45356633949](https://github.com/MketyDigital/Factsport/actions/runs/45356633949), native build [45356633844](https://github.com/MketyDigital/Factsport/actions/runs/45356633844), and protected staging [45356633825](https://github.com/MketyDigital/Factsport/actions/runs/45356633825). The workflow proves the protected deploy/preflight; a real media-admin session reviewing a real asset is still pending.
+
+
+### 2026-11-24 — M105 original 3D look-dev proof
+
+Rendered and visually inspected an original 3-second, 960×540, 24-fps Blender stadium/football animation with visible fictional-scene disclosure. The isolated preview uses procedural geometry only. It is not a match episode, is not connected to production data, has no audio/captions or publishing flow, and does not clear or consume the owner's stadium model.
