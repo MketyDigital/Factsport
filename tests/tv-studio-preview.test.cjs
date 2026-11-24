@@ -11,6 +11,7 @@ test('Factsport TV preview is private, read-only and discoverable from Media ope
   const layout = read('app/admin/layout.tsx');
   const home = read('app/admin/page.tsx');
   const preview = read('app/admin/tv/TVStoryboardPreview.tsx');
+  const inventoryApi = read('app/api/admin/tv/episodes/route.ts');
   assert.match(page, /robots: \{ index: false, follow: false, nocache: true \}/);
   assert.match(layout, /href="\/admin\/tv"/);
   assert.match(home, /href="\/admin\/tv"/);
@@ -18,7 +19,13 @@ test('Factsport TV preview is private, read-only and discoverable from Media ope
   assert.match(preview, /disconnected from real match feeds, durable render jobs and social accounts/);
   assert.match(preview, /renderMatchStorySvgScenes/);
   assert.match(preview, /Synthetic demo data · no real fixture, footage or player likeness/);
-  assert.doesNotMatch(preview, /fetch\(|use server|formAction=/);
+  assert.match(preview, /fetch\('\/api\/admin\/tv\/episodes'/);
+  assert.match(preview, /cache: 'no-store'/);
+  assert.match(inventoryApi, /authorizeMediaEditorialAction\('tv'\)/);
+  assert.match(inventoryApi, /export async function GET\(/);
+  assert.match(inventoryApi, /LIMIT 100/);
+  assert.doesNotMatch(inventoryApi, /INSERT INTO|UPDATE public|DELETE FROM|upload/i);
+  assert.doesNotMatch(preview, /use server|formAction=|youtube-resumable-upload|tiktok-draft-upload/);
 });
 
 test('TV preview uses distinct 2D/3D sample scenes and discloses illustrative material', () => {
