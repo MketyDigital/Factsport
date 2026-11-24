@@ -445,3 +445,12 @@ The owner-directed Media/TV-first release sequence continues to preserve the cur
 
 - Added the underlying source and observation time to each fact card in the private TV storyboard preview and scene list, keeping evidence visible during editorial review.
 - Exact head `3f0d6c6` passed isolated verification [45343476559](https://github.com/MketyDigital/Factsport/actions/runs/45343476559), native build [45343476547](https://github.com/MketyDigital/Factsport/actions/runs/45343476547), and protected staging [45343476525](https://github.com/MketyDigital/Factsport/actions/runs/45343476525). No rights, status, rendering, OAuth or publication gate changed. Prediction routing remains unchanged.
+
+
+## M103 — private 3D model asset intake (2026-11-24)
+
+- Added a reusable, private model library and episode links, with protected upload/list/download endpoints. The Studio accepts self-contained GLB 2.0 stadium, generic-player and football assets up to 32 MiB, rejects external file references, and records a SHA-256 digest plus submitted source/license details.
+- All submissions stay `pending`; owner-entered “free to use” wording is not treated as rights evidence. No model is used by the renderer or publisher until an authorized rights review clears it.
+- Staging migration 0053 is applied to isolated `factsport_v2`; guarded ledger run [45353663369](https://github.com/MketyDigital/Factsport/actions/runs/45353663369) reports versions 0–53 across 54 migrations, and disposable PostgreSQL migration verification [45353666408](https://github.com/MketyDigital/Factsport/actions/runs/45353666408) passed. Exact code head `cb2d13a` passed verification [45354250796](https://github.com/MketyDigital/Factsport/actions/runs/45354250796), build [45354250921](https://github.com/MketyDigital/Factsport/actions/runs/45354250921) and staging [45354251013](https://github.com/MketyDigital/Factsport/actions/runs/45354251013).
+- For generic, non-identifiable 3D players/animation, candidate sources are Quaternius [Universal Base Characters](https://quaternius.com/packs/universalbasecharacters.html) and [Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html); both official pages mark the packs CC0 and describe commercial use. Keep the package's license file with provenance and avoid real player likenesses.
+- The stadium model itself is still needed from the owner; its upload and exact source/license review remain open. Upload limit is 32 MiB, so optimize/export larger source files as self-contained GLB or add multipart upload.
