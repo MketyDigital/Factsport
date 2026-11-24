@@ -136,3 +136,11 @@ Factsport TV is an internal modular subsystem of Factsport V2, delivered in the 
 - Script text is plain text, bounded to 40 blocks/10,000 characters, version-checked against `updated_at`, and recorded in the audit log with a content digest. The save does not advance episode status, clear rights, enqueue rendering, generate audio or publish.
 - Added a workspace editor with per-block source selection and explicit rights-blocked state. It remains a draft editor; review approvals, rights evidence decisions, narration QA, captions/audio sync, rendering and publishing remain separate gates.
 - Exact-head isolated verification `3c3b110` passed [45323117266](https://github.com/MketyDigital/Factsport/actions/runs/45323117266). Native build and protected staging preflight are still in progress.
+
+
+## 2026-11-24 — script review and persisted storyboard draft
+
+- Added an independent editorial review endpoint and Studio controls. A different TV editor must approve the saved script digest; review records are tied to the episode revision and audited. Editing the script clears the prior review and deletes any storyboard scenes.
+- Added a protected storyboard builder. After the current digest has independent approval, it deterministically creates one source-linked 2D fact-card scene per narration block, with estimated text timing and no external asset references. Scenes are stored in the isolated TV scene table and returned by the protected episode-detail API.
+- The storyboard is still a text-only editorial plan: no image, footage, voice, audio, video render, render job, rights change, status advancement, or platform upload occurs. Rights remain blocked. A real authorized browser journey and exact-head staging acceptance are still required.
+- Exact source head `681e1ff` has isolated verification, native build and protected staging checks running (runs [45324009688](https://github.com/MketyDigital/Factsport/actions/runs/45324009688), [45324009518](https://github.com/MketyDigital/Factsport/actions/runs/45324009518), [45324009600](https://github.com/MketyDigital/Factsport/actions/runs/45324009600)); results are pending.
