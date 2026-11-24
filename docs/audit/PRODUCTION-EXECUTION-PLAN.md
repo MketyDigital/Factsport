@@ -304,3 +304,5 @@ Exact head `f002be521e6013a022adb25a5a090c55678225b6` passed isolated verificati
 ### 2026-11-24 — M105 original 3D look-dev proof
 
 Rendered and visually inspected an original 3-second, 960×540, 24-fps Blender stadium/football animation with visible fictional-scene disclosure. The isolated preview uses procedural geometry only. It is not a match episode, is not connected to production data, has no audio/captions or publishing flow, and does not clear or consume the owner's stadium model.
+
+Exact head `2639d84a83d817f6ae7968afce8f2377a5df1357` passed isolated verification [45358005169](https://github.com/MketyDigital/Factsport/actions/runs/45358005169), native build [45358005177](https://github.com/MketyDigital/Factsport/actions/runs/45358005177), and protected staging deploy/preflight [45358005256](https://github.com/MketyDigital/Factsport/actions/runs/45358005256). Authenticated TV Studio and real asset-rights acceptance remain pending.
