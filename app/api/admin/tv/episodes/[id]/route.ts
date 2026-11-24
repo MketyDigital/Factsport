@@ -83,7 +83,7 @@ function publicEpisode(row: Record<string, unknown>, currentUserId: string) {
     rights: (row.snapshot as { storyPlan?: { rights?: unknown } } | null)?.storyPlan?.rights ?? null,
     facts,
     scriptDraft: savedDraft ? { blocks: savedDraft.blocks ?? [], digest: savedDraft.digest, savedAt: savedDraft.savedAt } : null,
-    scriptReview: savedReview ? { decision: savedReview.decision, notes: savedReview.notes, reviewedAt: savedReview.reviewedAt } : null,
+    scriptReview: savedReview ? { decision: savedReview.decision, notes: savedReview.notes, reviewedAt: savedReview.reviewedAt, scriptDigest: savedReview.scriptDigest } : null,
     canReview: Boolean(savedDraft && savedDraft.savedBy !== currentUserId),
   };
 }
@@ -94,12 +94,23 @@ export async function GET(_request: Request, context: { params: { id: string } }
   if (!UUID.test(context.params.id)) return NextResponse.json({ error: 'Episode not found.' }, { status: 404, headers: PRIVATE_HEADERS });
 
   try {
-    const rows = await withFactsportEditorialPostgres(sql => sql`
-      SELECT id, title, status, revision, source_digest, updated_at, snapshot, editorial_content
-      FROM public.factsport_tv_episodes WHERE id = ${context.params.id}::uuid LIMIT 1
-    `);
-    if (!rows[0]) return NextResponse.json({ error: 'Episode not found.' }, { status: 404, headers: PRIVATE_HEADERS });
-    return NextResponse.json({ success: true, episode: publicEpisode(rows[0], authorization.user.domainUserId) }, { headers: PRIVATE_HEADERS });
+    const result = await withFactsportEditorialPostgres(sql => sql.begin(async tx => {
+      const rows = await tx`
+        SELECT id, title, status, revision, source_digest, updated_at, snapshot, editorial_content
+        FROM public.factsport_tv_episodes WHERE id = ${context.params.id}::uuid LIMIT 1
+      `;
+      if (!rows[0]) return null;
+      const scenes = await tx`
+        SELECT id, position, scene FROM public.factsport_tv_scenes
+        WHERE episode_id = ${context.params.id}::uuid ORDER BY position ASC LIMIT 40
+      `;
+      return { episode: publicEpisode(rows[0], authorization.user.domainUserId), scenes };
+    }));
+    if (!result) return NextResponse.json({ error: 'Episode not found.' }, { status: 404, headers: PRIVATE_HEADERS });
+    return NextResponse.json({ success: true, episode: {
+      ...result.episode,
+      scenes: result.scenes.map(row => ({ id: row.id, position: row.position, ...(row.scene as Record<string, unknown>) })),
+    } }, { headers: PRIVATE_HEADERS });
   } catch (error) {
     console.error('Factsport TV episode detail unavailable', error);
     return NextResponse.json({ error: 'TV episode details are not available.' }, { status: 503, headers: PRIVATE_HEADERS });
@@ -153,6 +164,7 @@ export async function PATCH(request: Request, context: { params: { id: string } 
         savedAt: new Date().toISOString(),
         savedBy: authorization.user.domainUserId,
       };
+      await tx`DELETE FROM public.factsport_tv_scenes WHERE episode_id = ${context.params.id}::uuid`;
       const updated = await tx`
         UPDATE public.factsport_tv_episodes
         SET editorial_content = ${JSON.stringify({ ...content, scriptDraft, scriptReview: null })}::jsonb,
