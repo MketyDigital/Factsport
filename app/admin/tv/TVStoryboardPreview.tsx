@@ -1,8 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Activity, CircleDot, ListVideo, ShieldCheck, Users } from 'lucide-react';
 import { renderMatchStorySvgScenes } from '@/lib/tv/svg-scene-renderer.mjs';
+
+type TVEpisode = {
+  id: string;
+  show_format: string;
+  match_id: string | null;
+  revision: number;
+  status: string;
+  title: string;
+  duration_seconds: number | null;
+  updated_at: string;
+};
 
 const scenes = [
   { id: 'opening', label: '3D opening', eyebrow: 'MATCH STORY', type: 'stadium', Icon: ListVideo },
@@ -108,6 +119,27 @@ function SceneView({ type }: { type: (typeof scenes)[number]['type'] }) {
 
 export default function TVStoryboardPreview() {
   const [active, setActive] = useState(0);
+  const [episodes, setEpisodes] = useState<TVEpisode[]>([]);
+  const [episodeState, setEpisodeState] = useState<'loading' | 'ready' | 'denied' | 'unavailable'>('loading');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/admin/tv/episodes', { cache: 'no-store', signal: controller.signal })
+      .then(async response => {
+        if (response.status === 401 || response.status === 403) throw new Error('denied');
+        if (!response.ok) throw new Error('unavailable');
+        const payload = await response.json() as { episodes?: TVEpisode[] };
+        if (!Array.isArray(payload.episodes)) throw new Error('unavailable');
+        setEpisodes(payload.episodes);
+        setEpisodeState('ready');
+      })
+      .catch(error => {
+        if (controller.signal.aborted) return;
+        setEpisodeState(error instanceof Error && error.message === 'denied' ? 'denied' : 'unavailable');
+      });
+    return () => controller.abort();
+  }, []);
+
   const scene = scenes[active];
   return (
     <div className="space-y-6">
@@ -117,6 +149,18 @@ export default function TVStoryboardPreview() {
           <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[.15em] text-amber-100">Preview only · not publishable</span>
         </div>
       </header>
+
+      <section aria-labelledby="tv-episode-inventory" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 id="tv-episode-inventory" className="font-black text-slate-900">Episode inventory</h2><p className="mt-1 text-xs text-slate-600">Private V2 drafts and render status, loaded through the Entra-protected TV API.</p></div>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-700">{episodeState === 'loading' ? 'Loading' : episodeState === 'ready' ? 'Connected' : episodeState === 'denied' ? 'Editor access required' : 'Unavailable'}</span>
+        </div>
+        {episodeState === 'loading' && <p className="mt-4 text-xs text-slate-600" role="status">Loading episode inventory…</p>}
+        {episodeState === 'denied' && <p className="mt-4 text-xs text-amber-900" role="status">Your signed-in account needs an active Factsport TV editor, publisher or media-admin membership to view episodes.</p>}
+        {episodeState === 'unavailable' && <p className="mt-4 text-xs text-amber-900" role="status">The private episode inventory is temporarily unavailable. The synthetic storyboard below remains a disconnected preview.</p>}
+        {episodeState === 'ready' && episodes.length === 0 && <p className="mt-4 rounded-xl bg-slate-50 p-4 text-xs leading-5 text-slate-600">No episode records yet. The sample storyboard below uses fictional data and is not a production episode.</p>}
+        {episodeState === 'ready' && episodes.length > 0 && <ul className="mt-4 divide-y divide-slate-100">{episodes.map(episode => <li key={episode.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="text-sm font-bold text-slate-900">{episode.title}</p><p className="mt-1 text-[10px] uppercase tracking-wide text-slate-500">{episode.show_format.replaceAll('_', ' ')} · revision {episode.revision} · {episode.duration_seconds ? Math.round(episode.duration_seconds / 60) + ' min' : 'duration pending'}</p></div><span className="rounded-full bg-cyan-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-cyan-900">{episode.status.replaceAll('_', ' ')}</span></li>)}</ul>}
+      </section>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(290px,.7fr)]">
         <section aria-label="Storyboard scene preview" className="min-w-0 rounded-3xl border border-slate-200 bg-slate-900 p-3 shadow-xl md:p-5">
