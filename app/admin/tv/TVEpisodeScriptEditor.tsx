@@ -97,7 +97,8 @@ export default function TVEpisodeScriptEditor({
       });
       const payload = await response.json() as { scenes?: Scene[]; episode?: { id: string; updatedAt: string }; error?: string };
       if (!response.ok || !payload.episode || !payload.scenes) throw new Error(payload.error || 'Storyboard could not be saved.');
-      setActiveSceneIndex(0);\n      setEpisode(current => current ? { ...current, updatedAt: payload.episode!.updatedAt, scenes: payload.scenes! } : current);
+      setActiveSceneIndex(0);
+      setEpisode(current => current ? { ...current, updatedAt: payload.episode!.updatedAt, scenes: payload.scenes! } : current);
       onSaved(payload.episode.id, payload.episode.updatedAt);
       setMessage('Text-only storyboard saved. Scene timing is an estimate; no footage, audio, render, or upload was created. Rights remain blocked.');
       setState('ready');
@@ -173,7 +174,7 @@ export default function TVEpisodeScriptEditor({
             </div>
             <div className="relative isolate min-h-64 overflow-hidden bg-[radial-gradient(ellipse_at_50%_110%,rgba(16,185,129,.24),transparent_48%),linear-gradient(135deg,#020617,#0f172a_55%,#082f49)] p-5 sm:p-8" aria-live="polite" aria-atomic="true">
               <div aria-hidden="true" className="absolute inset-x-8 bottom-6 h-24 -skew-y-3 rounded-[50%] border border-emerald-200/20 bg-[repeating-linear-gradient(90deg,rgba(16,185,129,.10)_0_12.5%,rgba(34,197,94,.05)_12.5%_25%)] shadow-[0_0_50px_rgba(34,211,238,.12)] [transform:perspective(700px)_rotateX(38deg)] motion-reduce:transform-none" />
-              <div aria-hidden="true" className="absolute right-8 top-8 h-24 w-24 rounded-full bg-cyan-300/10 blur-2xl" style={{ animation: 'fs-stadium-glow 5s ease-in-out infinite alternate' }} />
+              <div aria-hidden="true" className="absolute right-8 top-8 h-24 w-24 rounded-full bg-cyan-300/10 blur-2xl motion-safe:animate-[fs-stadium-glow_5s_ease-in-out_infinite_alternate]" />
               <div className="relative z-10 mx-auto grid min-h-48 max-w-2xl place-items-center text-center">
                 <div className="w-full rounded-2xl border border-white/15 bg-slate-950/65 p-5 shadow-[0_22px_60px_rgba(0,0,0,.35)] backdrop-blur-sm sm:p-7 motion-safe:animate-[fs-match-event-in_.45s_ease-out]">
                   <p className="text-[9px] font-black uppercase tracking-[.24em] text-cyan-200">Evidence-led narration</p>
