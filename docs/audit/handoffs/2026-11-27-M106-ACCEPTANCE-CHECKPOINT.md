@@ -1,0 +1,11 @@
+# 2026-11-27 — M106 acceptance evidence checkpoint
+
+Branch HEAD inspected: `811e63a63f5530dbe1b682450d82dca623294f60` (documentation-only change). Issue #288 open. No new product commit since the 26 November checkpoint. Read governing contract, roadmap, execution plan, previous handoff and page/route/component/data/role matrices. Matrix historical migration statements remain superseded by staging migration 0054 evidence, not by runtime acceptance.
+
+CI: exact HEAD combined status reports Vercel failure; PR-filtered workflow query returned no runs, and direct Actions listing unavailable. Exact-head push CI therefore UNVERIFIED, not failed or passed on Cloudflare. Prior isolated run 45578629768 and native/staging runs 45384439141/45384438535 remain historical evidence only.
+
+All prior acceptance groups remain open: public routes/sports/ESPN linked lifecycle and conditional FD fallback/standings; CMS/auth/admin; TV authenticated multipart and rights workflow, Mode A full episode, B licensed pilot, C reconstruction; Predict/campaign/VIP/payment/points/settlement/monthly audit; chat/MOTM/pins/video/PWA; AI/Mail/social/indexing/schedules/retention; responsive brand, security, backup/restore, rollback, load, accessibility, SEO/legal/disclosure/ads.txt/robots/sitemap. No reset or disposition change.
+
+AdSense: rechecked https://support.google.com/adsense/answer/10437795 and https://support.google.com/adsense/answer/12169212 on 27 November. Restrictions still cover gambling affiliates and paid prize opportunities; Nigeria not listed as an exclusion. Account Ready/Policy Center and legal decisions remain blocked. No ad activation.
+
+Next concrete evidence: obtain push-run ID for exact HEAD; use two distinct authorized staging identities to execute editor draft/review/publish/unpublish and TV synthetic GLB multipart interruption/resume, cross-user denial, independent rights approval and cleanup. Record redacted request outcomes and role evidence, then full episode, ESPN lifecycle and isolated restore. No authenticated session or safe execution facility established in this run; no behavioral patch or test execution claimed. No production modifications, merge or cutover. Owner go/no-go remains outstanding.
